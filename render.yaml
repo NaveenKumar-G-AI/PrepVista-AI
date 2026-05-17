@@ -1,0 +1,140 @@
+services:
+  # ─────────────────────────────────────────────
+  # BACKEND WEB SERVICE  (unchanged)
+  # ─────────────────────────────────────────────
+  - type: web
+    name: prepvista-backend
+    env: docker
+    plan: starter
+    autoDeploy: true
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: UPSTASH_REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_TOKEN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: DB_POOL_MIN_SIZE
+        value: "3"
+      - key: DB_POOL_MAX_SIZE
+        value: "20"
+
+  # ─────────────────────────────────────────────
+  # PRIMARY HEARTBEAT  — fires at :03 :08 :13 … :58
+  # Pings BOTH backend + frontend every 5 min
+  # 6 rounds · exponential backoff · parallel URL
+  # racing · per-request abort timeout · jitter
+  # ─────────────────────────────────────────────
+  - type: cron
+    name: prepvista-heartbeat-primary
+    runtime: node
+    plan: starter
+    autoDeploy: true
+    schedule: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
+    buildCommand: echo "PrepVista heartbeat v3 primary ready"
+    startCommand: >-
+      node -e "
+      const bBase=(process.env.BACKEND_HEARTBEAT_BASE_URL||'https://prepvistabeckend.onrender.com').replace(/\/$/,'');
+      const fBase=(process.env.FRONTEND_HEARTBEAT_BASE_URL||'').replace(/\/$/,'');
+      const bUrls=[bBase+'/health/awake',bBase+'/health/ready',bBase+'/health',bBase+'/'];
+      const fUrls=fBase?[fBase+'/',fBase+'/api/health',fBase+'/ping']:[];
+      const hdrs={'x-prepvista-awake':'1','x-prepvista-awake-source':'render-cron-primary','user-agent':'PrepVistaHeartbeat/3.0','accept':'application/json,text/html,*/*','cache-control':'no-cache'};
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const jitter=ms=>ms+Math.floor(Math.random()*(ms*0.2));
+      const ping=async(url,ms)=>{const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{headers:hdrs,signal:c.signal,redirect:'follow'});clearTimeout(t);return{url,ok:r.ok||r.status===301||r.status===302,status:r.status};}catch(e){clearTimeout(t);return{url,ok:false,err:e.message};}};
+      const pingAny=async(label,urls,ms)=>{if(!urls.length)return true;const res=await Promise.allSettled(urls.map(u=>ping(u,ms)));const hit=res.find(r=>r.status==='fulfilled'&&r.value.ok);if(hit)console.log('['+label+'] alive via '+hit.value.url+' ('+hit.value.status+')');else res.forEach(r=>{if(r.status==='fulfilled')console.log('['+label+'] miss '+r.value.url+' '+(r.value.err||r.value.status));});return!!hit;};
+      (async()=>{
+      const ROUNDS=6;let bOk=false,fOk=!fUrls.length;
+      for(let i=1;i<=ROUNDS;i++){
+      console.log('['+new Date().toISOString()+'] round='+i+'/'+ROUNDS+' backend='+bOk+' frontend='+fOk);
+      const tout=Math.min(20000,9000+(i*1500));
+      if(!bOk)bOk=await pingAny('BACKEND',bUrls,tout);
+      if(!fOk)fOk=await pingAny('FRONTEND',fUrls,tout);
+      if(bOk&&fOk){console.log('ALL SERVICES ALIVE - exit 0');process.exit(0);}
+      if(i<ROUNDS){const d=jitter(Math.min(45000,5500*Math.pow(1.65,i-1)));console.log('retry in '+Math.round(d/1000)+'s');await sleep(d);}
+      }
+      const allOk=bOk&&fOk;
+      console[allOk?'log':'error']('heartbeat end backend='+bOk+' frontend='+fOk);
+      process.exit(allOk?0:1);
+      })();"
+    envVars:
+      - key: BACKEND_HEARTBEAT_BASE_URL
+        value: https://prepvistabeckend.onrender.com
+      - key: FRONTEND_HEARTBEAT_BASE_URL
+        sync: false   # ← set to your frontend URL e.g. https://prepvista.vercel.app
+
+  # ─────────────────────────────────────────────
+  # BACKUP HEARTBEAT  — fires at :01 :06 :11 … :56
+  # Offset +2 min from primary → effective coverage
+  # every ~2-3 min.  Identical resilience logic.
+  # ─────────────────────────────────────────────
+  - type: cron
+    name: prepvista-heartbeat-backup
+    runtime: node
+    plan: starter
+    autoDeploy: true
+    schedule: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"
+    buildCommand: echo "PrepVista heartbeat v3 backup ready"
+    startCommand: >-
+      node -e "
+      const bBase=(process.env.BACKEND_HEARTBEAT_BASE_URL||'https://prepvistabeckend.onrender.com').replace(/\/$/,'');
+      const fBase=(process.env.FRONTEND_HEARTBEAT_BASE_URL||'').replace(/\/$/,'');
+      const bUrls=[bBase+'/health/awake',bBase+'/health/ready',bBase+'/health',bBase+'/'];
+      const fUrls=fBase?[fBase+'/',fBase+'/api/health',fBase+'/ping']:[];
+      const hdrs={'x-prepvista-awake':'1','x-prepvista-awake-source':'render-cron-backup','user-agent':'PrepVistaHeartbeat/3.0','accept':'application/json,text/html,*/*','cache-control':'no-cache'};
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const jitter=ms=>ms+Math.floor(Math.random()*(ms*0.2));
+      const ping=async(url,ms)=>{const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{headers:hdrs,signal:c.signal,redirect:'follow'});clearTimeout(t);return{url,ok:r.ok||r.status===301||r.status===302,status:r.status};}catch(e){clearTimeout(t);return{url,ok:false,err:e.message};}};
+      const pingAny=async(label,urls,ms)=>{if(!urls.length)return true;const res=await Promise.allSettled(urls.map(u=>ping(u,ms)));const hit=res.find(r=>r.status==='fulfilled'&&r.value.ok);if(hit)console.log('['+label+'] alive via '+hit.value.url+' ('+hit.value.status+')');else res.forEach(r=>{if(r.status==='fulfilled')console.log('['+label+'] miss '+r.value.url+' '+(r.value.err||r.value.status));});return!!hit;};
+      (async()=>{
+      const ROUNDS=6;let bOk=false,fOk=!fUrls.length;
+      for(let i=1;i<=ROUNDS;i++){
+      console.log('['+new Date().toISOString()+'] round='+i+'/'+ROUNDS+' backend='+bOk+' frontend='+fOk);
+      const tout=Math.min(20000,9000+(i*1500));
+      if(!bOk)bOk=await pingAny('BACKEND',bUrls,tout);
+      if(!fOk)fOk=await pingAny('FRONTEND',fUrls,tout);
+      if(bOk&&fOk){console.log('ALL SERVICES ALIVE - exit 0');process.exit(0);}
+      if(i<ROUNDS){const d=jitter(Math.min(45000,5500*Math.pow(1.65,i-1)));console.log('retry in '+Math.round(d/1000)+'s');await sleep(d);}
+      }
+      const allOk=bOk&&fOk;
+      console[allOk?'log':'error']('heartbeat end backend='+bOk+' frontend='+fOk);
+      process.exit(allOk?0:1);
+      })();"
+    envVars:
+      - key: BACKEND_HEARTBEAT_BASE_URL
+        value: https://prepvistabeckend.onrender.com
+      - key: FRONTEND_HEARTBEAT_BASE_URL
+        sync: false   # ← same URL as primary

@@ -1,0 +1,15 @@
+{
+  "id": "thin_student_resume",
+  "label": "Thin student resume",
+  "resume_hint": "Final-year student with limited projects and stronger education/learning signals than implementation depth.",
+  "expected": {
+    "opener_variation_required": true,
+    "no_exact_repeat": true,
+    "early_categories": ["introduction", "communication", "project_ownership"],
+    "difficulty_mode_expectation": {
+      "basic": "Keeps the round supportive and direct.",
+      "medium": "Balances background, project comfort, and practical learning signals.",
+      "difficult": "Moves to ownership or problem solving earlier without becoming trick-based."
+    }
+  }
+}

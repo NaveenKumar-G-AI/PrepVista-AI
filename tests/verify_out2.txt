@@ -1,0 +1,81 @@
+
+=== Test 1: Preamble templates exist for all plans and families ===
+  PASS:   free plan has templates
+  PASS:   free/introduction has ≥1 option
+  PASS:   free/studies_background has ≥1 option
+  PASS:   free/ownership has ≥1 option
+  PASS:   free/workflow_process has ≥1 option
+  PASS:   free/tool_method has ≥1 option
+  PASS:   free/challenge_debugging has ≥1 option
+  PASS:   free/communication_explain has ≥1 option
+  PASS:   free/teamwork_pressure has ≥1 option
+  PASS:   free/learning_growth has ≥1 option
+  PASS:   free/role_fit has ≥1 option
+  PASS:   free/closeout has ≥1 option
+  PASS:   pro plan has templates
+  PASS:   pro/introduction has ≥1 option
+  PASS:   pro/studies_background has ≥1 option
+  PASS:   pro/ownership has ≥1 option
+  PASS:   pro/workflow_process has ≥1 option
+  PASS:   pro/tool_method has ≥1 option
+  PASS:   pro/challenge_debugging has ≥1 option
+  PASS:   pro/validation_metrics has ≥1 option
+  PASS:   pro/tradeoff_decision has ≥1 option
+  PASS:   pro/communication_explain has ≥1 option
+  PASS:   pro/teamwork_pressure has ≥1 option
+  PASS:   pro/learning_growth has ≥1 option
+  PASS:   pro/role_fit has ≥1 option
+  PASS:   pro/closeout has ≥1 option
+  PASS:   career plan has templates
+  PASS:   career/introduction has ≥1 option
+  PASS:   career/studies_background has ≥1 option
+  PASS:   career/ownership has ≥1 option
+  PASS:   career/workflow_process has ≥1 option
+  PASS:   career/tool_method has ≥1 option
+  PASS:   career/challenge_debugging has ≥1 option
+  PASS:   career/validation_metrics has ≥1 option
+  PASS:   career/tradeoff_decision has ≥1 option
+  PASS:   career/communication_explain has ≥1 option
+  PASS:   career/teamwork_pressure has ≥1 option
+  PASS:   career/learning_growth has ≥1 option
+  PASS:   career/role_fit has ≥1 option
+  PASS:   career/closeout has ≥1 option
+
+=== Test 2: _build_question_preamble returns context for new topics ===
+  PASS:   free/introduction preamble is non-empty
+  PASS:   free/ownership preamble is non-empty
+  FAIL:   free/tradeoff_decision preamble is non-empty - got ''
+  PASS:   free/role_fit preamble is non-empty
+  PASS:   free/closeout preamble is non-empty
+  PASS:   pro/introduction preamble is non-empty
+  PASS:   pro/ownership preamble is non-empty
+  PASS:   pro/tradeoff_decision preamble is non-empty
+  PASS:   pro/role_fit preamble is non-empty
+  PASS:   pro/closeout preamble is non-empty
+  PASS:   career/introduction preamble is non-empty
+  PASS:   career/ownership preamble is non-empty
+  PASS:   career/tradeoff_decision preamble is non-empty
+  PASS:   career/role_fit preamble is non-empty
+  PASS:   career/closeout preamble is non-empty
+
+=== Test 3: Preamble is empty for follow-ups and retries ===
+  PASS:   preamble empty for followup
+  PASS:   preamble empty for retry
+
+=== Test 4: HR-style templates cover hire/weakness/future ===
+  PASS: role_fit/hire contains 'hire' or 'panel'
+  PASS: learning_growth/weakness contains weakness/growth
+  PASS: closeout/future contains 'years/grow'
+  PASS: teamwork_pressure/conflict contains conflict/disagree/feedback
+
+=== Test 5: Pro follow-up drills into metric claims ===
+  FAIL: Pro follow-up mentions 'reduced' or 'changed' or 'measure' - got 'What practical impact did that change have on the user, team, or system?'
+  PASS: Pro follow-up drills into ownership
+
+=== Test 6: New follow-up families (validation_metrics, tradeoff_decision) ===
+  PASS: validation_metrics follow-up is non-empty
+  PASS: tradeoff_decision follow-up is non-empty
+
+==================================================
+Results: 63 passed, 2 failed
+WARNING: Some tests failed!

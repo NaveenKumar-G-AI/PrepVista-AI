@@ -1,0 +1,15 @@
+{
+  "id": "strong_ai_backend",
+  "label": "Strong AI/backend resume",
+  "resume_hint": "AI + backend projects with FastAPI, retrieval, prompts, evaluation, and deployment signals.",
+  "expected": {
+    "opener_variation_required": true,
+    "no_exact_repeat": true,
+    "early_categories": ["introduction", "project_ownership", "technical_depth"],
+    "difficulty_mode_expectation": {
+      "basic": "Uses simpler wording and no more than one follow-up on the same topic.",
+      "medium": "Keeps a balanced practical round without tiny warm-up filler.",
+      "difficult": "Introduces ownership, technical depth, or problem solving by turn 4."
+    }
+  }
+}
