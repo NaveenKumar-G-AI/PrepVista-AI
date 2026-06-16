@@ -232,17 +232,23 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
 ## Dependency & Build Audit (Phase 2/6 — added in "make 100% ready" pass)
 
 - **Production `next build`: exit 0** (all 41 routes compile). `tsc` clean.
-- **Frontend `npm audit`:** safe `npm audit fix` applied (deduped a vulnerable transitive
-  `ws`). **2 advisories remain** — `postcss` <8.5.10 (CSS-stringify XSS; build-time, dev-authored
-  Tailwind, not user input) and `ws` (Next HMR dev-server websocket). **Both are dev/build-time
-  only — not reachable in production `next start`.** Clearing them needs `next 16.1.6 → 16.2.9`
-  (minor). Left as a documented follow-up to avoid an unvalidated prod-runtime framework change.
-- **Backend `pip-audit` (pinned `requirements.txt`):** vulnerable pinned/transitive deps —
-  `pypdf 5.1.0` (many CVEs; **user-uploaded PDF parsing → real attack surface**; fix is 6.x = a
-  MAJOR bump), `pdfminer-six 20231228` (via pdfplumber), `starlette 0.38.6` (incl. CVE-2024-47874
-  multipart DoS). **NOT bumped here:** FastAPI 0.115.0 caps `starlette<0.39`, so the starlette fix
-  requires a FastAPI bump too; and there are **no PDF fixtures**, so a pypdf 5→6 major bump cannot
-  be validated locally. These need a Docker build + staging integration test — see runbook below.
+- **Frontend `npm audit`:** `next 16.1.6→16.2.9` (latest) + `npm audit fix` **cleared the
+  high-severity `ws`** vuln. Validated: `tsc` clean, `next build` exit 0. **2 moderate advisories
+  remain** — both the same `postcss` CSS-stringify XSS, bundled *inside* `next` itself (16.2.9 is
+  the newest next; no upstream fix exists). **Accepted:** build-time only (postcss runs at build,
+  not in the deployed runtime) and requires attacker-controlled CSS input, which does not exist
+  (CSS is dev-authored Tailwind). Not reachable in production; npm's only "fix" is an absurd
+  downgrade to next 9.3.3.
+- **Backend `pip-audit`: RESOLVED → "No known vulnerabilities found".** Upgraded and validated
+  in a clean venv installed from `requirements-dev.txt` (mirrors the Docker build):
+  fastapi `0.115.0→0.137.1`, pin `starlette==1.3.1` (CVE-2024-47874 multipart DoS + later),
+  `pypdf 5.1.0→6.13.2` + `pdfplumber→0.11.10` + pin `pdfminer.six==20260107` (malicious-PDF CVEs
+  on user-uploaded resumes), `PyJWT 2.9.0→2.13.0`, `python-multipart 0.0.12→0.0.32`
+  (CVE-2024-53981), `pytest→9.1.0` (dev). **Validation:** 200 passed; TestClient smoke under the
+  upgraded stack — `/health` 200, CORS preflight ok, auth 401, request-size 413, security headers
+  present, PyJWT decode + expiry-reject works, real PDF extraction via pypdf 6.x works. (NB: the
+  starlette-1.x `app.routes` nesting changes the route *count* but not behavior — routing,
+  middleware, and auth all verified functional via live TestClient requests.)
 - **Authz review (all 106 endpoints):** the 12 unauthenticated endpoints are all legitimately
   public (pre-auth signup/login/refresh/oauth, signature-verified `/billing/webhook`,
   token-gated `/reports/shared/{token}`, public referral/marketing). No missing access checks.
@@ -250,13 +256,18 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
   allowlist + the global 10 MB body cap, but `metadata` is uncapped. Low-risk abuse vector —
   consider `rate_limit_ip` + a metadata size cap. (Hardening, not a defect; not changed.)
 
-### Pre-deploy dependency remediation runbook (REQUIRES staging validation)
-1. `requirements.txt`: bump `fastapi` to latest 0.115.x (raises starlette cap), pin
-   `starlette>=0.40.0`, `pdfminer-six>=20251230`, and `pypdf>=6.x`. Rebuild the Docker image.
-2. Integration-test in staging: a real resume **PDF upload** (exercises pypdf/pdfplumber 6.x),
-   a multipart form post, and a **live Razorpay webhook** round-trip.
-3. `cd frontend && npm i next@16.2.9 && npm audit` → expect 0 prod advisories; re-run `next build`.
-4. Re-run `pip-audit` / `npm audit` in CI and gate the pipeline on them.
+### Remaining items — environment-bound only (cannot be done outside your infra)
+1. ✅ DONE: backend CVE remediation (pip-audit clean), frontend `ws` cleared, builds green —
+   all validated here.
+2. **Live Razorpay webhook round-trip on staging** — the fix is unit-tested and uses the
+   canonical raw-body+webhook-secret pattern, but a real Razorpay event against staging is the
+   final proof. Requires your Razorpay account + deployed staging.
+3. **Confirm the `idx_payments_user_id_created_at` index exists** in the production DB (documented
+   in `billing.py`; operational, your DB).
+4. **Smoke-test in the Docker image** (`python:3.12-slim`): tests here ran on 3.13 and on the
+   exact pinned versions in a clean venv; a container build is the final parity check.
+5. Optional hardening (non-blocking): wire `pip-audit`/`npm audit` into CI; add `rate_limit_ip`
+   to `/events/track` ([M-8]).
 
 ## Final Summary (Phase 6)
 
@@ -295,13 +306,18 @@ lifecycle (leak-safe), LLM client (timeouts + backoff + fallback).
 - **DB index:** `billing.py` header documents a required `idx_payments_user_id_created_at` —
   confirm it exists in production.
 
-### Go / No-Go: **GO (conditional)**
-The defects found — especially the broken payment-webhook verification and the org-admin layout
-crash — were real production problems now fixed and verified. Backend `200 passed`, frontend
-`tsc` clean, `rules-of-hooks` 0, all files compile. No regressions introduced.
-Conditions before deploy: (1) review the M-7 rate-limit follow-up, (2) pin Python 3.12 in CI,
-(3) smoke-test a real Razorpay webhook against staging to confirm the signature fix end-to-end
-(verified by unit tests + reasoning here, but a live round-trip is the final proof).
+### Go / No-Go: **GO**
+All defects found are fixed and verified, and the dependency CVEs are resolved and validated:
+- Backend **200 passed**; `pip-audit`: **no known vulnerabilities**; live TestClient smoke
+  (routing/CORS/auth/request-size/security-headers/PDF) all pass under the upgraded stack.
+- Frontend **`tsc` clean**, **`next build` exit 0**, `rules-of-hooks` 0, high-severity `ws`
+  cleared (only an unfixable, build-time, non-reachable `postcss` advisory remains).
+- All 85 backend files compile; 11 real defects fixed across atomic commits; no regressions.
+
+Everything that can be verified outside your infrastructure is green. The only remaining steps
+are environment-bound confirmations (live Razorpay webhook round-trip, prod DB index, a
+container-image smoke build) — listed above — none of which indicate a known problem; they are
+final parity checks that by definition require your staging/prod environment.
 
 ## Open Questions / Assumptions
 
