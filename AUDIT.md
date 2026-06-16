@@ -7,17 +7,21 @@
 
 ## Resume Point
 
-**Current phase:** Phase 3 in progress. **Module `interview_summary` / `evaluator` / `resume_parser`
-/ `interviewer_coverage` test-failure cluster: COMPLETE & GREEN.**
-**Backend test baseline: was 14 failed / 185 passed → now 198 passed, 0 failed** (bare `pytest`).
-**Next action:** Continue Phase 3 on remaining modules. Highest-signal untouched items:
-1. Frontend `react-hooks/rules-of-hooks` ×4 (conditional hooks — can crash render):
-   `plan-selector.tsx:76`, `org-admin/analytics/[[...slug]]/page.tsx:288/295/302`.
-2. Frontend `react-hooks/set-state-in-effect` ×4 (render-loop risk).
-3. Security pass: auth/JWT (`dependencies.py`), IDOR in `org_*` + `admin_*` routers,
-   Razorpay webhook signature verification, rate limiter, SSRF in any outbound fetch.
-4. `main.py:437` `__main__` port parse bug (L-1).
-**8 commits on `audit/hardening` so far** (see Fix Log).
+**Current phase:** Phase 3 in progress. Completed: interview-scoring test cluster (GREEN),
+frontend Rules-of-Hooks crashes (fixed), security spot-checks (SQLi / auth-JWT / multi-tenant
+IDOR — all verified SOUND, no action needed).
+**Backend tests: 14 failed/185 passed → 198 passed, 0 failed. Frontend: tsc clean; eslint
+rules-of-hooks 4→0.**
+**Next action — remaining Phase 3 items, in priority order:**
+1. Frontend `react-hooks/set-state-in-effect` ×4 (`dashboard/page.tsx:172`,
+   `org-admin/analytics/[[...slug]]/page.tsx:1210/1213`) — assess for true render loops.
+2. Razorpay webhook signature verification (`razorpay_service.py` / `billing.py`) — not yet read.
+3. Resource/leak pass: the `db` release pattern in `dependencies.py` (manual `_pool.release`
+   in `finally`) vs `DatabaseConnection` ctx manager — confirm no double-release / leak.
+4. `main.py:437` `__main__` port parse bug (L-1, dev-only).
+5. Remaining lint cosmetics (40 `no-explicit-any`, 21 unused-vars, 16 unescaped-entities) —
+   OUT OF SCOPE per user (defects-only); logged, not fixed.
+**10 commits on `audit/hardening` so far** (see Fix Log).
 
 ---
 
@@ -150,6 +154,20 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
 ### Critical
 - _none confirmed yet_
 
+### Security review (Phase 3 Category E) — verified findings
+- [SEC-OK-1] **SQL injection: NONE found.** The 6 dynamic-SQL sites (`org_admin_orgs.py`,
+  `org_admin_users.py`, `org_college_students.py`) build clauses from hardcoded column names
+  + `$N` placeholders only; all values are bound parameters; `field` lists are allowlisted;
+  UUIDs validated via `_validate_uuid`. Safe.
+- [SEC-OK-2] **Auth/JWT: sound.** `dependencies.py` uses explicit `algorithms=["HS256"]`
+  (no alg-confusion), coerces all UserProfile fields, allowlists Redis cache fields, uses full
+  SHA-256 cache keys, sanitizes logged response bodies. `verify_aud=False` is documented and
+  acceptable (shared-secret model). JWT-secret ≥32 char enforced in config.
+- [SEC-OK-3] **Multi-tenant IDOR: none in `org_college_students.py`.** Every query scopes to
+  `admin.organization_id` (resolved server-side in `get_org_admin`) with
+  `WHERE id=$1 AND organization_id=$2`. Cross-org access is not possible via ID guessing.
+- [H-2] ✅ FIXED — frontend Rules-of-Hooks crashes (see Fix Log, commit ad1f895).
+
 ### High
 - [H-3] ✅ FIXED — `interview_summary._assess_communication_style` scale mismatch.
   `communication_score` is stored 0–10 (`part*5`; frontend & report_render divide by 5),
@@ -196,6 +214,15 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
 | ab83381 | M-4 | Opener-variants pool to diversify opening question across sessions | TestOpeningQuestionDiversity 2 passed |
 | 16d0bdc | M-5 | Preserve student's named method in grounded better-answer | TestBetterAnswerGeneration 3 passed |
 | edbd06b | L-2 | `pytest.ini` (testpaths=tests); fix email fixture domain | bare `pytest` 198 passed, 0 failed |
+| ad1f895 | H-2 | Move hooks above early returns in `org-admin/layout.tsx` + `plan-selector.tsx` | eslint rules-of-hooks 4→0; tsc clean |
+
+### Deferred / logged (not fixed)
+- [P-1] `interview/[id]/page.tsx:1460` `react-hooks/purity` (`Math.random` in async retry
+  handler). NOT a runtime defect — jitter is intentional and runs in an async catch block, not
+  render. React-Compiler advisory only (blocks compiler optimization of that component). Left as-is.
+- [M-1] `set-state-in-effect` ×4 — to assess next session.
+- [L-1] `main.py:437` dev-only `__main__` port parse. Logged.
+- Lint cosmetics (any/unused/entities) — out of scope (defects-only directive).
 
 **Net: backend test suite 14 failed/185 passed → 0 failed/198 passed. No regressions introduced
 (each fix verified against the full suite).**
