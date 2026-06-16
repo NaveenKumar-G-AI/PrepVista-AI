@@ -11,14 +11,17 @@ class _ValidatedEmail:
 
 
 def test_validate_deliverable_email_address_returns_normalized_email(monkeypatch):
+    # Use a non-reserved domain: example.com/.net/.org are intentionally in
+    # BLOCKED_EMAIL_DOMAINS (RFC 2606 reserved — no real user owns them), so a
+    # valid-email fixture must use a real-looking domain to test normalization.
     def fake_validate_email(email: str, *, check_deliverability: bool):
-        assert email == "User@Example.com"
+        assert email == "User@Company.com"
         assert check_deliverability is True
-        return _ValidatedEmail("user@example.com")
+        return _ValidatedEmail("user@company.com")
 
     monkeypatch.setattr("app.services.email_validation.validate_email", fake_validate_email)
 
-    assert validate_deliverable_email_address("User@Example.com") == "user@example.com"
+    assert validate_deliverable_email_address("User@Company.com") == "user@company.com"
 
 
 def test_validate_deliverable_email_address_rejects_undeliverable_email(monkeypatch):
