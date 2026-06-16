@@ -35,6 +35,12 @@ FIELD_KEYWORDS = {
         "ai", "artificial intelligence", "machine learning", "ml", "nlp", "rag", "llm",
         "prompt", "embedding", "retrieval", "ranking", "evaluation", "grounding",
         "hallucination", "classification", "data science", "computer vision",
+        # Modern AI/ML frameworks & tooling — strong, unambiguous AI signals that
+        # were previously unrecognised, causing AI/RAG resumes to be misclassified
+        # as generic software when they also listed Python/FastAPI/an API.
+        "pytorch", "tensorflow", "keras", "hugging face", "huggingface", "transformer",
+        "transformers", "openai", "groq", "anthropic", "langchain", "llamaindex",
+        "fine-tuning", "fine tuning", "generative",
     },
     "software_backend_frontend": {
         "python", "java", "c++", "javascript", "typescript", "react", "next.js",
