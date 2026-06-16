@@ -741,7 +741,19 @@ def get_allowed_hosts() -> list[str]:
     Returns ['*'] in development if not configured (safe default for local dev).
     """
     raw = get_settings().ALLOWED_HOSTS or "*"
-    return [h.strip() for h in raw.split(",") if h.strip()]
+    hosts = [h.strip() for h in raw.split(",") if h.strip()]
+    
+    # Safely inject production domains to prevent Host header injection and clear the startup warning
+    for required_host in ["prepvista.ai", "www.prepvista.ai", "prepvistaai.com", "www.prepvistaai.com", "prepvistabackend1.onrender.com"]:
+        if required_host not in hosts:
+            hosts.append(required_host)
+            
+    # If we added specific hosts, we should remove '*' to actually secure it (unless they explicitly passed * in dev)
+    import os
+    if os.getenv("ENVIRONMENT", "production").lower() == "production" and "*" in hosts:
+        hosts.remove("*")
+        
+    return hosts
 
 
 def get_cors_origins() -> list[str]:
