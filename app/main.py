@@ -251,6 +251,13 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
     await close_db_pool()
+    # Close the rate limiter's persistent httpx client so its connection pool is
+    # not leaked on every restart/redeploy.
+    try:
+        from app.middleware.rate_limiter import close_redis_client
+        await close_redis_client()
+    except Exception as exc:
+        logger.warning("rate_limiter_client_close_failed", error=_describe_startup_error(exc))
     logger.info("shutdown_complete")
 
 
