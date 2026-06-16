@@ -48,7 +48,7 @@ class Settings(BaseSettings):
                     "Example: 'prepvista.ai,www.prepvista.ai'",
     )
     CORS_ALLOWED_ORIGINS: str = Field(
-        default="http://localhost:3000",
+        default="http://localhost:3000,https://www.prepvistaai.com,https://prepvistaai.com",
         description="Comma-separated CORS allowed origins. Never use '*' in production.",
     )
     SECURE_HEADERS_ENABLED: bool = Field(
@@ -751,7 +751,14 @@ def get_cors_origins() -> list[str]:
     factor in several 2024-2025 SaaS credential theft incidents. Never '*' in prod.
     """
     raw = get_settings().CORS_ALLOWED_ORIGINS or "http://localhost:3000"
-    return [o.strip() for o in raw.split(",") if o.strip()]
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    
+    # Safely inject production frontend origins to prevent CORS errors even if env vars are misconfigured
+    for required_domain in ["https://www.prepvistaai.com", "https://prepvistaai.com"]:
+        if required_domain not in origins:
+            origins.append(required_domain)
+            
+    return origins
 
 
 @lru_cache()
