@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "C:\RecruitBrain_Project\interviewer_basic\tests\verify_upgrades.py", line 77, in <module>
+    print("\n\u2550\u2550\u2550 Test 1: Preamble templates exist for all plans and families \u2550\u2550\u2550")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 2-4: character maps to <undefined>

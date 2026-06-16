@@ -1,0 +1,336 @@
+INTERVIEW CHECKLIST
+
+This file lists the interview structures, functions, and features in simple text.
+
+FRONTEND MAIN STRUCTURES
+
+InterviewUiState
+This is the interview page state system.
+States are:
+INIT
+AI_SPEAKING
+USER_LISTENING
+SUBMITTING
+WARNING
+FINISHED
+TERMINATED
+ERROR
+
+TranscriptMessage
+This stores one transcript line.
+It has:
+role
+text
+
+StoredSessionData
+This stores interview session data in browser session storage.
+It contains:
+session_id
+access_token
+duration_seconds
+max_turns
+plan
+candidate_name
+proctoring_mode
+
+ContinueResponse
+This is the backend response when interview continues.
+It contains:
+action
+text
+turn
+max_turns
+remaining_turns
+
+CompletedResponse
+This is the backend response when interview is finished or terminated.
+It contains:
+action
+final_score
+interpretation
+strengths
+weaknesses
+report_url
+total_questions
+answered_questions
+termination_reason
+
+BACKEND REQUEST STRUCTURES
+
+AnswerRequest
+Used when candidate submits an answer.
+Fields:
+user_text
+access_token
+duration_actual
+
+FinishRequest
+Used when finishing the interview manually.
+Fields:
+access_token
+duration_actual
+
+ProctoringViolation
+Used when saving warning or violation logs.
+Fields:
+access_token
+violation_type
+detail
+
+TerminateRequest
+Used when interview is forcefully terminated.
+Fields:
+access_token
+reason
+duration_actual
+
+BACKEND INTERVIEW SERVICE FUNCTIONS
+
+EXIT_PHRASES
+This is the list of phrases that can end the interview.
+Examples:
+end interview
+stop the interview
+wrap it up
+
+_clean_ai_response
+This removes leaked words like Strong, Vague, Wrong, or Classification from AI output.
+
+create_session
+This creates a new interview session.
+It also:
+creates access token
+stores resume
+creates question plan
+saves everything in database
+
+process_answer
+This is the main interview engine.
+It does:
+start greeting flow
+handle normal answers
+handle silence markers
+handle time over marker
+handle user requested end
+save transcript messages
+generate next AI question
+return finish signal when needed
+
+finish_session
+This completes the interview.
+It does:
+read evaluations
+calculate final score
+save strengths
+save weaknesses
+save finish state
+
+BACKEND ROUTER FUNCTIONS
+
+setup_interview
+Creates interview after resume upload and plan validation.
+
+submit_answer
+Receives answer from frontend.
+If interview should continue, it returns next question.
+If interview should finish, it evaluates last answer and returns final result.
+
+end_interview
+Finishes interview manually.
+
+terminate_interview
+Force ends interview because of strong violation.
+Also saves termination reason.
+
+report_violation
+Stores warning and violation records.
+
+_evaluate_and_store
+Evaluates one answered question and saves it safely only once.
+
+PROMPT FUNCTIONS
+
+build_master_prompt
+Core interview rules based on legacy style.
+Includes:
+ask one question only
+classify answer internally
+handle strong partial vague wrong silent
+plan specific behavior
+
+build_greeting_prompt
+Creates first question behavior.
+
+build_followup_prompt
+Creates ongoing interview behavior.
+Also handles silence logic.
+
+build_question_plan_prompt
+Creates structured question plan from resume.
+
+build_per_question_eval_prompt
+Creates scoring prompt for one answer.
+
+FRONTEND INTERVIEW PAGE FUNCTIONS
+
+formatClock
+Formats timer as mm:ss.
+
+getTimestamp
+Gets current time.
+
+isBrowserMobile
+Checks if device is mobile.
+
+clearSilenceTimers
+Stops silence timeout and countdown.
+
+clearGlobalClock
+Stops main interview clock.
+
+stopRecognition
+Stops speech recognition safely.
+
+stopAllMedia
+Stops:
+speech
+camera
+screen share
+fullscreen
+timers
+
+appendTranscript
+Adds AI or user message to transcript panel.
+
+pickVoice
+Chooses browser speech voice.
+
+transitionTo
+Changes interview UI state.
+Also updates status text and timers.
+
+resetSilenceTimer
+Restarts the 20 second silence timer.
+
+ensureRecognition
+Creates speech recognition if not already created.
+
+startListeningLoop
+Starts mic listening and silence timer together.
+
+speak
+Makes AI question speak with text to speech.
+
+finishInterviewLocally
+Shows finished result screen on frontend.
+
+terminateInterviewLocally
+Shows terminated result screen on frontend.
+
+submitToBackend
+Sends current answer or marker to backend.
+Handles:
+continue result
+finish result
+terminated result
+
+hardTerminate
+Calls backend terminate endpoint after hard violation.
+
+triggerStrike
+Adds warning strike.
+If strikes become 3, it terminates interview.
+
+runGlobalClock
+Runs full interview countdown timer.
+
+initializeHardware
+Requests:
+camera
+microphone
+screen share
+fullscreen
+
+handleStartInterview
+Starts the interview after pre-start security check.
+
+handleManualSubmit
+Manual submit button action.
+
+handleEndInterview
+End interview button action.
+
+API CLIENT FUNCTIONS
+
+setupInterview
+Starts interview setup API call.
+
+submitAnswer
+Sends answer to backend.
+
+finishInterview
+Finishes interview manually.
+
+terminateInterview
+Force terminates interview.
+
+reportInterviewViolation
+Sends warning or violation log.
+
+SESSION STORAGE DATA
+
+The setup page stores:
+session_id
+access_token
+duration_seconds
+max_turns
+plan
+candidate_name
+proctoring_mode
+
+MAIN INTERVIEW FEATURES
+
+Pre-start security modal
+Camera permission check
+Microphone permission check
+Screen share check on desktop
+Fullscreen check on desktop
+AI speaking state
+User listening state
+20 second silence auto submit
+Manual submit answer button
+Manual end interview button
+Live transcript while speaking
+Transcript history panel
+Full interview countdown timer
+Urgent timer in last minute
+Warning overlay screen
+Automatic resume after warning
+Terminate after 3 strikes
+Warning logging to backend
+Termination endpoint in backend
+Exit phrase detection
+Support for markers:
+[NO_ANSWER_TIMEOUT]
+[SYSTEM_DURATION_EXPIRED]
+[USER_REQUESTED_END]
+Legacy style greeting flow
+Legacy style silence simplification flow
+Classifier cleanup from AI output
+Evaluation of previous AI question correctly
+Single safe save for each question evaluation
+Finish screen with score and feedback
+Terminate screen with report access
+Full media cleanup on finish, terminate, and page leave
+
+SUMMARY
+
+The interview section was changed to follow the legacy interview pattern more closely while keeping the current SaaS structure.
+The work covers:
+backend interview flow
+frontend interview flow
+prompt behavior
+API integration
+session storage update
+warning and termination flow
+result screens

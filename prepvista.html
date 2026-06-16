@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepVista AI — AI-Powered Placement Readiness Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#07070E;
+--bg2:#0D0D1A;
+--bg3:#111124;
+--card:rgba(255,255,255,0.04);
+--card-hover:rgba(79,110,247,0.07);
+--border:rgba(255,255,255,0.07);
+--border-hover:rgba(79,110,247,0.4);
+--blue:#4F6EF7;
+--violet:#7C3AED;
+--teal:#06D6A0;
+--amber:#F59E0B;
+--red:#EF4444;
+--text:#F0F4FF;
+--text2:#94A3B8;
+--text3:#475569;
+--grad:linear-gradient(135deg,#4F6EF7 0%,#7C3AED 50%,#06D6A0 100%);
+--grad2:linear-gradient(135deg,#4F6EF7,#7C3AED);
+--r:16px;
+--r2:12px;
+}
+html{scroll-behavior:smooth;font-size:16px}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;line-height:1.7;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+img{max-width:100%}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:999;padding:0 5%;transition:all 0.4s ease}
+nav.scrolled{background:rgba(7,7,14,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:68px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.2rem;letter-spacing:-0.3px}
+.logo-icon{width:36px;height:36px;background:var(--grad2);border-radius:9px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{color:var(--text2);font-size:0.9rem;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:var(--text)}
+.nav-ctas{display:flex;gap:12px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border-radius:10px;font-weight:600;font-size:0.875rem;cursor:pointer;transition:all 0.25s ease;border:none;font-family:'DM Sans',sans-serif}
+.btn-primary{background:var(--grad2);color:#fff;box-shadow:0 0 28px rgba(79,110,247,0.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 44px rgba(79,110,247,0.5)}
+.btn-outline{background:transparent;border:1px solid rgba(79,110,247,0.45);color:var(--blue)}
+.btn-outline:hover{background:rgba(79,110,247,0.1);transform:translateY(-2px)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:rgba(79,110,247,0.4);color:var(--text);background:rgba(79,110,247,0.06)}
+.btn-lg{padding:14px 32px;font-size:1rem;border-radius:12px}
+.btn-xl{padding:16px 38px;font-size:1.05rem;border-radius:14px}
+.hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px}
+.hamburger span{width:24px;height:2px;background:var(--text2);border-radius:2px;transition:all 0.3s}
+
+/* ── SECTIONS ── */
+section{padding:100px 5%}
+.section-inner{max-width:1180px;margin:0 auto}
+.label{display:inline-flex;align-items:center;gap:8px;background:rgba(79,110,247,0.1);border:1px solid rgba(79,110,247,0.2);color:var(--blue);font-size:0.75rem;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;padding:6px 14px;border-radius:100px;margin-bottom:20px}
+.label-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.4)}}
+h1{font-size:clamp(2.2rem,5vw,3.8rem);font-weight:800;line-height:1.1;letter-spacing:-1.5px}
+h2{font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:700;line-height:1.2;letter-spacing:-0.8px}
+h3{font-size:1.25rem;font-weight:600;letter-spacing:-0.3px}
+.grad-text{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.text-muted{color:var(--text2)}
+.center{text-align:center}
+.subtitle{font-size:1.1rem;color:var(--text2);line-height:1.8;max-width:640px}
+.subtitle.wide{max-width:780px}
+
+/* ── GRID ── */
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px}
+.grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
+
+/* ── CARD ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:28px;transition:all 0.3s ease}
+.card:hover{border-color:var(--border-hover);background:var(--card-hover);transform:translateY(-4px);box-shadow:0 20px 60px rgba(79,110,247,0.08)}
+.card-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:1.4rem}
+.icon-blue{background:rgba(79,110,247,0.12)}
+.icon-violet{background:rgba(124,58,237,0.12)}
+.icon-teal{background:rgba(6,214,160,0.12)}
+.icon-amber{background:rgba(245,158,11,0.12)}
+.icon-red{background:rgba(239,68,68,0.12)}
+.card h3{margin-bottom:10px}
+.card p{color:var(--text2);font-size:0.95rem;line-height:1.7}
+
+/* ── HERO ── */
+#hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;padding-top:68px}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);animation:float 8s ease-in-out infinite}
+.orb1{width:500px;height:500px;background:rgba(79,110,247,0.18);top:-100px;left:-150px;animation-delay:0s}
+.orb2{width:400px;height:400px;background:rgba(124,58,237,0.14);top:200px;right:-100px;animation-delay:2.5s}
+.orb3{width:350px;height:350px;background:rgba(6,214,160,0.1);bottom:-80px;left:30%;animation-delay:5s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(20px,-30px) scale(1.05)}66%{transform:translate(-15px,20px) scale(0.97)}}
+.grid-dots{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,0.06) 1px,transparent 1px);background-size:36px 36px;z-index:0}
+.hero-inner{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 0;width:100%}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(6,214,160,0.08);border:1px solid rgba(6,214,160,0.2);color:var(--teal);font-size:0.8rem;font-weight:600;letter-spacing:0.8px;padding:7px 16px;border-radius:100px;margin-bottom:28px}
+.badge-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse-dot 1.5s infinite}
+.hero-h1{margin-bottom:22px}
+.hero-sub{font-size:1.15rem;color:var(--text2);line-height:1.85;max-width:600px;margin-bottom:40px}
+.hero-ctas{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:60px}
+.trust-row{display:flex;flex-wrap:wrap;gap:24px;padding-top:48px;border-top:1px solid var(--border)}
+.trust-item{display:flex;align-items:center;gap:10px;font-size:0.875rem;color:var(--text2);font-weight:500}
+.trust-icon{width:32px;height:32px;border-radius:8px;background:rgba(79,110,247,0.1);border:1px solid rgba(79,110,247,0.2);display:flex;align-items:center;justify-content:center;font-size:0.9rem}
+
+/* ── PROBLEM ── */
+#problem{background:var(--bg2)}
+.problem-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:48px}
+.prob-card{background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.12);border-radius:var(--r);padding:26px;transition:all 0.3s}
+.prob-card:hover{border-color:rgba(245,158,11,0.35);transform:translateY(-3px)}
+.prob-num{font-size:0.75rem;font-weight:700;color:var(--amber);letter-spacing:1px;margin-bottom:10px;text-transform:uppercase}
+.prob-card h3{color:var(--text);margin-bottom:8px;font-size:1.05rem}
+.prob-card p{color:var(--text2);font-size:0.9rem;line-height:1.65}
+.divider-bar{margin-top:52px;display:flex;align-items:center;gap:0;border-radius:12px;overflow:hidden;height:52px}
+.div-before{flex:1;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.15);display:flex;align-items:center;justify-content:center;gap:8px;color:rgba(239,68,68,0.7);font-size:0.8rem;font-weight:600;letter-spacing:0.5px}
+.div-mid{width:44px;background:var(--bg2);display:flex;align-items:center;justify-content:center;z-index:1;font-size:1.2rem}
+.div-after{flex:1;background:rgba(6,214,160,0.08);border:1px solid rgba(6,214,160,0.15);display:flex;align-items:center;justify-content:center;gap:8px;color:var(--teal);font-size:0.8rem;font-weight:600;letter-spacing:0.5px}
+
+/* ── FEATURES ── */
+#features{background:var(--bg)}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-top:48px}
+
+/* ── STUDENTS ── */
+#students{background:var(--bg3)}
+.students-layout{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;margin-top:48px}
+.check-list{list-style:none;display:flex;flex-direction:column;gap:16px}
+.check-list li{display:flex;align-items:flex-start;gap:14px;font-size:0.95rem;line-height:1.6}
+.check-icon{width:22px;height:22px;border-radius:50%;background:rgba(6,214,160,0.12);border:1px solid rgba(6,214,160,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;font-size:0.7rem}
+
+/* ── STUDENT PROFILE CARD ── */
+.profile-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:28px;position:relative;overflow:hidden}
+.profile-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad)}
+.profile-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.avatar{width:48px;height:48px;border-radius:50%;background:var(--grad2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;color:#fff}
+.profile-info h4{font-size:1rem;font-weight:600;margin-bottom:2px}
+.profile-info p{font-size:0.8rem;color:var(--text2)}
+.badge-green{display:inline-block;background:rgba(6,214,160,0.1);border:1px solid rgba(6,214,160,0.25);color:var(--teal);font-size:0.72rem;font-weight:600;padding:3px 10px;border-radius:100px;margin-left:8px}
+.readiness-ring{display:flex;align-items:center;gap:18px;margin-bottom:22px;padding:16px;background:rgba(79,110,247,0.05);border-radius:12px;border:1px solid rgba(79,110,247,0.1)}
+.ring-val{font-size:2rem;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.ring-label{font-size:0.78rem;color:var(--text2)}
+.skill-bars{display:flex;flex-direction:column;gap:12px}
+.skill-bar-item{display:flex;flex-direction:column;gap:5px}
+.skill-bar-head{display:flex;justify-content:space-between;font-size:0.8rem}
+.skill-bar-head span:first-child{color:var(--text2)}
+.skill-bar-head span:last-child{color:var(--text);font-weight:600}
+.bar-track{height:5px;background:rgba(255,255,255,0.07);border-radius:100px;overflow:hidden}
+.bar-fill{height:100%;border-radius:100px;transition:width 1.5s cubic-bezier(0.4,0,0.2,1)}
+.bar-blue{background:linear-gradient(90deg,#4F6EF7,#7C3AED)}
+.bar-teal{background:linear-gradient(90deg,#06D6A0,#4F6EF7)}
+.bar-violet{background:linear-gradient(90deg,#7C3AED,#4F6EF7)}
+.bar-amber{background:linear-gradient(90deg,#F59E0B,#EF4444)}
+.last-active{margin-top:18px;font-size:0.78rem;color:var(--text3);display:flex;align-items:center;gap:6px}
+.active-dot{width:7px;height:7px;border-radius:50%;background:var(--teal)}
+
+/* ── IMPACT ── */
+#impact{background:var(--bg)}
+.impact-disclaimer{font-size:0.8rem;color:var(--text3);margin-top:8px;font-style:italic}
+.counters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin:48px 0 56px}
+.counter-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--r);padding:28px 24px;text-align:center;transition:all 0.3s}
+.counter-card:hover{border-color:var(--border-hover);background:rgba(79,110,247,0.05)}
+.counter-val{font-size:2.6rem;font-weight:800;line-height:1;margin-bottom:6px}
+.counter-val.pos{background:linear-gradient(135deg,#06D6A0,#4F6EF7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.counter-val.neg{background:linear-gradient(135deg,#F59E0B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.counter-label{font-size:0.82rem;color:var(--text2);font-weight:500;line-height:1.4}
+.counter-tag{font-size:0.7rem;color:var(--text3);margin-top:6px;font-style:italic}
+.chart-wrapper{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r);padding:32px;margin-top:8px}
+.chart-title{font-size:0.85rem;font-weight:600;color:var(--text2);margin-bottom:8px;letter-spacing:0.3px}
+.chart-note{font-size:0.75rem;color:var(--text3);margin-bottom:24px;font-style:italic}
+
+/* ── COMPARISON ── */
+#compare{background:var(--bg2)}
+.compare-table-wrap{overflow-x:auto;margin-top:48px;border-radius:var(--r);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:0.9rem}
+thead tr{border-bottom:1px solid var(--border)}
+th{padding:16px 20px;font-size:0.78rem;font-weight:600;letter-spacing:0.8px;text-transform:uppercase}
+th:first-child{color:var(--text2);text-align:left;width:200px}
+th.th-bad{color:rgba(239,68,68,0.75);text-align:center}
+th.th-good{color:var(--teal);text-align:center}
+td{padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.04)}
+td:first-child{color:var(--text2);font-weight:500;font-size:0.85rem}
+td.td-bad{text-align:center;color:rgba(239,68,68,0.7);font-size:0.875rem}
+td.td-good{text-align:center;color:var(--teal);font-size:0.875rem;font-weight:500}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.015)}
+
+/* ── ROI ── */
+#roi{background:var(--bg3)}
+.roi-wrap{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;margin-top:48px}
+.roi-inputs{display:flex;flex-direction:column;gap:24px}
+.roi-input-group{display:flex;flex-direction:column;gap:8px}
+.roi-label{font-size:0.85rem;font-weight:600;color:var(--text2);display:flex;justify-content:space-between}
+.roi-label span.val{color:var(--blue);font-weight:700}
+input[type="range"]{-webkit-appearance:none;width:100%;height:4px;border-radius:100px;background:rgba(255,255,255,0.08);outline:none;cursor:pointer}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--blue);cursor:pointer;box-shadow:0 0 12px rgba(79,110,247,0.5);transition:transform 0.15s}
+input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.roi-outputs{display:flex;flex-direction:column;gap:16px}
+.roi-out-card{background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.15);border-radius:var(--r2);padding:20px 22px;transition:all 0.3s}
+.roi-out-card.pulse{animation:card-pulse 0.5s ease}
+@keyframes card-pulse{0%{border-color:rgba(79,110,247,0.15)}50%{border-color:rgba(79,110,247,0.6);background:rgba(79,110,247,0.12)}100%{border-color:rgba(79,110,247,0.15)}}
+.roi-out-label{font-size:0.78rem;color:var(--text2);font-weight:500;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.6px}
+.roi-out-val{font-size:1.8rem;font-weight:800;background:var(--grad2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.roi-out-desc{font-size:0.78rem;color:var(--text3);margin-top:4px}
+.roi-note{margin-top:32px;padding:20px;background:rgba(6,214,160,0.04);border:1px solid rgba(6,214,160,0.12);border-radius:var(--r2);font-size:0.875rem;color:var(--text2);line-height:1.7}
+.roi-note strong{color:var(--teal)}
+
+/* ── TIMELINE ── */
+#timeline{background:var(--bg)}
+.timeline-wrap{position:relative;margin-top:56px}
+.tl-line{position:absolute;top:32px;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),var(--teal));z-index:0}
+.tl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;position:relative;z-index:1}
+.tl-item{display:flex;flex-direction:column;align-items:center;text-align:center}
+.tl-node{width:64px;height:64px;border-radius:50%;background:var(--bg);border:2px solid var(--blue);display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:1.4rem;position:relative;transition:all 0.3s}
+.tl-node::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(79,110,247,0.2);animation:node-pulse 3s infinite}
+@keyframes node-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0;transform:scale(1.3)}}
+.tl-day{font-size:0.7rem;font-weight:700;color:var(--blue);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.tl-title{font-size:1rem;font-weight:700;margin-bottom:8px}
+.tl-desc{font-size:0.83rem;color:var(--text2);line-height:1.6}
+
+/* ── FAQ ── */
+#faq{background:var(--bg2)}
+.faq-wrap{margin-top:48px;display:flex;flex-direction:column;gap:12px}
+.faq-item{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;transition:border-color 0.3s}
+.faq-item.open{border-color:rgba(79,110,247,0.3)}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;cursor:pointer;user-select:none}
+.faq-q-text{font-size:0.97rem;font-weight:600;line-height:1.4;padding-right:20px}
+.faq-icon{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.3s;font-size:1.1rem;color:var(--text2)}
+.faq-item.open .faq-icon{background:rgba(79,110,247,0.1);border-color:rgba(79,110,247,0.3);color:var(--blue);transform:rotate(45deg)}
+.faq-body{max-height:0;overflow:hidden;transition:max-height 0.45s cubic-bezier(0.4,0,0.2,1)}
+.faq-body-inner{padding:0 24px 20px;font-size:0.92rem;color:var(--text2);line-height:1.8}
+
+/* ── CTA CLOSE ── */
+#close{background:var(--bg);position:relative;overflow:hidden}
+.close-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(79,110,247,0.12) 0%,transparent 70%)}
+.close-inner{position:relative;z-index:1;max-width:900px;margin:0 auto;text-align:center}
+.close-h2{font-size:clamp(2rem,4vw,3rem);font-weight:800;letter-spacing:-1px;margin-bottom:16px}
+.close-sub{font-size:1.05rem;color:var(--text2);max-width:620px;margin:0 auto 52px;line-height:1.8}
+.cta-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-bottom:48px}
+.cta-card{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--r);padding:28px;text-align:center;transition:all 0.3s}
+.cta-card:hover{border-color:rgba(79,110,247,0.35);background:rgba(79,110,247,0.06);transform:translateY(-4px)}
+.cta-card-icon{font-size:2rem;margin-bottom:14px}
+.cta-card h3{margin-bottom:8px;font-size:1rem}
+.cta-card p{font-size:0.85rem;color:var(--text2);margin-bottom:18px;line-height:1.6}
+.trust-line{font-size:0.85rem;color:var(--text3);margin-bottom:40px}
+footer{text-align:center;padding:32px 5%;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text3)}
+footer span{color:var(--text2);margin:0 12px}
+
+/* ── ANIMATIONS ── */
+.fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+.fade-up-d1{transition-delay:0.1s}
+.fade-up-d2{transition-delay:0.2s}
+.fade-up-d3{transition-delay:0.3s}
+.fade-up-d4{transition-delay:0.4s}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+.nav-links{display:none}
+.hamburger{display:flex}
+section{padding:70px 5%}
+.students-layout{grid-template-columns:1fr}
+.roi-wrap{grid-template-columns:1fr}
+.tl-grid{grid-template-columns:1fr 1fr}
+.tl-line{display:none}
+h1{font-size:2.2rem}
+h2{font-size:1.7rem}
+.hero-ctas{flex-direction:column}
+.hero-ctas .btn{width:100%;justify-content:center}
+.trust-row{gap:16px}
+}
+@media(max-width:480px){
+.tl-grid{grid-template-columns:1fr}
+.counters-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="navbar">
+  <div class="nav-inner">
+    <a href="#" class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      PrepVista AI
+    </a>
+    <div class="nav-links">
+      <a href="#problem">The Problem</a>
+      <a href="#features">Features</a>
+      <a href="#impact">Impact</a>
+      <a href="#roi">ROI Calculator</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-ctas">
+      <a href="mailto:contact@prepvista.in" class="btn btn-outline">Request Demo</a>
+      <a href="#close" class="btn btn-primary">Get Started</a>
+    </div>
+    <div class="hamburger" onclick="this.classList.toggle('active')">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-bg">
+    <div class="grid-dots"></div>
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+  </div>
+  <div class="hero-inner section-inner">
+    <div class="hero-badge">
+      <div class="badge-dot"></div>
+      AI-Powered Placement Intelligence
+    </div>
+    <h1 class="hero-h1">
+      Transform Student Potential<br>
+      Into <span class="grad-text">Placement Success</span><br>
+      — At Scale.
+    </h1>
+    <p class="hero-sub">
+      PrepVista AI conducts unlimited personalised mock interviews, gives instant rubric-based feedback, and gives your Placement Cell a real-time analytics command centre. Every student. Every department. 24 × 7.
+    </p>
+    <div class="hero-ctas">
+      <a href="#close" class="btn btn-primary btn-xl">Schedule a Demo</a>
+      <a href="#impact" class="btn btn-outline btn-xl">See Projected Impact</a>
+      <a href="#roi" class="btn btn-ghost btn-xl">Calculate ROI ↗</a>
+    </div>
+    <div class="trust-row">
+      <div class="trust-item"><div class="trust-icon">🎓</div>NAAC-Aligned Analytics</div>
+      <div class="trust-item"><div class="trust-icon">📊</div>Department-Wise Tracking</div>
+      <div class="trust-item"><div class="trust-icon">⚡</div>Zero Setup Complexity</div>
+      <div class="trust-item"><div class="trust-icon">🏢</div>Recruiter-Ready Pipeline</div>
+      <div class="trust-item"><div class="trust-icon">🔒</div>Institution-Grade Security</div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <div class="section-inner">
+    <div class="center fade-up">
+      <div class="label"><span class="label-dot"></span>Industry Challenge</div>
+      <h2>Most Colleges Are Fighting a Placement<br>Battle with 1990s Tools.</h2>
+      <p class="subtitle" style="margin:16px auto 0">Only <strong style="color:#F0F4FF">45.6%</strong> of engineering graduates are employable. <strong style="color:#F0F4FF">73%</strong> of recruiters rank communication as the #1 hiring factor. Yet most colleges have no structured, scalable preparation system.</p>
+    </div>
+    <div class="problem-cards" style="margin-top:48px">
+      <div class="prob-card fade-up fade-up-d1">
+        <div class="prob-num">01 — Problem</div>
+        <h3>Inconsistent Preparation</h3>
+        <p>Each student prepares differently — or not at all. There is no standardised readiness path and no way to track who is ready.</p>
+      </div>
+      <div class="prob-card fade-up fade-up-d2">
+        <div class="prob-num">02 — Problem</div>
+        <h3>High Resume Rejection Rates</h3>
+        <p>Students submit resumes with critical gaps. Placement officers only discover the problem after rejections — when it is too late.</p>
+      </div>
+      <div class="prob-card fade-up fade-up-d3">
+        <div class="prob-num">03 — Problem</div>
+        <h3>Pre-Interview Panic</h3>
+        <p>Without structured mock practice, students freeze under pressure. Interview anxiety reduces cognitive performance by 15–30%.</p>
+      </div>
+      <div class="prob-card fade-up fade-up-d1">
+        <div class="prob-num">04 — Problem</div>
+        <h3>Zero Placement Intelligence</h3>
+        <p>Management asks "how prepared are our students?" — the TPO has no data to answer. Every decision is guesswork.</p>
+      </div>
+      <div class="prob-card fade-up fade-up-d2">
+        <div class="prob-num">05 — Problem</div>
+        <h3>The 1 : 500 Impossible Ratio</h3>
+        <p>One TPO cannot individually coach 500 students. 97% of students never receive a single individual mock interview session.</p>
+      </div>
+      <div class="prob-card fade-up fade-up-d3">
+        <div class="prob-num">06 — Problem</div>
+        <h3>Reputation at Stake</h3>
+        <p>Every unplaced student means word-of-mouth damage. A 10% drop in placement rate can reduce next-year admissions by 15–25%.</p>
+      </div>
+    </div>
+    <div class="divider-bar fade-up" style="margin-top:40px">
+      <div class="div-before">❌ &nbsp;Before PrepVista — Manual · Inconsistent · No Data</div>
+      <div class="div-mid">→</div>
+      <div class="div-after">✅ &nbsp;After PrepVista — AI-Powered · Scalable · Data-Driven</div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-inner">
+    <div class="center fade-up">
+      <div class="label"><span class="label-dot"></span>For Management</div>
+      <h2>Complete Placement Intelligence,<br>Finally Centralised.</h2>
+      <p class="subtitle wide" style="margin:16px auto 0">Everything your placement cell has been asking for — in one platform your TPO can manage from a browser, with zero IT support needed.</p>
+    </div>
+    <div class="features-grid">
+      <div class="card fade-up fade-up-d1">
+        <div class="card-icon icon-blue">📈</div>
+        <h3>Real-Time TPO Dashboard</h3>
+        <p>A live command centre showing every student's readiness score, sessions completed, skill gaps, and interview history. Know exactly who needs help — before placement season.</p>
+      </div>
+      <div class="card fade-up fade-up-d2">
+        <div class="card-icon icon-violet">🏫</div>
+        <h3>Department-Wise Analytics</h3>
+        <p>Track placement readiness by department, batch, year, and section. Share department-level reports with HODs in one click. No spreadsheets, no manual compilation.</p>
+      </div>
+      <div class="card fade-up fade-up-d3">
+        <div class="card-icon icon-teal">🏢</div>
+        <h3>Recruiter-Ready Pipeline</h3>
+        <p>Automatically surface your most interview-ready students when companies arrive. Reduce manual shortlisting effort. Show recruiters data-backed candidate quality.</p>
+      </div>
+      <div class="card fade-up fade-up-d1">
+        <div class="card-icon icon-blue">📋</div>
+        <h3>Automated Reporting</h3>
+        <p>Weekly placement readiness reports generated automatically for the Principal, HODs, and management. Formatted and ready for NAAC / NBA documentation.</p>
+      </div>
+      <div class="card fade-up fade-up-d2">
+        <div class="card-icon icon-violet">⚙️</div>
+        <h3>Zero IT Burden</h3>
+        <p>Browser-based. Works on any smartphone. Bulk enroll 500 students via one CSV upload. No software installation, no server maintenance, no technical expertise needed.</p>
+      </div>
+      <div class="card fade-up fade-up-d3">
+        <div class="card-icon icon-teal">🔒</div>
+        <h3>Role-Based Access Control</h3>
+        <p>Principal sees executive summaries. HODs see their department. Placement Officers see institution-wide data. Students see only their own profile. Complete audit trail.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STUDENTS -->
+<section id="students">
+  <div class="section-inner">
+    <div class="label fade-up"><span class="label-dot"></span>For Students</div>
+    <h2 class="fade-up">From "Not Ready" to<br><span class="grad-text">Recruiter-Ready</span> — Step by Step.</h2>
+    <div class="students-layout">
+      <div>
+        <p class="text-muted fade-up" style="margin-bottom:28px;line-height:1.8">Students don't just consume content. They practice speaking out loud, receive rubric-based AI feedback, and build a verified placement profile that grows with every session. Research shows 10+ structured mock interviews improve real interview performance by 34%.</p>
+        <ul class="check-list">
+          <li class="fade-up fade-up-d1"><div class="check-icon">✓</div><span>Resume-personalised AI mock interviews — the AI reads their projects and asks questions about <em>their actual experience</em></span></li>
+          <li class="fade-up fade-up-d2"><div class="check-icon">✓</div><span>Structured STAR-method training for every behavioural question — Situation, Task, Action, Result</span></li>
+          <li class="fade-up fade-up-d3"><div class="check-icon">✓</div><span>Technical depth + communication clarity scored separately so students know exactly what to fix</span></li>
+          <li class="fade-up fade-up-d1"><div class="check-icon">✓</div><span>Company-specific preparation modes aligned to TCS, Infosys, Wipro, Accenture, and product companies</span></li>
+          <li class="fade-up fade-up-d2"><div class="check-icon">✓</div><span>24 × 7 availability — students can practice at 11 PM the night before a morning interview</span></li>
+          <li class="fade-up fade-up-d3"><div class="check-icon">✓</div><span>Downloadable PDF session report — shareable with faculty mentors, trackable improvement</span></li>
+        </ul>
+      </div>
+      <div class="profile-card fade-up fade-up-d2">
+        <div class="profile-head">
+          <div class="avatar">AR</div>
+          <div class="profile-info">
+            <h4>Arjun R. <span class="badge-green">Interview Ready ✓</span></h4>
+            <p>Computer Science · Final Year · Batch 2025</p>
+          </div>
+        </div>
+        <div class="readiness-ring">
+          <div>
+            <div class="ring-val">78%</div>
+            <div class="ring-label" style="font-size:0.72rem;color:var(--text2)">Overall Readiness</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:0.78rem;color:var(--text2);margin-bottom:4px">Sessions completed: <strong style="color:var(--text)">15</strong></div>
+            <div style="font-size:0.78rem;color:var(--text2);margin-bottom:4px">Score improved: <strong style="color:var(--teal)">42% → 78%</strong></div>
+            <div style="font-size:0.78rem;color:var(--text2)">Mode: <strong style="color:var(--text)">Pro (TCS / Infosys)</strong></div>
+          </div>
+        </div>
+        <div class="skill-bars">
+          <div class="skill-bar-item">
+            <div class="skill-bar-head"><span>Technical Depth</span><span>82%</span></div>
+            <div class="bar-track"><div class="bar-fill bar-blue" data-width="82"></div></div>
+          </div>
+          <div class="skill-bar-item">
+            <div class="skill-bar-head"><span>Communication Clarity</span><span>71%</span></div>
+            <div class="bar-track"><div class="bar-fill bar-teal" data-width="71"></div></div>
+          </div>
+          <div class="skill-bar-item">
+            <div class="skill-bar-head"><span>Behavioural Responses</span><span>85%</span></div>
+            <div class="bar-track"><div class="bar-fill bar-violet" data-width="85"></div></div>
+          </div>
+          <div class="skill-bar-item">
+            <div class="skill-bar-head"><span>Aptitude & Problem-Solving</span><span>69%</span></div>
+            <div class="bar-track"><div class="bar-fill bar-amber" data-width="69"></div></div>
+          </div>
+        </div>
+        <div class="last-active"><div class="active-dot"></div>Last session 2 hours ago · TCS-style mock · Score: 79%</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- IMPACT -->
+<section id="impact">
+  <div class="section-inner">
+    <div class="center fade-up">
+      <div class="label"><span class="label-dot"></span>Projected Institutional Impact</div>
+      <h2>What Institutions Experience<br>After Platform Activation.</h2>
+      <p class="impact-disclaimer">* Projections based on platform design logic and peer-reviewed interview research. Actual results vary by institutional context.</p>
+    </div>
+    <div class="counters-grid">
+      <div class="counter-card fade-up fade-up-d1">
+        <div class="counter-val pos" data-target="42" data-prefix="+" data-suffix="%">0</div>
+        <div class="counter-label">Interview Confidence Growth</div>
+        <div class="counter-tag">Projected</div>
+      </div>
+      <div class="counter-card fade-up fade-up-d2">
+        <div class="counter-val pos" data-target="31" data-prefix="+" data-suffix="%">0</div>
+        <div class="counter-label">Resume Shortlist Improvement</div>
+        <div class="counter-tag">Estimated</div>
+      </div>
+      <div class="counter-card fade-up fade-up-d3">
+        <div class="counter-val pos" data-target="55" data-prefix="+" data-suffix="%">0</div>
+        <div class="counter-label">Mock Interview Participation Rate</div>
+        <div class="counter-tag">Simulated</div>
+      </div>
+      <div class="counter-card fade-up fade-up-d1">
+        <div class="counter-val neg" data-target="40" data-prefix="-" data-suffix="%">0</div>
+        <div class="counter-label">Placement Team Manual Effort</div>
+        <div class="counter-tag">Estimated Reduction</div>
+      </div>
+      <div class="counter-card fade-up fade-up-d2">
+        <div class="counter-val pos" data-target="2.4" data-prefix="" data-suffix="×" data-decimal="1">0</div>
+        <div class="counter-label">Student Preparation Consistency</div>
+        <div class="counter-tag">Projected Multiplier</div>
+      </div>
+    </div>
+    <div class="chart-wrapper fade-up">
+      <div class="chart-title">Placement Readiness Distribution — Before vs After Platform</div>
+      <div class="chart-note">Simulated data for illustration. Chart shows projected shift in student readiness tiers.</div>
+      <canvas id="readinessChart" height="110"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section id="compare">
+  <div class="section-inner">
+    <div class="center fade-up">
+      <div class="label"><span class="label-dot"></span>The Difference</div>
+      <h2>Why Traditional Methods Are<br>Holding Your Students Back.</h2>
+    </div>
+    <div class="compare-table-wrap fade-up">
+      <table>
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th class="th-bad">❌ Traditional Methods</th>
+            <th class="th-good">✅ PrepVista AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Availability</td><td class="td-bad">Office hours only (8 hrs/day)</td><td class="td-good">24 × 7, any device, any location</td></tr>
+          <tr><td>Students served simultaneously</td><td class="td-bad">8–10 per trainer per day</td><td class="td-good">All 500 students at the same time</td></tr>
+          <tr><td>Preparation tracking</td><td class="td-bad">None — manual registers</td><td class="td-good">Real-time digital dashboard</td></tr>
+          <tr><td>Interview personalisation</td><td class="td-bad">Generic HR question sets</td><td class="td-good">Questions built from student's own resume</td></tr>
+          <tr><td>Feedback consistency</td><td class="td-bad">Depends on faculty mood & time</td><td class="td-good">Standardised rubric — every session, always</td></tr>
+          <tr><td>Data for management</td><td class="td-bad">Unavailable</td><td class="td-good">Automated weekly reports for Principal & HODs</td></tr>
+          <tr><td>Sessions per student per year</td><td class="td-bad">3–5 (max practical limit)</td><td class="td-good">Unlimited</td></tr>
+          <tr><td>Annual cost for 500 students</td><td class="td-bad">₹5–15 lakhs (3–5 trainers)</td><td class="td-good">₹1–2.5 lakhs</td></tr>
+          <tr><td>NAAC documentation</td><td class="td-bad">Manual compilation</td><td class="td-good">One-click CSV export, formatted reports</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ROI -->
+<section id="roi">
+  <div class="section-inner">
+    <div class="center fade-up">
+      <div class="label"><span class="label-dot"></span>ROI Simulator</div>
+      <h2>See the Impact on Your Institution.<br>Adjust and Explore.</h2>
+      <p class="subtitle" style="margin:16px auto 0">This is a projection tool. Enter your institution's numbers and see estimated impact potential — in real time.</p>
+    </div>
+    <div class="roi-wrap">
+      <div class="roi-inputs fade-up">
+        <div class="roi-input-group">
+          <label class="roi-label">Total Final-Year Students <span class="val" id="v-students">800</span></label>
+          <input type="range" id="r-students" min="100" max="3000" step="50" value="800" oninput="updateROI()">
+        </div>
+        <div class="roi-input-group">
+          <label class="roi-label">Current Placement Rate <span class="val" id="v-rate">55%</span></label>
+          <input type="range" id="r-rate" min="20" max="90" step="1" value="55" oninput="updateROI()">
+        </div>
+        <div class="roi-input-group">
+          <label class="roi-label">Average CTC Offered <span class="val" id="v-ctc">₹4.5 LPA</span></label>
+          <input type="range" id="r-ctc" min="2" max="15" step="0.5" value="4.5" oninput="updateROI()">
+        </div>
+        <div class="roi-input-group">
+          <label class="roi-label">Annual Fee per Student <span class="val" id="v-fee">₹1.2L</span></label>
+          <input type="range" id="r-fee" min="50000" max="500000" step="10000" value="120000" oninput="updateROI()">
+        </div>
+        <div class="roi-note">
+          <strong>How this works:</strong> We apply a conservative <strong>10% placement rate improvement</strong> projection — supported by research showing 34% better interview performance after 10+ structured practice sessions. Admission impact assumes stronger placement record drives 50+ additional admissions the following year.
+        </div>
+      </div>
+      <div class="roi-outputs fade-up fade-up-d2">
+        <div class="roi-out-card" id="out1">
+          <div class="roi-out-label">Additional Students Placed</div>
+          <div class="roi-out-val" id="o-placed">80</div>
+          <div class="roi-out-desc">students more placed per year (10% placement rate improvement)</div>
+        </div>
+        <div class="roi-out-card" id="out2">
+          <div class="roi-out-label">Salary Impact (Additional)</div>
+          <div class="roi-out-val" id="o-salary">₹36L</div>
+          <div class="roi-out-desc">cumulative additional LPA if avg CTC improves by ₹0.5 LPA</div>
+        </div>
+        <div class="roi-out-card" id="out3">
+          <div class="roi-out-label">Admission Revenue Protected</div>
+          <div class="roi-out-val" id="o-revenue">₹60L</div>
+          <div class="roi-out-desc">estimated fee revenue from ~50 additional admissions driven by better placement reputation</div>
+        </div>
+        <div class="roi-out-card" id="out4">
+          <div class="roi-out-label">PrepVista Cost Per Student/Day</div>
+          <div class="roi-out-val" id="o-cost">₹1.37</div>
+          <div class="roi-out-desc">less than a cup of chai — for unlimited AI interview practice</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIMELINE -->
+<section id="timeline">
+  <div class="section-inner">
+    <div class="center fade-up">
+      <div class="label"><span class="label-dot"></span>Getting Started</div>
+      <h2>Live in 14 Days.<br>Zero Technical Dependency.</h2>
+      <p class="subtitle" style="margin:16px auto 0">Our team handles everything. Your IT team does nothing. Your only job is saying yes.</p>
+    </div>
+    <div class="timeline-wrap fade-up">
+      <div class="tl-line"></div>
+      <div class="tl-grid">
+        <div class="tl-item">
+          <div class="tl-node">⚙️</div>
+          <div class="tl-day">Day 1</div>
+          <div class="tl-title">Institutional Setup</div>
+          <p class="tl-desc">Platform configured with your college name, departments, batch years. Zero effort from your IT team.</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-node">👥</div>
+          <div class="tl-day">Day 3</div>
+          <div class="tl-title">Department Onboarding</div>
+          <p class="tl-desc">HODs and Placement Officers receive role-based access. 45-minute orientation call. No training manual.</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-node">🎓</div>
+          <div class="tl-day">Day 7</div>
+          <div class="tl-title">Student Activation</div>
+          <p class="tl-desc">Students join via college link. Self-guided onboarding in under 5 minutes. First readiness scores appear.</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-node">📊</div>
+          <div class="tl-day">Day 14</div>
+          <div class="tl-title">Full Analytics Live</div>
+          <p class="tl-desc">Management dashboard active. Automated weekly reports begin. Real student improvement data visible to TPO.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="section-inner">
+    <div class="center fade-up">
+      <div class="label"><span class="label-dot"></span>Frequently Asked</div>
+      <h2>Questions Institutions Usually Ask.</h2>
+    </div>
+    <div class="faq-wrap fade-up">
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">Do students need training or technical skills to use the platform?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">No. PrepVista works on any smartphone browser — no app installation required. Students sign up in under 2 minutes, upload their resume with one tap, and start their first mock interview immediately. The interface is simpler than most social media apps. If your students can use WhatsApp, they can use PrepVista. We also send a 3-minute onboarding video with the student invitation email.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">Will students actually use it regularly?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">Three things drive consistent student usage: fear, convenience, and visible results. Your students are already afraid of interviews — that is the most powerful motivator. PrepVista is available on their phones at any hour — that is convenience. And the moment a student sees their specific, actionable score after their first session, they return. Your TPO also has a live usage dashboard — if a student is not practising, you know immediately and can intervene. We also support making a minimum number of sessions mandatory as a placement registration condition.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">How much work does implementation require from our IT team?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">None. PrepVista is entirely cloud-based. We handle setup, configuration, and deployment. You need zero server infrastructure, zero software installation, and zero technical expertise on your end. The TPO uploads a CSV of student emails — that is the most technical task required from your college. Everything else is handled by our team.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">Can each department track students separately?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">Yes. The platform supports Department, Year, Batch, and Section organisation. HODs see only their department's data. The Placement Officer sees institution-wide analytics. The Principal sees executive summaries. Role-based access is configured during setup. There is also a complete audit trail of every admin action — every grant or revoke is logged with a timestamp.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">Can the platform carry our college's branding?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">Yes. The platform supports institutional branding — your college name and identity are applied to the student interface. Students see a platform that feels like it belongs to your college, not a third-party tool. This matters for student adoption and for how the platform appears in NAAC documentation as a college-led initiative.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">How fast can we be fully operational?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">Most institutions are fully operational within 7–14 days. A pilot cohort — one department, one batch — can begin within 48 hours of your confirmation. We provide dedicated onboarding support throughout the setup period. There is no waiting list, no complex procurement process, and no minimum commitment for a pilot.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">Is student data secure and kept private?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">Yes. Student data is encrypted at rest and in transit. Institutional data is never shared with third parties — including recruiters — without explicit permission. Students' interview recordings and reports are accessible only to the student and the college admin. A detailed data handling policy is available on request before any commitment.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">Can placement officers monitor individual student progress?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">Yes. The TPO dashboard shows every student's readiness score, total sessions completed, skill gap analysis, score progression over time, and current interview-ready status. You can filter by department, year, or batch. The bottom 20% of performers are automatically flagged for intervention. Reports can be exported as CSV for sharing with HODs or for NAAC submissions.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">We already have a training department. Do we still need this?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">PrepVista does not replace your training department — it multiplies their impact. Think of it this way: your TPO is the coach, PrepVista is the practice ground. A cricket coach is essential, but the team also needs a nets facility to practice individually, every day, with data on every ball they face. Your placement cell handles strategy, corporate relationships, and human mentoring. PrepVista handles the 500-student-scale practice problem that no human team can solve alone.</div></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="faq-q-text">Is there a pilot option before full commitment?</span>
+          <div class="faq-icon">+</div>
+        </div>
+        <div class="faq-body"><div class="faq-body-inner">Yes — and we strongly encourage it. We propose starting with a 2-week free pilot: one department, 20–30 students, full admin access for your TPO. No payment. No contract. You see real data from your own students before making any decision. If the data supports a partnership, we formalise it. If it does not, you have invested nothing except 30 minutes of setup time.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLOSE CTA -->
+<section id="close">
+  <div class="close-bg"></div>
+  <div class="close-inner section-inner">
+    <div class="fade-up">
+      <div class="label" style="margin:0 auto 24px"><span class="label-dot"></span>Founding Partner Opportunity</div>
+      <h2 class="close-h2">Your Next Placement Advantage<br><span class="grad-text">Starts With One Conversation.</span></h2>
+      <p class="close-sub">We are onboarding our founding institution partners this quarter. These colleges shape the product roadmap, receive permanently locked pricing, and benefit from priority support from day one.</p>
+    </div>
+    <div class="cta-cards fade-up">
+      <div class="cta-card">
+        <div class="cta-card-icon">📅</div>
+        <h3>Schedule a Demo</h3>
+        <p>See the full platform live. 30 minutes. We show you exactly what your TPO and students would experience.</p>
+        <a href="mailto:contact@prepvista.in?subject=Demo Request — PrepVista AI" class="btn btn-primary" style="width:100%;justify-content:center">Book Demo Call</a>
+      </div>
+      <div class="cta-card">
+        <div class="cta-card-icon">🧪</div>
+        <h3>Pilot on Your Campus</h3>
+        <p>Start with one department. 20–30 students. 2 weeks. See real data from your own students before committing.</p>
+        <a href="mailto:contact@prepvista.in?subject=Pilot Request — PrepVista AI" class="btn btn-outline" style="width:100%;justify-content:center">Start a Free Pilot</a>
+      </div>
+      <div class="cta-card">
+        <div class="cta-card-icon">💬</div>
+        <h3>Talk to the Founder</h3>
+        <p>Direct conversation. No sales script. Real answers to your specific questions about your college's situation.</p>
+        <a href="mailto:contact@prepvista.in?subject=Founder Call — PrepVista AI" class="btn btn-ghost" style="width:100%;justify-content:center">Speak with Founder</a>
+      </div>
+    </div>
+    <p class="trust-line fade-up">Built by educators and engineers who believe every student deserves a fair shot at their first job.</p>
+    <a href="https://prepvista-ai.vercel.app" class="btn btn-primary btn-xl fade-up" target="_blank">Visit Live Platform →</a>
+  </div>
+</section>
+
+<footer>
+  <div style="font-size:1rem;font-weight:700;margin-bottom:8px">PrepVista AI</div>
+  <div style="margin-bottom:12px;color:var(--text3);font-size:0.82rem">AI-Powered Interview Coaching for Indian College Students</div>
+  <div>
+    <a href="mailto:contact@prepvista.in"><span>contact@prepvista.in</span></a>
+    <a href="https://prepvista-ai.vercel.app" target="_blank"><span>prepvista-ai.vercel.app</span></a>
+  </div>
+  <div style="margin-top:16px">© 2025 PrepVista AI. Designed for institutions that care about student futures.</div>
+</footer>
+
+<script>
+// NAV scroll effect
+window.addEventListener('scroll',()=>{
+  document.getElementById('navbar').classList.toggle('scrolled',window.scrollY>60)
+})
+
+// Intersection Observer — fade-up + counter trigger
+const observer = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.classList.add('visible')
+      // skill bars
+      e.target.querySelectorAll('.bar-fill[data-width]').forEach(b=>{
+        b.style.width=b.dataset.width+'%'
+      })
+    }
+  })
+},{threshold:0.15})
+document.querySelectorAll('.fade-up').forEach(el=>observer.observe(el))
+
+// Counter animation
+const counterObs = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting && !e.target.dataset.done){
+      e.target.dataset.done=1
+      animateCounter(e.target)
+    }
+  })
+},{threshold:0.5})
+document.querySelectorAll('.counter-val[data-target]').forEach(el=>counterObs.observe(el))
+
+function animateCounter(el){
+  const target=parseFloat(el.dataset.target)
+  const prefix=el.dataset.prefix||''
+  const suffix=el.dataset.suffix||''
+  const dec=parseInt(el.dataset.decimal||0)
+  const dur=2000
+  const start=performance.now()
+  function step(now){
+    const t=Math.min((now-start)/dur,1)
+    const ease=t<0.5?2*t*t:(4-2*t)*t-1
+    const val=target*ease
+    el.textContent=prefix+(dec?val.toFixed(dec):Math.round(val))+suffix
+    if(t<1)requestAnimationFrame(step)
+    else el.textContent=prefix+(dec?target.toFixed(dec):target)+suffix
+  }
+  requestAnimationFrame(step)
+}
+
+// Skill bars trigger on student section load
+const skillObs = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.bar-fill[data-width]').forEach(b=>{
+        setTimeout(()=>b.style.width=b.dataset.width+'%',200)
+      })
+    }
+  })
+},{threshold:0.3})
+document.querySelectorAll('.profile-card').forEach(el=>skillObs.observe(el))
+
+// Chart.js
+window.addEventListener('load',()=>{
+  const ctx=document.getElementById('readinessChart').getContext('2d')
+  new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:['0–25% (Very Low)','26–50% (Developing)','51–75% (Approaching)','76–100% (Ready)'],
+      datasets:[{
+        label:'Before PrepVista',
+        data:[22,48,24,6],
+        backgroundColor:'rgba(239,68,68,0.55)',
+        borderColor:'rgba(239,68,68,0.8)',
+        borderWidth:1.5,
+        borderRadius:6
+      },{
+        label:'After PrepVista (Projected)',
+        data:[5,18,42,35],
+        backgroundColor:'rgba(6,214,160,0.55)',
+        borderColor:'rgba(6,214,160,0.8)',
+        borderWidth:1.5,
+        borderRadius:6
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{labels:{color:'rgba(240,244,255,0.7)',font:{family:'DM Sans',size:12}}},
+        tooltip:{backgroundColor:'rgba(13,13,26,0.95)',titleColor:'#F0F4FF',bodyColor:'#94A3B8',borderColor:'rgba(79,110,247,0.3)',borderWidth:1}
+      },
+      scales:{
+        x:{ticks:{color:'rgba(148,163,184,0.8)',font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'rgba(148,163,184,0.8)',font:{size:11},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.06)'},title:{display:true,text:'% of Student Batch',color:'rgba(148,163,184,0.6)',font:{size:11}}}
+      }
+    }
+  })
+})
+
+// ROI Calculator
+function updateROI(){
+  const students=parseInt(document.getElementById('r-students').value)
+  const rate=parseInt(document.getElementById('r-rate').value)
+  const ctc=parseFloat(document.getElementById('r-ctc').value)
+  const fee=parseInt(document.getElementById('r-fee').value)
+  document.getElementById('v-students').textContent=students.toLocaleString('en-IN')
+  document.getElementById('v-rate').textContent=rate+'%'
+  document.getElementById('v-ctc').textContent='₹'+ctc.toFixed(1)+' LPA'
+  document.getElementById('v-fee').textContent='₹'+(fee/100000).toFixed(1)+'L'
+  const addPlaced=Math.round(students*0.10)
+  const totalPlaced=Math.round(students*rate/100)+addPlaced
+  const salImpact=Math.round(totalPlaced*0.5)
+  const addAdmissions=50
+  const revProtected=Math.round(addAdmissions*fee/100000)
+  const dailyCost=Math.round((200000/students)/365*100)/100
+  document.getElementById('o-placed').textContent='+'+addPlaced
+  document.getElementById('o-salary').textContent='₹'+salImpact+'L'
+  document.getElementById('o-revenue').textContent='₹'+revProtected+'L'
+  document.getElementById('o-cost').textContent='₹'+dailyCost.toFixed(2)
+  // Pulse animation
+  ;['out1','out2','out3','out4'].forEach(id=>{
+    const el=document.getElementById(id)
+    el.classList.remove('pulse')
+    void el.offsetWidth
+    el.classList.add('pulse')
+  })
+}
+updateROI()
+
+// FAQ accordion
+function toggleFaq(el){
+  const item=el.parentElement
+  const body=item.querySelector('.faq-body')
+  const isOpen=item.classList.contains('open')
+  document.querySelectorAll('.faq-item.open').forEach(i=>{
+    i.classList.remove('open')
+    i.querySelector('.faq-body').style.maxHeight='0'
+  })
+  if(!isOpen){
+    item.classList.add('open')
+    body.style.maxHeight=body.scrollHeight+'px'
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,552 @@
+{
+  "frontend": {
+    "app\\layout.tsx": {
+      "head": "import type { Metadata } from 'next';\n\nimport './globals.css';\nimport { AwakeKeeper } from '@/components/awake-keeper';\nimport { AmbientEffects } from '@/components/ambient-effects';\nimport { AuthProvider } from '@/lib/auth-context';\nimport { ThemeProvider } from '@/lib/theme-context';\nimport { SupportChatWidget } from '@/components/SupportChatWidget';\n\nexport const metadata: Metadata = {\n  title: 'PrepVista - Resume-Based AI Interview Practice',\n  description:\n    'PrepVista helps final-year students, freshers, and early-career candidates practice resume-based mock interviews with voice-first simulation and actionable AI feedback.',\n  keywords:\n    'interview prep, mock interview, resume-based interview practice, AI interview feedback, voice interview practice, fresher interview prep',\n",
+      "signatures": [
+        "export const metadata: Metadata = {",
+        "export default function RootLayout({ children }: { children: React.ReactNode }) {"
+      ]
+    },
+    "app\\page.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useRef, useState } from 'react';\nimport Link from 'next/link';\nimport { BrandLogo } from '@/components/brand-logo';\nimport { LaunchOfferBanner } from '@/components/launch-offer-banner';\n\nimport { api, ApiPublicGrowth } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\n\nconst liveWaveformBars = [22, 28, 18, 30, 42, 34, 56, 44, 62, 38, 24, 40, 58, 36, 28, 50, 32, 47, 66, 42, 25, 36, 18, 27];\nconst secondaryWaveformBars = [18, 34, 22, 48, 36, 58, 44, 62, 28, 54, 38, 30, 44, 60, 35, 26];\n\nexport default function PrepVistaLandingPage() {\n  const { user } = useAuth();\n",
+      "signatures": [
+        "const liveWaveformBars = [22, 28, 18, 30, 42, 34, 56, 44, 62, 38, 24, 40, 58, 36, 28, 50, 32, 47, 66, 42, 25, 36, 18, 27];",
+        "const secondaryWaveformBars = [18, 34, 22, 48, 36, 58, 44, 62, 28, 54, 38, 30, 44, 60, 35, 26];",
+        "export default function PrepVistaLandingPage() {"
+      ]
+    },
+    "app\\admin\\page.tsx": {
+      "head": "'use client';\n\nimport React, { useEffect, useMemo, useState, useRef } from 'react';\nimport { useRouter } from 'next/navigation';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { ChartIcon, CreditCardIcon, FeedbackIcon, GiftIcon, ShieldIcon, UserIcon } from '@/components/icons';\nimport { api, ApiAdminLaunchOfferItem, ApiAdminOverview } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\n\ntype AdminSection = 'overview' | 'approvals' | 'users' | 'referrals' | 'feedback' | 'revenue' | 'grants' | 'support';\n\nfunction formatDateTime(value?: string | null) {\n  if (!value) {\n    return 'Not available';\n",
+      "signatures": [
+        "function formatDateTime(value?: string | null) {",
+        "function formatPlanName(plan?: string | null) {",
+        "function statusBadgeClass(status: string) {",
+        "const ADMIN_SECTIONS: Array<{",
+        "function StatCard({",
+        "function OverviewSection({ data }: { data: ApiAdminOverview | null }) {",
+        "function ApprovalsSection({",
+        "function GrantsSection({ data, loadOverview }: { data: ApiAdminOverview | null, loadOverview: () => Promise<void> }) {",
+        "function SupportChatSection() {",
+        "function UsersSection({ data }: { data: ApiAdminOverview | null }) {",
+        "function ReferralsSection({ data }: { data: ApiAdminOverview | null }) {",
+        "function FeedbackSection({ data }: { data: ApiAdminOverview | null }) {",
+        "function RevenueSection({ data }: { data: ApiAdminOverview | null }) {",
+        "export default function AdminPage() {"
+      ]
+    },
+    "app\\analytics\\page.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useState } from 'react';\nimport Link from 'next/link';\nimport { useRouter } from 'next/navigation';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { ArrowUpRightIcon, ChartIcon, CrownIcon, PlayIcon, SparklesIcon, TargetIcon } from '@/components/icons';\nimport { api } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\nimport { getStartInterviewHref, isUnlimitedUsage, hasRemainingUsage, PlanUsage } from '@/lib/plan-usage';\n\ninterface DashboardAnalytics {\n  user: {\n    active_plan: string;\n",
+      "signatures": [
+        "interface DashboardAnalytics {",
+        "interface SkillTrendResponse {",
+        "function formatCategoryName(category: string) {",
+        "function normalizeCategoryKey(value: string) {",
+        "function getDifficultyLabel(totalSessions: number, averageScore: number | null) {",
+        "function getEstimatedTime(plan: string) {",
+        "export default function AnalyticsPage() {"
+      ]
+    },
+    "app\\api\\awake\\route.ts": {
+      "head": "export const dynamic = 'force-dynamic';\nexport const runtime = 'nodejs';\n\nconst NO_STORE_HEADERS = {\n  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',\n  Pragma: 'no-cache',\n  'X-Robots-Tag': 'noindex',\n};\n\nconst BACKEND_AWAKE_TIMEOUT_MS = 10000;\nconst BACKEND_AWAKE_RETRY_DELAY_MS = 1500;\n\ntype BackendProbeResult = {\n  configured: boolean;\n  ok: boolean;\n",
+      "signatures": [
+        "export const dynamic = 'force-dynamic';",
+        "export const runtime = 'nodejs';",
+        "const NO_STORE_HEADERS = {",
+        "const BACKEND_AWAKE_TIMEOUT_MS = 10000;",
+        "const BACKEND_AWAKE_RETRY_DELAY_MS = 1500;",
+        "function getBackendAwakeUrl() {",
+        "function getBackendCandidateUrls() {",
+        "export async function GET() {"
+      ]
+    },
+    "app\\auth\\callback\\page.tsx": {
+      "head": "'use client';\n/**\n * PrepVista \u2014 Google OAuth Callback Handler\n * Processes the Supabase OAuth redirect and syncs the session.\n */\n\nimport { Suspense, useEffect } from 'react';\nimport { useRouter, useSearchParams } from 'next/navigation';\nimport { getSupabase } from '@/lib/supabase';\nimport { api } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\n\nfunction AuthCallbackLogic() {\n  const router = useRouter();\n  const searchParams = useSearchParams();\n",
+      "signatures": [
+        "function AuthCallbackLogic() {",
+        "export default function AuthCallbackPage() {"
+      ]
+    },
+    "app\\dashboard\\page.tsx": {
+      "head": "'use client';\n/**\n * PrepVista - Main Workspace Page\n * Cleaner main page with hero, compact plan control, usage, and side navigation.\n */\n\nimport { useEffect, useState } from 'react';\nimport Link from 'next/link';\nimport { useRouter } from 'next/navigation';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { BoltIcon, GiftIcon, HistoryIcon, PlayIcon, ShareIcon, SparklesIcon, TargetIcon } from '@/components/icons';\nimport { MainSideRail } from '@/components/main-side-rail';\nimport { PlanSelector } from '@/components/plan-selector';\nimport { api, ApiLaunchOfferState, ApiReferralSummary } from '@/lib/api';\n",
+      "signatures": [
+        "interface DashboardData {",
+        "function formatPlanName(plan: string) {",
+        "function getCycleResetDateLabel(periodStart?: string | null) {",
+        "function formatExpiryDate(value?: string | null) {",
+        "function formatDateTime(value?: string | null) {",
+        "function getPlanExpiryBadge(plan: 'pro' | 'career', ownedPlans: string[], expiredPlans: string[], planExpiries?: { pro?: string | null; career?: string | null }) {",
+        "export default function DashboardPage() {"
+      ]
+    },
+    "app\\feedback\\page.tsx": {
+      "head": "'use client';\n\nimport { FormEvent, useEffect, useState } from 'react';\nimport { useRouter } from 'next/navigation';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { FeedbackIcon } from '@/components/icons';\nimport { api, ApiFeedbackItem, ApiFeedbackResponse } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\n\nexport default function FeedbackPage() {\n  const { user, loading: authLoading } = useAuth();\n  const [feedbackText, setFeedbackText] = useState('');\n  const [entries, setEntries] = useState<ApiFeedbackItem[]>([]);\n  const [mode, setMode] = useState<'self' | 'admin'>('self');\n",
+      "signatures": [
+        "export default function FeedbackPage() {"
+      ]
+    },
+    "app\\history\\page.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useState } from 'react';\nimport Link from 'next/link';\nimport { useRouter } from 'next/navigation';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { ConfirmDialog } from '@/components/confirm-dialog';\nimport { FileIcon, HistoryIcon, LockIcon, TrashIcon } from '@/components/icons';\nimport { api } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\nimport { getStartInterviewHref, hasRemainingUsage } from '@/lib/plan-usage';\n\ninterface HistoryResponse {\n  sessions: Array<{\n",
+      "signatures": [
+        "interface HistoryResponse {",
+        "export default function HistoryPage() {"
+      ]
+    },
+    "app\\interview\\setup\\page.tsx": {
+      "head": "'use client';\n/**\n * PrepVista - Interview Setup Page\n * Upload resume and start interview. Selected-plan quota is enforced here too.\n */\n\nimport { FormEvent, useEffect, useRef, useState } from 'react';\nimport { useRouter } from 'next/navigation';\nimport Link from 'next/link';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { DifficultySelector } from '@/components/difficulty-selector';\nimport { PlanSelector } from '@/components/plan-selector';\nimport { AlertIcon, BoltIcon, CameraIcon, CrownIcon, FileIcon, InfoIcon, LockIcon, MicIcon, MonitorIcon, ShieldIcon, TargetIcon } from '@/components/icons';\nimport { api } from '@/lib/api';\n",
+      "signatures": [
+        "export default function InterviewSetupPage() {"
+      ]
+    },
+    "app\\interview\\[id]\\page.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useRef, useState } from 'react';\nimport Link from 'next/link';\nimport { useParams, useRouter } from 'next/navigation';\n\nimport { ConfirmDialog } from '@/components/confirm-dialog';\nimport { useAuth } from '@/lib/auth-context';\nimport { api } from '@/lib/api';\n\nimport styles from './page.module.css';\n\ntype InterviewUiState =\n  | 'INIT'\n  | 'AI_SPEAKING'\n",
+      "signatures": [
+        "interface TranscriptMessage {",
+        "interface WarningResumeSnapshot {",
+        "interface StoredSessionData {",
+        "interface ContinueResponse {",
+        "interface NeuralFeedback {",
+        "interface CompletedResponse {",
+        "const FACE_WATCH_INTERVAL_MS = 200;",
+        "const PROCTORING_REPEAT_COOLDOWN_MS = 1400;",
+        "const FACE_MISSING_WARNING_FRAMES = 5;",
+        "const FACE_MULTIPLE_WARNING_FRAMES = 4;",
+        "const FACE_UNSTABLE_WARNING_FRAMES = 5;",
+        "const FACE_FRAMING_WARNING_FRAMES = 7;",
+        "const FACE_HEAD_TURN_WARNING_FRAMES = 8;",
+        "const LIVE_WAVEFORM_BARS = Array.from({ length: 32 }, (_, index) => 26 + Math.round(Math.sin((index / 31) * Math.PI) * 18));",
+        "const WAVEFORM_TICK_MS = 18;",
+        "const WARNING_RESUME_FALLBACK_BUFFER_MS = 2600;",
+        "const WARNING_MIN_VISIBLE_MS = 7600;",
+        "const WARNING_BANNER_PERSIST_MS = 9000;",
+        "const MAX_SUBMIT_RETRIES = 1;",
+        "const SUBMIT_RETRY_DELAY_MS = 350;",
+        "const SILENCE_TIMEOUT_SECONDS = 20;",
+        "const SILENCE_TIMEOUT_MS = SILENCE_TIMEOUT_SECONDS * 1000;",
+        "const SILENCE_CHECK_INTERVAL_MS = 250;",
+        "const AUDIO_ACTIVITY_REFRESH_MS = 450;",
+        "const SPEECH_ENERGY_KEEPALIVE_THRESHOLD = 0.08;",
+        "const PREFERRED_FEMALE_VOICE_MARKERS = [",
+        "const SOFT_VOICE_MARKERS = ['natural', 'neural', 'premium', 'enhanced', 'wavenet', 'online', 'studio', 'expressive'];",
+        "const DISFAVORED_VOICE_MARKERS = ['male', 'david', 'mark', 'alex', 'daniel', 'fred', 'jorge', 'desktop', 'espeak', 'classic'];",
+        "const SPEECH_PRONUNCIATION_RULES: Array<[RegExp, string]> = [",
+        "const LIVE_TRANSCRIPT_RULES: Array<[RegExp, string]> = ["
+      ]
+    },
+    "app\\login\\page.tsx": {
+      "head": "'use client';\n/**\n * PrepVista \u2014 Login / Signup Page\n * Email/password + Google OAuth sign-in.\n * Wrapped in Suspense to satisfy Next.js 16 useSearchParams() requirement.\n */\n\nimport { useEffect, useState, FormEvent, Suspense } from 'react';\nimport { useAuth } from '@/lib/auth-context';\nimport { useSearchParams } from 'next/navigation';\nimport Link from 'next/link';\nimport { BrandLogo } from '@/components/brand-logo';\nimport { LaunchOfferBanner } from '@/components/launch-offer-banner';\nimport { api, ApiPublicGrowth } from '@/lib/api';\n\n",
+      "signatures": [
+        "function LoginForm() {",
+        "export default function LoginPage() {"
+      ]
+    },
+    "app\\pricing\\page.tsx": {
+      "head": "'use client';\n/**\n * PrepVista - Pricing Page\n * Supports purchase, expiry awareness, and switching across active tiers.\n */\n\nimport { useEffect, useRef, useState } from 'react';\nimport Link from 'next/link';\nimport { useRouter } from 'next/navigation';\n\nimport { BrandLogo } from '@/components/brand-logo';\nimport { ArrowLeftIcon, CrownIcon } from '@/components/icons';\nimport { LaunchOfferBanner } from '@/components/launch-offer-banner';\nimport { useAuth } from '@/lib/auth-context';\nimport { api, ApiPublicGrowth } from '@/lib/api';\n",
+      "signatures": [
+        "const plans: readonly PlanCard[] = [",
+        "export default function PricingPage() {"
+      ]
+    },
+    "app\\privacy\\page.tsx": {
+      "head": "import { LegalDocumentPage } from '@/components/legal-document-page';\nimport { PRIVACY_POLICY_TEXT } from '@/lib/legal-content';\n\nexport const metadata = { title: 'Privacy Policy - PrepVista' };\n\nexport default function PrivacyPage() {\n  return <LegalDocumentPage content={PRIVACY_POLICY_TEXT} />;\n}\n",
+      "signatures": [
+        "export const metadata = { title: 'Privacy Policy - PrepVista' };",
+        "export default function PrivacyPage() {"
+      ]
+    },
+    "app\\profile\\page.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useState } from 'react';\nimport Link from 'next/link';\nimport { useRouter } from 'next/navigation';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { CreditCardIcon, CrownIcon, FileIcon, PaletteIcon, TrashIcon, UserIcon } from '@/components/icons';\nimport { api } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\nimport { getStartInterviewHref } from '@/lib/plan-usage';\n\ninterface BillingData {\n  active_plan: string;\n  owned_plans: string[];\n",
+      "signatures": [
+        "interface BillingData {",
+        "function formatPlanName(plan: string) {",
+        "function formatBillingDateTime(value?: string | null) {",
+        "export default function ProfilePage() {"
+      ]
+    },
+    "app\\referral\\[code]\\page.tsx": {
+      "head": "'use client';\n\nimport { FormEvent, useEffect, useMemo, useState } from 'react';\nimport Link from 'next/link';\nimport { useParams } from 'next/navigation';\n\nimport { BrandLogo } from '@/components/brand-logo';\nimport { GiftIcon, SparklesIcon } from '@/components/icons';\nimport { api, ApiPublicReferral } from '@/lib/api';\n\nexport default function ReferralInvitePage() {\n  const params = useParams<{ code: string }>();\n  const referralCode = useMemo(() => {\n    const rawCode = params?.code;\n    return Array.isArray(rawCode) ? rawCode[0] : rawCode || '';\n",
+      "signatures": [
+        "export default function ReferralInvitePage() {"
+      ]
+    },
+    "app\\report\\[id]\\page.tsx": {
+      "head": "'use client';\n/**\n * PrepVista - Report Page\n * Displays interview report with scores, rubric breakdown, per-question feedback.\n * Free users see limited view. Premium users can download a professional PDF.\n */\n\nimport { useEffect, useState } from 'react';\nimport Link from 'next/link';\nimport { useParams, useRouter } from 'next/navigation';\n\nimport { BrandLogo } from '@/components/brand-logo';\nimport { useAuth } from '@/lib/auth-context';\nimport { api } from '@/lib/api';\n\n",
+      "signatures": [
+        "interface Evaluation {",
+        "interface CareerSummary {",
+        "interface ProSummary {",
+        "interface InterviewSummary {",
+        "interface ReportData {",
+        "function formatDurationLabel(totalSeconds?: number | null) {",
+        "function getFreeBadgeClass(answerStatus?: string | null) {",
+        "function getStatusBadgeClass(answerStatus?: string | null, fallbackClassification?: string | null) {",
+        "export default function ReportPage() {"
+      ]
+    },
+    "app\\settings\\page.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useState } from 'react';\nimport { useRouter } from 'next/navigation';\n\nimport { AuthHeader } from '@/components/auth-header';\nimport { CreditCardIcon, PaletteIcon, SettingsIcon } from '@/components/icons';\nimport { api } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\n\ninterface BillingData {\n  active_plan: string;\n  owned_plans: string[];\n  recent_payments: Array<{\n    plan: string;\n",
+      "signatures": [
+        "interface BillingData {",
+        "function formatBillingDateTime(value?: string | null) {",
+        "export default function SettingsPage() {"
+      ]
+    },
+    "app\\terms\\page.tsx": {
+      "head": "import { LegalDocumentPage } from '@/components/legal-document-page';\nimport { TERMS_TEXT } from '@/lib/legal-content';\n\nexport const metadata = { title: 'Terms & Conditions - PrepVista' };\n\nexport default function TermsPage() {\n  return <LegalDocumentPage content={TERMS_TEXT} />;\n}\n",
+      "signatures": [
+        "export const metadata = { title: 'Terms & Conditions - PrepVista' };",
+        "export default function TermsPage() {"
+      ]
+    },
+    "components\\ambient-effects.tsx": {
+      "head": "'use client';\n\nimport { useEffect } from 'react';\n\nexport function AmbientEffects() {\n  useEffect(() => {\n    const root = document.documentElement;\n    let rafId = 0;\n\n    const updatePointer = (x: number, y: number) => {\n      root.style.setProperty('--cursor-x', `${x}px`);\n      root.style.setProperty('--cursor-y', `${y}px`);\n    };\n\n    const handleMove = (event: MouseEvent) => {\n",
+      "signatures": [
+        "export function AmbientEffects() {"
+      ]
+    },
+    "components\\auth-header.tsx": {
+      "head": "'use client';\n\nimport type { ReactNode } from 'react';\nimport Link from 'next/link';\nimport { usePathname, useRouter } from 'next/navigation';\n\nimport { useAuth } from '@/lib/auth-context';\nimport { BrandLogo } from '@/components/brand-logo';\n\nimport {\n  ArrowLeftIcon,\n  ChartIcon,\n  CreditCardIcon,\n  FeedbackIcon,\n  HistoryIcon,\n",
+      "signatures": [
+        "interface AuthHeaderProps {",
+        "function matchesPath(pathname: string, href: string) {",
+        "function NavLink({",
+        "export function AuthHeader({ backHref, backLabel = 'Back' }: AuthHeaderProps) {"
+      ]
+    },
+    "components\\awake-keeper.tsx": {
+      "head": "'use client';\n\nimport { useEffect } from 'react';\n\nconst TEN_MINUTES_MS = 10 * 60 * 1000;\nconst FIVE_MINUTES_MS = 5 * 60 * 1000;\nconst KEEPALIVE_TIMEOUT_MS = 12000;\n\nfunction getKeepaliveIntervalMs() {\n  const rawValue = Number(process.env.NEXT_PUBLIC_AWAKE_INTERVAL_MS || TEN_MINUTES_MS);\n  if (!Number.isFinite(rawValue)) {\n    return TEN_MINUTES_MS;\n  }\n  return Math.max(rawValue, FIVE_MINUTES_MS);\n}\n",
+      "signatures": [
+        "const TEN_MINUTES_MS = 10 * 60 * 1000;",
+        "const FIVE_MINUTES_MS = 5 * 60 * 1000;",
+        "const KEEPALIVE_TIMEOUT_MS = 12000;",
+        "function getKeepaliveIntervalMs() {",
+        "export function AwakeKeeper() {"
+      ]
+    },
+    "components\\brand-logo.tsx": {
+      "head": "import Image from 'next/image';\n\ninterface BrandLogoProps {\n  nameClassName?: string;\n  subtitle?: string;\n  subtitleClassName?: string;\n  className?: string;\n  imageClassName?: string;\n  size?: number;\n  priority?: boolean;\n}\n\nexport function BrandLogo({\n  nameClassName = 'text-lg font-bold text-primary',\n  subtitle,\n",
+      "signatures": [
+        "interface BrandLogoProps {",
+        "export function BrandLogo({"
+      ]
+    },
+    "components\\confirm-dialog.tsx": {
+      "head": "'use client';\n\nimport type { ReactNode } from 'react';\nimport { useEffect } from 'react';\n\ninterface ConfirmDialogProps {\n  open: boolean;\n  title: string;\n  description: ReactNode;\n  confirmLabel: string;\n  cancelLabel?: string;\n  confirmTone?: 'danger' | 'primary';\n  loading?: boolean;\n  onConfirm: () => void;\n  onCancel: () => void;\n",
+      "signatures": [
+        "interface ConfirmDialogProps {",
+        "export function ConfirmDialog({"
+      ]
+    },
+    "components\\difficulty-selector.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useRef, useState } from 'react';\n\nimport { CheckIcon, ChevronDownIcon, SparklesIcon, TargetIcon } from './icons';\n\nconst difficultyOptions = [\n  {\n    id: 'auto',\n    name: 'Auto',\n    short: 'Adaptive by resume',\n    description: 'Uses the current smart adaptive flow.',\n    icon: SparklesIcon,\n  },\n  {\n",
+      "signatures": [
+        "const difficultyOptions = [",
+        "export function DifficultySelector({"
+      ]
+    },
+    "components\\icons.tsx": {
+      "head": "import { SVGProps } from 'react';\n\ntype IconProps = SVGProps<SVGSVGElement> & {\n  size?: number;\n};\n\nfunction baseProps(size = 18) {\n  return {\n    width: size,\n    height: size,\n    viewBox: '0 0 24 24',\n    fill: 'none',\n    stroke: 'currentColor',\n    strokeWidth: 1.9,\n    strokeLinecap: 'round' as const,\n",
+      "signatures": [
+        "function baseProps(size = 18) {",
+        "export function HomeIcon({ size = 18, ...props }: IconProps) {",
+        "export function UserIcon({ size = 18, ...props }: IconProps) {",
+        "export function HistoryIcon({ size = 18, ...props }: IconProps) {",
+        "export function SettingsIcon({ size = 18, ...props }: IconProps) {",
+        "export function LogoutIcon({ size = 18, ...props }: IconProps) {",
+        "export function SunIcon({ size = 18, ...props }: IconProps) {",
+        "export function MoonIcon({ size = 18, ...props }: IconProps) {",
+        "export function CrownIcon({ size = 18, ...props }: IconProps) {",
+        "export function LockIcon({ size = 18, ...props }: IconProps) {",
+        "export function ArrowLeftIcon({ size = 18, ...props }: IconProps) {",
+        "export function BoltIcon({ size = 18, ...props }: IconProps) {",
+        "export function FileIcon({ size = 18, ...props }: IconProps) {",
+        "export function InfoIcon({ size = 18, ...props }: IconProps) {",
+        "export function ShieldIcon({ size = 18, ...props }: IconProps) {",
+        "export function CameraIcon({ size = 18, ...props }: IconProps) {",
+        "export function MicIcon({ size = 18, ...props }: IconProps) {",
+        "export function MonitorIcon({ size = 18, ...props }: IconProps) {",
+        "export function AlertIcon({ size = 18, ...props }: IconProps) {",
+        "export function CreditCardIcon({ size = 18, ...props }: IconProps) {",
+        "export function GiftIcon({ size = 18, ...props }: IconProps) {",
+        "export function BellIcon({ size = 18, ...props }: IconProps) {",
+        "export function ChartIcon({ size = 18, ...props }: IconProps) {",
+        "export function SparklesIcon({ size = 18, ...props }: IconProps) {",
+        "export function TargetIcon({ size = 18, ...props }: IconProps) {",
+        "export function ArrowUpRightIcon({ size = 18, ...props }: IconProps) {",
+        "export function ShareIcon({ size = 18, ...props }: IconProps) {",
+        "export function PlayIcon({ size = 18, ...props }: IconProps) {",
+        "export function ClockIcon({ size = 18, ...props }: IconProps) {",
+        "export function FolderIcon({ size = 18, ...props }: IconProps) {"
+      ]
+    },
+    "components\\launch-offer-banner.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useState } from 'react';\n\nconst OFFER_SEEN_KEY = 'pv_launch_offer_seen_v1';\nconst FIRST_VIEW_ANIMATION_MS = 6500;\n\ntype LaunchOfferBannerProps = {\n  className?: string;\n  tone?: 'dark' | 'light';\n  maxSlots?: number | null;\n  remainingSlots?: number | null;\n  offerDurationDays?: number | null;\n};\n\n",
+      "signatures": [
+        "const OFFER_SEEN_KEY = 'pv_launch_offer_seen_v1';",
+        "const FIRST_VIEW_ANIMATION_MS = 6500;",
+        "export function LaunchOfferBanner({"
+      ]
+    },
+    "components\\legal-document-page.tsx": {
+      "head": "import Link from 'next/link';\nimport { BrandLogo } from '@/components/brand-logo';\n\ninterface LegalDocumentPageProps {\n  content: string;\n}\n\nexport function LegalDocumentPage({ content }: LegalDocumentPageProps) {\n  return (\n    <div className=\"min-h-screen surface-primary\">\n      <nav className=\"border-b border-border px-6 py-3\">\n        <div className=\"mx-auto flex max-w-5xl items-center justify-between\">\n          <Link href=\"/\" className=\"inline-flex\">\n            <BrandLogo size={32} priority nameClassName=\"text-lg font-bold text-primary\" />\n          </Link>\n",
+      "signatures": [
+        "interface LegalDocumentPageProps {",
+        "export function LegalDocumentPage({ content }: LegalDocumentPageProps) {"
+      ]
+    },
+    "components\\main-side-rail.tsx": {
+      "head": "'use client';\n\nimport type { ReactElement, SVGProps } from 'react';\nimport Link from 'next/link';\nimport { usePathname, useRouter } from 'next/navigation';\n\nimport {\n  ChartIcon,\n  ClockIcon,\n  CrownIcon,\n  FeedbackIcon,\n  FolderIcon,\n  PlayIcon,\n  SettingsIcon,\n  ShieldIcon,\n",
+      "signatures": [
+        "interface RailItem {",
+        "interface MainSideRailProps {",
+        "function isActive(pathname: string, href: string) {",
+        "function RailLink({ item, pathname }: { item: RailItem; pathname: string }) {",
+        "export function MainSideRail({ startInterviewHref, liveSessionHref, careerHref, showAdminLink = false }: MainSideRailProps) {"
+      ]
+    },
+    "components\\plan-selector.tsx": {
+      "head": "'use client';\n\nimport { useEffect, useRef, useState } from 'react';\nimport Link from 'next/link';\n\nimport { useAuth } from '@/lib/auth-context';\nimport { api, ApiUser } from '@/lib/api';\n\nimport {\n  BoltIcon,\n  CheckIcon,\n  ChevronDownIcon,\n  CrownIcon,\n  LockIcon,\n  SparklesIcon,\n",
+      "signatures": [
+        "const planOptions = [",
+        "export function PlanSelector({"
+      ]
+    },
+    "components\\SupportChatWidget.tsx": {
+      "head": "'use client';\n\nimport React, { useState, useEffect, useRef } from 'react';\nimport { api } from '@/lib/api';\nimport { useAuth } from '@/lib/auth-context';\n\nexport function SupportChatWidget() {\n  const { user } = useAuth();\n  const [isOpen, setIsOpen] = useState(false);\n  const [messages, setMessages] = useState<any[]>([]);\n  const [loading, setLoading] = useState(false);\n  const [text, setText] = useState('');\n  const [base64Image, setBase64Image] = useState<string | null>(null);\n  const fileInputRef = useRef<HTMLInputElement>(null);\n  const scrollRef = useRef<HTMLDivElement>(null);\n",
+      "signatures": [
+        "export function SupportChatWidget() {"
+      ]
+    },
+    "lib\\api.ts": {
+      "head": "/**\n * PrepVista \u2014 Backend API Client\n * Centralized HTTP client with retry, error parsing, and Razorpay billing.\n */\n\nconst API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';\n\nexport interface ApiUser {\n  id: string;\n  email: string;\n  full_name: string | null;\n  plan: string;\n  active_plan: string;\n  owned_plans: string[];\n  expired_plans: string[];\n",
+      "signatures": [
+        "const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';",
+        "export interface ApiUser {",
+        "export interface ApiReferralEntry {",
+        "export interface ApiReferralSummary {",
+        "export interface ApiPublicReferral {",
+        "export interface ApiPublicGrowth {",
+        "export interface ApiFeedbackItem {",
+        "export interface ApiFeedbackResponse {",
+        "export interface ApiLaunchOfferState {",
+        "export interface ApiAdminLaunchOfferItem {",
+        "export interface ApiAdminUserItem {",
+        "export interface ApiAdminReferralItem {",
+        "export interface ApiAdminOverview {",
+        "interface AuthTokensResponse {",
+        "interface SignupCodeResponse {",
+        "interface OAuthCompleteResponse {",
+        "interface ApiOptions {",
+        "class ApiClient {",
+        "export const api = new ApiClient();"
+      ]
+    },
+    "lib\\auth-context.tsx": {
+      "head": "'use client';\n/**\n * PrepVista \u2014 Auth Context Provider\n * Global authentication state with email/password + Google OAuth support.\n */\n\nimport { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';\nimport { api, ApiUser } from '@/lib/api';\nimport { deriveUsageForPlan } from '@/lib/plan-usage';\nimport { getSupabase } from '@/lib/supabase';\nimport { useRouter } from 'next/navigation';\n\nexport type User = ApiUser;\n\ninterface AuthContextType {\n",
+      "signatures": [
+        "export type User = ApiUser;",
+        "interface AuthContextType {",
+        "const AuthContext = createContext<AuthContextType | undefined>(undefined);",
+        "export function AuthProvider({ children }: { children: ReactNode }) {",
+        "export function useAuth() {"
+      ]
+    },
+    "lib\\legal-content.ts": {
+      "head": "export const PRIVACY_POLICY_TEXT = `**Privacy Policy**\n\n**Effective Date:** March 22, 2026\n**Last Updated:** March 22, 2026\n\nPrepVista (\u00e2\u20ac\u0153PrepVista,\u00e2\u20ac\u009d \u00e2\u20ac\u0153we,\u00e2\u20ac\u009d \u00e2\u20ac\u0153us,\u00e2\u20ac\u009d or \u00e2\u20ac\u0153our\u00e2\u20ac\u009d) is committed to protecting your privacy and handling personal information in a responsible, transparent, and secure manner. This Privacy Policy explains how we collect, receive, use, process, store, disclose, transfer, retain, and otherwise handle information when you access, visit, register for, interact with, or use our website, platform, applications, products, features, content, communications, and related services, including interview practice, personalized question generation, coaching, performance reporting, subscriptions, account management, customer support, and any related functionality we make available from time to time (collectively, the \u00e2\u20ac\u0153Services\u00e2\u20ac\u009d). This Privacy Policy is intended to help you understand what information we collect, why we collect it, how we use it, when it may be shared, how long it may be retained, what rights and choices you may have, and how we seek to safeguard it. By accessing or using the Services, you acknowledge that you have read and understood this Privacy Policy and agree to the practices described in it, subject to applicable law.\n\nWe may collect information directly from you, automatically through your use of the Services, and in certain cases from authorized third parties or service providers. The information we collect depends on how you use PrepVista, the features you access, the information you choose to provide, the permissions you grant, and the transactions you complete. Information you provide directly may include your name, email address, account credentials, profile information, communication preferences, subscription choices, support messages, uploaded documents, feedback, form responses, and any other information or content you voluntarily submit through the Services. If you create an account, we may collect information necessary to establish, authenticate, maintain, and secure that account. If you choose to sign in through a third-party authentication provider, we may receive limited profile or account information associated with that provider, subject to the permissions you authorize and the settings of that provider.\n\nAs part of the Services, you may upload resumes, CVs, career documents, or similar materials for personalization and interview preparation purposes. When you submit such materials, we may collect, process, analyze, and store the content contained in those materials in order to provide and improve the Services. This may include information such as education history, professional experience, work samples, projects, skills, certifications, achievements, and other career-related details that you choose to include. We may use this information to tailor interview questions, personalize practice sessions, improve the relevance of feedback, adapt question difficulty or subject matter to your background, and provide outputs that are more closely aligned with your profile, goals, and experience. The quality and relevance of some features may depend in part on the accuracy, completeness, and appropriateness of the information you choose to provide.\n\nWhen you participate in interview sessions, voice-based interactions, coaching flows, evaluation features, feedback modules, or related user experiences, we may collect and process information associated with those interactions. This may include prompts shown to you, answers you provide, transcripts derived from your responses, interview mode selections, timing information, categories of questions, evaluation results, scores, comparative performance insights, progress history, strengths and weaknesses identified by the system, recommendations, coaching feedback, and other session-related information. If a feature involves spoken responses, your spoken input may be converted into text and processed as part of the Services. If a feature requests access to your microphone or camera, such access is requested solely to provide that particular feature or user-selected functionality. Depending on the design of the specific feature, some information may be processed temporarily, locally, or in connection with the relevant session experience in order to support voice interaction, focus monitoring, realistic simulation, personalization, or related service functionality. We do not use camera or microphone access for purposes unrelated to delivering the feature you have chosen to use.\n\nWe may also collect technical, device, and usage information automatically when you use the Services. This may include browser type, device type, operating system, language settings, IP address, approximate location information inferred from technical data, timestamps, pages or screens viewed, features accessed, buttons clicked, referral information, session duration, authentication events, account activity, reports viewed or downloaded, interviews started or completed, plan usage, quota consumption, cookies, local storage data, session identifiers, logs, crash information, diagnostic data, and similar information. We collect and use this information to operate the Services, maintain security, authenticate users, preserve session integrity, detect suspicious activity, enforce subscription limits, monitor performance, troubleshoot problems, improve reliability, analyze usage trends, understand how features are used, refine product design, and support overall business operations. We may also generate aggregated, statistical, anonymized, or de-identified information derived from this data for analytics, reporting, research, benchmarking, testing, service optimization, and lawful business improvement purposes.\n\n",
+      "signatures": [
+        "export const PRIVACY_POLICY_TEXT = `**Privacy Policy**",
+        "export const TERMS_TEXT = `**Terms & Conditions**"
+      ]
+    },
+    "lib\\plan-usage.ts": {
+      "head": "export interface PlanUsage {\n  plan: string;\n  effective_plan?: string;\n  used: number;\n  limit: number | null;\n  remaining: number | null;\n  is_unlimited?: boolean;\n  referral_bonus_interviews?: number;\n  period_start?: string | null;\n}\n\nconst PLAN_LIMITS: Record<string, number | null> = {\n  free: 2,\n  pro: 15,\n  career: null,\n",
+      "signatures": [
+        "export interface PlanUsage {",
+        "const PLAN_LIMITS: Record<string, number | null> = {",
+        "export function getPlanInterviewLimit(plan: string, referralBonusInterviews = 0) {",
+        "export function deriveUsageForPlan(",
+        "export function isUnlimitedUsage(usage?: PlanUsage | null) {",
+        "export function hasRemainingUsage(usage?: PlanUsage | null) {",
+        "export function getStartInterviewHref(usage?: PlanUsage | null) {",
+        "export function getPlanLimitLabel(usage?: PlanUsage | null) {",
+        "export function getUsageHeadline(usage?: PlanUsage | null) {",
+        "export function getLowLimitNotice(usage?: PlanUsage | null) {"
+      ]
+    },
+    "lib\\supabase.ts": {
+      "head": "/**\n * PrepVista \u2014 Supabase Client (Frontend)\n * Used for Google OAuth and session management on the client side.\n * Lazy-initialized to avoid build-time errors when env vars are not set.\n */\n\nimport { createClient, SupabaseClient } from '@supabase/supabase-js';\n\nconst supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';\nconst supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';\n\nlet _supabase: SupabaseClient | null = null;\n\nexport function getSupabase(): SupabaseClient {\n  if (!_supabase) {\n",
+      "signatures": [
+        "const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';",
+        "const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';",
+        "export function getSupabase(): SupabaseClient {",
+        "export const supabase = (typeof window !== 'undefined' && supabaseUrl && supabaseAnonKey)"
+      ]
+    },
+    "lib\\theme-context.tsx": {
+      "head": "'use client';\n/**\n * PrepVista - Theme Context Provider\n * Dark-mode only theme provider that preserves the existing app structure.\n */\n\nimport { createContext, useContext, useEffect, ReactNode } from 'react';\n\ntype Theme = 'dark';\ntype ResolvedTheme = 'dark';\n\ninterface ThemeContextType {\n  theme: Theme;\n  resolvedTheme: ResolvedTheme;\n  setTheme: (_theme: 'light' | 'dark' | 'system') => void;\n",
+      "signatures": [
+        "interface ThemeContextType {",
+        "const ThemeContext = createContext<ThemeContextType | undefined>(undefined);",
+        "const STORAGE_KEY = 'pv_theme';",
+        "export function ThemeProvider({ children }: { children: ReactNode }) {",
+        "export function useTheme() {"
+      ]
+    },
+    "types\\speech.d.ts": {
+      "head": "/**\n * Web Speech API Type Declarations\n * Required because TypeScript doesn't include these by default.\n */\n\ninterface SpeechRecognitionEvent extends Event {\n  readonly resultIndex: number;\n  readonly results: SpeechRecognitionResultList;\n}\n\ninterface SpeechRecognitionResultList {\n  readonly length: number;\n  item(index: number): SpeechRecognitionResult;\n  [index: number]: SpeechRecognitionResult;\n}\n",
+      "signatures": [
+        "interface SpeechRecognitionEvent extends Event {",
+        "interface SpeechRecognitionResultList {",
+        "interface SpeechRecognitionResult {",
+        "interface SpeechRecognitionAlternative {",
+        "interface SpeechRecognition extends EventTarget {",
+        "interface Window {",
+        "interface MediaPipeFaceDetectionLandmark {",
+        "interface MediaPipeFaceDetectionItem {",
+        "interface MediaPipeFaceDetectionResults {",
+        "interface MediaPipeFaceDetector {",
+        "interface MediaPipeFaceDetectionConstructor {"
+      ]
+    }
+  },
+  "tests": {
+    "test_50_questions_validation.py": {
+      "head": "\"\"\"\nCOMPREHENSIVE 50-QUESTION VALIDATION\n=====================================\nGenerates 50 deterministic follow-up questions across ALL plans (Free, Pro, Career),\nALL question families, MULTIPLE resume types, and varied answer signals.\n\nEach question is validated for:\n  1. NOT empty \u2014 the function must return a question\n  2. NO vague phrases \u2014 \"that work\", \"that project\", \"there\", etc. are banned\n     unless the specific subject is already named in the same sentence\n  3. GROUNDED \u2014 references a specific project, skill, role, or education detail\n  4. USER CLARITY \u2014 question is self-contained (user knows exactly what it refers to)\n  5. STRUCTURE INTACT \u2014 original return types and call signatures preserved\n\nThis test ensures 100% accuracy and deployment readiness.\n",
+      "signatures": [
+        "def _is_grounded(question: str) -> tuple[bool, str]:",
+        "def _ai_resume() -> dict:",
+        "def _business_resume() -> dict:",
+        "def _fullstack_resume() -> dict:",
+        "def test_question_is_grounded(plan, builder_key, previous_q, user_answer, resume_fn, label):",
+        "class TestOriginalStructureIntact:",
+        "def test_free_builder_returns_str(self):",
+        "def test_free_builder_works_without_resume(self):",
+        "def test_pro_builder_returns_str(self):",
+        "def test_pro_builder_works_without_resume(self):",
+        "def test_career_builder_returns_str(self):",
+        "def test_career_builder_works_with_none_resume(self):",
+        "def test_career_builder_works_with_empty_resume(self):",
+        "def test_humanize_target_returns_str(self):",
+        "def test_humanize_target_no_banned_defaults(self):",
+        "def test_question_family_detection_still_works(self):",
+        "class TestCrossResumeConsistency:",
+        "def test_free_intro_grounded_all_resumes(self, resume_fn):",
+        "def test_pro_intro_grounded_all_resumes(self, resume_fn):",
+        "def test_career_intro_grounded_all_resumes(self, resume_fn):"
+      ]
+    },
+    "test_auth_identity.py": {
+      "head": "import asyncio\n\nfrom app.services.auth_identity import (\n    ensure_auth_identity_link,\n    extract_auth_identity,\n    get_profile_id_for_auth_user,\n    list_auth_user_ids_for_profile,\n)\n\n\nclass _FakeConn:\n    def __init__(self):\n        self.links: dict[str, dict[str, str]] = {}\n\n    async def execute(self, query: str, auth_user_id: str, profile_id: str, email: str, provider: str):\n",
+      "signatures": [
+        "class _FakeConn:",
+        "def __init__(self):",
+        "def test_extract_auth_identity_reads_google_metadata():",
+        "def test_extract_auth_identity_falls_back_to_name_picture_and_email_provider():",
+        "def test_auth_identity_links_resolve_canonical_profile():"
+      ]
+    },
+    "test_email_validation.py": {
+      "head": "from app.services.email_validation import (\n    REAL_EMAIL_ERROR_MESSAGE,\n    TEMPORARY_EMAIL_ERROR_MESSAGE,\n    validate_deliverable_email_address,\n)\n\n\nclass _ValidatedEmail:\n    def __init__(self, normalized: str):\n        self.normalized = normalized\n\n\ndef test_validate_deliverable_email_address_returns_normalized_email(monkeypatch):\n    def fake_validate_email(email: str, *, check_deliverability: bool):\n        assert email == \"User@Example.com\"\n",
+      "signatures": [
+        "class _ValidatedEmail:",
+        "def __init__(self, normalized: str):",
+        "def test_validate_deliverable_email_address_returns_normalized_email(monkeypatch):",
+        "def fake_validate_email(email: str, *, check_deliverability: bool):",
+        "def test_validate_deliverable_email_address_rejects_undeliverable_email(monkeypatch):",
+        "def fake_validate_email(email: str, *, check_deliverability: bool):",
+        "def test_validate_deliverable_email_address_rejects_common_provider_typos(monkeypatch):",
+        "def fake_validate_email(email: str, *, check_deliverability: bool):",
+        "def test_validate_deliverable_email_address_rejects_disposable_domains(monkeypatch):",
+        "def fake_validate_email(email: str, *, check_deliverability: bool):",
+        "def test_pro_deactivation_does_not_change_other_unlimited_markers():",
+        "def __init__(self):"
+      ]
+    },
+    "test_grounded_questions.py": {
+      "head": "\"\"\"Verify that deterministic follow-up questions are always resume-grounded.\n\nEvery question must reference specific project names, skills, or education\ncontext from the resume \u2014 never vague placeholders like \"that work\",\n\"that project\", or \"there\".\n\"\"\"\n\nfrom app.services.interviewer import (\n    _build_free_followup_question,\n    _build_pro_followup_question,\n    _build_career_followup_question,\n    _humanize_question_target,\n)\n\nVAGUE_PHRASES = [\n",
+      "signatures": [
+        "def _ai_resume() -> dict:",
+        "def _non_software_resume() -> dict:",
+        "def _has_no_vague_phrases(question: str) -> bool:",
+        "def _has_resume_context(question: str, resume: dict) -> bool:",
+        "def test_free_intro_followup_no_vague_with_resume():",
+        "def test_free_intro_followup_has_context_with_resume():",
+        "def test_free_ownership_followup_no_vague():",
+        "def test_free_communication_explain_no_vague():",
+        "def test_free_fallback_with_no_signal_still_grounded():",
+        "def test_pro_intro_followup_no_vague():",
+        "def test_pro_ownership_fallback_no_vague():",
+        "def test_pro_workflow_followup_no_vague():",
+        "def test_pro_tool_method_no_vague():",
+        "def test_career_intro_followup_no_vague():",
+        "def test_career_ownership_no_vague():",
+        "def test_career_role_fit_no_vague():",
+        "def test_career_studies_followup_no_vague():",
+        "def test_free_non_software_resume_still_grounded():",
+        "def test_career_non_software_resume_still_grounded():",
+        "def test_humanize_target_no_that_work_defaults():",
+        "def test_humanize_target_workflow_returns_your_work():"
+      ]
+    },
+    "test_interview_logic.py": {
+      "head": "from app.config import is_valid_difficulty_mode, normalize_difficulty_mode\nfrom app.services.evaluator import compute_final_score\nfrom app.services.interview_summary import (\n    TURN_OUTCOME_CLARIFICATION,\n    TURN_OUTCOME_TIMEOUT,\n    TURN_STATE_ACTIVE_QUESTION_OPEN,\n    TURN_STATE_QUESTION_CLOSED,\n    TURN_STATE_WAITING_CLARIFICATION,\n    compute_interview_summary,\n)\nfrom app.services.interviewer import (\n    _apply_cross_session_question_cooldown,\n    _build_fallback_question_plan,\n    _build_opening_question,\n    _build_repeat_question,\n",
+      "signatures": [
+        "def _sample_resume() -> dict:",
+        "def test_normalize_difficulty_mode_falls_back_to_auto():",
+        "def test_is_valid_difficulty_mode_rejects_unknown_values():",
+        "def test_fallback_question_plan_applies_difficulty_bias():",
+        "def test_cross_session_cooldown_changes_recent_targets_when_resume_has_depth():",
+        "def test_opening_question_avoids_exact_repeats_across_recent_sessions():",
+        "def test_repeat_question_returns_simpler_wording():",
+        "def test_duplicate_detection_catches_exact_or_near_repeat():",
+        "def test_live_difficulty_signal_respects_selected_mode():",
+        "def test_final_score_scales_by_expected_questions():",
+        "def test_clarification_requested_does_not_count_as_answered():",
+        "def test_interview_summary_keeps_open_question_out_of_closed_count():",
+        "def test_interview_summary_uses_runtime_counters_for_clarification_and_timeout():",
+        "def test_interview_summary_tracks_waiting_clarification_as_open_question():",
+        "def test_interview_summary_timeout_on_closed_question_does_not_reopen_it():",
+        "def _ai_backend_resume_quality() -> dict:",
+        "def _non_software_resume_quality() -> dict:",
+        "def test_resume_field_inference_detects_ai_backend_resume():",
+        "def test_resume_field_inference_detects_non_software_resume():",
+        "def test_career_difficult_plan_avoids_recruiter_loop_and_escalates_early():",
+        "def test_free_basic_plan_stays_field_aware_for_non_software_resume():",
+        "def test_question_family_repeat_rule_blocks_second_recruiter_style_question():",
+        "def test_technical_transcript_recovery_recovers_fastapi_and_context_filtering():",
+        "def test_career_transcript_recovery_recovers_role_fit_language():",
+        "def test_pro_better_answer_preserves_fastapi_for_tool_question():",
+        "def test_career_better_answer_for_role_fit_uses_project_or_role_context():",
+        "def test_role_fit_and_closeout_templates_cover_real_hr_style_questions():",
+        "def test_question_family_detects_future_and_hire_questions():",
+        "def test_career_better_answer_preserves_user_decision_and_outcome():",
+        "def test_summarize_recovered_intent_uses_technical_and_role_fit_rules():"
+      ]
+    },
+    "verify_upgrades.py": {
+      "head": "\"\"\"Standalone verification script for interviewer upgrades.\nTests the pure functions without requiring asyncpg or other database dependencies.\nRun with: python tests/verify_upgrades.py\n\"\"\"\nimport sys\nimport os\nsys.stdout.reconfigure(encoding='utf-8')\n\n# Ensure project root is in sys.path\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\n\n# Monkey-patch modules that require unavailable database drivers\nimport types\nfor mod_name in [\n    \"asyncpg\", \"structlog\", \"app.database\", \"app.database.connection\",\n",
+      "signatures": [
+        "class FakeConn:",
+        "def check(name: str, condition: bool, detail: str = \"\"):"
+      ]
+    }
+  },
+  "scripts": {
+    "staging_smoke.py": {
+      "head": "\"\"\"\nRelease-day staging smoke runner for the interview flow.\n\nExpected environment variables:\n- PREPVISTA_BASE_URL\n- PREPVISTA_BEARER_TOKEN\n- PREPVISTA_RESUME_PDF\n- PREPVISTA_PLAN (optional, default: pro)\n- PREPVISTA_DIFFICULTY (optional, default: medium)\n- PREPVISTA_DURATION (optional, default: 600)\n\"\"\"\n\nfrom __future__ import annotations\n\nimport json\n",
+      "signatures": [
+        "def _require_env(name: str) -> str:",
+        "def _make_headers(token: str) -> dict[str, str]:",
+        "def _request_json(url: str, *, method: str = \"GET\", headers: dict[str, str] | None = None, body: bytes | None = None):",
+        "def _build_multipart_form(fields: dict[str, str], file_field: str, file_path: str) -> tuple[bytes, str]:",
+        "def main() -> int:",
+        "def submit_answer(user_text: str, duration_actual: int = 0) -> dict:"
+      ]
+    },
+    "ts_extractor.py": {
+      "head": "import os\nimport json\nimport re\n\ndirectories = {\n    \"frontend\": \"c:\\\\prepforme\\\\frontend\\\\src\",\n    \"tests\": \"c:\\\\prepforme\\\\tests\",\n    \"scripts\": \"c:\\\\prepforme\\\\scripts\"\n}\n\nresult = {}\n\ndef process_dir(name, path):\n    result[name] = {}\n    for root, _, files in os.walk(path):\n",
+      "signatures": [
+        "def process_dir(name, path):"
+      ]
+    }
+  }
+}

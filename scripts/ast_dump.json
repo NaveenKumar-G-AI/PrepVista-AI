@@ -1,0 +1,4203 @@
+{
+  "config.py": {
+    "docstring": "PrepVista - Application Configuration\nUses Pydantic Settings for type-safe env var management.",
+    "classes": [
+      {
+        "name": "Settings",
+        "docstring": "Central configuration. All values loaded from environment variables.",
+        "methods": [
+          {
+            "name": "_strip_string_values",
+            "docstring": null
+          },
+          {
+            "name": "_normalize_urls",
+            "docstring": null
+          },
+          {
+            "name": "_validate_environment",
+            "docstring": null
+          },
+          {
+            "name": "_validate_positive_ints",
+            "docstring": null
+          },
+          {
+            "name": "_validate_timeout",
+            "docstring": null
+          },
+          {
+            "name": "_validate_provider_config",
+            "docstring": null
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "get_plan_config",
+        "docstring": "Return a safe plan config copy with fallback to free.",
+        "args": [
+          "plan"
+        ]
+      },
+      {
+        "name": "is_valid_plan",
+        "docstring": "Check whether the supplied plan name is valid.",
+        "args": [
+          "plan"
+        ]
+      },
+      {
+        "name": "is_valid_difficulty_mode",
+        "docstring": "Check whether the supplied difficulty mode is one of the supported public values.",
+        "args": [
+          "mode"
+        ]
+      },
+      {
+        "name": "normalize_difficulty_mode",
+        "docstring": "Return a safe difficulty-mode value with fallback to auto.",
+        "args": [
+          "mode"
+        ]
+      },
+      {
+        "name": "get_difficulty_mode_config",
+        "docstring": "Return a safe difficulty-mode config copy.",
+        "args": [
+          "mode"
+        ]
+      },
+      {
+        "name": "can_access_plan",
+        "docstring": "Check whether a user's current plan can access a requested plan.",
+        "args": [
+          "user_plan",
+          "requested_plan"
+        ]
+      },
+      {
+        "name": "get_env",
+        "docstring": "Small helper for non-pydantic one-off environment access.",
+        "args": [
+          "name",
+          "default"
+        ]
+      },
+      {
+        "name": "get_settings",
+        "docstring": "Cached settings singleton.",
+        "args": []
+      }
+    ]
+  },
+  "dependencies.py": {
+    "docstring": "PrepVista - FastAPI dependencies\nCommon dependencies injected into route handlers.",
+    "classes": [
+      {
+        "name": "UserProfile",
+        "docstring": "User context object attached to authenticated requests.",
+        "methods": [
+          {
+            "name": "__init__",
+            "docstring": null
+          },
+          {
+            "name": "effective_plan",
+            "docstring": "Highest owned plan is used for gating unless admin override is active."
+          },
+          {
+            "name": "effective_config",
+            "docstring": "Plan config based on effective plan."
+          },
+          {
+            "name": "has_feature",
+            "docstring": "Check if user has access to a feature."
+          },
+          {
+            "name": "has_expired_paid_plan",
+            "docstring": "Return True when a paid plan existed before but is no longer active."
+          },
+          {
+            "name": "premium_lock_message",
+            "docstring": "Build a user-facing lock message for expired or missing premium access."
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "_token_cache_key",
+        "docstring": null,
+        "args": [
+          "token"
+        ]
+      },
+      {
+        "name": "_get_cached_user",
+        "docstring": null,
+        "args": [
+          "token"
+        ]
+      },
+      {
+        "name": "_set_cached_user",
+        "docstring": null,
+        "args": [
+          "token",
+          "user"
+        ]
+      },
+      {
+        "name": "_decode_token_identity",
+        "docstring": "Decode Supabase JWT locally to avoid network round-trips on every request.",
+        "args": [
+          "token",
+          "settings"
+        ]
+      },
+      {
+        "name": "get_current_user",
+        "docstring": "Extract and verify JWT from Authorization header or cookie.",
+        "args": [
+          "request"
+        ]
+      },
+      {
+        "name": "require_plan",
+        "docstring": "Dependency that gates access based on plan tier.",
+        "args": [
+          "minimum"
+        ]
+      }
+    ]
+  },
+  "main.py": {
+    "docstring": "PrepVista \u2014 FastAPI Application Factory\nProduction entry point. Registers all routers, middleware, and lifecycle events.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_init_sentry",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_validate_runtime_environment",
+        "docstring": "Log a clear startup contract for Render and fail early on missing essentials.",
+        "args": [
+          "settings"
+        ]
+      },
+      {
+        "name": "_run_user_activity_refresh_loop",
+        "docstring": "Keep live-user counts fresh as users become active or inactive.",
+        "args": []
+      },
+      {
+        "name": "_describe_startup_error",
+        "docstring": "Return a useful startup error string even when str(exc) is empty.",
+        "args": [
+          "exc"
+        ]
+      },
+      {
+        "name": "_health_payload",
+        "docstring": "Build a consistent lightweight health payload.",
+        "args": [
+          "app",
+          "settings"
+        ]
+      },
+      {
+        "name": "_bootstrap_runtime_services",
+        "docstring": "Bring up DB-backed services in the background so the port binds quickly.",
+        "args": [
+          "app"
+        ]
+      },
+      {
+        "name": "lifespan",
+        "docstring": "Startup and shutdown events.",
+        "args": [
+          "app"
+        ]
+      },
+      {
+        "name": "create_app",
+        "docstring": null,
+        "args": []
+      }
+    ]
+  },
+  "database\\connection.py": {
+    "docstring": "PrepVista - Database Connection Pool\nUses asyncpg for high-performance async PostgreSQL access.",
+    "classes": [
+      {
+        "name": "DatabaseNotReadyError",
+        "docstring": "Raised when the database pool is not ready for application traffic.",
+        "methods": []
+      },
+      {
+        "name": "DatabaseConnection",
+        "docstring": "Async context manager for database connections.",
+        "methods": [
+          {
+            "name": "__init__",
+            "docstring": null
+          },
+          {
+            "name": "__aenter__",
+            "docstring": null
+          },
+          {
+            "name": "__aexit__",
+            "docstring": null
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "_describe_db_error",
+        "docstring": "Return a useful error string even for empty exception messages.",
+        "args": [
+          "exc"
+        ]
+      },
+      {
+        "name": "_require_db_pool",
+        "docstring": "Return the active pool or raise a clean not-ready error.",
+        "args": []
+      },
+      {
+        "name": "init_db_pool",
+        "docstring": "Initialize the connection pool on app startup.",
+        "args": []
+      },
+      {
+        "name": "close_db_pool",
+        "docstring": "Close pool on app shutdown.",
+        "args": []
+      },
+      {
+        "name": "get_db",
+        "docstring": "Get a connection from the pool.",
+        "args": []
+      },
+      {
+        "name": "_run_migrations",
+        "docstring": "Run schema creation. Idempotent - safe to run on every startup.",
+        "args": [
+          "conn"
+        ]
+      }
+    ]
+  },
+  "middleware\\error_handler.py": {
+    "docstring": "PrepVista AI \u2014 Global Error Handler\nStructured error responses for all exception types.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "register_error_handlers",
+        "docstring": "Register global exception handlers on the FastAPI app.",
+        "args": [
+          "app"
+        ]
+      }
+    ]
+  },
+  "middleware\\rate_limiter.py": {
+    "docstring": "PrepVista AI \u2014 Redis-Based Rate Limiter\nSliding window rate limiting using Upstash Redis REST API.\nFalls back to in-memory if Redis is unavailable.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_redis_rate_check",
+        "docstring": "Check rate limit via Upstash Redis REST API. Returns True if allowed.",
+        "args": [
+          "key",
+          "limit",
+          "window"
+        ]
+      },
+      {
+        "name": "_memory_rate_check",
+        "docstring": "In-memory sliding window fallback.",
+        "args": [
+          "key",
+          "limit",
+          "window"
+        ]
+      },
+      {
+        "name": "rate_limit_ip",
+        "docstring": "Rate limit by client IP for anonymous endpoints.",
+        "args": [
+          "request"
+        ]
+      },
+      {
+        "name": "rate_limit_user",
+        "docstring": "Rate limit by authenticated user ID.",
+        "args": [
+          "user_id"
+        ]
+      },
+      {
+        "name": "rate_limit_session",
+        "docstring": "Rate limit per interview session (prevents automation).",
+        "args": [
+          "session_id"
+        ]
+      }
+    ]
+  },
+  "middleware\\security_headers.py": {
+    "docstring": "PrepVista AI \u2014 Security Headers Middleware\nAdds production security headers to every response.",
+    "classes": [
+      {
+        "name": "SecurityHeadersMiddleware",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "dispatch",
+            "docstring": null
+          }
+        ]
+      }
+    ],
+    "functions": []
+  },
+  "routers\\account.py": {
+    "docstring": "PrepVista - Account Router\nOwn-account management that does not change the auth flow structure.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_delete_supabase_auth_user",
+        "docstring": "Delete the matching Supabase auth user with the service role key.",
+        "args": [
+          "user_id"
+        ]
+      },
+      {
+        "name": "delete_account",
+        "docstring": "Delete the current user's live account data and archive minimal identity.",
+        "args": [
+          "user"
+        ]
+      }
+    ]
+  },
+  "routers\\admin.py": {
+    "docstring": "PrepVista - Admin Router\nAdmin-only oversight for users, launch-offer metrics, referrals, and feedback.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "require_admin",
+        "docstring": "Allow admin-only endpoints for the configured admin account.",
+        "args": [
+          "user"
+        ]
+      },
+      {
+        "name": "_serialize_dt",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_paid_status",
+        "docstring": null,
+        "args": [
+          "active_flag",
+          "expired_flag"
+        ]
+      },
+      {
+        "name": "get_admin_overview",
+        "docstring": "Return one admin snapshot for users, launch-offer metrics, referrals, and feedback.",
+        "args": [
+          "admin"
+        ]
+      },
+      {
+        "name": "reset_launch_offers",
+        "docstring": "Delete all launch-offer grants and optionally reset settings.",
+        "args": [
+          "admin",
+          "reset_settings"
+        ]
+      }
+    ]
+  },
+  "routers\\admin_grants.py": {
+    "docstring": "PrepVista - Admin Grants\nEndpoints for manipulating fine-grained user subscription limits and tiers manually.",
+    "classes": [
+      {
+        "name": "AdminGrantRequest",
+        "docstring": null,
+        "methods": []
+      }
+    ],
+    "functions": [
+      {
+        "name": "_clear_model_bonus_override",
+        "docstring": "Remove the stored bonus marker that belongs to the selected model.",
+        "args": [
+          "conn",
+          "target_user_id",
+          "model"
+        ]
+      },
+      {
+        "name": "grant_admin_access",
+        "docstring": "Apply targeted overrides or unlocks to a user's subscription natively.",
+        "args": [
+          "payload",
+          "current_user"
+        ]
+      }
+    ]
+  },
+  "routers\\admin_support.py": {
+    "docstring": "PrepVista - Global Support Chat Plugin (Admin Facing)\nEndpoints allowing administrators to query all platform messages and manually send responses.",
+    "classes": [
+      {
+        "name": "AdminReplyRequest",
+        "docstring": null,
+        "methods": []
+      }
+    ],
+    "functions": [
+      {
+        "name": "get_support_users",
+        "docstring": "Fetch all users who have initiated support threads, ordered by the most recent message so admins know who is active.",
+        "args": [
+          "current_user"
+        ]
+      },
+      {
+        "name": "get_user_thread",
+        "docstring": "Retrieve the full context thread for a specific targeted user.",
+        "args": [
+          "target_user_id",
+          "current_user",
+          "limit"
+        ]
+      },
+      {
+        "name": "send_admin_reply",
+        "docstring": "Send an official reply directly to the end-user's chat widget.",
+        "args": [
+          "target_user_id",
+          "payload",
+          "current_user"
+        ]
+      }
+    ]
+  },
+  "routers\\auth.py": {
+    "docstring": "PrepVista AI \u2014 Auth Router\nHandles signup, login, and token refresh via Supabase Auth.",
+    "classes": [
+      {
+        "name": "SignupRequest",
+        "docstring": null,
+        "methods": []
+      },
+      {
+        "name": "SignupCodeRequest",
+        "docstring": null,
+        "methods": []
+      },
+      {
+        "name": "LoginRequest",
+        "docstring": null,
+        "methods": []
+      },
+      {
+        "name": "AccountStatusRequest",
+        "docstring": null,
+        "methods": []
+      },
+      {
+        "name": "OnboardingRequest",
+        "docstring": null,
+        "methods": []
+      }
+    ],
+    "functions": [
+      {
+        "name": "_is_admin_email",
+        "docstring": "Return True when the given email matches the configured admin email.",
+        "args": [
+          "email",
+          "settings"
+        ]
+      },
+      {
+        "name": "_find_profile_by_email",
+        "docstring": null,
+        "args": [
+          "email"
+        ]
+      },
+      {
+        "name": "_require_deliverable_signup_email",
+        "docstring": "Reject manual signups that use a syntactically valid but undeliverable email.",
+        "args": [
+          "email"
+        ]
+      },
+      {
+        "name": "_delete_supabase_auth_user",
+        "docstring": "Delete a Supabase auth user with the service role key.",
+        "args": [
+          "user_id"
+        ]
+      },
+      {
+        "name": "_get_supabase_identity",
+        "docstring": "Resolve the authenticated Supabase user from the bearer token.",
+        "args": [
+          "request"
+        ]
+      },
+      {
+        "name": "account_status",
+        "docstring": "Check whether a PrepVista profile already exists for an email address.",
+        "args": [
+          "req"
+        ]
+      },
+      {
+        "name": "request_signup_code",
+        "docstring": "Send a one-time manual signup verification code to the provided email.",
+        "args": [
+          "req"
+        ]
+      },
+      {
+        "name": "signup",
+        "docstring": "Complete manual signup only after the email verification code is confirmed.",
+        "args": [
+          "req"
+        ]
+      },
+      {
+        "name": "login",
+        "docstring": "Authenticate user via Supabase Auth.",
+        "args": [
+          "req"
+        ]
+      },
+      {
+        "name": "complete_oauth_login",
+        "docstring": "Complete Google OAuth for both new and existing users.",
+        "args": [
+          "request"
+        ]
+      },
+      {
+        "name": "refresh_token",
+        "docstring": "Refresh an expired access token.",
+        "args": [
+          "request"
+        ]
+      },
+      {
+        "name": "complete_onboarding",
+        "docstring": "Complete the onboarding wizard.",
+        "args": [
+          "req",
+          "request"
+        ]
+      },
+      {
+        "name": "get_me",
+        "docstring": "Get current user profile.",
+        "args": [
+          "request"
+        ]
+      }
+    ]
+  },
+  "routers\\billing.py": {
+    "docstring": "PrepVista - Billing Router\nRazorpay order creation, payment verification, switching active plans, and webhook handling.",
+    "classes": [
+      {
+        "name": "CreateOrderRequest",
+        "docstring": null,
+        "methods": []
+      },
+      {
+        "name": "VerifyPaymentRequest",
+        "docstring": null,
+        "methods": []
+      },
+      {
+        "name": "SwitchPlanRequest",
+        "docstring": null,
+        "methods": []
+      }
+    ],
+    "functions": [
+      {
+        "name": "create_razorpay_order",
+        "docstring": "Create a Razorpay order for a new plan purchase.",
+        "args": [
+          "req",
+          "user"
+        ]
+      },
+      {
+        "name": "verify_razorpay_payment",
+        "docstring": "Verify a Razorpay payment server-side and activate the purchased plan.",
+        "args": [
+          "req",
+          "user"
+        ]
+      },
+      {
+        "name": "switch_active_plan",
+        "docstring": "Switch the currently selected plan without repurchasing.",
+        "args": [
+          "req",
+          "user"
+        ]
+      },
+      {
+        "name": "razorpay_webhook",
+        "docstring": "Handle incoming Razorpay webhook events.",
+        "args": [
+          "request"
+        ]
+      },
+      {
+        "name": "get_billing_status",
+        "docstring": "Get current billing state, owned plans, and recent payments.",
+        "args": [
+          "user"
+        ]
+      }
+    ]
+  },
+  "routers\\dashboard.py": {
+    "docstring": "PrepVista AI \u2014 Dashboard Router\nUser dashboard: session history, stats, skill tracking.",
+    "classes": [
+      {
+        "name": "BulkDeleteSessionsRequest",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "_validate_session_ids",
+            "docstring": null
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "_score_to_percent",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "get_dashboard",
+        "docstring": "Get dashboard data: stats, recent sessions, usage.",
+        "args": [
+          "user"
+        ]
+      },
+      {
+        "name": "get_public_growth_banner",
+        "docstring": "Return public-facing user-count messaging for login and landing UI.",
+        "args": []
+      },
+      {
+        "name": "get_session_history",
+        "docstring": "Get paginated session history.",
+        "args": [
+          "user",
+          "limit",
+          "offset"
+        ]
+      },
+      {
+        "name": "bulk_delete_session_history",
+        "docstring": "Delete multiple user interview sessions in one action.",
+        "args": [
+          "payload",
+          "user"
+        ]
+      },
+      {
+        "name": "delete_session_history",
+        "docstring": "Delete a user's interview session and all related records.",
+        "args": [
+          "session_id",
+          "user"
+        ]
+      },
+      {
+        "name": "get_skill_breakdown",
+        "docstring": "Get detailed skill breakdown across all sessions.",
+        "args": [
+          "user"
+        ]
+      }
+    ]
+  },
+  "routers\\events.py": {
+    "docstring": "PrepVista - Product funnel events router\nPublic tracking endpoint with optional user resolution from bearer token.",
+    "classes": [
+      {
+        "name": "TrackEventRequest",
+        "docstring": null,
+        "methods": []
+      }
+    ],
+    "functions": [
+      {
+        "name": "_extract_bearer_token",
+        "docstring": null,
+        "args": [
+          "request"
+        ]
+      },
+      {
+        "name": "_decode_auth_user_id",
+        "docstring": null,
+        "args": [
+          "token"
+        ]
+      },
+      {
+        "name": "track_event",
+        "docstring": null,
+        "args": [
+          "payload",
+          "request"
+        ]
+      }
+    ]
+  },
+  "routers\\feedback.py": {
+    "docstring": "PrepVista AI - Feedback Router\nCollect user feedback and expose user/admin views.",
+    "classes": [
+      {
+        "name": "FeedbackCreateRequest",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "_strip_feedback",
+            "docstring": null
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "get_feedback_entries",
+        "docstring": "Return feedback entries for the current user, or all entries for admin.",
+        "args": [
+          "user"
+        ]
+      },
+      {
+        "name": "submit_feedback",
+        "docstring": "Store a feedback entry for the current user.",
+        "args": [
+          "req",
+          "user"
+        ]
+      }
+    ]
+  },
+  "routers\\interviews.py": {
+    "docstring": "PrepVista AI - Interviews Router\nCore interview lifecycle: setup, answer, finish.",
+    "classes": [
+      {
+        "name": "AnswerRequest",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "_strip_strings",
+            "docstring": null
+          },
+          {
+            "name": "_validate_answer_duration",
+            "docstring": null
+          }
+        ]
+      },
+      {
+        "name": "FinishRequest",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "_strip_access_token",
+            "docstring": null
+          }
+        ]
+      },
+      {
+        "name": "ProctoringViolation",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "_strip_fields",
+            "docstring": null
+          }
+        ]
+      },
+      {
+        "name": "TerminateRequest",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "_strip_fields",
+            "docstring": null
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "_safe_json_dumps",
+        "docstring": "Serialize safely for DB JSON columns.",
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_safe_json_loads",
+        "docstring": "Parse JSON values safely.",
+        "args": [
+          "value",
+          "default"
+        ]
+      },
+      {
+        "name": "_normalize_candidate_name",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_normalize_plan",
+        "docstring": null,
+        "args": [
+          "plan"
+        ]
+      },
+      {
+        "name": "_clip_text",
+        "docstring": null,
+        "args": [
+          "value",
+          "max_length"
+        ]
+      },
+      {
+        "name": "_normalize_violation_text",
+        "docstring": null,
+        "args": [
+          "value",
+          "max_length"
+        ]
+      },
+      {
+        "name": "_build_proctoring_event",
+        "docstring": null,
+        "args": [
+          "event_type",
+          "detail"
+        ]
+      },
+      {
+        "name": "_cache_client_response",
+        "docstring": "Persist the last request/response for idempotent client retries.",
+        "args": [
+          "session_id",
+          "client_request_id",
+          "payload"
+        ]
+      },
+      {
+        "name": "_get_cached_client_response",
+        "docstring": "Return cached response for duplicate client submissions.",
+        "args": [
+          "session_id",
+          "access_token",
+          "client_request_id"
+        ]
+      },
+      {
+        "name": "_session_is_active",
+        "docstring": null,
+        "args": [
+          "session_id",
+          "access_token"
+        ]
+      },
+      {
+        "name": "setup_interview",
+        "docstring": "Set up a new interview session.",
+        "args": [
+          "request",
+          "resume",
+          "plan",
+          "difficulty_mode",
+          "duration",
+          "proctoring_mode",
+          "user"
+        ]
+      },
+      {
+        "name": "submit_answer",
+        "docstring": "Submit a user answer and get the next AI question or finish result.",
+        "args": [
+          "session_id",
+          "req",
+          "request",
+          "background_tasks",
+          "user"
+        ]
+      },
+      {
+        "name": "end_interview",
+        "docstring": "Finish the interview and compute final results.",
+        "args": [
+          "session_id",
+          "req",
+          "user"
+        ]
+      },
+      {
+        "name": "terminate_interview",
+        "docstring": "Force-end the interview due to a hard client-side violation.",
+        "args": [
+          "session_id",
+          "req",
+          "user"
+        ]
+      },
+      {
+        "name": "report_violation",
+        "docstring": "Log a proctoring violation from the client.",
+        "args": [
+          "session_id",
+          "req",
+          "user"
+        ]
+      },
+      {
+        "name": "_evaluate_and_store",
+        "docstring": "Run per-question evaluation and persist it.",
+        "args": [
+          "session_id",
+          "turn_number",
+          "question_text",
+          "raw_answer",
+          "answer_duration_seconds"
+        ]
+      }
+    ]
+  },
+  "routers\\referrals.py": {
+    "docstring": "PrepVista - Referral Router\nPublic invite queueing plus authenticated referral workspace data.",
+    "classes": [
+      {
+        "name": "QueueReferralRequest",
+        "docstring": null,
+        "methods": []
+      }
+    ],
+    "functions": [
+      {
+        "name": "get_my_referrals",
+        "docstring": "Return referral slots and queue state for the current user.",
+        "args": [
+          "user"
+        ]
+      },
+      {
+        "name": "get_public_referral",
+        "docstring": "Resolve public referral context for invite landing pages.",
+        "args": [
+          "referral_code"
+        ]
+      },
+      {
+        "name": "queue_referral_email",
+        "docstring": "Queue a referred email if it is not already a user and not already claimed.",
+        "args": [
+          "payload"
+        ]
+      }
+    ]
+  },
+  "routers\\reports.py": {
+    "docstring": "PrepVista AI \u2014 Reports Router\nRetrieve interview reports and download PDFs.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_is_latest_finished_session",
+        "docstring": null,
+        "args": [
+          "conn",
+          "user_id",
+          "session_id"
+        ]
+      },
+      {
+        "name": "get_report",
+        "docstring": "Get the full interview report for a session.",
+        "args": [
+          "session_id",
+          "user"
+        ]
+      },
+      {
+        "name": "download_pdf",
+        "docstring": "Download the interview report as a PDF. Pro/Career only.",
+        "args": [
+          "session_id",
+          "user"
+        ]
+      }
+    ]
+  },
+  "routers\\support.py": {
+    "docstring": "PrepVista - Global Support Chat Plugin (User Facing)\nEndpoints allowing end-users to persist their conversations and query admin responses directly.",
+    "classes": [
+      {
+        "name": "SupportMessageRequest",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "check_empty",
+            "docstring": null
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "get_my_chat_history",
+        "docstring": "Fetch the thread history for the active user.",
+        "args": [
+          "current_user",
+          "limit",
+          "offset"
+        ]
+      },
+      {
+        "name": "send_support_message",
+        "docstring": "Allow a user to send a new message optionally containing Base64 image data to the Admin.",
+        "args": [
+          "payload",
+          "current_user"
+        ]
+      }
+    ]
+  },
+  "services\\analytics.py": {
+    "docstring": "PrepVista AI - Analytics Service\nBuilds persistent skill snapshots from finished interview evaluations.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_to_float",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_to_percent",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_format_category_name",
+        "docstring": null,
+        "args": [
+          "category"
+        ]
+      },
+      {
+        "name": "build_dashboard_feedback",
+        "docstring": "Create beginner-friendly analytics coaching text, with stronger Free-plan guidance.",
+        "args": [
+          "plan",
+          "skill_scores",
+          "total_sessions",
+          "average_score",
+          "total_questions"
+        ]
+      },
+      {
+        "name": "build_interview_neural_feedback",
+        "docstring": "Build interview-end neural feedback. Free gets the upgraded beginner-coach version.",
+        "args": [
+          "plan",
+          "question_evaluations",
+          "strengths",
+          "weaknesses",
+          "final_score"
+        ]
+      },
+      {
+        "name": "derive_skill_score_rows",
+        "docstring": "Aggregate per-question evaluations into category-level skill rows.",
+        "args": [
+          "evaluations"
+        ]
+      },
+      {
+        "name": "sync_session_skill_scores",
+        "docstring": "Replace persisted skill rows for a session with fresh aggregates.",
+        "args": [
+          "conn",
+          "session_id",
+          "user_id",
+          "evaluations"
+        ]
+      },
+      {
+        "name": "backfill_missing_skill_scores",
+        "docstring": "Fill analytics rows for older finished sessions that predate skill tracking.",
+        "args": [
+          "conn",
+          "user_id"
+        ]
+      }
+    ]
+  },
+  "services\\auth_identity.py": {
+    "docstring": "PrepVista - Auth identity helpers\nMaps one or more auth provider identities to a single canonical profile.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "resolve_auth_provider",
+        "docstring": "Resolve the primary auth provider from a Supabase user payload.",
+        "args": [
+          "user_data"
+        ]
+      },
+      {
+        "name": "extract_auth_identity",
+        "docstring": "Extract a normalized identity snapshot from a Supabase user payload.",
+        "args": [
+          "user_data"
+        ]
+      },
+      {
+        "name": "ensure_auth_identity_link",
+        "docstring": "Upsert the mapping from an auth identity to the canonical profile id.",
+        "args": [
+          "conn",
+          "auth_user_id",
+          "profile_id",
+          "email",
+          "provider"
+        ]
+      },
+      {
+        "name": "get_profile_id_for_auth_user",
+        "docstring": "Return the canonical profile id for a given auth identity, when linked.",
+        "args": [
+          "conn",
+          "auth_user_id"
+        ]
+      },
+      {
+        "name": "list_auth_user_ids_for_profile",
+        "docstring": "Return every linked auth identity for a profile.",
+        "args": [
+          "conn",
+          "profile_id"
+        ]
+      }
+    ]
+  },
+  "services\\email_service.py": {
+    "docstring": "PrepVista \u2014 Email Notification Service\nSends transactional emails via Resend API.\nPrimary use: admin payment notifications.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "send_admin_payment_notification",
+        "docstring": "Send a payment notification email to the admin.\nReturns True if sent successfully, False otherwise.\nNon-blocking \u2014 failures are logged but don't affect the payment flow.",
+        "args": [
+          "user_name",
+          "user_email",
+          "plan",
+          "amount_display",
+          "payment_status",
+          "razorpay_order_id",
+          "razorpay_payment_id"
+        ]
+      }
+    ]
+  },
+  "services\\email_validation.py": {
+    "docstring": "PrepVista - Email validation helpers\nAdds stricter deliverability checks for manual email flows.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_extract_email_parts",
+        "docstring": null,
+        "args": [
+          "normalized_email"
+        ]
+      },
+      {
+        "name": "_is_blocked_domain",
+        "docstring": null,
+        "args": [
+          "domain"
+        ]
+      },
+      {
+        "name": "_reject_known_fake_email_patterns",
+        "docstring": null,
+        "args": [
+          "normalized_email"
+        ]
+      },
+      {
+        "name": "validate_deliverable_email_address",
+        "docstring": "Return the normalized email when the address syntax and domain are deliverable.",
+        "args": [
+          "email"
+        ]
+      }
+    ]
+  },
+  "services\\evaluator.py": {
+    "docstring": "PrepVista AI - Evaluator Service\nPer-question rubric evaluation plus deterministic final score aggregation.\nFree plan uses a simpler, fairer beginner rubric without changing the higher tiers.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_join_phrases_natural",
+        "docstring": null,
+        "args": [
+          "parts",
+          "max_items"
+        ]
+      },
+      {
+        "name": "_safe_text",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_coerce_list",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_coerce_resume_summary_dict",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_resume_field_profile",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_best_resume_project",
+        "docstring": null,
+        "args": [
+          "summary",
+          "question_text",
+          "normalized_answer"
+        ]
+      },
+      {
+        "name": "_best_resume_tool",
+        "docstring": null,
+        "args": [
+          "summary",
+          "question_text",
+          "normalized_answer"
+        ]
+      },
+      {
+        "name": "_question_family",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_is_low_value_strength",
+        "docstring": null,
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_fallback_strength_from_evaluation",
+        "docstring": null,
+        "args": [
+          "evaluation"
+        ]
+      },
+      {
+        "name": "_field_label_for_feedback",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_contains_any",
+        "docstring": null,
+        "args": [
+          "text",
+          "phrases"
+        ]
+      },
+      {
+        "name": "_extract_grounding_facts",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "normalized_answer",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_worked_signal_for_family",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "rubric_category",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_missing_signal_for_family",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_improvement_for_family",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "rubric_category",
+          "plan"
+        ]
+      },
+      {
+        "name": "_score_summary_for_family",
+        "docstring": null,
+        "args": [
+          "plan",
+          "question_text",
+          "rubric_category",
+          "total_score"
+        ]
+      },
+      {
+        "name": "_tokenize",
+        "docstring": null,
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_extract_resume_terms",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_clamp_score",
+        "docstring": null,
+        "args": [
+          "value",
+          "maximum"
+        ]
+      },
+      {
+        "name": "_sentence",
+        "docstring": null,
+        "args": [
+          "text",
+          "fallback"
+        ]
+      },
+      {
+        "name": "_trim_to_sentence_count",
+        "docstring": null,
+        "args": [
+          "text",
+          "max_sentences",
+          "max_chars"
+        ]
+      },
+      {
+        "name": "_looks_like_placeholder_rewrite",
+        "docstring": null,
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_looks_too_generic_for_question",
+        "docstring": null,
+        "args": [
+          "text",
+          "question_text",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_normalize_user_facing_feedback",
+        "docstring": null,
+        "args": [
+          "text",
+          "fallback"
+        ]
+      },
+      {
+        "name": "_normalize_content_label",
+        "docstring": null,
+        "args": [
+          "value",
+          "metric"
+        ]
+      },
+      {
+        "name": "_normalize_communication_label",
+        "docstring": null,
+        "args": [
+          "value",
+          "metric"
+        ]
+      },
+      {
+        "name": "normalize_rubric_category",
+        "docstring": "Tighten category mapping so reports stay credible across all plans.",
+        "args": [
+          "question_text",
+          "rubric_category",
+          "plan"
+        ]
+      },
+      {
+        "name": "_normalize_pro_answer_status",
+        "docstring": null,
+        "args": [
+          "value",
+          "total_score",
+          "question_match",
+          "technical_accuracy",
+          "specificity",
+          "word_count"
+        ]
+      },
+      {
+        "name": "_pro_classification",
+        "docstring": null,
+        "args": [
+          "answer_status"
+        ]
+      },
+      {
+        "name": "_build_pro_communication_note",
+        "docstring": null,
+        "args": [
+          "technical_understanding",
+          "communication_clarity"
+        ]
+      },
+      {
+        "name": "_build_career_interview_note",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "rubric_category",
+          "answer_status"
+        ]
+      },
+      {
+        "name": "_fallback_corrected_intent",
+        "docstring": null,
+        "args": [
+          "normalized_answer",
+          "question_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_timeout_status_from_raw",
+        "docstring": null,
+        "args": [
+          "raw_answer"
+        ]
+      },
+      {
+        "name": "_has_answer_marker",
+        "docstring": null,
+        "args": [
+          "raw_answer"
+        ]
+      },
+      {
+        "name": "_fallback_pro_better_answer",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_normalize_career_answer_status",
+        "docstring": null,
+        "args": [
+          "value",
+          "total_score",
+          "relevance",
+          "depth",
+          "word_count",
+          "raw_answer"
+        ]
+      },
+      {
+        "name": "_career_classification",
+        "docstring": null,
+        "args": [
+          "answer_status"
+        ]
+      },
+      {
+        "name": "_heuristic_pro_components",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "normalized_answer",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_answer_blueprint_for_family",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_grounded_better_answer",
+        "docstring": null,
+        "args": [
+          "plan",
+          "question_text",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_career_answer_blueprint",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_fallback_career_better_answer",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_heuristic_career_components",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "normalized_answer",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_free_status_from_metrics",
+        "docstring": null,
+        "args": [
+          "word_count",
+          "total_score",
+          "relevance"
+        ]
+      },
+      {
+        "name": "_normalize_free_answer_status",
+        "docstring": null,
+        "args": [
+          "value",
+          "total_score",
+          "relevance",
+          "word_count"
+        ]
+      },
+      {
+        "name": "_free_classification",
+        "docstring": null,
+        "args": [
+          "answer_status",
+          "total_score",
+          "relevance",
+          "basic_accuracy",
+          "word_count"
+        ]
+      },
+      {
+        "name": "_fallback_better_answer",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_heuristic_free_components",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "normalized_answer",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_fallback_free_evaluation",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "raw_answer",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_normalize_free_result",
+        "docstring": null,
+        "args": [
+          "raw_answer",
+          "normalized_answer",
+          "question_text",
+          "resume_summary",
+          "rubric_category",
+          "llm_result"
+        ]
+      },
+      {
+        "name": "_fallback_pro_evaluation",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "raw_answer",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_normalize_pro_result",
+        "docstring": null,
+        "args": [
+          "raw_answer",
+          "normalized_answer",
+          "question_text",
+          "resume_summary",
+          "rubric_category",
+          "llm_result"
+        ]
+      },
+      {
+        "name": "_career_marker_response",
+        "docstring": null,
+        "args": [
+          "raw_answer"
+        ]
+      },
+      {
+        "name": "_fallback_career_evaluation",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "raw_answer",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category"
+        ]
+      },
+      {
+        "name": "_normalize_career_result",
+        "docstring": null,
+        "args": [
+          "raw_answer",
+          "normalized_answer",
+          "question_text",
+          "resume_summary",
+          "rubric_category",
+          "llm_result"
+        ]
+      },
+      {
+        "name": "_fallback_evaluation",
+        "docstring": null,
+        "args": [
+          "raw_answer",
+          "normalized_answer"
+        ]
+      },
+      {
+        "name": "evaluate_single_question",
+        "docstring": "Evaluate a single question-answer pair using the rubric system.\nReturns structured evaluation data.",
+        "args": [
+          "question_text",
+          "raw_answer",
+          "resume_summary",
+          "rubric_category",
+          "plan"
+        ]
+      },
+      {
+        "name": "_response_time_stats",
+        "docstring": null,
+        "args": [
+          "question_evaluations"
+        ]
+      },
+      {
+        "name": "_apply_response_time_guidance",
+        "docstring": null,
+        "args": [
+          "strengths",
+          "improvements",
+          "question_evaluations"
+        ]
+      },
+      {
+        "name": "_resolve_expected_questions",
+        "docstring": null,
+        "args": [
+          "plan",
+          "expected_questions",
+          "observed_questions"
+        ]
+      },
+      {
+        "name": "_top_readiness_dimensions",
+        "docstring": null,
+        "args": [
+          "question_evaluations",
+          "limit"
+        ]
+      },
+      {
+        "name": "_best_answer_style_for_evaluations",
+        "docstring": null,
+        "args": [
+          "question_evaluations",
+          "plan"
+        ]
+      },
+      {
+        "name": "_derive_free_strengths_and_improvements",
+        "docstring": null,
+        "args": [
+          "question_evaluations"
+        ]
+      },
+      {
+        "name": "_derive_pro_strengths_and_improvements",
+        "docstring": null,
+        "args": [
+          "question_evaluations"
+        ]
+      },
+      {
+        "name": "build_pro_readiness_summary",
+        "docstring": null,
+        "args": [
+          "question_evaluations",
+          "expected_questions"
+        ]
+      },
+      {
+        "name": "_is_valid_career_strength",
+        "docstring": null,
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_derive_career_strengths_and_improvements",
+        "docstring": null,
+        "args": [
+          "question_evaluations"
+        ]
+      },
+      {
+        "name": "_infer_best_fit_role",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "build_career_readiness_summary",
+        "docstring": null,
+        "args": [
+          "question_evaluations",
+          "resume_summary",
+          "expected_questions"
+        ]
+      },
+      {
+        "name": "compute_final_score",
+        "docstring": "Deterministic final score aggregation from per-question evaluations.\nThe LLM does not generate this score. This is computed by the backend.",
+        "args": [
+          "question_evaluations",
+          "plan",
+          "expected_questions"
+        ]
+      },
+      {
+        "name": "get_score_interpretation",
+        "docstring": "Human-readable interpretation of the final score.",
+        "args": [
+          "score",
+          "plan"
+        ]
+      }
+    ]
+  },
+  "services\\funnel_tracking.py": {
+    "docstring": "PrepVista - Product funnel event tracking\nStores sparse, high-signal events used for growth and conversion analysis.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "normalize_funnel_event_name",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_sanitize_scalar",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "sanitize_funnel_metadata",
+        "docstring": null,
+        "args": [
+          "metadata"
+        ]
+      },
+      {
+        "name": "track_funnel_event",
+        "docstring": null,
+        "args": [
+          "conn",
+          "event_name"
+        ]
+      }
+    ]
+  },
+  "services\\history_retention.py": {
+    "docstring": "PrepVista - History Retention\nCaps retained finished interview history by the highest active premium plan.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "get_history_limit",
+        "docstring": "Return the retained history limit for the given premium plan.",
+        "args": [
+          "plan"
+        ]
+      },
+      {
+        "name": "enforce_history_retention",
+        "docstring": "Delete the oldest finished sessions beyond the active plan limit.\nFree users are not pruned here because history is already locked for them.",
+        "args": [
+          "conn",
+          "user_id",
+          "highest_active_plan"
+        ]
+      }
+    ]
+  },
+  "services\\interviewer.py": {
+    "docstring": "PrepVista AI - Interviewer Service\nManages interview session lifecycle: setup, greeting, Q&A, finish.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_clean_ai_response",
+        "docstring": "Strip leaked internal classifier labels and keep one clean interviewer message.",
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_coerce_question_plan",
+        "docstring": "Normalize stored question-plan data into a list of dict items.",
+        "args": [
+          "question_plan"
+        ]
+      },
+      {
+        "name": "_resume_highlight",
+        "docstring": "Build a short highlight for deterministic fallback prompts.",
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_coerce_resume_summary_dict",
+        "docstring": "Normalize stored resume summary payloads into a dictionary.",
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_resume_field_profile",
+        "docstring": "Use additive resume field routing without breaking older stored summaries.",
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_resume_primary_project",
+        "docstring": null,
+        "args": [
+          "resume_summary",
+          "index"
+        ]
+      },
+      {
+        "name": "_resume_primary_skill",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_resume_target_role",
+        "docstring": "Infer a simple human-readable target role from resume summary signals.",
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_field_focus_angle",
+        "docstring": null,
+        "args": [
+          "resume_summary",
+          "family"
+        ]
+      },
+      {
+        "name": "_get_next_plan_item",
+        "docstring": "Return the next planned question item for a turn, if present.",
+        "args": [
+          "question_plan",
+          "upcoming_turn"
+        ]
+      },
+      {
+        "name": "_normalize_topic_label",
+        "docstring": "Create a compact topic label for skip/follow-up tracking.",
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_contains_any",
+        "docstring": null,
+        "args": [
+          "text",
+          "phrases"
+        ]
+      },
+      {
+        "name": "_extract_family_history",
+        "docstring": "Safely normalize stored family-history data from runtime state.",
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_trim_family_history",
+        "docstring": "Keep tracked family history small and deduplicated in order.",
+        "args": [
+          "families",
+          "max_items"
+        ]
+      },
+      {
+        "name": "_normalize_candidate_name",
+        "docstring": "Normalize noisy extracted names so greetings sound natural instead of letter-by-letter.",
+        "args": [
+          "name"
+        ]
+      },
+      {
+        "name": "_resume_answer_terms",
+        "docstring": "Collect a small set of resume-grounded terms that help detect covered angles.",
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_short_target_role_label",
+        "docstring": "Return a cleaner human role label for anchored live questions.",
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_extract_answer_anchor_facts",
+        "docstring": "Pull a few concrete facts from the last answer so follow-ups can sound interviewer-led.",
+        "args": [
+          "answer_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_build_answer_anchor_summary",
+        "docstring": "Compress the last answer into a short fact list for the live follow-up prompt.",
+        "args": [
+          "answer_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_extract_answer_coverage",
+        "docstring": "Infer which interview families the latest answer already covered well enough to avoid immediate repeats.",
+        "args": [
+          "question_text",
+          "answer_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_derive_redundant_followup_families",
+        "docstring": "Turn answer coverage into a small next-turn family blocklist to avoid awkward repeated prompts.",
+        "args": [
+          "previous_question",
+          "answer_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_build_answer_led_followup",
+        "docstring": "Return a deterministic next question when the last answer already implies the right next step.",
+        "args": [
+          "plan",
+          "previous_question",
+          "user_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_should_force_answer_led_followup",
+        "docstring": "Detect when the generated next question ignores what the candidate just answered.",
+        "args": [
+          "previous_question",
+          "user_text",
+          "candidate_question"
+        ]
+      },
+      {
+        "name": "_answer_signal_profile",
+        "docstring": "Extract a few concrete answer signals to make live follow-ups more human and answer-led.",
+        "args": [
+          "answer_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_is_ambiguous_followup_question",
+        "docstring": "Detect vague follow-ups that can confuse a beginner after a good answer.",
+        "args": [
+          "question_text"
+        ]
+      },
+      {
+        "name": "_is_easy_to_understand_question",
+        "docstring": "Keep the next question short, concrete, and easy to follow.",
+        "args": [
+          "question_text"
+        ]
+      },
+      {
+        "name": "_select_next_plan_item",
+        "docstring": "Pick the next planned item while softly skipping angles the candidate already covered.",
+        "args": [
+          "question_plan",
+          "upcoming_turn"
+        ]
+      },
+      {
+        "name": "_extract_skip_topics",
+        "docstring": "Safely normalize stored skip-topics data.",
+        "args": [
+          "skip_topics_value"
+        ]
+      },
+      {
+        "name": "_trim_skip_topics",
+        "docstring": "Keep skip-topics bounded so prompt/context stays small.",
+        "args": [
+          "skip_topics",
+          "max_items"
+        ]
+      },
+      {
+        "name": "_safe_json_dumps",
+        "docstring": "Serialize safely for DB JSON columns.",
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_question_retry_limit",
+        "docstring": "Return a stable per-question retry limit without changing the public plan shape.",
+        "args": [
+          "plan",
+          "difficulty_mode"
+        ]
+      },
+      {
+        "name": "_record_turn_outcome",
+        "docstring": "Keep bounded runtime counters so reports and finish scoring share the same truth.",
+        "args": [
+          "runtime_state",
+          "outcome"
+        ]
+      },
+      {
+        "name": "_dedupe_preserve_order",
+        "docstring": "Keep recent ordered strings without duplicates.",
+        "args": [
+          "values",
+          "max_items"
+        ]
+      },
+      {
+        "name": "_plan_target_signature",
+        "docstring": "Normalize a question-plan target for cross-session cooldown checks.",
+        "args": [
+          "category",
+          "target"
+        ]
+      },
+      {
+        "name": "_question_angle_from_text",
+        "docstring": "Capture the finer interview angle so semantic repeats are easier to block.",
+        "args": [
+          "question_text",
+          "fallback_category"
+        ]
+      },
+      {
+        "name": "_plan_target_angle",
+        "docstring": null,
+        "args": [
+          "category",
+          "target"
+        ]
+      },
+      {
+        "name": "_is_recruiter_language_question",
+        "docstring": null,
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_question_family_from_text",
+        "docstring": null,
+        "args": [
+          "question_text",
+          "fallback_category"
+        ]
+      },
+      {
+        "name": "_recent_question_families",
+        "docstring": null,
+        "args": [
+          "asked_questions",
+          "limit"
+        ]
+      },
+      {
+        "name": "_recent_question_angles",
+        "docstring": null,
+        "args": [
+          "asked_questions",
+          "limit"
+        ]
+      },
+      {
+        "name": "_violates_family_repeat_rules",
+        "docstring": null,
+        "args": [
+          "candidate_text",
+          "asked_questions"
+        ]
+      },
+      {
+        "name": "_resolve_item_difficulty",
+        "docstring": "Blend plan difficulty with the selected difficulty mode.",
+        "args": [
+          "plan",
+          "item_difficulty",
+          "difficulty_mode"
+        ]
+      },
+      {
+        "name": "_normalize_plan_category",
+        "docstring": null,
+        "args": [
+          "value",
+          "fallback"
+        ]
+      },
+      {
+        "name": "_normalize_plan_difficulty",
+        "docstring": null,
+        "args": [
+          "value",
+          "fallback"
+        ]
+      },
+      {
+        "name": "_sanitize_plan_target",
+        "docstring": "Keep plan targets short and subject-like so generated questions stay natural.",
+        "args": [
+          "category",
+          "target",
+          "fallback_target"
+        ]
+      },
+      {
+        "name": "_normalize_generated_question_plan",
+        "docstring": "Validate and normalize a generated question plan, then backfill gaps safely.",
+        "args": [
+          "plan",
+          "question_plan",
+          "resume_summary",
+          "max_turns",
+          "difficulty_mode",
+          "variant_seed"
+        ]
+      },
+      {
+        "name": "_style_variant_index",
+        "docstring": null,
+        "args": [
+          "plan",
+          "category",
+          "target",
+          "style_hint"
+        ]
+      },
+      {
+        "name": "_humanize_question_target",
+        "docstring": "Convert planner-style target text into a natural subject for spoken questions.",
+        "args": [
+          "target",
+          "family"
+        ]
+      },
+      {
+        "name": "_humanize_live_question_text",
+        "docstring": "Remove planner-like phrasing so spoken questions sound more human.",
+        "args": [
+          "question_text"
+        ]
+      },
+      {
+        "name": "_apply_question_style_hints",
+        "docstring": "Attach a deterministic wording hint so repeated interviews feel less identical.",
+        "args": [
+          "plan",
+          "question_plan",
+          "seed_text"
+        ]
+      },
+      {
+        "name": "_extract_question_portion",
+        "docstring": "Extract the actual question portion from an interviewer response.",
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_looks_like_interviewer_question",
+        "docstring": "Check whether a text turn looks like a single interviewer question.",
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_finalize_interviewer_turn",
+        "docstring": "Normalize a model turn into one clean interviewer message.",
+        "args": [
+          "text",
+          "is_greeting"
+        ]
+      },
+      {
+        "name": "_strip_question_intro",
+        "docstring": "Remove encouragement and wrapper phrases before duplicate comparison.",
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_question_signature",
+        "docstring": "Build a normalized signature for duplicate-question detection.",
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_question_core_tokens",
+        "docstring": "Extract content-heavy question tokens for fuzzy duplicate detection.",
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_extract_asked_question_signatures",
+        "docstring": "Collect normalized signatures for already-asked interviewer questions.",
+        "args": [
+          "history_rows"
+        ]
+      },
+      {
+        "name": "_collect_asked_questions",
+        "docstring": "Return all unique interviewer questions in session order.",
+        "args": [
+          "history_rows"
+        ]
+      },
+      {
+        "name": "_collect_recent_asked_questions",
+        "docstring": "Return recent interviewer questions for prompt-level repeat avoidance.",
+        "args": [
+          "history_rows",
+          "limit"
+        ]
+      },
+      {
+        "name": "_load_recent_session_question_memory",
+        "docstring": "Collect recent cross-session interview memory so new sessions feel fresher.",
+        "args": [
+          "conn",
+          "user_id",
+          "plan",
+          "limit_sessions",
+          "exclude_session_id"
+        ]
+      },
+      {
+        "name": "_is_duplicate_question",
+        "docstring": "Detect exact or near-duplicate question intent against prior interviewer turns.",
+        "args": [
+          "candidate_text",
+          "asked_question_signatures",
+          "asked_questions"
+        ]
+      },
+      {
+        "name": "_build_positive_boost",
+        "docstring": "Return a short confidence boost when the candidate gives a strong answer.",
+        "args": [
+          "plan",
+          "user_text",
+          "is_timeout",
+          "is_idk"
+        ]
+      },
+      {
+        "name": "_merge_boost_with_question",
+        "docstring": "Combine a short encouragement with the next question.",
+        "args": [
+          "boost_text",
+          "question_text"
+        ]
+      },
+      {
+        "name": "_get_future_plan_items",
+        "docstring": "Return upcoming planned question items sorted by turn.",
+        "args": [
+          "question_plan",
+          "upcoming_turn",
+          "max_items"
+        ]
+      },
+      {
+        "name": "_get_plan_item_for_turn",
+        "docstring": "Return the planned item for one specific turn.",
+        "args": [
+          "question_plan",
+          "turn_number"
+        ]
+      },
+      {
+        "name": "_infer_free_retry_category",
+        "docstring": "Infer the beginner question category so silence retries stay supportive.",
+        "args": [
+          "previous_question",
+          "fallback_category"
+        ]
+      },
+      {
+        "name": "_build_free_retry_question",
+        "docstring": "Return a calmer retry question for the free plan after silence.",
+        "args": [
+          "previous_question",
+          "fallback_category",
+          "silence_count"
+        ]
+      },
+      {
+        "name": "_build_repeat_question",
+        "docstring": "Repeat the last question once in simpler wording without scoring it.",
+        "args": [
+          "plan",
+          "previous_question",
+          "fallback_category"
+        ]
+      },
+      {
+        "name": "_build_clarification_question",
+        "docstring": "Return a more helpful rephrase when the candidate asks for clarification.",
+        "args": [
+          "plan",
+          "previous_question",
+          "fallback_category",
+          "clarification_text"
+        ]
+      },
+      {
+        "name": "_build_timeout_retry_question",
+        "docstring": "Return the next retry wording for the same logical question after silence.",
+        "args": [
+          "plan",
+          "previous_question",
+          "fallback_category",
+          "retry_count"
+        ]
+      },
+      {
+        "name": "_infer_pro_retry_category",
+        "docstring": "Infer the Pro question category so silence retries stay technical but fair.",
+        "args": [
+          "previous_question",
+          "fallback_category"
+        ]
+      },
+      {
+        "name": "_build_free_followup_question",
+        "docstring": "Deterministic Free follow-up when we want one human next question instead of a static plan hop.",
+        "args": [
+          "previous_question",
+          "user_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_build_pro_retry_question",
+        "docstring": "Return a shorter or narrower Pro retry question after silence.",
+        "args": [
+          "previous_question",
+          "fallback_category",
+          "silence_count"
+        ]
+      },
+      {
+        "name": "_infer_career_retry_category",
+        "docstring": "Infer the Career question category so silence retries stay premium and relevant.",
+        "args": [
+          "previous_question",
+          "fallback_category"
+        ]
+      },
+      {
+        "name": "_build_career_retry_question",
+        "docstring": "Return a shorter or narrower Career retry question after silence.",
+        "args": [
+          "previous_question",
+          "fallback_category",
+          "silence_count"
+        ]
+      },
+      {
+        "name": "_build_emergency_unique_question",
+        "docstring": "Guarantee a fresh question if both the model and fallback repeat themselves.",
+        "args": [
+          "plan",
+          "asked_question_signatures",
+          "asked_questions",
+          "boost_prefix",
+          "difficulty_mode",
+          "avoid_families",
+          "recent_angle_signatures"
+        ]
+      },
+      {
+        "name": "_planned_turn_limit",
+        "docstring": "Use the stored plan length when available so session limits stay stable per interview.",
+        "args": [
+          "plan",
+          "question_plan"
+        ]
+      },
+      {
+        "name": "_family_base_difficulty",
+        "docstring": null,
+        "args": [
+          "family"
+        ]
+      },
+      {
+        "name": "_rotate_question_families",
+        "docstring": null,
+        "args": [
+          "families",
+          "variant_seed"
+        ]
+      },
+      {
+        "name": "_pick_target_variant",
+        "docstring": null,
+        "args": [
+          "options",
+          "variant_seed",
+          "offset"
+        ]
+      },
+      {
+        "name": "_compose_family_targets",
+        "docstring": null,
+        "args": [
+          "plan",
+          "resume_summary",
+          "variant_seed"
+        ]
+      },
+      {
+        "name": "_plan_family_sequence",
+        "docstring": null,
+        "args": [
+          "plan",
+          "resume_summary",
+          "difficulty_mode",
+          "variant_seed",
+          "max_turns"
+        ]
+      },
+      {
+        "name": "_build_fallback_question_plan",
+        "docstring": "Build a deterministic question plan when the live planner is unavailable.",
+        "args": [
+          "plan",
+          "resume_summary",
+          "max_turns",
+          "difficulty_mode",
+          "variant_seed"
+        ]
+      },
+      {
+        "name": "_apply_cross_session_question_cooldown",
+        "docstring": "Replace recently reused targets so repeated interviews feel fresher.",
+        "args": [
+          "plan",
+          "question_plan",
+          "resume_summary",
+          "max_turns",
+          "difficulty_mode",
+          "recent_memory",
+          "variant_seed"
+        ]
+      },
+      {
+        "name": "_build_opening_question",
+        "docstring": "Pick a session opening question that avoids repeating the same opener across interviews.",
+        "args": [
+          "plan",
+          "question_plan",
+          "difficulty_mode",
+          "recent_question_signatures",
+          "recent_questions"
+        ]
+      },
+      {
+        "name": "_question_template_for_category",
+        "docstring": "Return a deterministic next question when the model is slow or unavailable.",
+        "args": [
+          "category",
+          "target",
+          "silence_count",
+          "plan",
+          "style_hint"
+        ]
+      },
+      {
+        "name": "_adapt_question_for_difficulty",
+        "docstring": "Shift fallback question wording based on the selected session difficulty.",
+        "args": [
+          "question",
+          "plan",
+          "category",
+          "difficulty_mode",
+          "planned_difficulty"
+        ]
+      },
+      {
+        "name": "_build_question_preamble",
+        "docstring": "Return a 1-sentence context intro for a new-topic question.\n\nPreambles are only added to the first question on a new topic.\nFollow-ups and retries skip the preamble to stay conversational.",
+        "args": [
+          "plan",
+          "category",
+          "variant_seed",
+          "is_followup",
+          "is_retry"
+        ]
+      },
+      {
+        "name": "_render_question_template",
+        "docstring": "Build one fallback question with session difficulty adjustments and context preamble.",
+        "args": [
+          "category",
+          "target",
+          "silence_count",
+          "plan",
+          "style_hint",
+          "planned_difficulty",
+          "difficulty_mode",
+          "is_followup",
+          "is_retry",
+          "variant_seed"
+        ]
+      },
+      {
+        "name": "_select_live_difficulty_signal",
+        "docstring": "Blend the live answer signal with the user-selected session difficulty mode.",
+        "args": [
+          "inferred_signal",
+          "difficulty_mode",
+          "is_timeout",
+          "is_idk",
+          "silence_count"
+        ]
+      },
+      {
+        "name": "_infer_difficulty_signal",
+        "docstring": "Infer whether the next question should get easier, stay steady, or get harder.",
+        "args": [
+          "user_text",
+          "is_timeout",
+          "is_idk",
+          "silence_count"
+        ]
+      },
+      {
+        "name": "_build_pro_followup_hint",
+        "docstring": "Suggest a sharper Pro follow-up chain based on the last answer.",
+        "args": [
+          "previous_question",
+          "user_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_build_free_followup_hint",
+        "docstring": "Guide the live model toward a warmer, answer-aware Free follow-up.",
+        "args": [
+          "previous_question",
+          "user_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_build_pro_followup_question",
+        "docstring": "Deterministic Pro follow-up if the live model is unavailable.",
+        "args": [
+          "previous_question",
+          "user_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_build_career_followup_hint",
+        "docstring": null,
+        "args": [
+          "previous_question",
+          "user_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_build_career_followup_question",
+        "docstring": null,
+        "args": [
+          "previous_question",
+          "user_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_is_probably_followup",
+        "docstring": "Estimate whether the next question should stay on the same topic.",
+        "args": [
+          "previous_question",
+          "latest_user_text",
+          "plan_item",
+          "plan"
+        ]
+      },
+      {
+        "name": "_should_force_topic_change",
+        "docstring": "Decide when to force the system away from the current topic.",
+        "args": [
+          "plan",
+          "consecutive_followups",
+          "silence_count",
+          "is_idk",
+          "is_timeout"
+        ]
+      },
+      {
+        "name": "_is_repeat_request",
+        "docstring": null,
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_build_fallback_ai_response",
+        "docstring": "Fallback interviewer response when the live model is delayed or unavailable.",
+        "args": [
+          "plan",
+          "upcoming_turn",
+          "question_plan",
+          "resume_summary",
+          "silence_count",
+          "is_greeting",
+          "difficulty_signal",
+          "previous_question",
+          "latest_user_text",
+          "asked_question_signatures",
+          "asked_questions",
+          "boost_prefix",
+          "difficulty_mode",
+          "preferred_plan_item",
+          "avoid_families"
+        ]
+      },
+      {
+        "name": "create_session",
+        "docstring": "Create a new interview session with pre-generated question plan.",
+        "args": [
+          "user_id",
+          "plan",
+          "difficulty_mode",
+          "resume_text",
+          "resume_summary",
+          "resume_file_path",
+          "duration_seconds",
+          "proctoring_mode"
+        ]
+      },
+      {
+        "name": "process_answer",
+        "docstring": "Process a user answer and return the next AI response or finish signal.",
+        "args": [
+          "session_id",
+          "user_text",
+          "access_token"
+        ]
+      },
+      {
+        "name": "_ensure_pending_evaluations",
+        "docstring": "Backfill any missing question evaluations before final scoring.",
+        "args": [
+          "conn",
+          "session_id",
+          "plan",
+          "resume_summary",
+          "question_plan"
+        ]
+      },
+      {
+        "name": "finish_session",
+        "docstring": "Finalize the interview session and compute the final score.",
+        "args": [
+          "session_id",
+          "access_token",
+          "duration_actual"
+        ]
+      }
+    ]
+  },
+  "services\\interview_summary.py": {
+    "docstring": "PrepVista AI - Interview Summary Contracts\nShared turn-outcome constants and canonical summary computation used by\nfinish scoring, report payloads, PDF generation, and analytics-style views.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "coerce_runtime_state",
+        "docstring": "Safely normalize stored runtime state into a dictionary.",
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "coerce_question_plan_items",
+        "docstring": "Normalize stored question-plan payloads into a list of dict items.",
+        "args": [
+          "question_plan"
+        ]
+      },
+      {
+        "name": "_safe_int",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_safe_duration_list",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_evaluation_is_answered",
+        "docstring": null,
+        "args": [
+          "evaluation"
+        ]
+      },
+      {
+        "name": "compute_interview_summary",
+        "docstring": "Compute one canonical summary object for reports, PDFs, analytics, and finish results.",
+        "args": [
+          "plan",
+          "question_plan",
+          "total_turns",
+          "evaluations",
+          "duration_seconds",
+          "runtime_state"
+        ]
+      }
+    ]
+  },
+  "services\\launch_offer.py": {
+    "docstring": "PrepVista - Launch offer helpers\nAutomatically grants free Pro access for the first configured number of new users.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_utcnow",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_coerce_dt",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_normalize_email",
+        "docstring": null,
+        "args": [
+          "email"
+        ]
+      },
+      {
+        "name": "_get_launch_offer_settings",
+        "docstring": null,
+        "args": [
+          "conn"
+        ]
+      },
+      {
+        "name": "_count_consumed_slots",
+        "docstring": null,
+        "args": [
+          "conn"
+        ]
+      },
+      {
+        "name": "_fetch_existing_grant",
+        "docstring": null,
+        "args": [
+          "conn",
+          "user_id",
+          "normalized_email"
+        ]
+      },
+      {
+        "name": "_approve_grant_now",
+        "docstring": null,
+        "args": [
+          "conn",
+          "grant_id",
+          "slot_number"
+        ]
+      },
+      {
+        "name": "queue_launch_offer_if_eligible",
+        "docstring": "Auto-grant launch offer when eligible.\nReturns the launch-offer row when user has or receives an offer record.",
+        "args": [
+          "conn",
+          "user_id",
+          "email"
+        ]
+      },
+      {
+        "name": "expire_launch_offer_grant",
+        "docstring": "Expire an active launch-offer grant for a specific user and paid plan.",
+        "args": [
+          "conn",
+          "user_id",
+          "plan",
+          "admin_email"
+        ]
+      },
+      {
+        "name": "get_launch_offer_overview",
+        "docstring": "Return launch-offer global counters.",
+        "args": [
+          "conn"
+        ]
+      },
+      {
+        "name": "get_launch_offer_state",
+        "docstring": "Return launch-offer state for one user plus global remaining counters.",
+        "args": [
+          "conn",
+          "user_id"
+        ]
+      },
+      {
+        "name": "reset_launch_offer_data",
+        "docstring": "Clear launch-offer grants and optionally reset settings to defaults.",
+        "args": [
+          "conn"
+        ]
+      }
+    ]
+  },
+  "services\\llm.py": {
+    "docstring": "PrepVista AI \u2014 LLM Service\nAbstraction over Groq (primary) and OpenAI (fallback) with automatic failover.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_get_groq",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_get_openai",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "call_groq",
+        "docstring": "Call Groq API (primary provider).",
+        "args": [
+          "messages",
+          "temperature",
+          "json_mode",
+          "model",
+          "max_tokens",
+          "timeout"
+        ]
+      },
+      {
+        "name": "call_openai",
+        "docstring": "Call OpenAI API (fallback provider).",
+        "args": [
+          "messages",
+          "temperature",
+          "json_mode",
+          "model",
+          "max_tokens",
+          "timeout"
+        ]
+      },
+      {
+        "name": "call_llm",
+        "docstring": "Call LLM with automatic Groq \u2192 OpenAI fallback.\nRetries on transient failures before falling back.",
+        "args": [
+          "messages",
+          "temperature",
+          "json_mode",
+          "model",
+          "max_tokens",
+          "retries",
+          "timeout",
+          "fallback_timeout",
+          "retry_delay",
+          "allow_provider_fallback"
+        ]
+      },
+      {
+        "name": "call_llm_json",
+        "docstring": "Call LLM and parse the response as JSON.",
+        "args": [
+          "messages",
+          "temperature",
+          "model",
+          "max_tokens",
+          "retries",
+          "timeout",
+          "fallback_timeout",
+          "retry_delay",
+          "allow_provider_fallback"
+        ]
+      }
+    ]
+  },
+  "services\\manual_signup_verification.py": {
+    "docstring": "PrepVista - Manual signup email verification\nSends short-lived verification codes over Gmail API and validates them before signup.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_utcnow",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_normalize_email",
+        "docstring": null,
+        "args": [
+          "email"
+        ]
+      },
+      {
+        "name": "normalize_verification_code",
+        "docstring": null,
+        "args": [
+          "code"
+        ]
+      },
+      {
+        "name": "_verification_code_hash",
+        "docstring": null,
+        "args": [
+          "email",
+          "code"
+        ]
+      },
+      {
+        "name": "_generate_verification_code",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_mail_from_email",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_gmail_api_is_configured",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_email_delivery_is_configured",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_email_not_configured_message",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_extract_gmail_api_error",
+        "docstring": null,
+        "args": [
+          "response"
+        ]
+      },
+      {
+        "name": "_gmail_api_access_token",
+        "docstring": null,
+        "args": [
+          "client"
+        ]
+      },
+      {
+        "name": "_gmail_api_send_message",
+        "docstring": null,
+        "args": [
+          "message"
+        ]
+      },
+      {
+        "name": "_deliver_message",
+        "docstring": null,
+        "args": [
+          "message"
+        ]
+      },
+      {
+        "name": "_send_verification_email_sync",
+        "docstring": null,
+        "args": [
+          "recipient_email",
+          "verification_code"
+        ]
+      },
+      {
+        "name": "send_verification_email",
+        "docstring": null,
+        "args": [
+          "recipient_email",
+          "verification_code"
+        ]
+      },
+      {
+        "name": "_send_admin_new_user_notification_sync",
+        "docstring": null,
+        "args": [
+          "admin_email"
+        ]
+      },
+      {
+        "name": "send_admin_new_user_notification",
+        "docstring": null,
+        "args": [
+          "user_email"
+        ]
+      },
+      {
+        "name": "issue_signup_verification_code",
+        "docstring": null,
+        "args": [
+          "conn",
+          "email"
+        ]
+      },
+      {
+        "name": "verify_signup_code",
+        "docstring": null,
+        "args": [
+          "conn",
+          "email",
+          "verification_code"
+        ]
+      },
+      {
+        "name": "clear_signup_verification_code",
+        "docstring": null,
+        "args": [
+          "conn",
+          "email"
+        ]
+      }
+    ]
+  },
+  "services\\plan_access.py": {
+    "docstring": "PrepVista - Plan entitlement helpers\nKeeps selected plan separate from purchased entitlements and enforces 30-day access windows.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_utcnow",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "_coerce_dt",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_expiry_from",
+        "docstring": null,
+        "args": [
+          "activated_at"
+        ]
+      },
+      {
+        "name": "normalize_plans",
+        "docstring": "Return unique plans in canonical order.",
+        "args": [
+          "plans"
+        ]
+      },
+      {
+        "name": "_normalize_paid_plans",
+        "docstring": null,
+        "args": [
+          "plans"
+        ]
+      },
+      {
+        "name": "highest_plan",
+        "docstring": "Return the highest tier from the given plans.",
+        "args": [
+          "plans"
+        ]
+      },
+      {
+        "name": "admin_override_state",
+        "docstring": "Return the entitlement state for admin accounts with premium override.",
+        "args": [
+          "selected_plan"
+        ]
+      },
+      {
+        "name": "_plan_status",
+        "docstring": "Return a human-readable plan purchase state for the stats table.",
+        "args": [
+          "plan",
+          "owned_plans",
+          "expired_plans",
+          "premium_override"
+        ]
+      },
+      {
+        "name": "sync_user_purchase_stats",
+        "docstring": "Upsert the Supabase-facing user purchase stats table.",
+        "args": [
+          "conn",
+          "user_id",
+          "selected_plan",
+          "owned_plans",
+          "highest_owned_plan",
+          "subscription_status",
+          "expired_plans",
+          "premium_override"
+        ]
+      },
+      {
+        "name": "activate_plan_entitlement",
+        "docstring": "Mark a paid plan active for a fresh 30-day access window.",
+        "args": [
+          "conn",
+          "user_id",
+          "plan"
+        ]
+      },
+      {
+        "name": "ensure_plan_entitlements",
+        "docstring": "Backfill entitlements from verified payments for legacy users and return active owned plans.\nThis keeps older purchases working with the 30-day access model.",
+        "args": [
+          "conn",
+          "user_id",
+          "selected_plan"
+        ]
+      },
+      {
+        "name": "sync_profile_plan_state",
+        "docstring": "Ensure profile.plan and subscription_status match current active entitlements.\nReturns selected plan, active owned plans, highest active plan, and expired paid plans.",
+        "args": [
+          "conn",
+          "user_id",
+          "selected_plan",
+          "premium_override"
+        ]
+      },
+      {
+        "name": "set_entitlement_status",
+        "docstring": "Update a plan entitlement status if the plan is paid.",
+        "args": [
+          "conn",
+          "user_id",
+          "plan",
+          "status"
+        ]
+      },
+      {
+        "name": "get_plan_expiry_map",
+        "docstring": "Return the current stored expiry timestamp for each paid plan.",
+        "args": [
+          "conn",
+          "user_id",
+          "premium_override"
+        ]
+      }
+    ]
+  },
+  "services\\prompts.py": {
+    "docstring": "PrepVista AI \u2014 Prompt Templates\nAll system prompts for the interview engine.\nClean separation of prompting logic from application code.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_coerce_resume_summary",
+        "docstring": "Normalize the stored resume summary into a dict.",
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_normalize_candidate_name",
+        "docstring": "Clean noisy extracted names so greeting prompts stay natural.",
+        "args": [
+          "name"
+        ]
+      },
+      {
+        "name": "_build_resume_highlight_text",
+        "docstring": "Create a concise factual highlight string for the greeting prompt.",
+        "args": [
+          "resume_summary",
+          "resume_text"
+        ]
+      },
+      {
+        "name": "_difficulty_prompt_block",
+        "docstring": "Return a short prompt block for the selected interview difficulty mode.",
+        "args": [
+          "mode"
+        ]
+      },
+      {
+        "name": "build_master_prompt",
+        "docstring": "Build the adaptive master interviewer prompt.",
+        "args": [
+          "plan",
+          "resume_text",
+          "cfg",
+          "silence_count",
+          "turn_count",
+          "recent_questions",
+          "difficulty_mode"
+        ]
+      },
+      {
+        "name": "build_greeting_prompt",
+        "docstring": "Build the first-message greeting prompt.",
+        "args": [
+          "plan",
+          "resume_text",
+          "resume_summary",
+          "cfg",
+          "opening_question",
+          "difficulty_mode"
+        ]
+      },
+      {
+        "name": "build_followup_prompt",
+        "docstring": "Build continuation prompt for the ongoing interview, including silence rules.",
+        "args": [
+          "plan",
+          "resume_text",
+          "cfg",
+          "silence_count",
+          "difficulty_mode"
+        ]
+      },
+      {
+        "name": "build_question_plan_prompt",
+        "docstring": "Generate a structured question plan before the interview starts.",
+        "args": [
+          "plan",
+          "resume_text",
+          "max_turns",
+          "difficulty_mode",
+          "recent_targets",
+          "recent_questions",
+          "session_variant"
+        ]
+      },
+      {
+        "name": "build_per_question_eval_prompt",
+        "docstring": "Build the per-question evaluation prompt for rubric-based scoring.",
+        "args": [
+          "question",
+          "normalized_answer",
+          "resume_summary",
+          "rubric_category",
+          "plan"
+        ]
+      },
+      {
+        "name": "build_resume_extraction_prompt",
+        "docstring": "Extract structured data from resume text.",
+        "args": [
+          "resume_text"
+        ]
+      }
+    ]
+  },
+  "services\\public_growth.py": {
+    "docstring": "PrepVista - Public growth metrics\nKeeps public-facing login/dashboard counters separate from internal analytics tables.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_display_label",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_candidate_noun",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "refresh_public_growth_metrics",
+        "docstring": "Recompute and persist public-facing total and active user counts.",
+        "args": [
+          "conn"
+        ]
+      },
+      {
+        "name": "get_public_growth_metrics",
+        "docstring": "Return the latest public-facing growth metrics, refreshing them first.",
+        "args": [
+          "conn"
+        ]
+      }
+    ]
+  },
+  "services\\quota.py": {
+    "docstring": "PrepVista - Quota Enforcement Service\nServer-side interview quota tracking and selected-plan quota enforcement.\nAdmin users bypass quota limits via premium_override.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_coerce_dt",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_period_needs_reset",
+        "docstring": null,
+        "args": [
+          "period_start"
+        ]
+      },
+      {
+        "name": "_ensure_current_usage_period",
+        "docstring": "Reset the rolling quota window when the current usage period has expired.",
+        "args": [
+          "conn",
+          "user_id"
+        ]
+      },
+      {
+        "name": "_resolve_selected_plan_usage",
+        "docstring": "Return the current rolling window start and used count for the selected plan.",
+        "args": [
+          "conn",
+          "user_id",
+          "selected_plan"
+        ]
+      },
+      {
+        "name": "_selected_plan_limit",
+        "docstring": "Return the selected plan interview limit. None means unlimited.",
+        "args": [
+          "plan"
+        ]
+      },
+      {
+        "name": "_effective_limit",
+        "docstring": "Combine plan allowance with referral bonus interviews and temporary admin bonuses.",
+        "args": [
+          "plan",
+          "referral_bonus_interviews",
+          "admin_bonus_interviews"
+        ]
+      },
+      {
+        "name": "enforce_quota",
+        "docstring": "Check if the currently selected plan still has interview capacity.",
+        "args": [
+          "user"
+        ]
+      },
+      {
+        "name": "get_usage_stats",
+        "docstring": "Get current usage statistics for the selected plan plus highest entitlement.",
+        "args": [
+          "user_id",
+          "premium_override"
+        ]
+      },
+      {
+        "name": "reset_period_usage",
+        "docstring": "Reset interview count for a new billing period.",
+        "args": [
+          "user_id"
+        ]
+      }
+    ]
+  },
+  "services\\razorpay_service.py": {
+    "docstring": "PrepVista - Razorpay Billing Service\nHandles order creation, payment verification, webhook processing, and plan activation.\nImplements a strict payment state machine: created -> pending -> verified/failed/expired.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_get_client",
+        "docstring": "Lazy-init Razorpay client.",
+        "args": []
+      },
+      {
+        "name": "_coerce_webhook_time",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "create_order",
+        "docstring": "Create a Razorpay order for a subscription plan.\nReturns order details for the frontend checkout.",
+        "args": [
+          "user_id",
+          "user_email",
+          "plan"
+        ]
+      },
+      {
+        "name": "verify_payment",
+        "docstring": "Verify a Razorpay payment server-side.\nOnly VERIFIED payments unlock premium access.\nReturns the updated plan info.",
+        "args": [
+          "user_id",
+          "razorpay_order_id",
+          "razorpay_payment_id",
+          "razorpay_signature"
+        ]
+      },
+      {
+        "name": "handle_webhook",
+        "docstring": "Handle Razorpay webhook events. Idempotent - safe to process multiple times.\nUsed for reconciliation, NOT as the primary payment verification path.",
+        "args": [
+          "payload",
+          "signature"
+        ]
+      }
+    ]
+  },
+  "services\\referrals.py": {
+    "docstring": "PrepVista - Referral Service\nTracks limited referral invitations and awards bonus interview credits on join.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_is_admin_referral_email",
+        "docstring": "Return True when the email belongs to the configured admin override account.",
+        "args": [
+          "email"
+        ]
+      },
+      {
+        "name": "_get_referral_limit",
+        "docstring": "Return the referral slot limit. None means unlimited.",
+        "args": [
+          "is_admin_override"
+        ]
+      },
+      {
+        "name": "normalize_email",
+        "docstring": "Normalize emails for collision-safe referral matching.",
+        "args": [
+          "email"
+        ]
+      },
+      {
+        "name": "_generate_referral_code",
+        "docstring": null,
+        "args": []
+      },
+      {
+        "name": "ensure_referral_identity",
+        "docstring": "Guarantee that every user has a stable referral code.",
+        "args": [
+          "conn",
+          "user_id"
+        ]
+      },
+      {
+        "name": "_build_referral_url",
+        "docstring": null,
+        "args": [
+          "code"
+        ]
+      },
+      {
+        "name": "get_referral_summary",
+        "docstring": "Return referral slots, share URL, and queued/joined referral state.",
+        "args": [
+          "conn",
+          "user_id"
+        ]
+      },
+      {
+        "name": "get_public_referral_context",
+        "docstring": "Resolve a public referral code for the invite page.",
+        "args": [
+          "conn",
+          "referral_code"
+        ]
+      },
+      {
+        "name": "queue_referral",
+        "docstring": "Queue a referral by public code without overriding existing referral ownership.",
+        "args": [
+          "conn",
+          "referral_code",
+          "invited_email"
+        ]
+      },
+      {
+        "name": "apply_joined_referral_reward",
+        "docstring": "Convert a queued referral into a rewarded referral when the invited user becomes real.\nSafe to call multiple times for the same user/email.",
+        "args": [
+          "conn",
+          "joined_user_id",
+          "joined_email"
+        ]
+      }
+    ]
+  },
+  "services\\report_builder.py": {
+    "docstring": "PrepVista AI - PDF Report Builder\nProfessional interview-report PDFs with a polished fpdf2 layout and a content-rich raw fallback.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_coerce_json_object",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_safe_text",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_safe_pdf_text",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_coerce_list",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_clamp_score",
+        "docstring": null,
+        "args": [
+          "value",
+          "maximum"
+        ]
+      },
+      {
+        "name": "_score_palette",
+        "docstring": null,
+        "args": [
+          "score"
+        ]
+      },
+      {
+        "name": "_classification_palette",
+        "docstring": null,
+        "args": [
+          "classification"
+        ]
+      },
+      {
+        "name": "_format_duration",
+        "docstring": null,
+        "args": [
+          "seconds"
+        ]
+      },
+      {
+        "name": "_format_timestamp",
+        "docstring": null,
+        "args": [
+          "value"
+        ]
+      },
+      {
+        "name": "_response_time_summary",
+        "docstring": null,
+        "args": [
+          "evaluations"
+        ]
+      },
+      {
+        "name": "_count_wrapped_lines",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "text",
+          "width_mm"
+        ]
+      },
+      {
+        "name": "_estimate_block_height",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "text",
+          "width_mm",
+          "line_height"
+        ]
+      },
+      {
+        "name": "_ensure_page_capacity",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "needed_height"
+        ]
+      },
+      {
+        "name": "_build_improvement_points",
+        "docstring": null,
+        "args": [
+          "evaluation"
+        ]
+      },
+      {
+        "name": "_build_improved_answer",
+        "docstring": null,
+        "args": [
+          "evaluation"
+        ]
+      },
+      {
+        "name": "_summary_dimension_labels",
+        "docstring": null,
+        "args": [
+          "evaluations"
+        ]
+      },
+      {
+        "name": "_build_overall_summary",
+        "docstring": null,
+        "args": [
+          "plan",
+          "score",
+          "strengths",
+          "weaknesses",
+          "evaluations"
+        ]
+      },
+      {
+        "name": "_escape_pdf_literal",
+        "docstring": null,
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "_wrap_raw_lines",
+        "docstring": null,
+        "args": [
+          "text",
+          "max_chars"
+        ]
+      },
+      {
+        "name": "_minimal_pdf_report",
+        "docstring": null,
+        "args": [
+          "score",
+          "plan",
+          "email",
+          "evaluations"
+        ]
+      },
+      {
+        "name": "_section_heading",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "title",
+          "subtitle",
+          "fill_rgb"
+        ]
+      },
+      {
+        "name": "_draw_chip",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "x",
+          "y",
+          "text",
+          "fill_rgb",
+          "text_rgb"
+        ]
+      },
+      {
+        "name": "_render_info_card",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "x",
+          "y",
+          "width",
+          "title",
+          "value",
+          "subtitle",
+          "fill_rgb"
+        ]
+      },
+      {
+        "name": "_render_bullets",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "items",
+          "empty_text"
+        ]
+      },
+      {
+        "name": "_render_career_summary",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "summary"
+        ]
+      },
+      {
+        "name": "_render_pro_summary",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "summary"
+        ]
+      },
+      {
+        "name": "_measure_labeled_box_height",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "text",
+          "width",
+          "line_height"
+        ]
+      },
+      {
+        "name": "_render_labeled_box",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "x",
+          "y",
+          "width",
+          "label",
+          "text",
+          "label_fill_rgb",
+          "box_fill_rgb",
+          "body_text_rgb"
+        ]
+      },
+      {
+        "name": "_render_question_header",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "index",
+          "category",
+          "classification",
+          "score_text",
+          "continued"
+        ]
+      },
+      {
+        "name": "_render_rubric_row",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "category",
+          "score"
+        ]
+      },
+      {
+        "name": "_render_question_block",
+        "docstring": null,
+        "args": [
+          "pdf",
+          "index",
+          "evaluation"
+        ]
+      },
+      {
+        "name": "_build_professional_fpdf_report",
+        "docstring": null,
+        "args": [
+          "score",
+          "rubric_scores",
+          "strengths",
+          "weaknesses",
+          "evaluations",
+          "email",
+          "date",
+          "plan",
+          "duration_seconds",
+          "finished_at",
+          "question_plan",
+          "session_summary",
+          "pro_summary",
+          "career_summary"
+        ]
+      },
+      {
+        "name": "generate_pdf_report",
+        "docstring": "Generate a PDF report from session data and evaluations.",
+        "args": [
+          "session",
+          "evaluations",
+          "user_email",
+          "session_summary"
+        ]
+      }
+    ]
+  },
+  "services\\resume_parser.py": {
+    "docstring": "PrepVista AI \u2014 Resume Parser Service\nPDF extraction, sanitization, and structured parsing via LLM.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "extract_text_from_pdf",
+        "docstring": "Extract raw text from PDF bytes. Raises HTTPException on failure.",
+        "args": [
+          "pdf_bytes"
+        ]
+      },
+      {
+        "name": "sanitize_resume_text",
+        "docstring": "Strip potential prompt injection patterns from resume text.",
+        "args": [
+          "text"
+        ]
+      },
+      {
+        "name": "validate_pdf_upload",
+        "docstring": "Validate the uploaded PDF file.",
+        "args": [
+          "file_bytes",
+          "filename"
+        ]
+      },
+      {
+        "name": "parse_resume_structured",
+        "docstring": "Extract structured resume data using LLM.",
+        "args": [
+          "resume_text"
+        ]
+      },
+      {
+        "name": "_collect_resume_signal_parts",
+        "docstring": "Flatten structured resume sections for deterministic field inference.",
+        "args": [
+          "summary"
+        ]
+      },
+      {
+        "name": "infer_resume_field_profile",
+        "docstring": "Infer a broad resume field and lightweight confidence using deterministic signals.",
+        "args": [
+          "summary"
+        ]
+      },
+      {
+        "name": "enrich_resume_summary",
+        "docstring": "Preserve current structure while adding deterministic field signals.",
+        "args": [
+          "summary",
+          "resume_text"
+        ]
+      },
+      {
+        "name": "_default_resume_summary",
+        "docstring": "Fallback resume summary when LLM extraction fails.",
+        "args": [
+          "resume_text"
+        ]
+      }
+    ]
+  },
+  "services\\transcript.py": {
+    "docstring": "PrepVista AI - Transcript Normalization Service\nCorrects common speech-to-text artifacts before evaluation.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "_coerce_resume_summary_dict",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_resume_field",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_collect_resume_context_terms",
+        "docstring": null,
+        "args": [
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "_apply_replacements",
+        "docstring": null,
+        "args": [
+          "text",
+          "replacements"
+        ]
+      },
+      {
+        "name": "_collapse_stretched_words",
+        "docstring": null,
+        "args": [
+          "match"
+        ]
+      },
+      {
+        "name": "normalize_transcript",
+        "docstring": "Apply STT correction rules to raw transcript text.\nPreserves original casing where possible, only corrects known artifacts.",
+        "args": [
+          "raw_text",
+          "aggressive"
+        ]
+      },
+      {
+        "name": "recover_spoken_meaning",
+        "docstring": "Apply stronger transcript cleanup for beginner voice answers before free-plan scoring.\nThis is intentionally more forgiving than normal transcript display cleanup.",
+        "args": [
+          "raw_text"
+        ]
+      },
+      {
+        "name": "_recover_contextual_intent",
+        "docstring": null,
+        "args": [
+          "raw_text",
+          "question_text",
+          "resume_summary",
+          "extra_rules",
+          "context_terms"
+        ]
+      },
+      {
+        "name": "summarize_recovered_intent",
+        "docstring": "Return one conservative, cleaned sentence for report corrected-intent fields.",
+        "args": [
+          "recovered_text",
+          "question_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "recover_technical_intent",
+        "docstring": "Recover likely technical meaning from imperfect spoken answers for the Pro plan.\nThis is stricter than free-plan recovery but still tolerant of STT noise.",
+        "args": [
+          "raw_text",
+          "question_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "recover_career_intent",
+        "docstring": "Recover likely intent from longer, noisier spoken answers for the Career plan.\nThis is the most forgiving transcript recovery path.",
+        "args": [
+          "raw_text",
+          "question_text",
+          "resume_summary"
+        ]
+      },
+      {
+        "name": "clean_for_display",
+        "docstring": "Clean text for display in transcript/report (remove system markers).",
+        "args": [
+          "text"
+        ]
+      }
+    ]
+  },
+  "services\\user_activity.py": {
+    "docstring": "PrepVista - Live user activity tracking\nKeeps a small database snapshot of total, active, and inactive users.",
+    "classes": [],
+    "functions": [
+      {
+        "name": "refresh_user_activity_stats",
+        "docstring": "Recompute and persist live user counts.",
+        "args": [
+          "conn"
+        ]
+      },
+      {
+        "name": "record_user_presence",
+        "docstring": "Touch the user's last_seen timestamp with throttling to avoid noisy writes.",
+        "args": [
+          "conn",
+          "user_id"
+        ]
+      }
+    ]
+  }
+}

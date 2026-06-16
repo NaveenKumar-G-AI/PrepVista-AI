@@ -1,0 +1,15 @@
+{
+  "id": "non_software_mixed",
+  "label": "Non-software or mixed-profile resume",
+  "resume_hint": "Mixed academic, communication, and operations-style experience with limited software-specific depth.",
+  "expected": {
+    "opener_variation_required": true,
+    "no_exact_repeat": true,
+    "early_categories": ["introduction", "communication", "behavioral"],
+    "difficulty_mode_expectation": {
+      "basic": "Uses plain wording and avoids software-specific assumptions.",
+      "medium": "Balances role-fit, process, and communication angles.",
+      "difficult": "Pushes ownership, decision-making, and role-fit without forcing software-only wording."
+    }
+  }
+}
