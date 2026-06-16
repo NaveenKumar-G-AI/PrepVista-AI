@@ -272,15 +272,6 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
     void refreshOrg();
   }, [authLoading, user?.is_org_admin, refreshOrg]);
 
-  // Show spinner while auth is loading or while a non-admin is being redirected.
-  if (authLoading || (!user?.is_org_admin && !authLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center surface-primary">
-        <div className="h-10 w-10 animate-spin rounded-full border-3 border-blue-200 border-t-blue-600" />
-      </div>
-    );
-  }
-
   // ── Derived values ─────────────────────────────────────────────────────────
 
   // isActive: memoised — only recalculates when pathname changes, not on every render.
@@ -304,6 +295,18 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
     if (seatUsagePercent >= 70) return 'from-orange-500 to-amber-500';
     return 'from-blue-500 to-indigo-500';
   }, [seatUsagePercent]);
+
+  // Show spinner while auth is loading or while a non-admin is being redirected.
+  // NOTE: this early return MUST stay below every hook above — React requires a
+  // stable hook order across renders, and on the auth loading→loaded transition
+  // returning before useCallback/useMemo would change the hook count and crash.
+  if (authLoading || !user?.is_org_admin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center surface-primary">
+        <div className="h-10 w-10 animate-spin rounded-full border-3 border-blue-200 border-t-blue-600" />
+      </div>
+    );
+  }
 
   // Seat warning chip at ≥ 85% to prompt action before students are blocked.
   const showSeatWarning = seatUsagePercent >= 85;

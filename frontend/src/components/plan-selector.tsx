@@ -60,6 +60,20 @@ export function PlanSelector({
   const currentOption = planOptions.find(option => option.id === activePlan) || planOptions[0];
   const dropdownPlacementClass = placement === 'top' ? 'bottom-[calc(100%+12px)]' : 'top-[calc(100%+12px)]';
 
+  // Hooks must run unconditionally before any early return (Rules of Hooks):
+  // user.org_student can flip after refreshUser(), so an early return above this
+  // effect would change the hook count between renders and crash the component.
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
   // Org students (college-granted) get a fixed Career badge — no switching allowed
   if (user.org_student) {
     return (
@@ -72,17 +86,6 @@ export function PlanSelector({
       </div>
     );
   }
-
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, []);
 
   const handleSwitch = async (plan: string) => {
     if (loadingPlan || plan === activePlan || !ownedPlans.has(plan)) {
