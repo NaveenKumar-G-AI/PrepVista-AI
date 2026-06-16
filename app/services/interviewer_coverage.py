@@ -892,6 +892,20 @@ def _apply_cross_session_question_cooldown(
     return final_items
 
 
+# Distinct self-introduction phrasings used to diversify the opening question
+# across a student's repeat sessions when the primary (difficulty-adapted)
+# opener has already been used recently. Each has different core tokens so they
+# produce distinct question signatures.
+_OPENING_QUESTION_VARIANTS = (
+    "Walk me through your background and the role you are aiming for next.",
+    "What is the short version of your story and the kind of work you want now?",
+    "Give me a quick snapshot of your strongest area and what you are building toward.",
+    "Tell me what makes your background stand out for the role you want next.",
+    "Share the highlights of your journey so far and where you want to go from here.",
+    "Take me through who you are, your sharpest skill, and the team you want to join.",
+)
+
+
 def _build_opening_question(
     plan: str,
     question_plan,
@@ -932,6 +946,16 @@ def _build_opening_question(
         )
         if not _is_duplicate_question(candidate, recent_question_signatures, recent_questions):
             return candidate
+
+    # In basic/medium/difficult modes _adapt_question_for_difficulty collapses
+    # the introduction template to a single fixed phrasing per (plan, mode), so
+    # the style loop above cannot diversify the opener across a student's repeat
+    # sessions. Fall back to a pool of distinct self-introduction phrasings and
+    # return the first one not used recently — fulfilling this function's
+    # "avoid repeating the same opener across interviews" contract.
+    for opener_variant in _OPENING_QUESTION_VARIANTS:
+        if not _is_duplicate_question(opener_variant, recent_question_signatures, recent_questions):
+            return opener_variant
 
     return _adapt_question_for_difficulty(
         "Tell me about yourself.",
