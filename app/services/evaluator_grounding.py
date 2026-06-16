@@ -433,7 +433,10 @@ def _extract_grounding_facts(question_text: str, normalized_answer: str, resume_
 
     decision = ""
     if "context filtering" in lower_answer:
-        decision = "filter the context before sending it to the model"
+        # Preserve the student's own named method — a grounded "better answer"
+        # should sharpen their actual decision, not paraphrase the named
+        # technique away.
+        decision = "use context filtering so only the most relevant context reaches the model"
     elif _contains_any(
         lower_answer,
         [
