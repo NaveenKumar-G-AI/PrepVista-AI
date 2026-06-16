@@ -229,6 +229,35 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
 
 ---
 
+## Dependency & Build Audit (Phase 2/6 — added in "make 100% ready" pass)
+
+- **Production `next build`: exit 0** (all 41 routes compile). `tsc` clean.
+- **Frontend `npm audit`:** safe `npm audit fix` applied (deduped a vulnerable transitive
+  `ws`). **2 advisories remain** — `postcss` <8.5.10 (CSS-stringify XSS; build-time, dev-authored
+  Tailwind, not user input) and `ws` (Next HMR dev-server websocket). **Both are dev/build-time
+  only — not reachable in production `next start`.** Clearing them needs `next 16.1.6 → 16.2.9`
+  (minor). Left as a documented follow-up to avoid an unvalidated prod-runtime framework change.
+- **Backend `pip-audit` (pinned `requirements.txt`):** vulnerable pinned/transitive deps —
+  `pypdf 5.1.0` (many CVEs; **user-uploaded PDF parsing → real attack surface**; fix is 6.x = a
+  MAJOR bump), `pdfminer-six 20231228` (via pdfplumber), `starlette 0.38.6` (incl. CVE-2024-47874
+  multipart DoS). **NOT bumped here:** FastAPI 0.115.0 caps `starlette<0.39`, so the starlette fix
+  requires a FastAPI bump too; and there are **no PDF fixtures**, so a pypdf 5→6 major bump cannot
+  be validated locally. These need a Docker build + staging integration test — see runbook below.
+- **Authz review (all 106 endpoints):** the 12 unauthenticated endpoints are all legitimately
+  public (pre-auth signup/login/refresh/oauth, signature-verified `/billing/webhook`,
+  token-gated `/reports/shared/{token}`, public referral/marketing). No missing access checks.
+- **[M-8, rec]** `/events/track` is public with no IP rate limit; bounded by an event-name
+  allowlist + the global 10 MB body cap, but `metadata` is uncapped. Low-risk abuse vector —
+  consider `rate_limit_ip` + a metadata size cap. (Hardening, not a defect; not changed.)
+
+### Pre-deploy dependency remediation runbook (REQUIRES staging validation)
+1. `requirements.txt`: bump `fastapi` to latest 0.115.x (raises starlette cap), pin
+   `starlette>=0.40.0`, `pdfminer-six>=20251230`, and `pypdf>=6.x`. Rebuild the Docker image.
+2. Integration-test in staging: a real resume **PDF upload** (exercises pypdf/pdfplumber 6.x),
+   a multipart form post, and a **live Razorpay webhook** round-trip.
+3. `cd frontend && npm i next@16.2.9 && npm audit` → expect 0 prod advisories; re-run `next build`.
+4. Re-run `pip-audit` / `npm audit` in CI and gate the pipeline on them.
+
 ## Final Summary (Phase 6)
 
 ### What was wrong & what changed (14 fixes, all on `audit/hardening`, all verified)
