@@ -265,22 +265,38 @@ async def verify_payment(
     }
 
 
-async def handle_webhook(payload: dict, signature: str):
+async def handle_webhook(raw_body: bytes | str, signature: str):
     """
     Handle Razorpay webhook events. Idempotent - safe to process multiple times.
     Used for reconciliation, NOT as the primary payment verification path.
+
+    `raw_body` MUST be the exact request body bytes received from Razorpay.
+    The signature is an HMAC over those raw bytes, so verifying a re-serialized
+    dict (different key order / unicode escaping / whitespace) would fail.
     """
     settings = get_settings()
 
+    body_str = raw_body.decode("utf-8") if isinstance(raw_body, (bytes, bytearray)) else str(raw_body)
+
     try:
         _get_client().utility.verify_webhook_signature(
-            json.dumps(payload, separators=(",", ":")),
+            body_str,
             signature,
-            settings.RAZORPAY_KEY_SECRET,
+            # Webhooks are signed with the dashboard webhook secret, which may
+            # differ from the API key secret. config populates this (falling
+            # back to the key secret only when no separate webhook secret is set).
+            settings.RAZORPAY_WEBHOOK_SECRET,
         )
     except Exception:
         logger.warning("razorpay_webhook_signature_failed")
         raise HTTPException(status_code=400, detail="Invalid webhook signature.")
+
+    try:
+        payload = json.loads(body_str)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid webhook JSON payload.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid webhook payload.")
 
     event_type = payload.get("event", "")
     event_data = payload.get("payload", {})
