@@ -7,10 +7,17 @@
 
 ## Resume Point
 
-**Current phase:** Phase 1–2 complete (recon + baseline). Phase 3 (deep analysis) NOT started.
-**Next action:** Begin Phase 3 module-by-module analysis, starting with `app/config.py`,
-`app/main.py`, auth/security middleware, then routers, then services, then frontend.
-**No code changes made yet.** Nothing committed beyond this file.
+**Current phase:** Phase 3 in progress. **Module `interview_summary` / `evaluator` / `resume_parser`
+/ `interviewer_coverage` test-failure cluster: COMPLETE & GREEN.**
+**Backend test baseline: was 14 failed / 185 passed → now 198 passed, 0 failed** (bare `pytest`).
+**Next action:** Continue Phase 3 on remaining modules. Highest-signal untouched items:
+1. Frontend `react-hooks/rules-of-hooks` ×4 (conditional hooks — can crash render):
+   `plan-selector.tsx:76`, `org-admin/analytics/[[...slug]]/page.tsx:288/295/302`.
+2. Frontend `react-hooks/set-state-in-effect` ×4 (render-loop risk).
+3. Security pass: auth/JWT (`dependencies.py`), IDOR in `org_*` + `admin_*` routers,
+   Razorpay webhook signature verification, rate limiter, SSRF in any outbound fetch.
+4. `main.py:437` `__main__` port parse bug (L-1).
+**8 commits on `audit/hardening` so far** (see Fix Log).
 
 ---
 
@@ -144,19 +151,35 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
 - _none confirmed yet_
 
 ### High
-- [H-1] (candidate) `tests/test_interview_logic.py` 12 assertion failures — triage whether
-  product logic regressed. Not yet root-caused.
-- [H-2] (candidate) `react-hooks/rules-of-hooks` ×4 — conditional hook calls
+- [H-3] ✅ FIXED — `interview_summary._assess_communication_style` scale mismatch.
+  `communication_score` is stored 0–10 (`part*5`; frontend & report_render divide by 5),
+  but this function compared the raw value to 0–2 thresholds (1.5/1.0/0.7) → **every real
+  interview averaged ~5–10, always ≥1.5 → every candidate misclassified as
+  "clear_and_structured"** regardless of actual communication quality. Fixed by normalizing
+  ÷5 before thresholds (commit 4a5e401).
+- [H-4] ✅ FIXED — `_compute_hr_readiness_level` dropped `timeout_count` param → `TypeError`
+  for any caller passing it (5 tests). Restored as optional (commit 071efe1).
+- [H-2] (OPEN) `react-hooks/rules-of-hooks` ×4 — conditional hook calls
   (`plan-selector.tsx:76`, `org-admin/analytics/.../page.tsx:288/295/302`). Can crash render.
 
 ### Medium
-- [M-1] (candidate) `react-hooks/set-state-in-effect` ×4 — potential render loops.
-- [M-2] (candidate) Runtime version drift: Docker py3.12 vs dev py3.13 — behavior differences.
+- [M-3] ✅ FIXED — `resume_parser.infer_resume_field_profile` missing modern AI/ML framework
+  keywords (PyTorch, Groq, TensorFlow, etc.) → AI/RAG resumes misclassified as generic
+  software (commit 1fb2067).
+- [M-4] ✅ FIXED — `_build_opening_question` returned the *identical* opener every session in
+  basic/medium/difficult modes (difficulty adapter collapses intro to one fixed string),
+  breaking its documented "avoid repeating opener across interviews" contract
+  (commit ab83381).
+- [M-5] ✅ FIXED — `evaluator_grounding` grounded better-answer discarded the student's named
+  method ("context filtering" → generic paraphrase) (commit 16d0bdc).
+- [M-1] (OPEN) `react-hooks/set-state-in-effect` ×4 — potential render loops.
+- [M-2] (OPEN) Runtime version drift: Docker py3.12 vs dev py3.13.
 
 ### Low
-- [L-1] (candidate) `main.py:437` `__main__` port parse: `BACKEND_URL.split(":")[-1]` breaks
+- [L-1] (OPEN) `main.py:437` `__main__` port parse: `BACKEND_URL.split(":")[-1]` breaks
   for scheme-only URLs (dev-only path; gunicorn used in prod).
-- [L-2] (candidate) bare `pytest` collection fails on `test_results.txt` (binary). Add config.
+- [L-2] ✅ FIXED — bare `pytest` crashed collecting `test_results.txt`; `test_queue.py` (DB
+  script) collected as a test. Added `pytest.ini` (`testpaths=tests`) (commit edbd06b).
 
 ---
 
@@ -164,7 +187,18 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
 
 > One entry per atomic commit: finding ID, what changed, evidence (test/lint output).
 
-- _none yet_
+| Commit | Finding | Change | Evidence |
+|--------|---------|--------|----------|
+| f8074b7 | — | AUDIT.md tracking doc | — |
+| 071efe1 | H-4 | Restore optional `timeout_count` to `_compute_hr_readiness_level` | TestHRReadinessLevel 5 passed |
+| 4a5e401 | H-3 | Normalize comm_score ÷5 in `_assess_communication_style`; `quality_rows` optional; `COMMUNICATION_SCORE_SCALE_MAX` 3→10 | suite 14→5 failed, 185→194 passed |
+| 1fb2067 | M-3 | Add modern AI/ML keywords to resume field inference | TestResumeFieldInference 2 passed |
+| ab83381 | M-4 | Opener-variants pool to diversify opening question across sessions | TestOpeningQuestionDiversity 2 passed |
+| 16d0bdc | M-5 | Preserve student's named method in grounded better-answer | TestBetterAnswerGeneration 3 passed |
+| edbd06b | L-2 | `pytest.ini` (testpaths=tests); fix email fixture domain | bare `pytest` 198 passed, 0 failed |
+
+**Net: backend test suite 14 failed/185 passed → 0 failed/198 passed. No regressions introduced
+(each fix verified against the full suite).**
 
 ---
 
