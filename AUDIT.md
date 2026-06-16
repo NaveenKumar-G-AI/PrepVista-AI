@@ -229,6 +229,51 @@ conditional `useCallback`/`useMemo` (288/295/302) + `setActiveTab` in effect (12
 
 ---
 
+## Final Summary (Phase 6)
+
+### What was wrong & what changed (14 fixes, all on `audit/hardening`, all verified)
+**Correctness / interview engine:**
+- Communication quality misclassified for *every* interview (0–10 vs 0–2 scale) — fixed.
+- HR-readiness `TypeError`; AI resumes misclassified; identical opener every session; grounded
+  better-answer erased the student's named method — all fixed.
+
+**Frontend (crash-class):** two components called hooks after conditional returns; the
+org-admin layout crashed on every auth loading→loaded transition — fixed (hooks moved above
+returns). `tsc` clean; `rules-of-hooks` 4→0.
+
+**Security:** Razorpay webhook signature verified against a re-serialized dict with the wrong
+secret → legitimate payment webhooks silently dropped — fixed to verify the raw body with the
+webhook secret (+2 regression tests).
+
+**Reliability:** rate-limiter httpx client leaked on shutdown — fixed. Dev-runner port parse
+crash — fixed.
+
+**Verified SOUND (no change needed):** SQL injection (parameterized throughout), JWT/auth
+(HS256 allowlist, coercion, hardened cache), multi-tenant IDOR (org-scoped queries), DB pool
+lifecycle (leak-safe), LLM client (timeouts + backoff + fallback).
+
+### Residual risks / recommended follow-ups
+- **[M-7] Rate-limit `ENDPOINT_RATE_LIMITS` is dead config** — keys (`/api/v1/...`) match no real
+  route and call sites don't pass `request`. The "tighter AI-endpoint limits" never apply.
+  *Not changed* (applying them alters prod limits — needs a product decision on paths/values).
+  Recommend: wire real paths + pass `request`, or delete the map to remove the false claim.
+- **Lint cosmetics:** 40 `no-explicit-any`, 21 unused-vars, 16 unescaped-entities, plus
+  `set-state-in-effect`×4 / `purity`×1 (React-Compiler advisories, reviewed — not bugs). Out of
+  scope (defects-only). Recommend a separate cleanup pass to unblock the React Compiler.
+- **Runtime drift:** Docker py3.12 vs dev py3.13. Tests pass on 3.13; CI should pin 3.12.
+- **Monitoring:** add an alert on `billing_webhook_failed` (now that verification is correct, any
+  failure is a real signature/secret problem) and on `redis_rate_limit_fallback` spikes.
+- **DB index:** `billing.py` header documents a required `idx_payments_user_id_created_at` —
+  confirm it exists in production.
+
+### Go / No-Go: **GO (conditional)**
+The defects found — especially the broken payment-webhook verification and the org-admin layout
+crash — were real production problems now fixed and verified. Backend `200 passed`, frontend
+`tsc` clean, `rules-of-hooks` 0, all files compile. No regressions introduced.
+Conditions before deploy: (1) review the M-7 rate-limit follow-up, (2) pin Python 3.12 in CI,
+(3) smoke-test a real Razorpay webhook against staging to confirm the signature fix end-to-end
+(verified by unit tests + reasoning here, but a live round-trip is the final proof).
+
 ## Open Questions / Assumptions
 
 - ASSUMPTION: Frontend deploys to Vercel (`vercel.json` present); backend + crons to Render.
