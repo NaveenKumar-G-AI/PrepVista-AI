@@ -426,7 +426,11 @@ class TestFinalScoreComputation:
         assert result["answered_questions"] == 1
 
     def test_all_strong_answers_produces_high_score(self):
-        evals = [_make_evaluation(turn=i + 1, score=9.0, classification="strong") for i in range(10)]
+        # Strong answers carry a strong communication_score too (0-10 stored scale).
+        evals = [
+            _make_evaluation(turn=i + 1, score=9.0, classification="strong", communication_score=9.0)
+            for i in range(10)
+        ]
         result = compute_final_score(evals, plan="pro", expected_questions=10)
         assert result["final_score"] >= 70, \
             "All strong answers on 10/10 questions must produce a score >= 70"
@@ -834,14 +838,16 @@ class TestCommunicationAssessment:
             "Empty evaluations must return unknown clarity level"
 
     def test_high_comm_scores_with_results_produce_clear_structured(self):
+        # communication_score is stored on a 0-10 scale (0-2 part * 5); 9.0/9.5
+        # are strong comm scores that normalize to 1.8/1.9 in the 0-2 thresholds.
         evals = [
             _make_evaluation(
                 raw_answer="I implemented the pipeline which improved accuracy by 35% measured over 200 runs.",
-                communication_score=1.8,
+                communication_score=9.0,
             ),
             _make_evaluation(
                 raw_answer="The result was a 40% reduction in latency. I validated with before-and-after benchmarks.",
-                communication_score=1.9,
+                communication_score=9.5,
             ),
         ]
         result = _assess_communication_style(evals)
@@ -850,9 +856,10 @@ class TestCommunicationAssessment:
 
     def test_filler_heavy_answers_produce_needs_improvement(self):
         filler = "umm i think basically like i mean you know honestly i guess umm yeah okay right"
+        # 1.5/1.0 on the 0-10 stored scale normalize to 0.3/0.2 — very low comm.
         evals = [
-            _make_evaluation(raw_answer=filler, communication_score=0.3),
-            _make_evaluation(raw_answer=filler, communication_score=0.2),
+            _make_evaluation(raw_answer=filler, communication_score=1.5),
+            _make_evaluation(raw_answer=filler, communication_score=1.0),
         ]
         result = _assess_communication_style(evals)
         assert result["clarity_level"] in {"needs_improvement", "developing"}, \
