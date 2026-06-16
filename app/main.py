@@ -434,5 +434,8 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(get_settings().BACKEND_URL.split(":")[-1]) if ":" in get_settings().BACKEND_URL else 8000
+    # Use the standard PORT env var (matches the Dockerfile's ${PORT:-8000}).
+    # The previous BACKEND_URL.split(":")[-1] crashed for a scheme-only URL like
+    # "https://host" (split(":")[-1] == "//host" -> int() ValueError).
+    port = int(os.environ.get("PORT", "8000"))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=get_settings().DEBUG)
