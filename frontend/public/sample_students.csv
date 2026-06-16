@@ -1,0 +1,11 @@
+full_name,student_id,email,phone,department,year,batch,section,notes,grant_career_access
+John Doe,CS101,johndoe@college.edu,9876543210,Computer Science,3rd Year,2026,A,,Yes
+Jane Smith,CS102,janesmith@college.edu,9876543211,Computer Science,3rd Year,2026,B,Transfer student,No
+Michael Brown,CS103,michaelbrown@college.edu,9876543212,Information Technology,2nd Year,2027,A,,Yes
+Emily Davis,CS104,emilydavis@college.edu,9876543213,Electronics,1st Year,2028,C,Scholarship holder,Yes
+Daniel Wilson,CS105,danielwilson@college.edu,9876543214,Mechanical,4th Year,2025,B,,No
+Sophia Taylor,CS106,sophiataylor@college.edu,9876543215,Civil,3rd Year,2026,A,Sports quota,Yes
+James Anderson,CS107,jamesanderson@college.edu,9876543216,Computer Science,2nd Year,2027,C,,No
+Olivia Thomas,CS108,oliviathomas@college.edu,9876543217,Artificial Intelligence,1st Year,2028,B,,Yes
+William Jackson,CS109,williamjackson@college.edu,9876543218,Data Science,4th Year,2025,A,Internship completed,Yes
+Ava Martin,CS110,avamartin@college.edu,9876543219,Cyber Security,2nd Year,2027,B,,No
