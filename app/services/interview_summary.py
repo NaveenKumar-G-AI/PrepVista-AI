@@ -770,19 +770,20 @@ def _compute_hr_readiness_level(
     planned_questions: int,
     silent_count: int,
     weak_ratio: float,
+    timeout_count: int = 0,
 ) -> str:
     """Classify the candidate's overall interview readiness as an HR evaluator would.
 
     Uses score, completion, silence rate, and weak-answer ratio as signals.
     Returns one of the HR_READINESS_* constants.
 
-    ✅ REMOVED: a `timeout_count` parameter was accepted here but never read
-    in the body. Its signal is not lost — _classify_answer_strength already
-    classifies a timeout-status evaluation as "silent", so timeouts are
-    already folded into `silent_count`. The dead parameter is removed and the
-    one call site in compute_premium_interview_report no longer passes it;
-    `summary["timeout_count"]` is still returned at the top level of the
-    premium report unchanged.
+    `timeout_count` is accepted for caller convenience but intentionally not
+    read in the body: _classify_answer_strength already classifies a
+    timeout-status evaluation as "silent", so timeouts are folded into
+    `silent_count`. It is kept as an optional parameter (the production call
+    site omits it) so direct callers/tests can pass the timeout tally without a
+    TypeError; `summary["timeout_count"]` is still returned at the top level of
+    the premium report unchanged.
     """
     if planned_questions > 0 and answered_questions == 0:
         return HR_READINESS_NOT_READY
