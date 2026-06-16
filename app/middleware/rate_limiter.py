@@ -57,16 +57,22 @@ _MAX_KEY_COMPONENT_LEN = 256
 # EVAL. The pipeline approach is the safe default.
 USE_LUA_ATOMIC = False
 
-# ── Rec E — Per-endpoint rate-limit config map ────────────────────────────────
-# Routes matching a prefix get tighter (limit, window) instead of the global
-# settings value. AI generation endpoints are expensive; throttle them harder.
-# Keys are path prefixes. First match wins.
-# Format: { "/api/path/prefix": (requests_per_window, window_seconds) }
-ENDPOINT_RATE_LIMITS: dict[str, tuple[int, int]] = {
-    "/api/v1/interview/generate": (10, 60),   # AI generation — expensive, tight
-    "/api/v1/feedback/generate":  (10, 60),   # AI feedback — expensive, tight
-    "/api/v1/question/generate":  (15, 60),   # Question generation — moderate
-}
+# ── Per-endpoint rate-limit config map ────────────────────────────────────────
+# Routes matching a prefix get tighter (limit, window) than the global settings
+# value. AI generation endpoints are expensive; throttle them harder.
+#
+# IMPORTANT: keys MUST be real mounted paths (see app/main.py router prefixes:
+# /interviews, /feedback, etc.) AND the caller must pass `request` so the path
+# is known — otherwise the override silently never applies. The previous keys
+# (/api/v1/...) matched no route and the interview/feedback call sites did not
+# pass `request`, so this map was dead and the comment overstated the actual
+# throttling. The effective per-call-type limits (RATE_LIMIT_ANONYMOUS /
+# _AUTHENTICATED / _INTERVIEW from settings) still apply regardless.
+#
+# Left intentionally EMPTY: the interview-session limit (RATE_LIMIT_INTERVIEW)
+# already throttles the expensive answer/question endpoints. Add real-path
+# entries here AND pass `request` at the call site to tighten further.
+ENDPOINT_RATE_LIMITS: dict[str, tuple[int, int]] = {}
 
 # ── Rec B — Trusted proxy CIDR whitelist ──────────────────────────────────────
 # X-Forwarded-For is only trusted when the direct connection comes from one of
