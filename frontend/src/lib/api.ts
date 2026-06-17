@@ -42,6 +42,237 @@ function isValidJwtShape(token: string | null): token is string {
   return parts.every(p => p.length > 0 && /^[A-Za-z0-9\-_=]+$/.test(p));
 }
 
+// ── Cohort analytics response adapters ────────────────────────────────────────
+// The org analytics page (/org-admin/analytics) expects a specific per-tab
+// contract, but the backend exposes three rich endpoints — /analytics/readiness,
+// /analytics/performance, /analytics/growth — with a different shape. These pure
+// functions adapt each backend response into exactly what the page's validators
+// and chart components consume, computing client-derivable stats (score
+// histogram, mean/median/std-dev) and returning valid empty shapes where the
+// backend has no source data (role fit). Frontend-only: keeps the page and the
+// backend untouched.
+const RUBRIC_CATEGORIES = [
+  'communication', 'technical_depth', 'problem_solving', 'confidence', 'structure_star',
+  'vocabulary', 'vocal_delivery', 'leadership', 'teamwork', 'adaptability', 'reasoning',
+  'conciseness', 'professionalism', 'role_fit',
+] as const;
+
+const TIER_META: Record<string, { label: string; color: string }> = {
+  ready:        { label: 'Ready',         color: 'green'  },
+  almost_ready: { label: 'Almost Ready',  color: 'yellow' },
+  developing:   { label: 'Developing',    color: 'orange' },
+  at_risk:      { label: 'At Risk',       color: 'red'    },
+  not_started:  { label: 'Not Started',   color: 'gray'   },
+};
+const TIER_KEYS = ['ready', 'almost_ready', 'developing', 'at_risk'] as const;
+
+type CohortObj = Record<string, unknown>;
+const cObj = (v: unknown): CohortObj => (v && typeof v === 'object' && !Array.isArray(v) ? v as CohortObj : {});
+const cArr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const cNum = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const cRound = (v: number): number => Math.round(v * 10) / 10;
+function catLabel(c: string): string {
+  return c.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function adaptReadinessDistribution(raw: unknown): unknown {
+  const r = cObj(raw);
+  const tiersObj = cObj(r.tiers);
+  const summary = cObj(r.summary);
+  const grid: CohortObj[] = [];
+  const tierCount: Record<string, number> = { ready: 0, almost_ready: 0, developing: 0, at_risk: 0, not_started: 0 };
+  const scores: number[] = [];
+  let notStarted = 0;
+
+  for (const key of TIER_KEYS) {
+    for (const e0 of cArr(tiersObj[key])) {
+      const e = cObj(e0);
+      const sc = cNum(e.session_count) ?? 0;
+      const score = cNum(e.avg_score);
+      const effTier = sc > 0 ? key : 'not_started';
+      tierCount[effTier] = (tierCount[effTier] ?? 0) + 1;
+      if (effTier === 'not_started') notStarted++;
+      if (score !== null) scores.push(score);
+      grid.push({
+        user_id: String(e.user_id ?? ''),
+        full_name: (e.name ?? e.full_name ?? '') as string,
+        department: (e.department_name ?? null) as string | null,
+        graduation_year: cNum(e.graduation_year),
+        latest_score: score,
+        session_count: sc,
+        readiness_tier: TIER_META[effTier].label,
+        readiness_color: TIER_META[effTier].color,
+      });
+    }
+  }
+
+  const total = cNum(summary.total_students) ?? grid.length;
+  const tiers = ['ready', 'almost_ready', 'developing', 'at_risk', 'not_started'].map(k => ({
+    tier: TIER_META[k].label,
+    color: TIER_META[k].color,
+    count: tierCount[k] ?? 0,
+    pct: total > 0 ? cRound(((tierCount[k] ?? 0) / total) * 100) : 0,
+  }));
+
+  const buckets: CohortObj[] = [];
+  for (let lo = 0; lo < 100; lo += 10) {
+    const hi = lo + 10;
+    const count = scores.filter(s => (hi < 100 ? s >= lo && s < hi : s >= lo && s <= hi)).length;
+    buckets.push({ range_start: lo, range_end: hi, count });
+  }
+  const sorted = [...scores].sort((a, b) => a - b);
+  const mean = scores.length ? cRound(scores.reduce((s, v) => s + v, 0) / scores.length) : null;
+  const median = sorted.length
+    ? (sorted.length % 2
+      ? sorted[(sorted.length - 1) / 2]
+      : cRound((sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2))
+    : null;
+  const std = (scores.length > 1 && mean !== null)
+    ? cRound(Math.sqrt(scores.reduce((s, v) => s + (v - mean) ** 2, 0) / (scores.length - 1)))
+    : null;
+
+  return {
+    readiness: { tiers, total_students: total, grid },
+    percentile: {
+      buckets,
+      total_scored_students: scores.length,
+      not_started_students: notStarted,
+      mean, median, std_dev: std,
+    },
+  };
+}
+
+function adaptRiskRoster(raw: unknown): unknown {
+  const r = cObj(raw);
+  const tiersObj = cObj(r.tiers);
+  const roster: CohortObj[] = [];
+  for (const key of TIER_KEYS) {
+    for (const e0 of cArr(tiersObj[key])) {
+      const e = cObj(e0);
+      const zor = e.zero_offer_risk === true;
+      if (key !== 'at_risk' && !zor) continue; // only at-risk / zero-offer-risk students
+      const sc = cNum(e.session_count) ?? 0;
+      const score = cNum(e.avg_score);
+      const reasons: string[] = [];
+      if (sc === 0) reasons.push('No interviews attempted yet');
+      else if (score !== null && score < 40) reasons.push('Average score below 40/100');
+      else if (score !== null && score < 60) reasons.push('Below the placement-ready score threshold');
+      if (sc > 0 && sc < 3) reasons.push('Too few practice sessions');
+      roster.push({
+        user_id: String(e.user_id ?? ''),
+        full_name: (e.name ?? '') as string,
+        department: (e.department_name ?? null) as string | null,
+        graduation_year: cNum(e.graduation_year),
+        latest_score: score,
+        delta: null,
+        session_count: sc,
+        readiness_tier: TIER_META[sc > 0 ? key : 'not_started'].label,
+        at_risk_of_zero_offers: zor,
+        risk_reasons: reasons.length ? reasons : ['Needs attention'],
+      });
+    }
+  }
+  roster.sort((a, b) => Number(b.at_risk_of_zero_offers) - Number(a.at_risk_of_zero_offers));
+  return { roster };
+}
+
+function adaptRollups(raw: unknown): unknown {
+  const r = cObj(raw);
+  const catAvgs = cObj(r.category_averages);
+  const studentCount = cNum(cObj(r.summary).scored_students) ?? 0;
+  const by_category = RUBRIC_CATEGORIES.map(c => ({
+    category: c,
+    label: catLabel(c),
+    cohort_avg_latest: cNum(catAvgs[c]),
+    cohort_avg_first: null,
+    cohort_avg_delta: null,
+    student_count: studentCount,
+  }));
+  const weakest_first = by_category
+    .filter(x => x.cohort_avg_latest !== null)
+    .sort((a, b) => (a.cohort_avg_latest as number) - (b.cohort_avg_latest as number))
+    .concat(by_category.filter(x => x.cohort_avg_latest === null));
+  const radarRaw = cObj(cObj(r.viz_shapes).radar);
+  const radar = {
+    categories: cArr(radarRaw.categories).map(c => catLabel(String(c))),
+    series: [
+      { key: 'cohort', label: 'Cohort Average', values: cArr(radarRaw.cohort_avg).map(cNum) },
+      { key: 'top_quartile', label: 'Top 25%', values: cArr(radarRaw.top_quartile_avg).map(cNum) },
+    ],
+  };
+  return { by_category, weakest_first, radar };
+}
+
+function adaptDepartments(raw: unknown): unknown {
+  const r = cObj(raw);
+  const instAvg = cNum(cObj(r.summary).cohort_avg_score);
+  const departments = cArr(r.department_comparison).map(d0 => {
+    const d = cObj(d0);
+    const avg = cNum(d.avg_score);
+    const cats = cObj(d.category_scores);
+    let wk: string | null = null;
+    let wkScore: number | null = null;
+    for (const c of RUBRIC_CATEGORIES) {
+      const v = cNum(cats[c]);
+      if (v !== null && (wkScore === null || v < wkScore)) { wkScore = v; wk = c; }
+    }
+    return {
+      department: (d.department_name ?? null) as string | null,
+      student_count: cNum(d.student_count) ?? 0,
+      avg_latest_score: avg,
+      avg_first_score: null,
+      avg_delta: null,
+      diverging_from_institution: (avg !== null && instAvg !== null) ? cRound(avg - instAvg) : null,
+      readiness_tier_counts: {},
+      at_risk_count: 0,
+      weakest_category: wk,
+      weakest_category_label: wk ? catLabel(wk) : null,
+      weakest_category_score: wkScore,
+    };
+  });
+  return {
+    departments,
+    diverging: {
+      institution_avg_latest_score: instAvg,
+      departments: departments.map(d => d.department),
+      values: departments.map(d => d.diverging_from_institution),
+    },
+  };
+}
+
+function adaptGrowthHeatmap(raw: unknown): unknown {
+  const r = cObj(raw);
+  const students = cArr(cObj(cObj(r.viz_shapes).growth_heatmap).students);
+  const sums = RUBRIC_CATEGORIES.map(() => 0);
+  const counts = RUBRIC_CATEGORIES.map(() => 0);
+  for (const s0 of students) {
+    const deltas = cObj(cObj(s0).category_deltas);
+    RUBRIC_CATEGORIES.forEach((c, i) => {
+      const v = cNum(deltas[c]);
+      if (v !== null) { sums[i] += v; counts[i]++; }
+    });
+  }
+  const hasData = counts.some(c => c > 0);
+  const row = RUBRIC_CATEGORIES.map((_, i) => (counts[i] ? cRound(sums[i] / counts[i]) : null));
+  return {
+    rows: hasData ? ['Cohort average'] : [],
+    row_label: 'Cohort',
+    categories: RUBRIC_CATEGORIES.map(catLabel),
+    matrix: hasData ? [row] : [],
+  };
+}
+
+function adaptActivity(raw: unknown): unknown {
+  const data = cArr(cObj(cObj(cObj(raw).viz_shapes).calendar_heatmap).data);
+  const out: Record<string, number> = {};
+  for (const d0 of data) {
+    const d = cObj(d0);
+    const date = String(d.date ?? '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) out[date] = cNum(d.session_count) ?? 0;
+  }
+  return out;
+}
+
 class ApiClient {
   private static readonly MAX_CACHE_ENTRIES = 100;
   // ✅ FIXED: MAX_INFLIGHT was declared but never enforced anywhere — was dead code.
@@ -1022,32 +1253,44 @@ class ApiClient {
     return query ? `?${query}` : '';
   }
 
+  // Each method fetches a backend endpoint and adapts its response to the exact
+  // shape the analytics page consumes (see the adapters above). The backend
+  // /readiness, /performance and /growth endpoints each feed more than one tab.
+
   async getCohortDistribution<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
-    return this.request<T>(`/org/my/analytics/readiness${this.buildCohortQuery(params)}`);
+    const raw = await this.request<unknown>(`/org/my/analytics/readiness${this.buildCohortQuery(params)}`);
+    return adaptReadinessDistribution(raw) as T;
   }
 
   async getCohortRollups<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
-    return this.request<T>(`/org/my/analytics/performance${this.buildCohortQuery(params)}`);
+    const raw = await this.request<unknown>(`/org/my/analytics/performance${this.buildCohortQuery(params)}`);
+    return adaptRollups(raw) as T;
   }
 
   async getCohortDepartments<T = unknown>(params?: { year?: number }): Promise<T> {
-    return this.request<T>(`/org/my/analytics/performance${this.buildCohortQuery(params)}`);
+    const raw = await this.request<unknown>(`/org/my/analytics/performance${this.buildCohortQuery(params)}`);
+    return adaptDepartments(raw) as T;
   }
 
   async getCohortRiskRoster<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
-    return this.request<T>(`/org/my/analytics/readiness${this.buildCohortQuery(params)}`);
+    const raw = await this.request<unknown>(`/org/my/analytics/readiness${this.buildCohortQuery(params)}`);
+    return adaptRiskRoster(raw) as T;
   }
 
   async getCohortGrowthHeatmap<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
-    return this.request<T>(`/org/my/analytics/growth${this.buildCohortQuery(params)}`);
+    const raw = await this.request<unknown>(`/org/my/analytics/growth${this.buildCohortQuery(params)}`);
+    return adaptGrowthHeatmap(raw) as T;
   }
 
   async getCohortActivity<T = unknown>(params?: { department?: string; year?: number; days?: number }): Promise<T> {
-    return this.request<T>(`/org/my/analytics/growth${this.buildCohortQuery(params)}`);
+    const raw = await this.request<unknown>(`/org/my/analytics/growth${this.buildCohortQuery(params)}`);
+    return adaptActivity(raw) as T;
   }
 
-  async getCohortRoleFit<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
-    return this.request<T>(`/org/my/analytics/performance${this.buildCohortQuery(params)}`);
+  // Role-fit (target role -> readiness flow) has no backend source data yet; return
+  // a valid empty shape so the tab renders its "no data" state instead of erroring.
+  async getCohortRoleFit<T = unknown>(_params?: { department?: string; year?: number }): Promise<T> {
+    return { nodes: [], links: [] } as T;
   }
 }
 
