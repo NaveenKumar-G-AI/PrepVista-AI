@@ -744,7 +744,7 @@ def get_allowed_hosts() -> list[str]:
     hosts = [h.strip() for h in raw.split(",") if h.strip()]
     
     # Safely inject production domains to prevent Host header injection and clear the startup warning
-    for required_host in ["prepvista.ai", "www.prepvista.ai", "prepvistaai.com", "www.prepvistaai.com", "prepvistabackend1.onrender.com"]:
+    for required_host in ["prepvista.ai", "www.prepvista.ai", "prepvistaai.com", "www.prepvistaai.com", "prepvistabackend.onrender.com"]:
         if required_host not in hosts:
             hosts.append(required_host)
             
