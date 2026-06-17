@@ -21,7 +21,11 @@ export function getSupabase(): SupabaseClient {
   return _supabase;
 }
 
-// Backward-compatible export — only use in client components
+// Backward-compatible export — only use in client components.
+// Reuses the lazy singleton from getSupabase() instead of calling createClient()
+// a second time. Creating two clients spins up two GoTrueClient instances against
+// the same storage key, which logs "Multiple GoTrueClient instances detected" and
+// can cause undefined auth behaviour under concurrent use.
 export const supabase = (typeof window !== 'undefined' && supabaseUrl && supabaseAnonKey)
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? getSupabase()
   : (null as unknown as SupabaseClient);
