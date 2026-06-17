@@ -4,6 +4,7 @@ PrepVista AI - Org College Analytics
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import json
@@ -40,6 +41,24 @@ from app.routers.org_college_helpers import (
 
 router = APIRouter()
 
+
+async def _parallel(*query_fns):
+    """Run independent read queries concurrently, each on its own pooled connection.
+
+    The backend (Render, us-east) and the database (Supabase, ap-southeast-1) sit
+    in different regions, so every query pays ~250ms of network round-trip. Run
+    sequentially, N independent queries cost ~N*250ms; run concurrently they cost
+    ~250ms total. Each callable receives a fresh asyncpg connection and must
+    finish using it before returning (the connection is released on return).
+
+    Order is preserved: results come back in the same order the callables are
+    passed, so callers can unpack them positionally.
+    """
+    async def _run(fn):
+        async with DatabaseConnection() as conn:
+            return await fn(conn)
+    return await asyncio.gather(*(_run(fn) for fn in query_fns))
+
 @router.get("/dashboard")
 async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin())):
     """Org overview dashboard.
@@ -53,39 +72,42 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
     All from one additional pre-aggregated query — page-load impact is minimal.
     """
     org_id = admin.organization_id
-    async with DatabaseConnection() as conn:
-        # ✅ SEC: Explicit column list prevents internal billing/payment fields
-        # from leaking to college-admin scope via SELECT *.
-        org = await conn.fetchrow(
+    # ✅ PERF: these five reads are independent, so run them concurrently (each on
+    # its own pooled connection) instead of serially. Across the Render<->Supabase
+    # region gap this collapses ~5x250ms of round-trips into ~one. See _parallel().
+    # ✅ SEC: Explicit column lists prevent internal billing/payment fields from
+    # leaking to college-admin scope via SELECT *.
+    org, stats, seg_stats, recent, perf_rows = await _parallel(
+        lambda conn: conn.fetchrow(
             """SELECT id, name, category, plan, seat_limit, seats_used,
                       access_expiry, status, created_at
                FROM organizations WHERE id = $1""",
             org_id,
-        )
-        stats = await conn.fetchrow(
+        ),
+        lambda conn: conn.fetchrow(
             """SELECT
                  COUNT(*) FILTER (WHERE status = 'active')                             AS total_students,
                  COUNT(*) FILTER (WHERE has_career_access = TRUE AND status = 'active') AS career_access_students
                FROM organization_students WHERE organization_id = $1""",
             org_id,
-        )
-        seg_stats = await conn.fetchrow(
+        ),
+        lambda conn: conn.fetchrow(
             """SELECT
                  (SELECT COUNT(*) FROM college_departments WHERE organization_id = $1 AND status = 'active') AS dept_count,
                  (SELECT COUNT(*) FROM college_years      WHERE organization_id = $1 AND status = 'active') AS year_count,
                  (SELECT COUNT(*) FROM college_batches    WHERE organization_id = $1 AND status = 'active') AS batch_count""",
             org_id,
-        )
-        recent = await conn.fetch(
+        ),
+        lambda conn: conn.fetch(
             """SELECT os.id, os.student_code, os.has_career_access, os.added_at,
                       p.email, p.full_name
                FROM organization_students os JOIN profiles p ON p.id = os.user_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                ORDER BY os.added_at DESC LIMIT 10""",
             org_id,
-        )
-        # NEW: lightweight per-student perf for dashboard KPIs (one extra query)
-        perf_rows = await conn.fetch(
+        ),
+        # NEW: lightweight per-student perf for dashboard KPIs
+        lambda conn: conn.fetch(
             """SELECT
                  os.user_id,
                  COUNT(isess.id) FILTER (WHERE isess.state = 'FINISHED') AS session_count,
@@ -124,7 +146,8 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY os.user_id""",
             org_id,
-        )
+        ),
+    )
 
     # Python-side KPI computation — zero additional DB round-trips
     tier_counts: dict[str, int] = {
@@ -188,16 +211,17 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
       diverging_bar, score_distribution).
     """
     org_id = admin.organization_id
-    async with DatabaseConnection() as conn:
-        # ── Existing queries (unchanged) ──────────────────────────────────────
-        counts = await conn.fetchrow(
+    # ✅ PERF: these reads are independent — run them concurrently (each on its own
+    # pooled connection) so the cross-region round-trips overlap. See _parallel().
+    counts, dept_stats, year_stats, batch_stats, perf_rows = await _parallel(
+        lambda conn: conn.fetchrow(
             """SELECT
                  COUNT(*) FILTER (WHERE status = 'active')                             AS total_students,
                  COUNT(*) FILTER (WHERE has_career_access = TRUE AND status = 'active') AS career_access_students
                FROM organization_students WHERE organization_id = $1""",
             org_id,
-        )
-        dept_stats = await conn.fetch(
+        ),
+        lambda conn: conn.fetch(
             """SELECT cd.department_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
@@ -205,8 +229,8 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cd.department_name ORDER BY total DESC""",
             org_id,
-        )
-        year_stats = await conn.fetch(
+        ),
+        lambda conn: conn.fetch(
             """SELECT cy.year_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
@@ -214,8 +238,8 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cy.year_name ORDER BY total DESC""",
             org_id,
-        )
-        batch_stats = await conn.fetch(
+        ),
+        lambda conn: conn.fetch(
             """SELECT cb.batch_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
@@ -223,9 +247,10 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cb.batch_name ORDER BY total DESC""",
             org_id,
-        )
-        # ── NEW: one-shot performance aggregate query ─────────────────────────
-        perf_rows = await _fetch_perf_aggregate(conn, org_id)
+        ),
+        # ── one-shot performance aggregate query ──────────────────────────────
+        lambda conn: _fetch_perf_aggregate(conn, org_id),
+    )
 
     # ── Python-side analytics ─────────────────────────────────────────────────
     total = len(perf_rows)
