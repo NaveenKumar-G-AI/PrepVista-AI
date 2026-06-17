@@ -743,11 +743,28 @@ def get_allowed_hosts() -> list[str]:
     raw = get_settings().ALLOWED_HOSTS or "*"
     hosts = [h.strip() for h in raw.split(",") if h.strip()]
     
-    # Safely inject production domains to prevent Host header injection and clear the startup warning
-    for required_host in ["prepvista.ai", "www.prepvista.ai", "prepvistaai.com", "www.prepvistaai.com", "prepvistabackend.onrender.com"]:
+    # Safely inject production domains to prevent Host header injection and clear the startup warning.
+    # NOTE: the live Render service is "prepvistabeckend" (misspelled "beckend") — that exact host
+    # MUST be present, otherwise TrustedHostMiddleware returns 400 before CORS runs and the browser
+    # reports it as a CORS error ("No 'Access-Control-Allow-Origin' header"). Both spellings are
+    # listed so a future rename to the correctly-spelled service also keeps working.
+    for required_host in [
+        "prepvista.ai", "www.prepvista.ai", "prepvistaai.com", "www.prepvistaai.com",
+        "prepvistabeckend.onrender.com", "prepvistabackend.onrender.com",
+    ]:
         if required_host not in hosts:
             hosts.append(required_host)
-            
+
+    # Also allow whatever host BACKEND_URL resolves to, so a changed Render URL is accepted
+    # without another code change. Browsers send the public backend host in the Host header.
+    try:
+        from urllib.parse import urlparse
+        backend_host = urlparse(get_settings().BACKEND_URL).hostname
+        if backend_host and backend_host not in hosts:
+            hosts.append(backend_host)
+    except Exception:
+        pass
+
     # If we added specific hosts, we should remove '*' to actually secure it (unless they explicitly passed * in dev)
     import os
     if os.getenv("ENVIRONMENT", "production").lower() == "production" and "*" in hosts:
