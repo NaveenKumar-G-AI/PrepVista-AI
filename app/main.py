@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
@@ -251,6 +252,13 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
     await close_db_pool()
+    # Close the rate limiter's persistent httpx client so its connection pool is
+    # not leaked on every restart/redeploy.
+    try:
+        from app.middleware.rate_limiter import close_redis_client
+        await close_redis_client()
+    except Exception as exc:
+        logger.warning("rate_limiter_client_close_failed", error=_describe_startup_error(exc))
     logger.info("shutdown_complete")
 
 
@@ -286,6 +294,15 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-Request-ID"],
         max_age=3600,
     )
+
+    # ── Response Compression ─────────────────────
+    # ✅ PERF: gzip every response body over ~500 bytes. The dashboard, analytics,
+    # student-list and report payloads are large JSON documents (cohort grids,
+    # category matrices, risk rosters); sending them uncompressed across the
+    # Render↔browser hop dominates perceived latency. gzip typically shrinks
+    # these 70–85%, turning multi-hundred-KB transfers into tens of KB.
+    # minimum_size avoids wasting CPU compressing tiny health/echo responses.
+    app.add_middleware(GZipMiddleware, minimum_size=500)
 
     # ── Trusted Host ─────────────────────────────
     # ✅ SEC: TrustedHostMiddleware prevents Host header injection attacks.
@@ -434,5 +451,8 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(get_settings().BACKEND_URL.split(":")[-1]) if ":" in get_settings().BACKEND_URL else 8000
+    # Use the standard PORT env var (matches the Dockerfile's ${PORT:-8000}).
+    # The previous BACKEND_URL.split(":")[-1] crashed for a scheme-only URL like
+    # "https://host" (split(":")[-1] == "//host" -> int() ValueError).
+    port = int(os.environ.get("PORT", "8000"))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=get_settings().DEBUG)

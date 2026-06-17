@@ -591,14 +591,18 @@ QUESTION_SCORE_SCALE_MAX = 10.0
 # _get_score_band's 30 / 45 / 60 / 75 / 85, both below.
 FINAL_SCORE_SCALE_MAX = 100.0
 
-# question_evaluations.communication_score is NOT 0-10 and NOT 0-100 — see
-# _assess_communication_style's avg_comm thresholds of 1.5 / 1.0 / 0.7 for
-# clear_and_structured / mostly_clear / needs_improvement, which only make
-# sense as fractions of a SMALL scale. 3.0 (a 0-3 Likert: poor/fair/good/
-# excellent) is the best-fit guess but is UNVERIFIED — confirm against the
-# evaluator prompt or a DB CHECK constraint before relying on it for
-# normalization. If the true max is 2.0 instead, only this constant changes.
-COMMUNICATION_SCORE_SCALE_MAX = 3.0
+# question_evaluations.communication_score is STORED on a 0-10 scale: the
+# evaluator (evaluator_feedback.py) writes `communication_part * 5`, where
+# communication_part is clamped to [0, 2]. Verified against three independent
+# consumers that all divide the stored value by 5: the frontend report page
+# (report/[id]/page.tsx renders ".../ 2"), report_render.py, and the
+# COMMUNICATION_PART_DIVISOR normalization in _assess_communication_style.
+COMMUNICATION_SCORE_SCALE_MAX = 10.0
+
+# Divisor that maps the STORED communication_score (0-10) back to the 0-2
+# "part" the evaluator originally produced. Mirrors the /5 used by
+# report_render.py and the frontend report view.
+COMMUNICATION_PART_DIVISOR = 5.0
 
 
 def normalize_score_to_100(value: float | None, scale_max: float) -> float | None:
@@ -770,19 +774,20 @@ def _compute_hr_readiness_level(
     planned_questions: int,
     silent_count: int,
     weak_ratio: float,
+    timeout_count: int = 0,
 ) -> str:
     """Classify the candidate's overall interview readiness as an HR evaluator would.
 
     Uses score, completion, silence rate, and weak-answer ratio as signals.
     Returns one of the HR_READINESS_* constants.
 
-    ✅ REMOVED: a `timeout_count` parameter was accepted here but never read
-    in the body. Its signal is not lost — _classify_answer_strength already
-    classifies a timeout-status evaluation as "silent", so timeouts are
-    already folded into `silent_count`. The dead parameter is removed and the
-    one call site in compute_premium_interview_report no longer passes it;
-    `summary["timeout_count"]` is still returned at the top level of the
-    premium report unchanged.
+    `timeout_count` is accepted for caller convenience but intentionally not
+    read in the body: _classify_answer_strength already classifies a
+    timeout-status evaluation as "silent", so timeouts are folded into
+    `silent_count`. It is kept as an optional parameter (the production call
+    site omits it) so direct callers/tests can pass the timeout tally without a
+    TypeError; `summary["timeout_count"]` is still returned at the top level of
+    the premium report unchanged.
     """
     if planned_questions > 0 and answered_questions == 0:
         return HR_READINESS_NOT_READY
@@ -840,13 +845,14 @@ _HR_READINESS_DESCRIPTIONS: dict[str, str] = {
 # Communication quality assessment  (additive — premium report)
 # ---------------------------------------------------------------------------
 
-def _assess_communication_style(evaluations: list[dict], quality_rows: list[dict]) -> dict:
+def _assess_communication_style(evaluations: list[dict], quality_rows: list[dict] | None = None) -> dict:
     """Compute aggregate communication quality signals from evaluation rows.
 
     `quality_rows` is the pre-computed _analyze_answer_quality output for
     every non-empty answer (see _compute_answer_quality_rows) — shared with
     _assess_integrity_and_ownership_signals so the ~15-regex analysis runs
-    once per answer, not twice.
+    once per answer, not twice. It is optional: when omitted (direct callers /
+    tests) it is computed here from `evaluations`.
     """
     if not evaluations:
         return {
@@ -855,8 +861,18 @@ def _assess_communication_style(evaluations: list[dict], quality_rows: list[dict
             "communication_summary": "No answers were recorded to assess communication quality.",
         }
 
+    if quality_rows is None:
+        quality_rows = _compute_answer_quality_rows(evaluations)
+
+    # ✅ FIXED: communication_score is STORED on a 0-10 scale (the evaluator
+    # writes communication_part[0-2] * 5 — see evaluator_feedback.py; the
+    # frontend report and report_render.py both divide by 5 to display "/2").
+    # The clarity thresholds below (1.5 / 1.0 / 0.7) are calibrated to the 0-2
+    # "part", so the raw stored value MUST be divided by COMMUNICATION_PART_DIVISOR
+    # first. Without this every real interview averaged ~5-10 → always
+    # >= 1.5 → every candidate was misclassified as "clear_and_structured".
     comm_scores = [
-        _safe_float(ev.get("communication_score"))
+        _safe_float(ev.get("communication_score")) / COMMUNICATION_PART_DIVISOR
         for ev in evaluations
         if isinstance(ev, dict) and _safe_float(ev.get("communication_score")) > 0
     ]

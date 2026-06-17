@@ -29,6 +29,7 @@ Call POST /billing/status/sync after:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
+import json
 from typing import Literal
 
 import structlog
@@ -200,8 +201,15 @@ async def razorpay_webhook(request: Request):
         except ValueError:
             pass  # Malformed content-length header — let json() handle it below
 
+    # Read the RAW body bytes. The webhook signature MUST be verified against
+    # the exact bytes Razorpay sent — re-serializing a parsed dict (different
+    # key order, unicode escaping, or whitespace) breaks HMAC verification.
+    raw_body = await request.body()
+    if len(raw_body) > _WEBHOOK_MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Webhook payload too large.")
+
     try:
-        payload = await request.json()
+        payload = json.loads(raw_body)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON payload.")
 
@@ -222,7 +230,7 @@ async def razorpay_webhook(request: Request):
     # Retries on a non-idempotent handler cause double plan activation / double
     # payment records. ERROR log fires on-call alerts for manual reprocessing.
     try:
-        result = await handle_webhook(payload, signature)
+        result = await handle_webhook(raw_body, signature)
     except Exception as exc:
         logger.error(
             "billing_webhook_failed",
