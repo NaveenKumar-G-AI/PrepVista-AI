@@ -77,80 +77,88 @@ def _paid_status(active_flag: Any, expired_flag: Any) -> str:
 
 
 async def _fetch_settings_and_activity(conn: Any) -> tuple[Any, Any]:
-    """Fetch launch-offer settings and activity stats concurrently on one connection."""
-    settings_row, activity_stats = await asyncio.gather(
-        conn.fetchrow(
-            """SELECT eligible_after, max_approved_slots
-               FROM launch_offer_settings
-               WHERE id = 1"""
-        ),
-        refresh_user_activity_stats(conn),
+    """Fetch launch-offer settings and activity stats on one connection.
+
+    ⚠️ SEQUENTIAL on purpose: asyncpg connections cannot run two operations
+    concurrently — gathering multiple queries on the SAME connection raises
+    InterfaceError("another operation is in progress"). Cross-group parallelism
+    is achieved by giving each group its OWN connection (see get_admin_overview),
+    not by sharing one connection across concurrent queries.
+    """
+    settings_row = await conn.fetchrow(
+        """SELECT eligible_after, max_approved_slots
+           FROM launch_offer_settings
+           WHERE id = 1"""
     )
+    activity_stats = await refresh_user_activity_stats(conn)
     return settings_row, activity_stats
 
 
 async def _fetch_operational_data(
     conn: Any,
 ) -> tuple[Any, Any, Any]:
-    """Fetch launch offers, referrals, and feedback concurrently on one connection."""
-    launch_offer_rows, referral_rows, feedback_rows = await asyncio.gather(
-        conn.fetch(
-            """
-            SELECT
-                lg.id,
-                lg.user_id,
-                lg.email,
-                p.full_name,
-                lg.status,
-                lg.slot_number,
-                lg.plan,
-                lg.requested_at,
-                lg.approved_at,
-                lg.reviewed_at,
-                lg.approved_by_email,
-                lg.expires_at
-            FROM launch_offer_grants lg
-            LEFT JOIN profiles p
-              ON p.id = lg.user_id
-            ORDER BY
-                CASE lg.status
-                    WHEN 'pending'  THEN 0
-                    WHEN 'approved' THEN 1
-                    WHEN 'expired'  THEN 2
-                    ELSE 3
-                END,
-                lg.requested_at ASC,
-                lg.id ASC
-            """
-        ),
-        conn.fetch(
-            """
-            SELECT
-                r.id,
-                r.invited_email,
-                r.status,
-                r.reward_granted,
-                r.created_at,
-                r.joined_at,
-                ref.full_name  AS referrer_name,
-                ref.email      AS referrer_email,
-                invited.full_name AS invited_user_name,
-                invited.email     AS invited_user_email
-            FROM referrals r
-            JOIN  profiles ref     ON ref.id    = r.referrer_user_id
-            LEFT JOIN profiles invited ON invited.id = r.invited_user_id
-            ORDER BY r.created_at DESC
-            LIMIT 200
-            """
-        ),
-        conn.fetch(
-            """
-            SELECT id, email, full_name, feedback_text, created_at
-            FROM feedback_entries
-            ORDER BY created_at DESC
-            LIMIT 200
-            """
-        ),
+    """Fetch launch offers, referrals, and feedback on one connection.
+
+    ⚠️ SEQUENTIAL on purpose — see _fetch_settings_and_activity. asyncpg raises
+    InterfaceError("another operation is in progress") if multiple queries run
+    concurrently on the same connection.
+    """
+    launch_offer_rows = await conn.fetch(
+        """
+        SELECT
+            lg.id,
+            lg.user_id,
+            lg.email,
+            p.full_name,
+            lg.status,
+            lg.slot_number,
+            lg.plan,
+            lg.requested_at,
+            lg.approved_at,
+            lg.reviewed_at,
+            lg.approved_by_email,
+            lg.expires_at
+        FROM launch_offer_grants lg
+        LEFT JOIN profiles p
+          ON p.id = lg.user_id
+        ORDER BY
+            CASE lg.status
+                WHEN 'pending'  THEN 0
+                WHEN 'approved' THEN 1
+                WHEN 'expired'  THEN 2
+                ELSE 3
+            END,
+            lg.requested_at ASC,
+            lg.id ASC
+        """
+    )
+    referral_rows = await conn.fetch(
+        """
+        SELECT
+            r.id,
+            r.invited_email,
+            r.status,
+            r.reward_granted,
+            r.created_at,
+            r.joined_at,
+            ref.full_name  AS referrer_name,
+            ref.email      AS referrer_email,
+            invited.full_name AS invited_user_name,
+            invited.email     AS invited_user_email
+        FROM referrals r
+        JOIN  profiles ref     ON ref.id    = r.referrer_user_id
+        LEFT JOIN profiles invited ON invited.id = r.invited_user_id
+        ORDER BY r.created_at DESC
+        LIMIT 200
+        """
+    )
+    feedback_rows = await conn.fetch(
+        """
+        SELECT id, email, full_name, feedback_text, created_at
+        FROM feedback_entries
+        ORDER BY created_at DESC
+        LIMIT 200
+        """
     )
     return launch_offer_rows, referral_rows, feedback_rows
 
@@ -158,9 +166,13 @@ async def _fetch_operational_data(
 async def _fetch_analytics_data(
     conn: Any,
 ) -> tuple[Any, Any, Any]:
-    """Fetch users, plan usage, and revenue (with global totals) concurrently."""
-    user_rows, plan_usage_rows, revenue_rows = await asyncio.gather(
-        conn.fetch(
+    """Fetch users, plan usage, and revenue (with global totals) on one connection.
+
+    ⚠️ SEQUENTIAL on purpose — see _fetch_settings_and_activity. Concurrent queries
+    on a single asyncpg connection raise InterfaceError("another operation is in
+    progress"); cross-group parallelism uses separate connections instead.
+    """
+    user_rows = await conn.fetch(
             """
             WITH entitlement_rollup AS (
                 SELECT
@@ -239,8 +251,8 @@ async def _fetch_analytics_data(
             ORDER BY p.created_at DESC
             LIMIT 500
             """
-        ),
-        conn.fetch(
+    )
+    plan_usage_rows = await conn.fetch(
             """
             SELECT p.email, p.full_name, u.plan, u.total_interviews, u.last_interview_at
             FROM user_plan_interviews u
@@ -248,8 +260,8 @@ async def _fetch_analytics_data(
             ORDER BY u.total_interviews DESC, u.last_interview_at DESC
             LIMIT 200
             """
-        ),
-        # ── revenue_rows: bounded + global totals via window function ─────────
+    )
+    # ── revenue_rows: bounded + global totals via window function ─────────
         # The original query had NO LIMIT — it returned every row in
         # user_revenue_analytics on every admin load. At 5,000 paying users this
         # is a 5,000-row full-table scan transferred to Python on every page hit.
@@ -260,7 +272,7 @@ async def _fetch_analytics_data(
         # window aggregates. This eliminates one complete extra round-trip to
         # user_revenue_analytics, cutting the total query count from 9 → 8
         # while also removing a redundant sequential scan on the same table.
-        conn.fetch(
+    revenue_rows = await conn.fetch(
             f"""
             SELECT
                 user_id,
@@ -280,7 +292,6 @@ async def _fetch_analytics_data(
             ORDER BY total_revenue_paise DESC, last_payment_date DESC
             LIMIT {_REVENUE_ROWS_LIMIT}
             """
-        ),
     )
     return user_rows, plan_usage_rows, revenue_rows
 
