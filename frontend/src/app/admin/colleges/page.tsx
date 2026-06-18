@@ -10,7 +10,6 @@
  */
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { AuthHeader } from '@/components/auth-header';
@@ -49,6 +48,23 @@ interface CreateAdminForm {
   full_name: string;
   phone: string;
 }
+
+/** Create-college form (posts to api.createOrganization). seat_limit kept as a
+ *  string for the controlled <input>, coerced to a number on submit. */
+interface CreateCollegeForm {
+  name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  address: string;
+  seat_limit: string;
+  notes: string;
+}
+
+const EMPTY_COLLEGE_FORM: CreateCollegeForm = {
+  name: '', contact_name: '', contact_email: '', contact_phone: '',
+  address: '', seat_limit: '50', notes: '',
+};
 
 type SortKey = 'full_name' | 'organization_name' | 'status' | 'created_at' | 'last_login';
 type SortDir = 'asc' | 'desc';
@@ -126,6 +142,11 @@ export default function CollegeAdminsPage() {
   const [sortKey,   setSortKey]   = useState<SortKey>('created_at');
   const [sortDir,   setSortDir]   = useState<SortDir>('desc');
 
+  // ── Create College modal ──
+  const [showCreateOrg, setShowCreateOrg] = useState(false);
+  const [orgForm,       setOrgForm]       = useState<CreateCollegeForm>(EMPTY_COLLEGE_FORM);
+  const [creatingOrg,   setCreatingOrg]   = useState(false);
+
   /** Guards stale state updates after unmount */
   const abortRef       = useRef<AbortController | null>(null);
   /** Prevents success-toast timer from firing after unmount */
@@ -194,13 +215,17 @@ export default function CollegeAdminsPage() {
     loadData();
   }, [authLoading, user, router, loadData]);
 
-  // ── Escape key: close create modal ───────────────────────────────────────
+  // ── Escape key: close whichever create modal is open ─────────────────────
   useEffect(() => {
-    if (!showCreate) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowCreate(false); };
+    if (!showCreate && !showCreateOrg) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setShowCreate(false);
+      setShowCreateOrg(false);
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showCreate]);
+  }, [showCreate, showCreateOrg]);
 
   // ── Filtered + sorted admins (memoized) ──────────────────────────────────
   const filtered = useMemo(() => {
@@ -268,6 +293,34 @@ export default function CollegeAdminsPage() {
     }
   };
 
+  // ── Create college (organization) ─────────────────────────────────────────
+  const handleCreateOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orgForm.name.trim()) return;
+    setCreatingOrg(true);
+    setError('');
+    try {
+      const seat = parseInt(orgForm.seat_limit, 10);
+      await api.createOrganization({
+        name:          orgForm.name.trim(),
+        contact_name:  orgForm.contact_name.trim() || null,
+        contact_email: orgForm.contact_email.trim() || null,
+        contact_phone: orgForm.contact_phone.trim() || null,
+        address:       orgForm.address.trim() || null,
+        seat_limit:    Number.isFinite(seat) && seat > 0 ? seat : 50,
+        notes:         orgForm.notes.trim() || null,
+      });
+      setOrgForm(EMPTY_COLLEGE_FORM);
+      setShowCreateOrg(false);
+      flashSuccess('College created successfully.');
+      await loadData();
+    } catch (err) {
+      setError(sanitizeError(err));
+    } finally {
+      setCreatingOrg(false);
+    }
+  };
+
   // ── Toggle enable / disable (optimistic update) ───────────────────────────
   const handleToggle = async (admin: OrgAdmin) => {
     setActionId(admin.id);
@@ -332,7 +385,13 @@ export default function CollegeAdminsPage() {
             </div>
           </div>
           <div className="flex gap-3">
-            <Link href="/admin/colleges" className="btn-secondary !px-5 !py-2.5 text-sm">← Colleges</Link>
+            <button
+              type="button"
+              onClick={() => setShowCreateOrg(true)}
+              className="btn-secondary !px-5 !py-2.5 text-sm"
+            >
+              <span className="inline-flex items-center gap-2"><PlusIcon size={16} />Create College</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowCreate(true)}
@@ -521,6 +580,126 @@ export default function CollegeAdminsPage() {
                     className="btn-primary flex-1 !py-2.5"
                   >
                     {creating ? 'Assigning…' : 'Assign Admin'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Create College Modal ── */}
+        {showCreateOrg && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setShowCreateOrg(false)}
+          >
+            <div
+              className="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-white">Create College</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateOrg(false)}
+                  aria-label="Close modal"
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <XIcon size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateOrg} className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    College Name *
+                  </label>
+                  <input
+                    value={orgForm.name}
+                    onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))}
+                    required
+                    placeholder="e.g. Anna University"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                  />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    A unique college code (COL-XXXX) is generated automatically.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Contact Name</label>
+                    <input
+                      value={orgForm.contact_name}
+                      onChange={e => setOrgForm(f => ({ ...f, contact_name: e.target.value }))}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Seat Limit</label>
+                    <input
+                      value={orgForm.seat_limit}
+                      onChange={e => setOrgForm(f => ({ ...f, seat_limit: e.target.value }))}
+                      type="number"
+                      min={1}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Contact Email</label>
+                    <input
+                      value={orgForm.contact_email}
+                      onChange={e => setOrgForm(f => ({ ...f, contact_email: e.target.value }))}
+                      type="email"
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Contact Phone</label>
+                    <input
+                      value={orgForm.contact_phone}
+                      onChange={e => setOrgForm(f => ({ ...f, contact_phone: e.target.value }))}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Address</label>
+                  <input
+                    value={orgForm.address}
+                    onChange={e => setOrgForm(f => ({ ...f, address: e.target.value }))}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Notes</label>
+                  <textarea
+                    value={orgForm.notes}
+                    onChange={e => setOrgForm(f => ({ ...f, notes: e.target.value }))}
+                    rows={2}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateOrg(false)}
+                    className="btn-secondary flex-1 !py-2.5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingOrg}
+                    className="btn-primary flex-1 !py-2.5"
+                  >
+                    {creatingOrg ? 'Creating…' : 'Create College'}
                   </button>
                 </div>
               </form>
