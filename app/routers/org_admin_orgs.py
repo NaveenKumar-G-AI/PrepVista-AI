@@ -20,6 +20,12 @@ from app.routers.org_admin_helpers import (
 )
 
 router = APIRouter()
+
+# Fixed key for the transaction-scoped advisory lock that serializes org_code
+# sequence generation (see create_organization). Any stable constant works.
+_ORG_CODE_LOCK_KEY = 0x6F726763  # 'orgc'
+
+
 @router.post("/organizations")
 async def create_organization(
     body: CreateOrgRequest,
@@ -36,10 +42,16 @@ async def create_organization(
     """
     async with DatabaseConnection() as conn:
         async with conn.transaction():
-            # ✅ FIXED: FOR UPDATE prevents concurrent race on MAX(seq)
+            # Serialize concurrent org creation so two requests can't read the
+            # same MAX(seq) and generate a duplicate org_code. FOR UPDATE cannot
+            # be combined with an aggregate (MAX) — Postgres raises
+            # FeatureNotSupportedError("FOR UPDATE is not allowed with aggregate
+            # functions") — so take a transaction-scoped advisory lock instead.
+            # It is released automatically when the transaction commits or rolls back.
+            await conn.execute("SELECT pg_advisory_xact_lock($1)", _ORG_CODE_LOCK_KEY)
             seq = await conn.fetchval(
                 "SELECT COALESCE(MAX(CAST(SUBSTRING(org_code FROM 5) AS INT)), 0) + 1 "
-                "FROM organizations FOR UPDATE"
+                "FROM organizations"
             )
             org_code = generate_org_code(seq, "college")
             cfg      = get_org_category_config("college")
