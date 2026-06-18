@@ -278,7 +278,7 @@ async def _fetch_analytics_data(
                 SUM(total_revenue_paise)   OVER () AS global_total_revenue
             FROM user_revenue_analytics
             ORDER BY total_revenue_paise DESC, last_payment_date DESC
-            LIMIT {{_REVENUE_ROWS_LIMIT}}
+            LIMIT {_REVENUE_ROWS_LIMIT}
             """
         ),
     )
