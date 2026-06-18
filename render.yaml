@@ -45,12 +45,19 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      # ⚠️ Supabase session-mode pooler is capped at 15 client connections.
+      # Total live connections = WEB_CONCURRENCY (worker processes) × DB_POOL_MAX_SIZE,
+      # because EACH gunicorn worker opens its OWN asyncpg pool. The old
+      # 2 × 20 = 40 guaranteed EMAXCONNSESSION ("max clients reached in session
+      # mode - pool_size: 15"). The app is async/I-O-bound, so a single worker
+      # serves high concurrency via the event loop — 1 worker × 10 = 10 keeps us
+      # safely under 15 with headroom for the migration conn and deploy overlap.
       - key: WEB_CONCURRENCY
-        value: "2"
+        value: "1"
       - key: DB_POOL_MIN_SIZE
-        value: "3"
+        value: "2"
       - key: DB_POOL_MAX_SIZE
-        value: "20"
+        value: "10"
 
   # ─────────────────────────────────────────────
   # PRIMARY HEARTBEAT  — fires at :03 :08 :13 … :58
