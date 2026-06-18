@@ -326,11 +326,32 @@ async def get_admin_overview(admin: UserProfile = Depends(require_admin)):
         async with DatabaseConnection() as conn:
             return await _fetch_analytics_data(conn)
 
-    (
-        (settings_row, activity_stats),
-        (launch_offer_rows, referral_rows, feedback_rows),
-        (user_rows, plan_usage_rows, revenue_rows),
-    ) = await asyncio.gather(_group1(), _group2(), _group3())
+    # ── Guard the data fetch ──────────────────────────────────────────────────
+    # Every realistic failure mode for this endpoint surfaces here: a SQL/query
+    # error, a connection-pool timeout, or a cross-region DB hiccup. Without this
+    # guard the exception propagates as an opaque 500 with no context. We log the
+    # full traceback (structlog .exception attaches exc_info — it lands in the
+    # Render logs) with the admin's email, then raise HTTPException so FastAPI
+    # returns a structured body the frontend's parseError() can surface. Raising
+    # HTTPException (vs a raw JSONResponse) keeps the response inside the CORS
+    # layer, so the 500 still carries Access-Control-Allow-Origin.
+    try:
+        (
+            (settings_row, activity_stats),
+            (launch_offer_rows, referral_rows, feedback_rows),
+            (user_rows, plan_usage_rows, revenue_rows),
+        ) = await asyncio.gather(_group1(), _group2(), _group3())
+    except Exception as exc:
+        logger.exception(
+            "admin_overview_query_failed",
+            admin_email=admin.email,
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to load admin overview. The error has been logged.",
+        ) from exc
 
     # ── Aggregations (PostgreSQL already pre-sorted the data) ─────────────────
     max_slots = int(settings_row["max_approved_slots"]) if settings_row else TOTAL_LAUNCH_OFFER_SLOTS
