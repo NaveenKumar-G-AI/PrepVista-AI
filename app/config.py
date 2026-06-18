@@ -79,20 +79,24 @@ class Settings(BaseSettings):
     # ⚠️ HARD CEILING: Supabase's connection pooler runs in SESSION mode with
     # Pool Size = 15 — each client connection holds one real Postgres connection
     # for its whole lifetime, and the 16th simultaneous connection is rejected
-    # with "(EMAXCONNSESSION) max clients reached in session mode". The app opens
-    # TWO asyncpg pools against the same DSN (main + analytics), so the SUM of
-    # their max_size must stay safely under 15. The previous 50 + 10 = 60 config
-    # guaranteed exhaustion under load → cascading 500s and runtime_db_init_retrying
-    # during deploy overlap (old + new instance both holding connections).
+    # with "(EMAXCONNSESSION) max clients reached in session mode". The original
+    # 50 config guaranteed exhaustion under load → cascading 500s and
+    # runtime_db_init_retrying during deploy overlap.
     #
-    # 10 + 3 = 13 leaves ~2 of headroom for the migration connection and brief
-    # deploy overlap. If you move to the TRANSACTION-mode pooler (port 6543,
-    # statement_cache_size=0) or raise the Supabase Pool Size, these can grow —
+    # As of the analytics-pool removal, the app runs a SINGLE asyncpg pool (the
+    # old, error-free model), so the whole budget is one pool: max 12 leaves ~3
+    # of headroom for the migration connection and brief deploy overlap (old +
+    # new instance). If you move to the TRANSACTION-mode pooler (port 6543,
+    # statement_cache_size=0) or raise the Supabase Pool Size, this can grow —
     # override via env var per environment.
     DB_POOL_MIN_SIZE: int = Field(default=2, description="asyncpg pool minimum connections")
-    DB_POOL_MAX_SIZE: int = Field(default=10, description="asyncpg pool maximum connections")
-    DB_ANALYTICS_POOL_MIN_SIZE: int = Field(default=1, description="asyncpg analytics pool minimum connections")
-    DB_ANALYTICS_POOL_MAX_SIZE: int = Field(default=3, description="asyncpg analytics pool maximum connections")
+    DB_POOL_MAX_SIZE: int = Field(default=12, description="asyncpg pool maximum connections")
+    # ⚠️ INERT: the separate analytics pool is no longer initialized (see
+    # app/database/connection.py) — nothing acquired from it. These remain only
+    # so the dormant init_analytics_pool() code stays importable; they consume no
+    # connections unless that pool is explicitly re-enabled.
+    DB_ANALYTICS_POOL_MIN_SIZE: int = Field(default=1, description="asyncpg analytics pool minimum connections (inert)")
+    DB_ANALYTICS_POOL_MAX_SIZE: int = Field(default=3, description="asyncpg analytics pool maximum connections (inert)")
 
     # LLM Providers
     GROQ_API_KEY: str = Field(default="", description="Groq API key")

@@ -251,8 +251,14 @@ async def init_db_pool(
                 async with _pool.acquire() as conn:
                     await _run_migrations(conn)
 
-                # Best-effort: never raises, never blocks B2C startup on failure.
-                await init_analytics_pool()
+                # NOTE: the separate analytics pool is intentionally NOT initialized.
+                # Nothing in the app acquires from it (org/college analytics use the
+                # main pool via DatabaseConnection), so it was pure dead weight that
+                # permanently reserved Supabase session-pooler slots (limit 15) and
+                # caused EMAXCONNSESSION exhaustion. Leaving it un-initialized reverts
+                # to the old single-pool model with zero feature impact. The
+                # init_analytics_pool()/AnalyticsConnection code remains dormant in
+                # case a future analytics worker genuinely needs an isolated pool.
                 return
 
             except Exception as exc:
