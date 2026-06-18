@@ -184,6 +184,65 @@ def _json_response_with_id(
     return response
 
 
+# ── Unhandled-exception response builder ───────────────────────────────────────
+# Module-level so it can be reused by BOTH the registered Exception handler
+# (invoked by Starlette's ServerErrorMiddleware, the outermost layer) AND the
+# CORS-safe catch-all middleware in main.py (which sits INSIDE CORSMiddleware).
+#
+# Why both: ServerErrorMiddleware is always the outermost middleware, so a 500 it
+# produces never passes back through CORSMiddleware and therefore lacks the
+# Access-Control-Allow-Origin header — the browser then reports a genuine 500 as
+# a misleading CORS error. The in-CORS middleware catches the exception first so
+# the 500 response is emitted within the CORS layer and gets the header.
+async def build_server_error_response(request: Request, exc: Exception) -> JSONResponse:
+    """Build the standard scrubbed 500 response for any unhandled exception."""
+    request_id = uuid.uuid4().hex
+    _error_counters["server_error"] += 1
+    path = _safe_request_path(request)
+    exc_type = type(exc).__name__
+
+    # Rec C — Capture in Sentry if available (sentry_sdk.init in main.py)
+    if _SENTRY_AVAILABLE:
+        try:
+            sentry_sdk.capture_exception(exc)
+        except Exception:
+            pass
+
+    try:
+        # Rec D — Offload CPU-bound traceback formatting off the event loop.
+        loop = asyncio.get_running_loop()
+        raw_tb = await loop.run_in_executor(None, traceback.format_exc)
+
+        capped_tb = raw_tb[:_MAX_TRACEBACK_CHARS] + (
+            f"\n... [truncated at {_MAX_TRACEBACK_CHARS} chars]"
+            if len(raw_tb) > _MAX_TRACEBACK_CHARS
+            else ""
+        )
+
+        # Rec A — Scrub PII from traceback and error string before any log sink
+        scrubbed_tb = _scrub_pii(capped_tb)
+        scrubbed_error = _scrub_pii(str(exc))
+
+        # Rec E — Only log if this (exc_type, path) hasn't fired within 60s
+        if _should_log_error(exc_type, path):
+            logger.error(
+                "unhandled_exception",
+                request_id=request_id,
+                path=path,
+                method=request.method,
+                error=scrubbed_error,
+                exc_type=exc_type,
+                traceback=scrubbed_tb,
+                _sampled=True,
+            )
+    except Exception:
+        # Logger / scrubber failure must never suppress the HTTP response.
+        pass
+
+    body = _build_response(500, _MSG_SERVER_ERROR, request_id, "server_error")
+    return _json_response_with_id(500, body, request_id)
+
+
 # ── Handler registration ──────────────────────────────────────────────────────
 
 def register_error_handlers(app: FastAPI):
@@ -292,51 +351,7 @@ def register_error_handlers(app: FastAPI):
     # ------------------------------------------------------------------ #
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
-        request_id = uuid.uuid4().hex
-        _error_counters["server_error"] += 1
-        path = _safe_request_path(request)
-        exc_type = type(exc).__name__
-
-        # Rec C — Capture in Sentry if available (sentry_sdk.init in main.py)
-        if _SENTRY_AVAILABLE:
-            try:
-                sentry_sdk.capture_exception(exc)
-            except Exception:
-                pass
-
-        try:
-            # Rec D — Offload CPU-bound traceback formatting off the event loop.
-            # At 500 concurrent failures, 500× traceback.format_exc() on the event
-            # loop creates measurable stall time. run_in_executor moves it to a
-            # thread pool, keeping the loop free for other requests.
-            loop = asyncio.get_running_loop()
-            raw_tb = await loop.run_in_executor(None, traceback.format_exc)
-
-            capped_tb = raw_tb[:_MAX_TRACEBACK_CHARS] + (
-                f"\n... [truncated at {_MAX_TRACEBACK_CHARS} chars]"
-                if len(raw_tb) > _MAX_TRACEBACK_CHARS
-                else ""
-            )
-
-            # Rec A — Scrub PII from traceback and error string before any log sink
-            scrubbed_tb = _scrub_pii(capped_tb)
-            scrubbed_error = _scrub_pii(str(exc))
-
-            # Rec E — Only log if this (exc_type, path) hasn't fired within 60s
-            if _should_log_error(exc_type, path):
-                logger.error(
-                    "unhandled_exception",
-                    request_id=request_id,
-                    path=path,
-                    method=request.method,
-                    error=scrubbed_error,
-                    exc_type=exc_type,
-                    traceback=scrubbed_tb,
-                    _sampled=True,
-                )
-        except Exception:
-            # Logger / scrubber failure must never suppress the HTTP response.
-            pass
-
-        body = _build_response(500, _MSG_SERVER_ERROR, request_id, "server_error")
-        return _json_response_with_id(500, body, request_id)
+        # Safety net for exceptions that escape the in-CORS catch-all middleware
+        # (e.g. raised inside CORS/ServerError itself). Shares one implementation
+        # with that middleware so behaviour and logging stay identical.
+        return await build_server_error_response(request, exc)

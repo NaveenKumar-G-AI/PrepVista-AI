@@ -17,7 +17,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings, get_cors_origins, get_allowed_hosts
-from app.middleware.error_handler import register_error_handlers
+from app.middleware.error_handler import build_server_error_response, register_error_handlers
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.database.connection import DatabaseConnection, init_db_pool, close_db_pool
 from app.routers import account, admin, admin_grants, auth, interviews, reports, dashboard, billing, referrals, feedback, support, admin_support, events, org_admin, org_college
@@ -274,10 +274,21 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # ── CORS ─────────────────────────────────────
+    # ── CORS origins (registration deferred — see end of this function) ──
     # ✅ SEC: Use get_cors_origins() from config — supports comma-separated list
     # of origins, enforces no wildcard in production, and is the single source
     # of truth so no route through the app bypasses the CORS policy.
+    #
+    # ⚠️ ORDER: CORSMiddleware MUST be the OUTERMOST middleware so that EVERY
+    # response — including ones produced by an inner middleware before the route
+    # is reached (TrustedHost 400 "Invalid host header", the request-size 413
+    # guard, a 500 from any handler) — still carries Access-Control-Allow-Origin.
+    # Starlette applies middleware in REVERSE order of registration: the LAST
+    # add_middleware call becomes the outermost layer. Therefore CORS is added
+    # LAST, at the bottom of this function. Registering it first (as before) made
+    # it the INNERMOST layer, so a TrustedHost rejection skipped CORS and the
+    # browser saw "No 'Access-Control-Allow-Origin' header" instead of the real
+    # 400/413/500 — the exact symptom seen on /admin/overview.
     cors_origins = get_cors_origins()
     if settings.DEBUG:
         # Add localhost variants only in dev — never in production
@@ -285,15 +296,6 @@ def create_app() -> FastAPI:
             "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000",
         }
         cors_origins = list(dict.fromkeys(cors_origins + [o for o in _dev_origins if o not in cors_origins]))
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-Request-ID"],
-        max_age=3600,
-    )
 
     # ── Response Compression ─────────────────────
     # ✅ PERF: gzip every response body over ~500 bytes. The dashboard, analytics,
@@ -339,6 +341,36 @@ def create_app() -> FastAPI:
 
     # ── Security Headers ─────────────────────────
     app.add_middleware(SecurityHeadersMiddleware)
+
+    # ── CORS-safe 500 catch-all (registered just before CORS → sits INSIDE it) ──
+    # Starlette's ServerErrorMiddleware is the absolute outermost layer, so a 500
+    # it produces never traverses CORSMiddleware and arrives at the browser with
+    # no Access-Control-Allow-Origin — surfacing as a misleading CORS error rather
+    # than the real server error. This middleware catches unhandled exceptions
+    # one layer below CORS, builds the identical scrubbed 500 envelope, and lets
+    # the response flow back out through CORS so it carries the proper header.
+    # (HTTPException / validation / DB-not-ready are already handled deeper by the
+    # registered exception handlers and never reach here.)
+    @app.middleware("http")
+    async def _cors_safe_server_error(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as exc:  # noqa: BLE001 — deliberately catch-all; re-raised path loses CORS
+            return await build_server_error_response(request, exc)
+
+    # ── CORS (registered LAST → outermost layer) ─────────────────────────
+    # See the "CORS origins" note near the top of this function for why this
+    # must be the final add_middleware call. Being outermost guarantees CORS
+    # headers are attached to every response, including those short-circuited
+    # by TrustedHost / request-size / security-header layers below it.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-Request-ID"],
+        max_age=3600,
+    )
 
     # ── Error Handlers ───────────────────────────
     register_error_handlers(app)
