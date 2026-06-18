@@ -76,15 +76,23 @@ class Settings(BaseSettings):
     RAZORPAY_WEBHOOK_SECRET: str = Field(default="", description="Razorpay Webhook Secret (if separate from key secret)")
 
     # Database Pool (asyncpg)
-    # ✅ FIXED: DB_POOL_MIN_SIZE 3→5, DB_POOL_MAX_SIZE 20→50.
-    # At 500 concurrent users all making async DB calls, 20 connections created a queue
-    # that snowballed under any burst load. asyncpg async queries are fast (< 10ms each)
-    # but 500 users ÷ 20 connections = 25 users waiting per connection at peak.
-    # 50 connections gives comfortable headroom; override via env var for your infra.
-    DB_POOL_MIN_SIZE: int = Field(default=5, description="asyncpg pool minimum connections")
-    DB_POOL_MAX_SIZE: int = Field(default=50, description="asyncpg pool maximum connections")
-    DB_ANALYTICS_POOL_MIN_SIZE: int = Field(default=2, description="asyncpg analytics pool minimum connections")
-    DB_ANALYTICS_POOL_MAX_SIZE: int = Field(default=10, description="asyncpg analytics pool maximum connections")
+    # ⚠️ HARD CEILING: Supabase's connection pooler runs in SESSION mode with
+    # Pool Size = 15 — each client connection holds one real Postgres connection
+    # for its whole lifetime, and the 16th simultaneous connection is rejected
+    # with "(EMAXCONNSESSION) max clients reached in session mode". The app opens
+    # TWO asyncpg pools against the same DSN (main + analytics), so the SUM of
+    # their max_size must stay safely under 15. The previous 50 + 10 = 60 config
+    # guaranteed exhaustion under load → cascading 500s and runtime_db_init_retrying
+    # during deploy overlap (old + new instance both holding connections).
+    #
+    # 10 + 3 = 13 leaves ~2 of headroom for the migration connection and brief
+    # deploy overlap. If you move to the TRANSACTION-mode pooler (port 6543,
+    # statement_cache_size=0) or raise the Supabase Pool Size, these can grow —
+    # override via env var per environment.
+    DB_POOL_MIN_SIZE: int = Field(default=2, description="asyncpg pool minimum connections")
+    DB_POOL_MAX_SIZE: int = Field(default=10, description="asyncpg pool maximum connections")
+    DB_ANALYTICS_POOL_MIN_SIZE: int = Field(default=1, description="asyncpg analytics pool minimum connections")
+    DB_ANALYTICS_POOL_MAX_SIZE: int = Field(default=3, description="asyncpg analytics pool maximum connections")
 
     # LLM Providers
     GROQ_API_KEY: str = Field(default="", description="Groq API key")
