@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PrepVista — Placement Command Centre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --canvas:#090A0E;--surface-0:#0E1015;--surface-1:#13161D;--surface-2:#191D27;--surface-3:#20252F;
+    --border:rgba(255,255,255,.07);--border-strong:rgba(255,255,255,.12);
+    --text:#EAECF2;--text-2:#AFB4C2;--muted:#7B8194;--faint:#565C6E;
+    --accent:#6366F1;--accent-2:#818CF8;--violet:#8B5CF6;--cyan:#22D3EE;
+    --ready:#34D399;--almost:#38BDF8;--developing:#FBBF24;--atrisk:#FB7185;
+    --ready-soft:rgba(52,211,153,.14);--almost-soft:rgba(56,189,248,.14);--developing-soft:rgba(251,191,36,.14);--atrisk-soft:rgba(251,113,133,.16);
+    --shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-2:0 8px 24px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.4);--shadow-3:0 24px 64px rgba(0,0,0,.55),0 8px 20px rgba(0,0,0,.4);
+    --ai-grad:linear-gradient(120deg,#8B5CF6 0%,#6366F1 45%,#22D3EE 100%);
+    --r-sm:8px;--r-md:12px;--r-lg:16px;--ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--canvas);color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-feature-settings:'tnum' 1,'cv01' 1;-webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(820px 520px at 12% -8%,rgba(99,102,241,.16),transparent 60%),radial-gradient(720px 520px at 96% 4%,rgba(139,92,246,.12),transparent 60%),radial-gradient(900px 700px at 70% 110%,rgba(34,211,238,.06),transparent 60%);}
+  body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:64px 64px;-webkit-mask-image:radial-gradient(circle at 50% 30%,black,transparent 85%);mask-image:radial-gradient(circle at 50% 30%,black,transparent 85%);}
+  .app{position:relative;z-index:1;display:grid;grid-template-columns:248px 1fr;min-height:100vh;transition:padding-right .34s var(--ease);}
+  body.shifted .app{padding-right:420px;}
+  .sidebar{border-right:1px solid var(--border);background:linear-gradient(180deg,rgba(20,22,30,.7),rgba(11,12,16,.7));backdrop-filter:blur(8px);padding:22px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px;overflow-y:auto;}
+  .brand{display:flex;align-items:center;gap:11px;padding:6px 8px 18px;}
+  .brand .logo{width:34px;height:34px;border-radius:10px;flex:none;background:var(--ai-grad);position:relative;box-shadow:0 6px 18px rgba(99,102,241,.45);}
+  .brand .logo::after{content:"";position:absolute;inset:6px;border-radius:6px;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.9),rgba(255,255,255,.05) 60%);opacity:.85;}
+  .brand h1{font-size:15.5px;font-weight:700;letter-spacing:-.02em;margin:0;}
+  .brand span{display:block;font-size:11px;color:var(--muted);font-weight:500;}
+  .nav-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);font-weight:600;padding:14px 10px 6px;}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:var(--r-sm);color:var(--text-2);font-size:13.5px;font-weight:500;cursor:pointer;position:relative;transition:background .18s var(--ease),color .18s var(--ease);}
+  .nav-item svg{width:17px;height:17px;flex:none;opacity:.8;}
+  .nav-item:hover{background:var(--surface-2);color:var(--text);}
+  .nav-item.active{background:linear-gradient(90deg,rgba(99,102,241,.18),rgba(99,102,241,.04));color:#fff;}
+  .nav-item.active::before{content:"";position:absolute;left:-16px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--accent);box-shadow:0 0 12px var(--accent);}
+  .nav-spacer{flex:1;}
+  .seat-card{margin-top:8px;padding:13px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface-1);}
+  .seat-card .row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:7px;}
+  .seat-card b{color:var(--text);font-weight:600;}
+  .seat-bar{height:6px;border-radius:6px;background:var(--surface-3);overflow:hidden;}
+  .seat-bar i{display:block;height:100%;border-radius:6px;background:var(--ai-grad);width:0;transition:width 1s var(--ease);}
+  .seat-card small{display:block;margin-top:8px;font-size:10.5px;color:var(--faint);}
+  .main{min-width:0;display:flex;flex-direction:column;}
+  .topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;padding:16px 28px;border-bottom:1px solid var(--border);background:rgba(9,10,14,.72);backdrop-filter:blur(14px);}
+  .topbar .title h2{margin:0;font-size:19px;font-weight:700;letter-spacing:-.025em;}
+  .topbar .title .crumb{font-size:12px;color:var(--muted);margin-top:1px;}
+  .badge-count{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--accent-2);border:1px solid rgba(129,140,248,.3);border-radius:99px;padding:4px 10px;background:rgba(99,102,241,.1);font-weight:600;}
+  .live{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:5px 11px;background:var(--surface-1);}
+  .live .dot{width:7px;height:7px;border-radius:50%;background:var(--ready);animation:pulse 2.4s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.55);}70%{box-shadow:0 0 0 7px rgba(52,211,153,0);}100%{box-shadow:0 0 0 0 rgba(52,211,153,0);}}
+  .grow{flex:1;}
+  .avatar{width:34px;height:34px;border-radius:50%;border:1px solid var(--border-strong);background:linear-gradient(135deg,#3b3f52,#222633);display:grid;place-items:center;font-size:12px;font-weight:700;color:#cdd2e0;}
+  .btn-ai{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;background:var(--ai-grad);background-size:160% 160%;box-shadow:0 6px 20px rgba(99,102,241,.4);transition:transform .15s var(--ease);animation:shift 7s ease infinite;}
+  @keyframes shift{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}
+  .btn-ai:hover{transform:translateY(-1px);}
+  .btn-ai svg{width:15px;height:15px;}
+  .dlbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.12);color:#6ee7b7;cursor:pointer;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:600;font-family:inherit;transition:all .15s var(--ease);}
+  .dlbtn:hover{background:rgba(52,211,153,.2);color:#fff;}
+  .dlbtn svg{width:15px;height:15px;}
+  .filterbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 28px;border-bottom:1px solid var(--border);background:rgba(13,15,21,.55);}
+  .fgroup{display:flex;align-items:center;gap:8px;}
+  .flabel{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);font-weight:600;}
+  .seg{display:inline-flex;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px;}
+  .seg button{border:none;background:transparent;color:var(--text-2);font-size:12.5px;font-weight:500;padding:6px 12px;border-radius:7px;cursor:pointer;transition:all .15s var(--ease);font-family:inherit;}
+  .seg button:hover{color:var(--text);}
+  .seg button.on{background:var(--surface-3);color:#fff;box-shadow:var(--shadow-1);}
+  .chip{border:1px solid var(--border);background:var(--surface-1);color:var(--text-2);border-radius:99px;padding:6px 12px 6px 10px;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s var(--ease);font-family:inherit;}
+  .chip .swatch{width:8px;height:8px;border-radius:50%;}
+  .chip:hover{border-color:var(--border-strong);color:var(--text);}
+  .chip.off{opacity:.4;}
+  .dd{position:relative;}
+  .dd-btn{border:1px solid var(--border);background:var(--surface-1);color:var(--text);border-radius:10px;padding:7px 12px;font-size:12.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-family:inherit;}
+  .dd-btn:hover{border-color:var(--border-strong);}
+  .dd-btn .count{background:var(--accent);color:#fff;border-radius:99px;font-size:10.5px;font-weight:700;padding:1px 7px;}
+  .dd-panel{position:absolute;top:calc(100% + 8px);left:0;z-index:50;min-width:210px;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:var(--r-md);box-shadow:var(--shadow-3);padding:7px;display:none;}
+  .dd-panel.open{display:block;animation:pop .16s var(--ease);}
+  @keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.98);}to{opacity:1;transform:none;}}
+  .dd-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--text-2);cursor:pointer;}
+  .dd-opt:hover{background:var(--surface-2);color:var(--text);}
+  .dd-opt .box{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--faint);display:grid;place-items:center;flex:none;}
+  .dd-opt.sel .box{background:var(--accent);border-color:var(--accent);}
+  .dd-opt .box svg{width:11px;height:11px;color:#fff;display:none;}
+  .dd-opt.sel .box svg{display:block;}
+  .reset{margin-left:auto;color:var(--muted);font-size:12px;background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:3px;font-family:inherit;}
+  .reset:hover{color:var(--text);}
+  .sel{appearance:none;background:var(--surface-1);border:1px solid var(--border-strong);color:var(--text);border-radius:10px;padding:8px 34px 8px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237B8194' stroke-width='2.4'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+  .sel:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .content{padding:22px 28px 60px;}
+  .focusbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:11px 15px;border:1px solid rgba(129,140,248,.3);border-radius:12px;background:linear-gradient(120deg,rgba(99,102,241,.1),transparent);}
+  .focusbar .fi{width:30px;height:30px;border-radius:50%;background:var(--ai-grad);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;flex:none;}
+  .focusbar .ft{flex:1;font-size:12.5px;color:var(--text-2);}
+  .focusbar .ft b{color:#fff;}
+  .focusbar .clearf{font-size:11.5px;color:var(--accent-2);background:none;border:none;cursor:pointer;font-family:inherit;text-decoration:underline;}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:18px;}
+  .kpi{background:linear-gradient(180deg,var(--surface-1),var(--surface-0));border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 16px 14px;position:relative;overflow:hidden;box-shadow:var(--shadow-1);}
+  .kpi .kl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;}
+  .kpi .kv{font-size:28px;font-weight:700;letter-spacing:-.03em;margin-top:7px;line-height:1;}
+  .kpi .kv small{font-size:14px;color:var(--text-2);font-weight:600;margin-left:2px;}
+  .kpi .kd{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;margin-top:9px;padding:2px 7px;border-radius:6px;}
+  .kpi .kd.up{color:var(--ready);background:var(--ready-soft);}
+  .kpi .kd.down{color:var(--atrisk);background:var(--atrisk-soft);}
+  .kpi .spark{position:absolute;right:12px;bottom:10px;width:90px;height:32px;opacity:.9;}
+  .kpi .ksub{font-size:10.5px;color:var(--faint);margin-top:8px;}
+  .ai-banner{border:1px solid rgba(129,140,248,.3);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:18px;background:linear-gradient(120deg,rgba(99,102,241,.13),rgba(34,211,238,.06));display:flex;align-items:center;gap:16px;}
+  .ai-banner .spark-ic{width:38px;height:38px;border-radius:11px;background:var(--ai-grad);display:grid;place-items:center;flex:none;box-shadow:0 6px 18px rgba(99,102,241,.45);}
+  .ai-banner .spark-ic svg{width:20px;height:20px;color:#fff;}
+  .ai-banner .txt{flex:1;min-width:0;}
+  .ai-banner .eyebrow{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--accent-2);font-weight:700;}
+  .ai-banner .head{font-size:14.5px;color:var(--text);font-weight:500;margin-top:3px;line-height:1.45;}
+  .ai-banner .head b{color:#fff;font-weight:700;}
+  .ai-actions{display:flex;gap:9px;flex:none;}
+  .mini-btn{border:1px solid var(--border-strong);background:rgba(255,255,255,.04);color:var(--text);border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s var(--ease);font-family:inherit;}
+  .mini-btn:hover{background:rgba(255,255,255,.09);}
+  .mini-btn svg{width:14px;height:14px;}
+  .bento{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;}
+  .card{background:linear-gradient(180deg,var(--surface-1),var(--surface-0));border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 16px 8px;box-shadow:var(--shadow-1);display:flex;flex-direction:column;min-width:0;transition:transform .25s var(--ease),box-shadow .25s var(--ease),border-color .25s var(--ease);}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-2);border-color:var(--border-strong);}
+  .card-h{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
+  .card-h .ti{flex:1;min-width:0;}
+  .card-h h3{margin:0;font-size:14px;font-weight:650;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;}
+  .card-h .pill{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:6px;padding:2px 7px;color:var(--accent-2);background:rgba(99,102,241,.14);}
+  .card-h p{margin:3px 0 0;font-size:11px;color:var(--muted);line-height:1.4;}
+  .explain{flex:none;border:1px solid rgba(129,140,248,.32);background:rgba(99,102,241,.1);color:var(--accent-2);border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s var(--ease);font-family:inherit;white-space:nowrap;}
+  .explain:hover{background:rgba(99,102,241,.2);color:#fff;}
+  .explain svg{width:13px;height:13px;}
+  .cfilter{flex:none;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);border-radius:8px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:inherit;transition:all .15s var(--ease);}
+  .cfilter:hover{color:var(--text);border-color:var(--border-strong);}
+  .cfilter.on{color:#fff;background:rgba(99,102,241,.22);border-color:rgba(129,140,248,.5);}
+  .cfilter svg{width:13px;height:13px;}
+  .vtoggle{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px;margin-right:6px;}
+  .vtoggle button{border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:600;padding:4px 9px;border-radius:6px;cursor:pointer;font-family:inherit;}
+  .vtoggle button.on{background:var(--surface-3);color:#fff;}
+  .chart{width:100%;flex:1;min-height:230px;}
+  .s12{grid-column:span 12;}.s8{grid-column:span 8;}.s7{grid-column:span 7;}.s6{grid-column:span 6;}.s5{grid-column:span 5;}.s4{grid-column:span 4;}.s3{grid-column:span 3;}
+  .tall{min-height:430px;}.mid{min-height:320px;}
+  .wl{flex:1;overflow:auto;margin:0 -4px;max-height:392px;}
+  .wl table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .wl th{position:sticky;top:0;background:var(--surface-1);text-align:left;color:var(--muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:9px 10px;border-bottom:1px solid var(--border);}
+  .wl td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+  .wl tr:hover td{background:rgba(255,255,255,.025);}
+  .wl .nm{font-weight:600;color:var(--text);}
+  .wl .sub{font-size:10.5px;color:var(--faint);}
+  .sev{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:99px;}
+  .sev .d{width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .sev.crit{color:var(--atrisk);background:var(--atrisk-soft);}
+  .sev.high{color:var(--developing);background:var(--developing-soft);}
+  .sev.med{color:var(--almost);background:var(--almost-soft);}
+  .reason{color:var(--text-2);font-size:11.5px;max-width:230px;}
+  .assign{border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);border-radius:7px;padding:5px 9px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;transition:all .15s var(--ease);}
+  .assign:hover{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .ledger{display:flex;flex-direction:column;gap:14px;flex:1;padding-bottom:8px;}
+  .ledger .big{display:flex;align-items:flex-end;gap:14px;}
+  .ledger .big .v{font-size:32px;font-weight:700;letter-spacing:-.03em;line-height:1;}
+  .ledger .big .cap{font-size:11.5px;color:var(--muted);padding-bottom:4px;}
+  .bullet .bl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-2);margin-bottom:6px;}
+  .bullet .bl b{color:var(--text);font-weight:600;}
+  .track{height:9px;border-radius:9px;background:var(--surface-3);position:relative;overflow:hidden;}
+  .track i{position:absolute;left:0;top:0;height:100%;border-radius:9px;transition:width 1s var(--ease);}
+  .track .target{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;opacity:.6;}
+  .ledger small{font-size:10.5px;color:var(--faint);}
+  .selbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+  .selbar .sel{min-width:240px;font-size:13.5px;padding:10px 38px 10px 14px;}
+  .sel-tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);font-weight:600;}
+  .pchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:99px;padding:6px 12px;font-size:12px;color:var(--text-2);background:var(--surface-1);}
+  .pchip b{color:var(--text);}
+  .verdict{flex:1;display:flex;flex-direction:column;gap:13px;padding-bottom:8px;}
+  .verdict .vbadge{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;font-size:12px;font-weight:700;padding:6px 13px;border-radius:99px;}
+  .verdict .vsum{font-size:15px;color:var(--text);line-height:1.55;font-weight:500;}
+  .vrow{display:flex;gap:10px;align-items:flex-start;}
+  .vrow .vic{width:26px;height:26px;border-radius:8px;flex:none;display:grid;place-items:center;font-size:13px;}
+  .vrow .vk{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--muted);}
+  .vrow .vv{font-size:13px;color:var(--text-2);line-height:1.5;margin-top:1px;}
+  .anatomy{display:flex;flex-direction:column;gap:12px;flex:1;}
+  .ana{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--surface-1);}
+  .ana .q{font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:9px;}
+  .ana .seg2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .ana .blk{border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.5;}
+  .ana .blk.said{background:rgba(255,255,255,.03);color:var(--text-2);border:1px solid var(--border);}
+  .ana .blk.ideal{background:var(--ready-soft);color:#c8f6e3;border:1px solid rgba(52,211,153,.25);}
+  .ana .blk .h{font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:5px;opacity:.8;}
+  .ana .fb{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;}
+  .ana .tag{font-size:11px;padding:3px 9px;border-radius:7px;font-weight:500;}
+  .ana .tag.good{background:var(--ready-soft);color:#7fe6c0;}
+  .ana .tag.bad{background:var(--developing-soft);color:#f7d488;}
+  .cf-pop{position:fixed;z-index:120;width:300px;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:14px;box-shadow:var(--shadow-3);padding:12px;display:none;}
+  .cf-pop.open{display:block;animation:pop .16s var(--ease);}
+  .cf-pop h4{margin:0 0 3px;font-size:13px;font-weight:700;}
+  .cf-pop .sub{font-size:11px;color:var(--muted);margin-bottom:9px;}
+  .cf-search{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:12.5px;font-family:inherit;margin-bottom:8px;}
+  .cf-search:focus{outline:1px solid var(--accent);}
+  .cf-quick{display:flex;gap:6px;margin-bottom:8px;}
+  .cf-quick button{flex:1;font-size:11px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);border-radius:7px;padding:6px;cursor:pointer;font-family:inherit;}
+  .cf-quick button:hover{color:var(--text);background:var(--surface-3);}
+  .cf-list{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:1px;}
+  .cf-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;font-size:12.5px;color:var(--text-2);cursor:pointer;}
+  .cf-row:hover{background:var(--surface-2);color:var(--text);}
+  .cf-row .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--faint);flex:none;display:grid;place-items:center;font-size:10px;color:#fff;}
+  .cf-row.sel .box{background:var(--accent);border-color:var(--accent);}
+  .cf-row.sel .box::after{content:"✓";}
+  .cf-row .dp{margin-left:auto;font-size:10.5px;color:var(--faint);}
+  .cf-act{display:flex;gap:8px;margin-top:10px;}
+  .cf-act button{flex:1;border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);}
+  .cf-act .apply{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .cf-act .apply:hover{background:#5558e3;}
+  .scrim{position:fixed;inset:0;z-index:80;background:rgba(5,6,9,.4);opacity:0;visibility:hidden;transition:opacity .3s var(--ease),visibility .3s;}
+  .scrim.open{opacity:1;visibility:visible;}
+  .drawer{position:fixed;top:0;right:0;z-index:90;height:100vh;width:420px;max-width:92vw;background:linear-gradient(180deg,rgba(22,26,35,.98),rgba(13,15,21,.99));border-left:1px solid var(--border-strong);box-shadow:var(--shadow-3);transform:translateX(102%);transition:transform .34s var(--ease);display:flex;flex-direction:column;}
+  .drawer.open{transform:none;}
+  .drawer-h{padding:20px 22px 16px;border-bottom:1px solid var(--border);position:relative;}
+  .drawer-h .tagline{display:inline-flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:transparent;background:var(--ai-grad);-webkit-background-clip:text;background-clip:text;}
+  .drawer-h .tagline svg{width:14px;height:14px;color:var(--accent-2);}
+  .drawer-h h3{margin:9px 0 0;font-size:18px;font-weight:700;letter-spacing:-.02em;}
+  .drawer-h .meta{font-size:11.5px;color:var(--muted);margin-top:4px;}
+  .drawer-close{position:absolute;top:18px;right:18px;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer;display:grid;place-items:center;font-family:inherit;}
+  .drawer-close:hover{color:#fff;background:var(--surface-3);}
+  .drawer-body{flex:1;overflow:auto;padding:20px 22px;}
+  .gen{display:flex;align-items:center;gap:10px;color:var(--accent-2);font-size:13px;font-weight:500;}
+  .gen .ring{width:16px;height:16px;border:2px solid rgba(129,140,248,.3);border-top-color:var(--accent-2);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .ai-block{margin-bottom:18px;animation:fade .4s var(--ease);}
+  .ai-block .lbl{display:flex;align-items:center;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--accent-2);margin-bottom:7px;}
+  .ai-block .lbl .ic{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:none;}
+  .ai-block p{margin:0;font-size:14px;color:var(--text);line-height:1.62;}
+  .ai-block.read p{color:var(--text-2);font-size:13.5px;}
+  .ai-stat{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 4px;}
+  .ai-stat .s{flex:1;min-width:110px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface-1);}
+  .ai-stat .s .n{font-size:20px;font-weight:700;letter-spacing:-.02em;}
+  .ai-stat .s .t{font-size:11px;color:var(--muted);margin-top:2px;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  .drawer-foot{padding:14px 22px 20px;border-top:1px solid var(--border);display:flex;gap:10px;}
+  .speak-btn{flex:1;border:none;cursor:pointer;border-radius:11px;padding:12px;font-size:13.5px;font-weight:650;color:#fff;background:var(--ai-grad);background-size:160%;animation:shift 7s ease infinite;display:inline-flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 6px 20px rgba(99,102,241,.4);font-family:inherit;transition:transform .15s var(--ease);}
+  .speak-btn:hover{transform:translateY(-1px);}
+  .speak-btn svg{width:17px;height:17px;}
+  .ask{border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);border-radius:11px;padding:12px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .ask:hover{background:var(--surface-3);}
+  .speaking-wave{display:inline-flex;align-items:flex-end;gap:2px;height:14px;}
+  .speaking-wave i{width:2.5px;background:#fff;border-radius:2px;animation:wave 1s ease infinite;}
+  .speaking-wave i:nth-child(2){animation-delay:.15s;}.speaking-wave i:nth-child(3){animation-delay:.3s;}.speaking-wave i:nth-child(4){animation-delay:.45s;}
+  @keyframes wave{0%,100%{height:4px;}50%{height:14px;}}
+  .pdfover{position:fixed;inset:0;z-index:300;background:rgba(7,8,12,.88);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;}
+  .pdfover.show{display:flex;}
+  .pdfcard{width:380px;max-width:90vw;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:18px;padding:28px;text-align:center;box-shadow:var(--shadow-3);}
+  .pdfcard .plogo{width:54px;height:54px;border-radius:15px;background:var(--ai-grad);margin:0 auto 16px;position:relative;box-shadow:0 8px 24px rgba(99,102,241,.5);}
+  .pdfcard .plogo::after{content:"";position:absolute;inset:9px;border-radius:8px;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95),rgba(255,255,255,.05) 60%);}
+  .pdfcard h3{margin:0 0 4px;font-size:17px;font-weight:700;}
+  .pdfcard p{margin:0 0 18px;font-size:12.5px;color:var(--muted);}
+  .pdfprog{height:8px;border-radius:8px;background:var(--surface-3);overflow:hidden;margin-bottom:10px;}
+  .pdfprog i{display:block;height:100%;width:0;background:var(--ai-grad);border-radius:8px;transition:width .3s ease;}
+  .pdfstat{font-size:11.5px;color:var(--text-2);}
+  .reveal{opacity:0;transform:translateY(16px);}
+  .revealed{animation:rise .55s var(--ease) forwards;}
+  @keyframes rise{to{opacity:1;transform:none;}}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);z-index:200;background:var(--surface-3);border:1px solid var(--border-strong);color:#fff;font-size:13px;font-weight:500;padding:11px 18px;border-radius:11px;box-shadow:var(--shadow-3);opacity:0;transition:all .3s var(--ease);display:flex;align-items:center;gap:9px;}
+  .toast.show{opacity:1;transform:translateX(-50%);}
+  .toast .tick{color:var(--ready);}
+  @media (max-width:1180px){.kpis{grid-template-columns:repeat(2,1fr);}.s8,.s7,.s6,.s5,.s4,.s3{grid-column:span 12;}}
+  @media (max-width:1100px){body.shifted .app{padding-right:0;}}
+  @media (max-width:880px){.app{grid-template-columns:1fr;}.sidebar{display:none;}.kpis{grid-template-columns:1fr;}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}.reveal{opacity:1;transform:none;}}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:10px;border:2px solid var(--canvas);}
+  ::-webkit-scrollbar-thumb:hover{background:#2c323e;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo"></div><div><h1>PrepVista</h1><span>Placement Intelligence</span></div></div>
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" data-tab="command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Command Centre</div>
+    <div class="nav-item" data-tab="risk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 21h20z"/><path d="M12 9v5M12 17.5v.5"/></svg>Risk &amp; Readiness</div>
+    <div class="nav-item" data-tab="skills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.6 6.3L21 9l-5 4.2L17.5 21 12 17l-5.5 4L8 13.2 3 9l6.4-.7z"/></svg>Skills Analytics</div>
+    <div class="nav-label">Explore</div>
+    <div class="nav-item" data-tab="dept"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-7h6v7"/></svg>Departments</div>
+    <div class="nav-item" data-tab="students"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.6M21 20a5 5 0 00-4-4.9"/></svg>Student Explorer</div>
+    <div class="nav-item" data-tab="sessions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Session Forensics</div>
+    <div class="nav-spacer"></div>
+    <div class="seat-card"><div class="row"><span>Seat licence</span><b id="seatTxt">— / —</b></div><div class="seat-bar"><i id="seatBar"></i></div><small id="seatSub">Annual plan · renews in 214 days</small></div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="title"><h2 id="viewTitle">Placement Command Centre</h2><div class="crumb">Lakshmi Institute of Technology · B.Tech 2026 batch</div></div>
+      <span class="badge-count" id="vizCount">67 charts · 67 filters</span>
+      <span class="live"><span class="dot"></span> Live · Season 2026</span>
+      <div class="grow"></div>
+      <button class="dlbtn" id="dlBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Download Report</button>
+      <button class="btn-ai" id="globalAi"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7z"/></svg>AI Summary</button>
+      <div class="avatar">RT</div>
+    </header>
+    <div class="filterbar">
+      <div class="fgroup"><span class="flabel">Department</span>
+        <div class="dd" id="deptDD"><button class="dd-btn" id="deptBtn">All departments <span class="count" id="deptCount">6</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-panel" id="deptPanel"></div></div>
+      </div>
+      <div class="fgroup" id="tierChips"><span class="flabel">Readiness</span>
+        <button class="chip" data-t="Ready"><span class="swatch" style="background:var(--ready)"></span>Ready</button>
+        <button class="chip" data-t="Almost"><span class="swatch" style="background:var(--almost)"></span>Almost</button>
+        <button class="chip" data-t="Developing"><span class="swatch" style="background:var(--developing)"></span>Developing</button>
+        <button class="chip" data-t="At Risk"><span class="swatch" style="background:var(--atrisk)"></span>At Risk</button>
+      </div>
+      <div class="fgroup"><span class="flabel">Window</span>
+        <div class="seg" id="winSeg"><button class="on" data-v="all">Season</button><button data-v="30">30d</button><button data-v="7">7d</button></div>
+      </div>
+      <div class="fgroup"><span class="flabel">Focus student</span>
+        <select class="sel" id="focusSel" style="min-width:236px"></select>
+      </div>
+      <button class="reset" id="resetBtn">Reset filters</button>
+    </div>
+    <main class="content"><div id="view"></div></main>
+  </div>
+</div>
+<div class="cf-pop" id="cfPop"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-h"><button class="drawer-close" id="drawerClose">✕</button><div class="tagline"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7z"/></svg>AI Explanation</div><h3 id="drawerTitle">—</h3><div class="meta" id="drawerMeta"></div></div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot"><button class="speak-btn" id="speakBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 8a5 5 0 010 8M19 5a9 9 0 010 14"/></svg><span id="speakLabel">Read this aloud</span></button><button class="ask" id="askBtn">Ask follow-up</button></div>
+</aside>
+<div class="pdfover" id="pdfOver"><div class="pdfcard"><div class="plogo"></div><h3 id="pdfTitle">Generating report…</h3><p>Building your PrepVista placement report</p><div class="pdfprog"><i id="pdfBar"></i></div><div class="pdfstat" id="pdfStat">Preparing…</div></div></div>
+<div class="toast" id="toast"><span class="tick">✓</span><span id="toastMsg"></span></div>
+<script>
+const SKILLS=['Technical Depth','Problem Solving','Communication','Behavioral','System Design','Specificity'];
+let DEPTS=[{code:'CSE',name:'Computer Science'},{code:'IT',name:'Information Tech'},{code:'ECE',name:'Electronics & Comm'},{code:'EEE',name:'Electrical'},{code:'MECH',name:'Mechanical'},{code:'CIVIL',name:'Civil'}];
+let SEATS=480, ANNUAL_FEE=100000, COLLEGE='Lakshmi Institute of Technology', BATCH='B.Tech 2026';
+const TIER_COLOR={'Ready':'#34D399','Almost':'#38BDF8','Developing':'#FBBF24','At Risk':'#FB7185'};
+const SERIES=['#6366F1','#22D3EE','#34D399','#FBBF24','#FB7185','#A78BFA','#38BDF8','#F472B6','#FCD34D','#4ADE80'];
+const ROLES=['Software Engineer','Data Analyst','Data Scientist','Embedded Engineer','Core Mechanical','Site Engineer','Product Analyst','QA Engineer','Network Engineer'];
+const WEEKS=['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12'];
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const rnd=mulberry32(20260618);
+const rint=(a,b)=>Math.floor(rnd()*(b-a+1))+a;
+const pick=arr=>arr[Math.floor(rnd()*arr.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const avg=arr=>arr.reduce((s,x)=>s+x,0)/(arr.length||1);
+const round=(v,d=0)=>{const f=10**d;return Math.round(v*f)/f;};
+const ri=(r,a,b)=>Math.floor(r()*(b-a+1))+a;
+const inr=v=>Number(v).toLocaleString('en-IN');
+const FIRST=['Aarav','Vivaan','Aditya','Vihaan','Arjun','Sai','Reyansh','Krishna','Ishaan','Rohan','Karthik','Ananya','Diya','Saanvi','Aadhya','Pari','Anika','Navya','Riya','Meera','Kavya','Ishita','Tara','Nisha','Priya','Sneha','Lakshmi','Deepa','Rahul','Vikram','Suresh','Manoj','Ajay','Naveen','Harish','Divya','Pooja','Swathi','Bhavya','Akhil','Teja','Varun','Nikhil','Gokul','Madhan','Yamini','Keerthi','Sruthi','Hari','Bala'];
+const LAST=['Sharma','Reddy','Iyer','Nair','Menon','Rao','Kumar','Krishnan','Pillai','Subramanian','Verma','Gupta','Patel','Das','Bose','Naidu','Murthy','Chandran','Raman','Venkat','Joshi','Mehta','Shetty','Hegde','Banerjee'];
+const BIAS={CSE:{'Technical Depth':12,'Problem Solving':10,'System Design':8,'Communication':-6,'Behavioral':-3,'Specificity':2},IT:{'Technical Depth':7,'Problem Solving':6,'System Design':3,'Communication':-2,'Behavioral':0,'Specificity':3},ECE:{'Technical Depth':4,'Problem Solving':2,'System Design':-2,'Communication':-4,'Behavioral':-2,'Specificity':-1},EEE:{'Technical Depth':2,'Problem Solving':0,'System Design':-4,'Communication':-7,'Behavioral':-5,'Specificity':-3},MECH:{'Technical Depth':-2,'Problem Solving':-3,'System Design':-6,'Communication':-12,'Behavioral':-8,'Specificity':-5},CIVIL:{'Technical Depth':-4,'Problem Solving':-5,'System Design':-8,'Communication':-10,'Behavioral':-7,'Specificity':-6}};
+function makeStudents(){
+  const out=[];const dw=['CSE','CSE','CSE','IT','IT','ECE','ECE','EEE','MECH','MECH','CIVIL'];
+  for(let i=0;i<SEATS;i++){
+    const dept=pick(dw);const started=rnd()>0.22;const sessions=started?rint(1,14):0;const base=46+rnd()*22;
+    let gf=0.4+rnd()*1.3; if(rnd()<0.18)gf=rnd()*0.35;
+    const sf={},sn={};
+    SKILLS.forEach(s=>{const b=clamp(base+(BIAS[dept][s]||0)+(rnd()*16-8),18,96);sf[s]=round(b);const grow=started?gf*(2.4+rnd()*3.0)*Math.min(sessions,10)/10*7:0;sn[s]=clamp(round(b+grow+(rnd()*6-3)),18,99);});
+    const firstScore=round(avg(SKILLS.map(s=>sf[s])));const latestScore=started?round(avg(SKILLS.map(s=>sn[s]))):firstScore;
+    const slope=started?round((latestScore-firstScore)/Math.max(2,sessions)*3+(rnd()*0.6-0.3),2):0;
+    const stuck=started&&sessions>=3&&slope<=0.35;
+    let tier; if(!started)tier='At Risk'; else if(latestScore>=76)tier='Ready'; else if(latestScore>=66)tier='Almost'; else if(latestScore>=52&&!stuck)tier='Developing'; else tier='At Risk';
+    const atRisk=(!started)||tier==='At Risk'||(stuck&&latestScore<60);
+    const lastActive=started?rint(0,38):rint(20,90);const stt=(started&&slope>0.2&&latestScore<76)?Math.ceil((76-latestScore)/Math.max(slope,0.2)):null;
+    const targetRole=pick(ROLES);const inferredRole=rnd()<0.78?targetRole:pick(ROLES);
+    out.push({id:i,name:pick(FIRST)+' '+pick(LAST),dept,sessions,started,skillsFirst:sf,skillsNow:sn,firstScore,latestScore,slope,stuck,tier,atRisk,lastActive,stt,targetRole,inferredRole});
+  }
+  return out;
+}
+let STUDENTS=makeStudents();
+function computePercentiles(){const sc=STUDENTS.filter(s=>s.started);const denom=Math.max(1,sc.length-1);[...sc].sort((a,b)=>a.firstScore-b.firstScore).forEach((s,i)=>s.pctFirst=round(i/denom*100));[...sc].sort((a,b)=>a.latestScore-b.latestScore).forEach((s,i)=>s.pctNow=round(i/denom*100));STUDENTS.filter(s=>!s.started).forEach(s=>{s.pctFirst=0;s.pctNow=0;});}
+computePercentiles();
+function detail(s){if(s.det)return s.det;const r=mulberry32(1000+s.id*97);const n=Math.max(3,s.sessions||3);
+  const hist=[];for(let i=0;i<n;i++){const t=i/(n-1||1);hist.push(clamp(round(s.firstScore+(s.latestScore-s.firstScore)*t+(r()*6-3)),20,99));}hist[0]=s.firstScore;hist[n-1]=s.latestScore;
+  const sub={Relevance:clamp(round(s.skillsNow['Problem Solving']/10+(r()*2-1),1),1,10),Clarity:clamp(round(s.skillsNow['Communication']/10+(r()*2-1),1),1,10),Specificity:clamp(round(s.skillsNow['Specificity']/10+(r()*2-1),1),1,10),Structure:clamp(round(s.skillsNow['Behavioral']/10+(r()*2-1),1),1,10)};
+  const comp={Clarifications:ri(r,0,4),Timeouts:ri(r,0,s.tier==='At Risk'?5:2),Silences:ri(r,0,3),Skips:ri(r,0,3),Cutoffs:ri(r,0,3)};
+  const rt=[];for(let i=0;i<Math.min(10,n+4);i++)rt.push(round(8+r()*55,1));
+  const pj=[];for(let i=0;i<5;i++){const t=i/4;pj.push(clamp(round(s.pctFirst+(s.pctNow-s.pctFirst)*t+(r()*8-4)),1,99));}pj[0]=s.pctFirst;pj[4]=s.pctNow;
+  const fams=['DSA','Databases','System Design','Behavioral','Projects','OOP','Networking','Aptitude'];const covered=fams.map(f=>({name:f,val:ri(r,0,5)}));
+  return {hist,sub,comp,rt,pj,covered,n};}
+function sessionOf(s){if(s.ses)return s.ses;const r=mulberry32(s.id*31+7);const fams=['DSA','Databases','System Design','Behavioral','Projects'];const N=ri(r,8,12);const turns=[];
+  for(let i=0;i<N;i++){const fam=fams[Math.floor(r()*fams.length)];const x=r();const st=x<0.6?'Answered':x<0.78?'Follow-up':x<0.9?'Timeout':'Skipped';turns.push({i:i+1,fam,st,score:clamp(round(40+r()*55),20,99),rt:round(6+r()*50,1)});}return {turns};}
+const state={depts:new Set(DEPTS.map(d=>d.code)),tiers:new Set(['Ready','Almost','Developing','At Risk']),win:'all',heatView:'score',focus:null};
+function filtered(){const w=state.win==='all'?Infinity:Number(state.win);return STUDENTS.filter(s=>state.depts.has(s.dept)&&state.tiers.has(s.tier)&&(state.win==='all'?true:(s.started&&s.lastActive<=w)));}
+const COHORT_TABS=['command','risk','skills','dept'];
+function cohortList(){return filtered();}
+function pageList(){if(state.focus!=null&&COHORT_TABS.indexOf(currentTab)>=0){const s=STUDENTS.find(x=>x.id===state.focus);if(s)return [s];}return filtered();}
+function deriveFrom(list){
+  const all=list;const scored=all.filter(s=>s.started);
+  const notStarted=all.filter(s=>!s.started).length;const ready=all.filter(s=>s.tier==='Ready').length;
+  const atRisk=all.filter(s=>s.atRisk).length;const stuck=all.filter(s=>s.stuck).length;
+  const avgNow=scored.length?round(avg(scored.map(s=>s.latestScore)),1):0;const avgFirst=scored.length?round(avg(scored.map(s=>s.firstScore)),1):0;
+  const totalInterviews=all.reduce((s,x)=>s+x.sessions,0);const utilisation=round(scored.length/Math.max(1,all.length)*100);
+  const skillNow={},skillFirst={};SKILLS.forEach(sk=>{skillNow[sk]=scored.length?round(avg(scored.map(s=>s.skillsNow[sk])),1):0;skillFirst[sk]=scored.length?round(avg(scored.map(s=>s.skillsFirst[sk])),1):0;});
+  const weakest=[...SKILLS].sort((a,b)=>skillNow[a]-skillNow[b])[0];const strongest=[...SKILLS].sort((a,b)=>skillNow[b]-skillNow[a])[0];
+  const matrix=DEPTS.map(d=>{const ds=scored.filter(s=>s.dept===d.code);return {dept:d,n:ds.length,skills:SKILLS.map(sk=>ds.length?round(avg(ds.map(s=>s.skillsNow[sk]))):null),growth:SKILLS.map(sk=>ds.length?round(avg(ds.map(s=>s.skillsNow[sk]-s.skillsFirst[sk]))):null),avgNow:ds.length?round(avg(ds.map(s=>s.latestScore)),1):0,avgFirst:ds.length?round(avg(ds.map(s=>s.firstScore)),1):0,ready:all.filter(s=>s.dept===d.code&&s.tier==='Ready').length,atRisk:all.filter(s=>s.dept===d.code&&s.atRisk).length,total:all.filter(s=>s.dept===d.code).length};}).filter(m=>m.total>0);
+  const watch=all.filter(s=>s.atRisk).map(s=>{let sev='med',reasons=[];if(!s.started){sev='crit';reasons.push('Never taken an interview');}else{if(s.latestScore<50){sev='crit';reasons.push('Score below 50');}else if(s.stuck){sev='high';reasons.push('Plateaued ('+s.slope.toFixed(1)+'/session)');}if(s.lastActive>14)reasons.push('Inactive '+s.lastActive+'d');if(s.tier==='At Risk'&&s.latestScore>=50&&!s.stuck)reasons.push('Slipping toward at-risk');}const action=!s.started?'Activate · onboarding':s.stuck?'Assign Behavioral Drill':s.latestScore<50?'Assign Fundamentals':'Book 1:1 review';const rank=(!s.started?0:s.latestScore)+(s.stuck?-12:0)-(s.lastActive>14?8:0);return {s,sev,reason:reasons.join(' · ')||'At-risk signals',action,rank};}).sort((a,b)=>a.rank-b.rank);
+  const movers=[...scored].sort((a,b)=>(b.latestScore-b.firstScore)-(a.latestScore-a.firstScore)).slice(0,8);
+  const traj=scored.map(s=>{const r=mulberry32(s.id+3);const pts=[];for(let k=0;k<5;k++){const t=k/4;pts.push(clamp(round(s.pctFirst+(s.pctNow-s.pctFirst)*t+(r()*8-4)),1,99));}pts[0]=s.pctFirst;pts[4]=s.pctNow;return {name:s.name.split(' ')[0],shift:s.pctNow-s.pctFirst,pts};});
+  const risers=[...traj].sort((a,b)=>b.shift-a.shift).slice(0,3),sliders=[...traj].sort((a,b)=>a.shift-b.shift).slice(0,2);
+  return {all,scored,notStarted,ready,atRisk,stuck,avgNow,avgFirst,totalInterviews,utilisation,skillNow,skillFirst,weakest,strongest,matrix,watch,movers,risers,sliders};
+}
+function derive(){return deriveFrom(pageList());}
+/* per-chart filter + builder registries */
+const BUILD={};      // chartId -> builder(view)
+const CHARTF={};     // chartId -> Set(studentId) | undefined
+let AIMETA={};
+function regAI(k,o){AIMETA[k]=o;}
+function viewFor(id){let list=pageList();const f=CHARTF[id];if(f&&f.size)list=list.filter(s=>f.has(s.id));return deriveFrom(list);}
+function defChart(id,fn){BUILD[id]=fn;try{fn(viewFor(id));}catch(e){console.warn('build',id,e);}}
+function rebuildChart(id){if(BUILD[id]){try{BUILD[id](viewFor(id));}catch(e){console.warn(e);}}}
+const charts={};
+function ech(id){if(charts[id])return charts[id];const el=document.getElementById(id);if(!el)return null;charts[id]=echarts.init(el,null,{renderer:'canvas'});return charts[id];}
+function disposeAll(){Object.values(charts).forEach(c=>{try{c.dispose();}catch(e){}});for(const k in charts)delete charts[k];}
+const AX={axisLine:{lineStyle:{color:'rgba(255,255,255,.12)'}},axisLabel:{color:'#7B8194',fontSize:11},splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}},axisTick:{show:false}};
+const TIP={backgroundColor:'rgba(20,24,32,.96)',borderColor:'rgba(255,255,255,.12)',borderWidth:1,textStyle:{color:'#EAECF2',fontSize:12,fontFamily:'Inter'},extraCssText:'border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:10px 12px;'};
+function grad(a,b){return new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:a},{offset:1,color:b}]);}
+function barChart(id,c){const o=ech(id);if(!o)return;const cat={type:'category',data:c.cats,...AX,axisLabel:{color:'#AFB4C2',fontSize:11,interval:0,rotate:c.rotate||0}};const val={type:'value',...AX,max:c.max,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}};
+  o.setOption({grid:{left:c.left||46,right:c.right||18,top:c.series.length>1?28:16,bottom:c.bottom||34},tooltip:{...TIP,trigger:'axis',axisPointer:{type:'shadow',shadowStyle:{color:'rgba(255,255,255,.04)'}},formatter:c.fmt},legend:c.series.length>1?{top:0,textStyle:{color:'#AFB4C2',fontSize:11},icon:'roundRect',itemWidth:10,itemHeight:10}:{show:false},xAxis:c.horizontal?val:cat,yAxis:c.horizontal?cat:val,series:c.series.map((s,i)=>({name:s.name,type:'bar',data:s.data,stack:c.stack?'t':null,barMaxWidth:c.barMax||34,itemStyle:{borderRadius:c.horizontal?[0,5,5,0]:[5,5,0,0],color:grad((s.color||SERIES[i])+(c.horizontal?'ff':'cc'),(s.color||SERIES[i])+(c.horizontal?'aa':'44'))},label:s.label?{show:true,position:c.horizontal?'right':'top',color:'#AFB4C2',fontSize:10,formatter:s.label}:undefined})),animationDuration:700,animationEasing:'cubicOut'},true);}
+function lineChart(id,c){const o=ech(id);if(!o)return;o.setOption({grid:{left:c.left||46,right:c.right||20,top:c.series.length>1?28:18,bottom:c.bottom||30},tooltip:{...TIP,trigger:'axis',axisPointer:{type:'line',lineStyle:{color:'rgba(255,255,255,.15)'}}},legend:c.series.filter(s=>s.name).length>1?{top:0,textStyle:{color:'#AFB4C2',fontSize:11},icon:'roundRect',itemWidth:10,itemHeight:10,data:c.series.filter(s=>s.name).map(s=>s.name)}:{show:false},xAxis:{type:'category',data:c.cats,boundaryGap:!!c.bar,...AX},yAxis:{type:'value',min:c.min,max:c.max,...AX,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},series:c.series.map((s,i)=>{const col=s.color||SERIES[i];return s.bar?{name:s.name,type:'bar',data:s.data,barMaxWidth:30,itemStyle:{borderRadius:[5,5,0,0],color:grad(col+'cc',col+'44')}}:{name:s.name,type:'line',data:s.data,smooth:c.smooth!==false,symbol:'circle',symbolSize:s.symbol||5,connectNulls:false,lineStyle:{width:s.width||2.4,color:col,type:s.dashed?'dashed':'solid'},itemStyle:{color:col},areaStyle:s.area?{color:grad(col+'55',col+'05')}:null,endLabel:s.endLabel?{show:true,formatter:s.endLabel,color:col,fontSize:10.5,distance:5}:undefined,markLine:s.markLine};}),animationDuration:800,animationEasing:'cubicOut'},true);}
+function radarChart(id,c){const o=ech(id);if(!o)return;o.setOption({tooltip:{...TIP},legend:c.series.length>1?{bottom:0,textStyle:{color:'#AFB4C2',fontSize:10.5},icon:'roundRect',itemWidth:9,itemHeight:9}:{show:false},radar:{center:c.center||['50%','47%'],radius:c.radius||'64%',indicator:c.indicators,axisName:{color:'#AFB4C2',fontSize:10},splitLine:{lineStyle:{color:'rgba(255,255,255,.08)'}},splitArea:{areaStyle:{color:['rgba(255,255,255,.015)','rgba(255,255,255,.04)']}},axisLine:{lineStyle:{color:'rgba(255,255,255,.08)'}}},series:[{type:'radar',data:c.series.map((s,i)=>({value:s.value,name:s.name,lineStyle:{color:s.color||SERIES[i],width:s.width||2.2,type:s.dashed?'dashed':'solid'},itemStyle:{color:s.color||SERIES[i]},areaStyle:s.area?{color:(s.color||SERIES[i])+'33'}:null,symbolSize:4}))}],animationDuration:800},true);}
+function scatterChart(id,c){const o=ech(id);if(!o)return;o.setOption({grid:{left:c.left||50,right:c.right||22,top:c.series.length>1?26:16,bottom:c.bottom||42},tooltip:{...TIP,formatter:c.fmt||(p=>p.seriesName+'<br/>'+p.value[0]+', '+p.value[1])},legend:c.series.length>1?{top:0,right:0,textStyle:{color:'#AFB4C2',fontSize:11},icon:'circle',itemWidth:9,itemHeight:9}:{show:false},xAxis:{type:'value',name:c.xName,nameLocation:'middle',nameGap:28,nameTextStyle:{color:'#7B8194',fontSize:11},min:c.xMin,max:c.xMax,...AX,splitLine:{show:c.grid!==false,lineStyle:{color:'rgba(255,255,255,.04)'}}},yAxis:{type:'value',name:c.yName,nameLocation:'middle',nameGap:38,nameTextStyle:{color:'#7B8194',fontSize:11},min:c.yMin,max:c.yMax,...AX,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},series:c.series.map((s,i)=>({name:s.name,type:'scatter',data:s.data,symbolSize:s.symbolSize||(v=>v[2]?6+v[2]:9),symbol:s.symbol,itemStyle:{color:s.color||SERIES[i],opacity:.85,borderColor:'rgba(255,255,255,.2)',borderWidth:.5,shadowBlur:8,shadowColor:(s.color||SERIES[i])+'66'},emphasis:{itemStyle:{shadowBlur:18,borderColor:'#fff'}},label:s.lbl,z:s.z,markLine:s.markLine,markArea:s.markArea})),animationDuration:700},true);}
+function heatmapChart(id,c){const o=ech(id);if(!o)return;o.setOption({grid:{left:c.left||60,right:18,top:14,bottom:c.bottom||54},tooltip:{...TIP,formatter:c.fmt},xAxis:{type:'category',data:c.x,...AX,axisLabel:{color:'#AFB4C2',fontSize:10.5,interval:0,lineHeight:13}},yAxis:{type:'category',data:c.y,...AX,axisLabel:{color:'#AFB4C2',fontSize:11.5,fontWeight:600}},visualMap:{min:c.min,max:c.max,calculable:false,orient:'horizontal',left:'center',bottom:6,itemWidth:12,itemHeight:110,textStyle:{color:'#7B8194',fontSize:10},inRange:{color:c.colors||['#3a1d2b','#7a2f43','#b85563','#e0a04a','#7fcf8e','#34D399']}},series:[{type:'heatmap',data:c.data,label:{show:true,color:'#0b0d12',fontSize:11,fontWeight:600},itemStyle:{borderColor:'#0E1015',borderWidth:3,borderRadius:6},emphasis:{itemStyle:{borderColor:'#fff',borderWidth:1.5}}}],animationDuration:600},true);}
+function donutChart(id,c){const o=ech(id);if(!o)return;o.setOption({tooltip:{...TIP,trigger:'item',formatter:p=>p.name+'<br/><b>'+p.value+'</b> ('+p.percent+'%)'},legend:{bottom:0,textStyle:{color:'#AFB4C2',fontSize:11},icon:'circle',itemWidth:8,itemHeight:8},series:[{type:'pie',radius:c.radius||['52%','74%'],center:c.center||['50%','45%'],avoidLabelOverlap:true,padAngle:2,itemStyle:{borderRadius:5,borderColor:'#0E1015',borderWidth:2},label:{show:false},emphasis:{scale:true,scaleSize:6,label:{show:true,color:'#fff',fontSize:13,fontWeight:700,formatter:'{b}\n{c}'}},data:c.data.map(d=>({name:d.name,value:d.value,itemStyle:{color:d.color}}))}],animationDuration:700},true);}
+function gaugeChart(id,c){const o=ech(id);if(!o)return;o.setOption({series:[{type:'gauge',startAngle:210,endAngle:-30,min:0,max:c.max||100,radius:'92%',center:['50%','60%'],progress:{show:true,width:9,roundCap:true,itemStyle:{color:grad(c.color||'#6366F1',c.color2||'#22D3EE')}},axisLine:{lineStyle:{width:9,color:[[1,'rgba(255,255,255,.08)']]}},pointer:{show:false},axisTick:{show:false},splitLine:{show:false},axisLabel:{show:false},anchor:{show:false},title:{show:!!c.name,offsetCenter:[0,'26%'],color:'#7B8194',fontSize:10.5},detail:{valueAnimation:true,offsetCenter:[0,'-4%'],fontSize:c.big||22,fontWeight:700,color:'#EAECF2',formatter:c.fmt||('{value}'+(c.suffix||''))},data:[{value:c.value,name:c.name}]}],animationDuration:900},true);}
+function funnelChart(id,c){const o=ech(id);if(!o)return;const cols=c.colors||[grad('#6366F1','#4f46e5'),grad('#818CF8','#6366F1'),grad('#38BDF8','#22D3EE'),grad('#34D399','#10b981'),grad('#FBBF24','#f59e0b')];o.setOption({tooltip:{...TIP,formatter:p=>p.name+'<br/><b>'+p.value+'</b>'},series:[{type:'funnel',top:12,bottom:12,left:'6%',right:'6%',minSize:'26%',gap:3,sort:c.sort||'descending',label:{color:'#EAECF2',fontSize:11.5,position:'inside',formatter:p=>p.name+'  '+p.value},labelLine:{show:false},itemStyle:{borderWidth:0,borderRadius:6},data:c.data.map((d,i)=>({...d,itemStyle:{color:cols[i%cols.length]}})),emphasis:{label:{fontSize:13,fontWeight:700}}}],animationDuration:800},true);}
+function slopeChart(id,c){const o=ech(id);if(!o)return;o.setOption({grid:{left:44,right:c.right||96,top:16,bottom:28},tooltip:{...TIP,trigger:'item'},xAxis:{type:'category',data:c.labels||['Baseline','Now'],boundaryGap:false,...AX,axisLabel:{color:'#AFB4C2',fontSize:11.5,fontWeight:600}},yAxis:{type:'value',min:c.min,max:c.max,...AX,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},series:c.series.map((s,i)=>{const up=s.b-s.a;const col=s.color||(up>=8?'#34D399':up>=4?'#818CF8':'#FBBF24');return {name:s.name,type:'line',data:[s.a,s.b],lineStyle:{width:2.3,color:col},itemStyle:{color:col},symbolSize:7,endLabel:{show:true,formatter:s.name+' '+(up>=0?'+':'')+round(up),color:col,fontSize:10.5,distance:6},labelLayout:{moveOverlap:'shiftY'}};}),animationDuration:800},true);}
+function histChart(id,c){const o=ech(id);if(!o)return;const bins=[];for(let x=c.lo;x<c.hi;x+=c.binW)bins.push({lo:x,hi:x+c.binW,c:0});c.values.forEach(v=>{let idx=Math.floor((v-c.lo)/c.binW);idx=clamp(idx,0,bins.length-1);bins[idx].c++;});const data=bins.map(b=>({value:b.c,itemStyle:{borderRadius:[4,4,0,0],color:c.colorFn?grad(c.colorFn(b.lo)+'cc',c.colorFn(b.lo)+'33'):grad((c.color||'#6366F1')+'cc',(c.color||'#6366F1')+'33')}}));o.setOption({grid:{left:36,right:14,top:18,bottom:30},tooltip:{...TIP,formatter:p=>round(bins[p.dataIndex].lo,1)+'–'+round(bins[p.dataIndex].hi,1)+'<br/><b>'+p.value+'</b> '+(c.unit||'students')},xAxis:{type:'category',data:bins.map(b=>round(b.lo,1)),...AX,axisLabel:{color:'#7B8194',fontSize:10,interval:c.interval==null?1:c.interval}},yAxis:{type:'value',...AX,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},series:[{type:'bar',data,barWidth:'86%',markLine:c.mean!=null?{silent:true,symbol:'none',data:[{xAxis:clamp(Math.floor((c.mean-c.lo)/c.binW),0,bins.length-1),lineStyle:{color:'#fff',type:'dashed',opacity:.6},label:{formatter:c.meanLabel||('avg '+c.mean),color:'#EAECF2',fontSize:10}}]}:null}],animationDuration:700},true);}
+function sankeyChart(id,c){const o=ech(id);if(!o)return;o.setOption({tooltip:{...TIP,trigger:'item',triggerOn:'mousemove'},series:[{type:'sankey',left:8,right:96,top:10,bottom:10,nodeWidth:13,nodeGap:9,data:c.nodes,links:c.links,label:{color:'#EAECF2',fontSize:11},lineStyle:{color:'gradient',opacity:.38,curveness:.5},itemStyle:{borderWidth:0},emphasis:{focus:'adjacency'}}],animationDuration:800},true);}
+function sunburstChart(id,c){const o=ech(id);if(!o)return;o.setOption({tooltip:{...TIP,formatter:p=>p.name+'<br/><b>'+p.value+'</b>'},series:[{type:'sunburst',radius:['16%','94%'],center:['50%','50%'],data:c.data,itemStyle:{borderColor:'#0E1015',borderWidth:2,borderRadius:3},label:{color:'#EAECF2',fontSize:10,minAngle:10}}],animationDuration:800},true);}
+function sparkSVG(series,color){const w=90,h=32,mx=Math.max(...series),mn=Math.min(...series),rg=(mx-mn)||1;const pts=series.map((v,i)=>[i/(series.length-1)*w,h-4-((v-mn)/rg)*(h-8)]);const path=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');const area=path+' L '+w+' '+h+' L 0 '+h+' Z';const g='g'+Math.random().toString(36).slice(2,7);return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><defs><linearGradient id="'+g+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+color+'" stop-opacity=".35"/><stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs><path d="'+area+'" fill="url(#'+g+')"/><path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="1.8" stroke-linecap="round"/></svg>';}
+function makeSpark(t){const s=[];let v=50;for(let i=0;i<12;i++){v+=t*(.6+rnd())+(rnd()*6-3);s.push(v);}return s;}
+function kpiStrip(cards){return '<section class="kpis">'+cards.map(c=>'<div class="kpi reveal"><div class="kl">'+c.l+'</div><div class="kv tnum"><span data-num="'+c.num+'" data-pre="'+(c.pre||'')+'">0</span>'+(c.suf||'')+'</div><div class="kd '+(c.up?'up':'down')+'">'+(c.up?'▲':'▼')+' '+c.delta+'</div><div class="ksub">'+(c.sub||'')+'</div>'+sparkSVG(makeSpark(c.trend||1),c.col||'#6366F1')+'</div>').join('')+'</section>';}
+function countUp(){document.querySelectorAll('[data-num]').forEach(el=>{if(el.dataset.done)return;el.dataset.done=1;const target=Number(el.dataset.num),pre=el.dataset.pre||'';const t0=performance.now();(function step(t){const p=Math.min(1,(t-t0)/900);const e=1-Math.pow(1-p,3);el.textContent=pre+inr(Math.round(target*e));if(p<1)requestAnimationFrame(step);})(performance.now());});}
+const SPARK='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7z"/></svg>';
+const FICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M6 12h12M10 19h4"/></svg>';
+function exBtn(k){return '<button class="explain" data-key="'+k+'">'+SPARK+'Explain</button>';}
+function cfBtn(id){return '<button class="cfilter" data-cid="'+id+'" title="Filter this chart by students">'+FICON+'<span class="lbl"></span></button>';}
+function card(span,title,sub,chartId,key,extra){return '<div class="card '+span+' reveal" data-key="'+key+'" data-cid="'+chartId+'"><div class="card-h"><div class="ti"><h3>'+title+'</h3><p>'+sub+'</p></div>'+(extra||'')+cfBtn(chartId)+exBtn(key)+'</div><div class="chart" id="'+chartId+'"></div></div>';}
+function aiContent(key){const M=AIMETA[key];if(M){const plain=M.plain||M.purpose||'This view visualises a slice of the placement data.';const means=M.means||(M.stats&&M.stats.length?'The figure to watch here is '+M.stats[0][0]+' ('+M.stats[0][1]+')'+(M.stats[1]?', alongside '+M.stats[1][0]+' '+M.stats[1][1]:'')+'. Read it for the overall pattern and the outliers, not only the headline number.':'Read this chart for the overall pattern and any outliers rather than a single value.');const todo=M.todo||M.action||'Compare against the institution benchmark and direct effort at the weakest area first.';return {title:M.title||key,meta:M.meta||'',stats:M.stats||[],read:plain,means,todo};}return {title:'AI summary',meta:'',stats:[],read:'Open a chart to see its explanation.',means:'',todo:''};}
+const drawer=document.getElementById('drawer'),scrim=document.getElementById('scrim');
+let speechActive=false;
+function resizeCharts(){Object.values(charts).forEach(c=>{try{c.resize();}catch(e){}});}
+function openDrawer(key){const c=aiContent(key);document.getElementById('drawerTitle').textContent=c.title;document.getElementById('drawerMeta').textContent=c.meta;
+  const body=document.getElementById('drawerBody');body.innerHTML='<div class="gen"><span class="ring"></span> Reading the data…</div>';
+  drawer.classList.add('open');scrim.classList.add('open');document.body.classList.add('shifted');drawer.setAttribute('aria-hidden','false');stopSpeech();
+  setTimeout(resizeCharts,360);
+  const statHTML=c.stats.length?'<div class="ai-stat">'+c.stats.map(s=>'<div class="s"><div class="n tnum">'+s[0]+'</div><div class="t">'+s[1]+'</div></div>').join('')+'</div>':'';
+  const blocks=[{lbl:'In plain words',ic:'rgba(99,102,241,.2)',col:'#818CF8',text:c.read,cls:'read'},{lbl:'What it means',ic:'rgba(56,189,248,.18)',col:'#38BDF8',text:c.means},{lbl:'What to do',ic:'rgba(52,211,153,.18)',col:'#34D399',text:c.todo}].filter(b=>b.text);
+  setTimeout(()=>{body.innerHTML=statHTML;let bi=0;(function next(){if(bi>=blocks.length)return;const b=blocks[bi];const w=document.createElement('div');w.className='ai-block '+(b.cls||'');w.innerHTML='<div class="lbl"><span class="ic" style="background:'+b.ic+'"><svg width="12" height="12" viewBox="0 0 24 24" fill="'+b.col+'"><path d="M12 2l1.6 5L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-2z"/></svg></span>'+b.lbl+'</div><p></p>';body.appendChild(w);typeWriter(w.querySelector('p'),b.text,()=>{bi++;setTimeout(next,130);});})();window.__lastSpeech=blocks.map(b=>b.text).join(' ');},540);}
+function typeWriter(el,text,done){el.textContent='';let i=0;(function step(){el.textContent=text.slice(0,i);i+=2;if(i<text.length)setTimeout(step,9);else{el.textContent=text;done&&done();}})();}
+function closeDrawer(){drawer.classList.remove('open');scrim.classList.remove('open');document.body.classList.remove('shifted');drawer.setAttribute('aria-hidden','true');stopSpeech();setTimeout(resizeCharts,360);}
+document.getElementById('drawerClose').onclick=closeDrawer;scrim.onclick=closeDrawer;
+document.getElementById('askBtn').onclick=()=>toast('Follow-up chat is available in the full product');
+function pickVoice(){const vs=speechSynthesis.getVoices();return vs.find(v=>/en-IN/i.test(v.lang))||vs.find(v=>/en-GB/i.test(v.lang))||vs.find(v=>/en-US/i.test(v.lang))||vs[0];}
+function speak(text){if(!('speechSynthesis' in window)){toast('Speech not supported here');return;}stopSpeech();const u=new SpeechSynthesisUtterance(text);const v=pickVoice();if(v)u.voice=v;u.rate=1;u.onstart=()=>{speechActive=true;const l=document.getElementById('speakLabel');if(l)l.innerHTML='<span class="speaking-wave"><i></i><i></i><i></i><i></i></span> &nbsp;Stop';};u.onend=()=>{speechActive=false;const l=document.getElementById('speakLabel');if(l)l.textContent='Read this aloud';};speechSynthesis.speak(u);}
+function stopSpeech(){if('speechSynthesis' in window)speechSynthesis.cancel();speechActive=false;const l=document.getElementById('speakLabel');if(l)l.textContent='Read this aloud';}
+document.getElementById('speakBtn').onclick=()=>{if(speechActive){stopSpeech();return;}speak(window.__lastSpeech||'');};
+document.getElementById('globalAi').onclick=()=>openDrawer(currentTab+'_overview');
+function attachCard(host){host.querySelectorAll('.explain').forEach(b=>b.onclick=()=>openDrawer(b.dataset.key));host.querySelectorAll('.cfilter').forEach(b=>b.onclick=e=>{e.stopPropagation();openCF(b.dataset.cid,b);});host.querySelectorAll('.cfilter').forEach(b=>markCF(b.dataset.cid));}
+let toastT;function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);}
+function staggerReveal(nodes,step){nodes.forEach((n,i)=>setTimeout(()=>n.classList.add('revealed'),i*step));}
+/* per-chart student filter popover */
+const cfPop=document.getElementById('cfPop');
+function markCF(cid){const btn=document.querySelector('.cfilter[data-cid="'+cid+'"]');if(!btn)return;const f=CHARTF[cid];const lbl=btn.querySelector('.lbl');if(f&&f.size){btn.classList.add('on');if(lbl)lbl.textContent=f.size;}else{btn.classList.remove('on');if(lbl)lbl.textContent='';}}
+function openCF(cid,btn){const cur=CHARTF[cid];const sel=new Set(cur?[...cur]:[]);
+  cfPop.innerHTML='<h4>Filter this chart</h4><div class="sub">Show only the selected students in this visualization.</div>'+
+    '<div class="cf-quick"><button data-q="all">All</button><button data-q="none">Clear</button><button data-q="risk">At-risk</button><button data-q="ready">Ready</button></div>'+
+    '<input class="cf-search" id="cfSearch" placeholder="Search students or department…"/>'+
+    '<div class="cf-list" id="cfList"></div>'+
+    '<div class="cf-act"><button data-a="reset">Reset</button><button class="apply" data-a="apply">Apply<span id="cfN"></span></button></div>';
+  function paint(q){const ql=(q||'').toLowerCase();const list=STUDENTS.filter(s=>!ql||s.name.toLowerCase().includes(ql)||s.dept.toLowerCase().includes(ql)).slice(0,150);
+    document.getElementById('cfList').innerHTML=list.map(s=>'<div class="cf-row '+(sel.has(s.id)?'sel':'')+'" data-id="'+s.id+'"><span class="box"></span>'+s.name+'<span class="dp">'+s.dept+(s.started?' · '+s.latestScore:'')+'</span></div>').join('');
+    document.getElementById('cfList').querySelectorAll('.cf-row').forEach(r=>r.onclick=()=>{const id=Number(r.dataset.id);if(sel.has(id))sel.delete(id);else sel.add(id);r.classList.toggle('sel');document.getElementById('cfN').textContent=sel.size?' ('+sel.size+')':'';});
+    document.getElementById('cfN').textContent=sel.size?' ('+sel.size+')':'';}
+  paint('');
+  document.getElementById('cfSearch').oninput=e=>paint(e.target.value);
+  cfPop.querySelectorAll('.cf-quick button').forEach(b=>b.onclick=()=>{const q=b.dataset.q;sel.clear();if(q==='all')STUDENTS.forEach(s=>sel.add(s.id));else if(q==='risk')STUDENTS.filter(s=>s.atRisk).forEach(s=>sel.add(s.id));else if(q==='ready')STUDENTS.filter(s=>s.tier==='Ready').forEach(s=>sel.add(s.id));paint(document.getElementById('cfSearch').value);});
+  cfPop.querySelector('[data-a="reset"]').onclick=()=>{delete CHARTF[cid];closeCF();markCF(cid);rebuildChart(cid);toast('Chart filter cleared');};
+  cfPop.querySelector('[data-a="apply"]').onclick=()=>{if(sel.size===0||sel.size===STUDENTS.length)delete CHARTF[cid];else CHARTF[cid]=sel;closeCF();markCF(cid);rebuildChart(cid);toast(CHARTF[cid]?'Chart filtered to '+sel.size+' students':'Showing all students');};
+  const r=btn.getBoundingClientRect();cfPop.style.top=Math.min(window.innerHeight-380,r.bottom+8)+'px';cfPop.style.left=Math.min(window.innerWidth-312,Math.max(12,r.right-300))+'px';
+  cfPop.classList.add('open');}
+function closeCF(){cfPop.classList.remove('open');}
+cfPop.onclick=e=>e.stopPropagation();
+document.addEventListener('click',()=>{closeCF();const dp=document.getElementById('deptPanel');if(dp)dp.classList.remove('open');});
+const TITLES={command:'Placement Command Centre',risk:'Risk & Readiness',skills:'Skills Analytics',dept:'Department Analytics',students:'Student Explorer',sessions:'Session Forensics'};
+function focusBanner(){if(state.focus==null)return '';const s=STUDENTS.find(x=>x.id===state.focus);if(!s)return '';return '<div class="focusbar reveal"><div class="fi">'+s.name.split(' ').map(w=>w[0]).join('').slice(0,2)+'</div><div class="ft">Showing only <b>'+s.name+'</b> · '+s.dept+' · '+(s.started?'score <b>'+s.latestScore+'</b> · '+s.tier:'not started')+'. Every chart on this page is filtered to this student. Pick <b>— Whole cohort —</b> in the top filter to see the full batch again.</div><button class="clearf" id="clearFocus">Show whole cohort</button></div>';}
+function weeklyTrend(end){const r=mulberry32(55);const a=[];let v=Math.max(40,end-13);for(let i=0;i<12;i++){v+=(end-v)/(12-i)+(r()*3-1.5);a.push(round(v,1));}a[11]=end;return a;}
+function weeklyVol(total){const r=mulberry32(91);const base=total/12;const a=[];for(let i=0;i<12;i++)a.push(Math.max(1,Math.round(base*(0.6+r()*0.9))));return a;}
+function viewCommand(host){const pv=viewFor('__page');
+  host.innerHTML=focusBanner()+
+    kpiStrip([
+      {l:'Placement-ready',num:pv.ready,suf:' <small>of '+pv.all.length+'</small>',sub:round(pv.ready/Math.max(1,pv.all.length)*100)+'% of cohort',delta:'+6 vs last month',up:true,col:'#34D399',trend:1.2},
+      {l:'At risk of zero offers',num:pv.atRisk,sub:pv.stuck+' stuck · '+pv.notStarted+' not started',delta:'needs action',up:false,col:'#FB7185',trend:-0.8},
+      {l:'Avg readiness',num:pv.avgNow,suf:' <small>/100</small>',sub:'up from '+pv.avgFirst+' baseline',delta:'+'+round(pv.avgNow-pv.avgFirst,1)+' pts',up:true,col:'#818CF8',trend:1.0},
+      {l:'Seat utilisation',num:pv.utilisation,suf:'<small>%</small>',sub:pv.scored.length+' of '+pv.all.length+' active',delta:pv.utilisation<70?'below target':'on track',up:pv.utilisation>=70,col:'#22D3EE',trend:.7},
+      {l:'Cost / ready student',num:Math.round(ANNUAL_FEE/Math.max(1,pv.ready)),pre:'₹',sub:'from ₹1,00,000 fee',delta:'-18% vs Q1',up:true,col:'#34D399',trend:-0.9}
+    ])+
+    '<section class="ai-banner reveal"><div class="spark-ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7z"/></svg></div><div class="txt"><div class="eyebrow">AI season briefing</div><div class="head" id="bannerHead"></div></div><div class="ai-actions"><button class="mini-btn" id="bannerSpeak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 8a5 5 0 010 8"/></svg>Listen</button><button class="mini-btn" id="bannerOpen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Full summary</button></div></section>'+
+    '<section class="bento">'+
+      '<div class="card s8 tall reveal" data-key="constellation" data-cid="c_const"><div class="card-h"><div class="ti"><h3>The Placement-Readiness Constellation <span class="pill">Flagship</span></h3><p>Every student by readiness (→) vs momentum (↑). The recruiter\'s 9-box, live.</p></div>'+cfBtn('c_const')+exBtn('constellation')+'</div><div class="chart" id="c_const"></div></div>'+
+      '<div class="card s4 tall reveal" data-key="watchlist" data-cid="c_watch"><div class="card-h"><div class="ti"><h3>At-Risk Watchlist</h3><p>Who to help first — why, and the next action.</p></div>'+cfBtn('c_watch')+exBtn('watchlist')+'</div><div class="wl" id="c_watch"></div></div>'+
+      card('s4','Institutional Skill Fingerprint','Cohort shape, baseline vs now.','c_finger','fingerprint')+
+      card('s4','Cohort Growth Slope','What the program actually moved.','c_slope','slope')+
+      card('s4','Readiness Distribution','The cohort hiding inside the average.','c_bell','bell')+
+      '<div class="card s8 reveal mid" data-key="heatmap" data-cid="c_heat"><div class="card-h"><div class="ti"><h3>Department × Skill Grid</h3><p>Which branch is weak in which exact skill.</p></div><div class="vtoggle" id="heatToggle"><button class="on" data-v="score">Score</button><button data-v="growth">Growth</button></div>'+cfBtn('c_heat')+exBtn('heatmap')+'</div><div class="chart" id="c_heat" style="min-height:280px"></div></div>'+
+      card('s4','Engagement Funnel','Seats paid for vs strivers.','c_funnel','funnel')+
+      '<div class="card s5 reveal" data-key="roi" data-cid="c_roi"><div class="card-h"><div class="ti"><h3>ROI &amp; Utilisation Ledger</h3><p>The renewal story, in one card.</p></div>'+cfBtn('c_roi')+exBtn('roi')+'</div><div class="ledger" id="c_roi"></div></div>'+
+      card('s7','Peer Mobility','Percentile movement across sessions — risers and sliders.','c_bump','bump')+
+      card('s4','Readiness Tiers','How the cohort splits across readiness bands.','c_tier','tier')+
+      card('s4','Readiness Over Season','Cohort average readiness, week by week.','c_trend','trend')+
+      card('s4','Interviews Per Week','Practice volume across the season.','c_ivol','ivol')+
+      card('s6','Top Improvers','Biggest point gains this season.','c_movers','movers')+
+      card('s6','Avg Readiness by Department','Where each branch stands today.','c_deptbar','deptbar')+
+    '</section>';
+  defChart('c_const',v=>renderConstellation('c_const',v));
+  defChart('c_watch',v=>renderWatchlist('c_watch',v));
+  defChart('c_finger',v=>radarChart('c_finger',{indicators:SKILLS.map(s=>({name:s,max:100})),series:[{name:'Baseline',value:SKILLS.map(s=>v.skillFirst[s]),color:'#565C6E',dashed:true,area:false,width:1.5},{name:'Now',value:SKILLS.map(s=>v.skillNow[s]),color:'#6366F1',area:true}]}));
+  defChart('c_slope',v=>slopeChart('c_slope',{series:SKILLS.map(s=>({name:s.split(' ')[0],a:v.skillFirst[s],b:v.skillNow[s]})),min:30,max:90}));
+  defChart('c_bell',v=>histChart('c_bell',{values:v.scored.map(s=>s.latestScore),lo:30,hi:100,binW:5,interval:1,mean:v.avgNow,meanLabel:'avg '+v.avgNow,colorFn:lo=>lo<50?'#FB7185':lo<65?'#FBBF24':lo<76?'#38BDF8':'#34D399'}));
+  defChart('c_heat',v=>renderHeat('c_heat',v));
+  defChart('c_funnel',v=>funnelChart('c_funnel',{data:[{name:'Licensed seats',value:v.all.length},{name:'Started practising',value:v.scored.length},{name:'Actively scored',value:Math.max(1,Math.round(v.scored.length*0.92))},{name:'Placement-ready',value:v.ready}]}));
+  defChart('c_roi',v=>renderROI('c_roi',v));
+  defChart('c_bump',v=>renderBump('c_bump',v));
+  defChart('c_tier',v=>donutChart('c_tier',{data:['Ready','Almost','Developing','At Risk'].map(t=>({name:t,value:v.all.filter(s=>s.tier===t).length,color:TIER_COLOR[t]}))}));
+  defChart('c_trend',v=>{const a=weeklyTrend(v.avgNow);lineChart('c_trend',{cats:WEEKS,series:[{name:'Avg',data:a,color:'#818CF8',area:true}],min:Math.max(30,Math.min(...a)-6),max:Math.min(100,Math.max(...a)+6)});});
+  defChart('c_ivol',v=>lineChart('c_ivol',{cats:WEEKS,bar:true,series:[{name:'Interviews',data:weeklyVol(v.totalInterviews),bar:true,color:'#22D3EE'}]}));
+  defChart('c_movers',v=>barChart('c_movers',{cats:v.movers.map(s=>s.name.split(' ')[0]),series:[{name:'Gain',data:v.movers.map(s=>round(s.latestScore-s.firstScore)),color:'#34D399',label:p=>'+'+p.value}]}));
+  defChart('c_deptbar',v=>barChart('c_deptbar',{cats:v.matrix.map(m=>m.dept.code),series:[{name:'Avg score',data:v.matrix.map(m=>m.avgNow),color:'#6366F1',label:'{c}'}],max:100}));
+  document.getElementById('bannerHead').innerHTML='<b>'+pv.atRisk+' students</b> are at risk of zero offers ('+pv.stuck+' stuck, '+pv.notStarted+' never started). Your weakest cohort skill is <b>'+pv.weakest+'</b> at '+pv.skillNow[pv.weakest]+'/100 — the highest-leverage fix this season.';
+  document.getElementById('bannerSpeak').onclick=function(){const c=aiContent('command_overview');if(speechActive){stopSpeech();this.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 8a5 5 0 010 8"/></svg>Listen';return;}speak([c.read,c.means,c.todo].join(' '));this.innerHTML='<span class="speaking-wave"><i></i><i></i><i></i><i></i></span> Stop';const b=this;const iv=setInterval(()=>{if(!speechActive){b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 8a5 5 0 010 8"/></svg>Listen';clearInterval(iv);}},400);};
+  document.getElementById('bannerOpen').onclick=()=>openDrawer('command_overview');
+  registerCommandAI(pv);
+}
+function renderConstellation(id,d){const o=ech(id);if(!o)return;
+  const series=['Ready','Almost','Developing','At Risk'].map(t=>({name:t,type:'scatter',data:d.scored.filter(s=>s.tier===t).map(s=>({value:[s.latestScore,s.slope,s.sessions,s.name,s.dept,s.tier],symbolSize:6+Math.min(s.sessions,14)*1.15})),itemStyle:{color:TIER_COLOR[t],borderColor:'rgba(255,255,255,.25)',borderWidth:.5,shadowBlur:10,shadowColor:TIER_COLOR[t]+'88'},emphasis:{itemStyle:{shadowBlur:22,borderColor:'#fff',borderWidth:1}}}));
+  const ns=d.all.filter(s=>!s.started);if(ns.length)series.push({name:'Not started',type:'scatter',data:ns.map(s=>({value:[s.firstScore,-1.6,0,s.name,s.dept,'Not started'],symbolSize:6})),itemStyle:{color:'#3b4150',borderColor:'rgba(255,255,255,.1)',borderWidth:.5}});
+  if(state.focus!=null){const fs=STUDENTS.find(s=>s.id===state.focus);if(fs)series.push({name:'★ Focus',type:'scatter',z:12,data:[{value:[fs.started?fs.latestScore:fs.firstScore,fs.started?fs.slope:-1.6,fs.sessions,fs.name,fs.dept,fs.tier]}],symbol:'pin',symbolSize:42,itemStyle:{color:'#ffffff',borderColor:'#6366F1',borderWidth:2,shadowBlur:22,shadowColor:'#818CF8'},label:{show:true,formatter:fs.name.split(' ')[0],color:'#fff',fontSize:10,fontWeight:700,position:'top'}});}
+  o.setOption({grid:{left:54,right:24,top:18,bottom:46},legend:{show:true,top:0,right:0,textStyle:{color:'#AFB4C2',fontSize:11},itemWidth:9,itemHeight:9,icon:'circle'},tooltip:{...TIP,formatter:p=>{const v=p.value;return '<b>'+v[3]+'</b> · '+v[4]+'<br/>Readiness <b>'+v[0]+'</b> &nbsp; Momentum <b>'+(v[1]>0?'+':'')+v[1]+'</b>/session<br/><span style="color:'+(TIER_COLOR[v[5]]||'#7B8194')+'">'+v[5]+'</span> · '+v[2]+' interviews';}},xAxis:{...AX,name:'Readiness score →',nameLocation:'middle',nameGap:30,nameTextStyle:{color:'#7B8194',fontSize:11},min:25,max:100,splitLine:{show:false}},yAxis:{...AX,name:'Momentum ↑',nameLocation:'middle',nameGap:38,nameTextStyle:{color:'#7B8194',fontSize:11},min:-2.5,max:6},series:[{type:'scatter',data:[],markArea:{silent:true,data:[[{xAxis:76,yAxis:0,itemStyle:{color:'rgba(52,211,153,.05)'}},{xAxis:100,yAxis:6}],[{xAxis:25,yAxis:-2.5,itemStyle:{color:'rgba(251,113,133,.07)'}},{xAxis:76,yAxis:0}]]},markLine:{silent:true,symbol:'none',lineStyle:{color:'rgba(255,255,255,.18)',type:'dashed'},label:{color:'#565C6E',fontSize:10},data:[{xAxis:76,label:{formatter:'Job-ready 76',position:'end'}},{yAxis:0,label:{formatter:'Plateau',position:'end'}}]}},...series],animationDuration:800,animationEasing:'cubicOut'},true);}
+function renderWatchlist(id,d){const el=document.getElementById(id);if(!el)return;if(!d.watch.length){el.innerHTML='<div class="empty">No at-risk students match this filter.</div>';return;}
+  el.innerHTML='<table><thead><tr><th>Student</th><th>Severity</th><th>Why</th><th>Next action</th></tr></thead><tbody>'+d.watch.slice(0,40).map(w=>'<tr><td><div class="nm">'+w.s.name+'</div><div class="sub">'+w.s.dept+' · '+(w.s.started?w.s.latestScore+' score':'no sessions')+'</div></td><td><span class="sev '+w.sev+'"><span class="d"></span>'+(w.sev==='crit'?'Critical':w.sev==='high'?'High':'Watch')+'</span></td><td class="reason">'+w.reason+'</td><td><button class="assign">'+w.action+'</button></td></tr>').join('')+'</tbody></table>';
+  el.querySelectorAll('.assign').forEach(b=>b.onclick=()=>toast('Action assigned · "'+b.textContent+'"'));}
+function renderHeat(id,d){const view=state.heatView;const data=[];const ys=d.matrix.map(m=>m.dept.code);d.matrix.forEach((m,yi)=>(view==='score'?m.skills:m.growth).forEach((v,xi)=>{if(v!==null)data.push([xi,yi,v]);}));const vals=data.map(x=>x[2]);
+  heatmapChart(id,{x:SKILLS.map(s=>s.replace(' ','\n')),y:ys,data,min:view==='score'?40:0,max:view==='score'?85:Math.max(20,Math.max(...vals,1)),colors:view==='score'?['#3a1d2b','#7a2f43','#b85563','#e0a04a','#7fcf8e','#34D399']:['#1c2230','#26425a','#2f6f8e','#46b3c7','#34D399'],fmt:p=>ys[p.value[1]]+' · '+SKILLS[p.value[0]]+'<br/><b>'+p.value[2]+'</b> '+(view==='score'?'avg score':'pts growth')});}
+function renderROI(id,d){const el=document.getElementById(id);if(!el)return;const ready=Math.max(1,d.ready);const cpr=Math.round(ANNUAL_FEE/ready);const purchased=6200,used=d.totalInterviews,elapsed=42;
+  el.innerHTML='<div class="big"><div class="v tnum">₹'+inr(cpr)+'</div><div class="cap">cost per<br/>ready student</div></div><div id="roiGauge" style="width:100%;height:96px"></div><div class="bullet"><div class="bl"><span>Interviews used this cycle</span><b class="tnum">'+inr(used)+' / '+inr(purchased)+'</b></div><div class="track"><i style="width:'+Math.min(100,used/purchased*100)+'%;background:linear-gradient(90deg,#6366F1,#22D3EE)"></i><span class="target" style="left:'+elapsed+'%"></span></div><small>White marker = '+elapsed+'% of the cycle elapsed. You\'re pacing '+(used/purchased*100<elapsed?'<b style="color:#FBBF24">behind</b>':'ahead of')+' schedule.</small></div>';
+  gaugeChart('roiGauge',{value:d.utilisation,name:'Seat utilisation',suffix:'%',big:24});}
+function renderBump(id,d){const o=ech(id);if(!o)return;const mk=(t,col)=>({name:t.name,type:'line',data:t.pts,smooth:.4,symbol:'circle',symbolSize:6,lineStyle:{width:2.6,color:col},itemStyle:{color:col},endLabel:{show:true,formatter:'{a}',color:col,fontSize:10.5,distance:6},z:5});
+  o.setOption({grid:{left:40,right:74,top:16,bottom:30},tooltip:{...TIP,trigger:'axis'},legend:{show:false},xAxis:{type:'category',data:['S1','S2','S3','S4','Now'],boundaryGap:false,...AX},yAxis:{...AX,name:'Percentile',nameTextStyle:{color:'#7B8194',fontSize:10},min:0,max:100,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},series:[...d.risers.map(t=>mk(t,'#34D399')),...d.sliders.map(t=>mk(t,'#FB7185'))],animationDuration:900},true);}
+function registerCommandAI(d){const cpr=Math.round(ANNUAL_FEE/Math.max(1,d.ready));const tc=['Ready','Almost','Developing','At Risk'].map(t=>d.all.filter(s=>s.tier===t).length);
+  regAI('command_overview',{title:'Season briefing',meta:d.all.length+' students in view',stats:[[d.ready,'ready'],[d.atRisk,'at risk'],[d.avgNow,'avg score']],plain:'Here is the state of your batch right now. Of '+d.all.length+' students in view, '+d.ready+' are placement ready and '+d.atRisk+' are at real risk of finishing the season with zero offers. '+d.stuck+' have plateaued and '+d.notStarted+' have never taken a single interview.',means:'Your single biggest cohort weakness is '+d.weakest+', sitting at '+d.skillNow[d.weakest]+' out of 100, while overall readiness rose to '+d.avgNow+'. That gap is why otherwise strong students stall in final rounds.',todo:'Open the At-Risk Watchlist and start with the critical names, run one focused '+d.weakest+' clinic for the whole batch, and activate the '+d.notStarted+' dormant students. At ₹'+inr(cpr)+' per ready student, closing these gaps is the cheapest win you have.'});
+  regAI('constellation',{title:'Placement-Readiness Constellation',meta:d.scored.length+' scored students',stats:[[tc[0],'stars'],[d.atRisk,'danger zone'],[d.stuck,'stuck']],plain:'Each dot is a student. Left to right is how ready they are; bottom to top is whether they are improving. The green cluster top-right are your stars; the red dots bottom-left are the danger zone — low score, no momentum.',means:'There are '+d.atRisk+' students in or near the danger zone and '+d.stuck+' are stuck, meaning recent interviews show no improvement. On a plain score list you would never spot them as a group.',todo:'Treat the bottom-left quadrant as your priority list. Stuck students need a different approach, not just more practice. Parade the top-right stars to recruiters first.'});
+  regAI('watchlist',{title:'At-Risk Watchlist',meta:d.watch.length+' students flagged',stats:[[d.watch.filter(w=>w.sev==='crit').length,'critical'],[d.notStarted,'never started']],plain:'This is your call list for the week, sorted so the most urgent students are at the top, with the specific reason and exact next action for each.',means:'The reasons matter. A stuck-and-inactive student needs a different intervention from one who simply scored low. '+d.notStarted+' have never started at all — pure unused risk.',todo:'Work top-down. Assign the recommended action for each critical student today and book one-to-ones for the high-severity rows.'});
+  regAI('fingerprint',{title:'Institutional Skill Fingerprint',meta:'baseline vs now',stats:[[d.skillNow[d.weakest],d.weakest],[d.skillNow[d.strongest],d.strongest]],plain:'This radar shows the shape of your whole cohort across the six skills recruiters test. The dashed shape is where you started; the solid shape is now.',means:'Your cohort is spiky. '+d.weakest+' is the collapsed point at '+d.skillNow[d.weakest]+' and has barely grown — the profile that fails balanced panels.',todo:'Pour coaching into '+d.weakest+'. A single institutional workshop there lifts outcomes more than any other action.'});
+  regAI('slope',{title:'Cohort Growth Slope',meta:'per skill',stats:[[round(d.avgNow-d.avgFirst,1),'avg gain'],[d.weakest,'laggard']],plain:'Each line connects where a skill started to where it is now. Steep lines are where the program works; flat lines are where effort is not converting.',means:'The cohort gained '+round(d.avgNow-d.avgFirst,1)+' points overall, but '+d.weakest+' is the flat line that has hardly moved.',todo:'Use the steep lines as proof of value at renewal; reallocate practice time into '+d.weakest+'.'});
+  regAI('bell',{title:'Readiness Distribution',meta:d.scored.length+' scored students',stats:[[d.avgNow,'mean'],[d.ready,'ready band'],[d.atRisk,'at-risk band']],plain:'This shows how many students sit in each score range, coloured by readiness band. The dashed line is the average.',means:'Watch for two humps. That means two hidden populations — a ready group and a stranded group — and the average describes almost nobody.',todo:'If the curve splits, run two tracks: stretch the top, rescue the bottom.'});
+  regAI('heatmap',{title:'Department × Skill Grid',meta:(state.heatView==='score'?'current scores':'growth')+' by branch',stats:[[d.matrix.length,'branches'],[d.ready,'ready total']],plain:'Every cell is one branch in one skill. Darker red cells are weak spots, green cells strengths. It turns "the batch needs communication help" into exactly which branch needs which skill.',means:'The darkest cell is your most concentrated, fixable weakness — invisible in the institution average.',todo:'Run a branch-specific clinic on the darkest cell. Switch to Growth view to see which branches are improving.'});
+  regAI('funnel',{title:'Engagement Funnel',meta:d.all.length+' licensed seats',stats:[[d.all.length,'seats'],[d.scored.length,'started'],[d.notStarted,'never started']],plain:'This funnel runs from every seat you paid for down to placement-ready students. A big drop at the top is wasted capacity.',means:d.notStarted+' students have never taken an interview — roughly ₹'+inr(Math.round(ANNUAL_FEE*d.notStarted/Math.max(1,d.all.length)))+' of licence sitting idle.',todo:'Launch a short activation drive. It is the cheapest lever — the seats are already paid for.'});
+  regAI('roi',{title:'ROI & Utilisation Ledger',meta:'against the ₹1,00,000 fee',stats:[['₹'+inr(cpr),'per ready'],[d.utilisation+'%','seat use']],plain:'The money view. It turns the contract into one defensible number — what each ready student costs — plus how much capacity you have used.',means:'At ₹'+inr(cpr)+' per ready student, this is the figure for the management committee at renewal.',todo:'Take the cost-per-ready figure into the renewal conversation. If pacing is behind, push usage now.'});
+  regAI('bump',{title:'Peer Mobility',meta:'percentile rank',stats:[[d.risers.length,'risers'],[d.sliders.length,'sliding']],plain:'This tracks how students move relative to peers over interviews. Green lines climb; red lines slide even when raw scores drift up.',means:'Sliders matter most: practising yet falling behind usually points to one specific skill quietly regressing.',todo:'Investigate each sliding student — a fixable issue, far cheaper to catch now than in placement week.'});
+  regAI('tier',{title:'Readiness Tiers',meta:'cohort composition',stats:[[tc[0],'ready'],[tc[3],'at risk']],purpose:'This breaks the cohort into the four readiness bands.',action:'Aim to shrink the At-Risk slice and grow the Ready slice.'});
+  regAI('trend',{title:'Readiness Over Season',meta:'weekly average',stats:[[d.avgNow,'current avg']],purpose:'This tracks cohort average readiness week by week.',means:'A rising line shows compounding; a flat line is an early warning.',action:'If it flattens, refresh question difficulty.'});
+  regAI('ivol',{title:'Interviews Per Week',meta:'practice volume',stats:[[d.totalInterviews,'total']],purpose:'This shows how many mock interviews the cohort completed each week.',means:'Dips in volume usually precede dips in readiness.',action:'Protect a steady weekly volume.'});
+  regAI('movers',{title:'Top Improvers',meta:'biggest gains',stats:[[d.movers.length?round(d.movers[0].latestScore-d.movers[0].firstScore):0,'top gain']],purpose:'The students who improved most from baseline.',means:'Living proof the program works — useful stories for recruiters.',action:'Feature these students; study what they did.'});
+  regAI('deptbar',{title:'Avg Readiness by Department',meta:'current standing',stats:[[d.matrix.length,'branches']],purpose:'This compares current average readiness of each department.',means:'The shortest bars drag your institution average down.',action:'Direct support to the lowest bars.'});
+}
+function riskTrend(end){const r=mulberry32(33);const a=[];let v=end+12;for(let i=0;i<12;i++){v+=(end-v)/(12-i)+(r()*4-2);a.push(Math.max(0,Math.round(v)));}a[11]=end;return a;}
+function projLine(ready,mode){return mode===1?[ready,ready+2,ready+3,ready+4]:[ready,ready+8,ready+18,ready+27];}
+function viewRisk(host){const pv=viewFor('__page');const avgRecovery=round(avg(pv.scored.filter(s=>s.stt).map(s=>s.stt))||0,1);
+  host.innerHTML=focusBanner()+
+    kpiStrip([
+      {l:'At risk of zero offers',num:pv.atRisk,sub:round(pv.atRisk/Math.max(1,pv.all.length)*100)+'% of cohort',delta:'priority',up:false,col:'#FB7185',trend:-0.7},
+      {l:'Plateaued (stuck)',num:pv.stuck,sub:'no recent improvement',delta:'watch',up:false,col:'#FBBF24',trend:-0.4},
+      {l:'Never started',num:pv.notStarted,sub:'dormant seats',delta:'activate',up:false,col:'#A78BFA',trend:-0.5},
+      {l:'Avg sessions to ready',num:avgRecovery,sub:'for recoverable students',delta:'projection',up:true,col:'#22D3EE',trend:.6},
+      {l:'Recoverable now',num:pv.scored.filter(s=>s.stt&&s.stt<=4).length,sub:'≤4 sessions from ready',delta:'quick wins',up:true,col:'#34D399',trend:.8}
+    ])+
+    '<section class="bento">'+
+      card('s5 mid','Why Students Are At Risk','The specific failure signals, counted.','r_reasons','r_reasons')+
+      card('s4 mid','At-Risk by Department','Where the danger concentrates.','r_dept','r_dept')+
+      card('s3 mid','Stuck vs Improving','Momentum split of scored students.','r_stuck','r_stuck')+
+      card('s6','Risk Map: Score vs Inactivity','Low score + long silence = highest risk.','r_scatter','r_scatter')+
+      card('s6','Readiness Pipeline','How the cohort stacks across tiers.','r_funnel','r_funnel')+
+      card('s4','Days Since Last Active','How fresh is the cohort engagement.','r_inact','r_inact')+
+      card('s4','Sessions to Job-Ready','How far recoverable students must go.','r_stt','r_stt')+
+      card('s4','Momentum Distribution','Improvement rate across the cohort.','r_mom','r_mom')+
+      card('s7','At-Risk Trend','At-risk count week by week.','r_trend','r_trend')+
+      card('s5','Recovery Projection','Ready students now vs with intervention.','r_proj','r_proj')+
+    '</section>';
+  defChart('r_reasons',v=>{const cats=['Never started','Score < 50','Plateaued','Inactive 14d+','Slipping'];const cnt=[v.notStarted,v.all.filter(s=>s.started&&s.latestScore<50).length,v.all.filter(s=>s.stuck).length,v.all.filter(s=>s.started&&s.lastActive>14).length,v.all.filter(s=>s.tier==='At Risk'&&s.started&&s.latestScore>=50&&!s.stuck).length];const cols=['#FB7185','#FB7185','#FBBF24','#A78BFA','#38BDF8'];barChart('r_reasons',{cats,series:[{name:'Students',data:cnt.map((x,i)=>({value:x,itemStyle:{borderRadius:[0,5,5,0],color:grad(cols[i]+'ff',cols[i]+'99')}})),label:'{c}'}],horizontal:true,left:96});});
+  defChart('r_dept',v=>barChart('r_dept',{cats:v.matrix.map(m=>m.dept.code),series:[{name:'At risk',data:v.matrix.map(m=>m.atRisk),color:'#FB7185',label:'{c}'}]}));
+  defChart('r_stuck',v=>donutChart('r_stuck',{data:[{name:'Improving',value:v.scored.filter(s=>s.slope>0.35).length,color:'#34D399'},{name:'Stuck',value:v.stuck,color:'#FBBF24'},{name:'Not started',value:v.notStarted,color:'#3b4150'}],radius:['48%','72%']}));
+  defChart('r_scatter',v=>scatterChart('r_scatter',{xName:'Readiness score →',yName:'Days inactive ↑',xMin:25,xMax:100,yMin:0,yMax:60,series:[{name:'At risk',color:'#FB7185',data:v.all.filter(s=>s.atRisk&&s.started).map(s=>[s.latestScore,s.lastActive,4,s.name])},{name:'Safe',color:'#34D399',data:v.scored.filter(s=>!s.atRisk).map(s=>[s.latestScore,s.lastActive,2,s.name])}],fmt:p=>'<b>'+p.value[3]+'</b><br/>Score '+p.value[0]+' · inactive '+p.value[1]+'d'}));
+  defChart('r_funnel',v=>funnelChart('r_funnel',{sort:'descending',data:[{name:'All students',value:v.all.length},{name:'Developing+',value:v.all.filter(s=>['Developing','Almost','Ready'].includes(s.tier)).length},{name:'Almost+',value:v.all.filter(s=>['Almost','Ready'].includes(s.tier)).length},{name:'Ready',value:v.ready}]}));
+  defChart('r_inact',v=>histChart('r_inact',{values:v.all.map(s=>s.lastActive),lo:0,hi:60,binW:5,color:'#A78BFA',unit:'students'}));
+  defChart('r_stt',v=>histChart('r_stt',{values:v.scored.filter(s=>s.stt).map(s=>s.stt),lo:0,hi:16,binW:2,color:'#22D3EE',unit:'students'}));
+  defChart('r_mom',v=>histChart('r_mom',{values:v.scored.map(s=>s.slope),lo:-1,hi:4,binW:0.5,color:'#6366F1',unit:'students',colorFn:lo=>lo<0.36?'#FBBF24':'#34D399'}));
+  defChart('r_trend',v=>lineChart('r_trend',{cats:WEEKS,series:[{name:'At risk',data:riskTrend(v.atRisk),color:'#FB7185',area:true}]}));
+  defChart('r_proj',v=>lineChart('r_proj',{cats:['Now','+2 wk','+4 wk','+6 wk'],series:[{name:'No action',data:projLine(v.ready,1),color:'#7B8194',dashed:true},{name:'With intervention',data:projLine(v.ready,2),color:'#34D399',area:true}],min:0}));
+  registerRiskAI(pv);
+}
+function registerRiskAI(d){const rc=[d.notStarted,d.all.filter(s=>s.started&&s.latestScore<50).length,d.all.filter(s=>s.stuck).length];
+  regAI('risk_overview',{title:'Risk & readiness briefing',meta:d.atRisk+' at risk',stats:[[d.atRisk,'at risk'],[d.stuck,'stuck'],[d.notStarted,'dormant']],plain:'This whole screen is about students who will not get placed unless something changes. Right now '+d.atRisk+' are at risk — '+d.stuck+' plateaued and '+d.notStarted+' never started.',means:'The reason breakdown shows these are several different problems: dormant students, low scorers, and plateaued students each need a different fix. The risk map shows the worst cases are low score and high inactivity together.',todo:'Split your response by reason. Activate the dormant group, give plateaued students a new approach, and give low scorers a fundamentals track.'});
+  regAI('r_reasons',{title:'Why Students Are At Risk',meta:'signals counted',stats:[[rc[0],'never started'],[rc[2],'plateaued']],purpose:'This counts the specific reasons students are flagged, so you treat causes not a label.',means:'Each bar needs a different intervention.',action:'Tackle the tallest bar first.'});
+  regAI('r_dept',{title:'At-Risk by Department',meta:'by branch',stats:[[d.atRisk,'total']],purpose:'This shows which departments hold the most at-risk students.',means:'Risk is rarely spread evenly.',action:'Concentrate support on the tallest bars.'});
+  regAI('r_stuck',{title:'Stuck vs Improving',meta:'momentum split',stats:[[d.stuck,'stuck']],purpose:'This splits scored students into improving versus plateaued.',means:'Stuck students will not recover with more of the same.',action:'Move stuck students onto a different drill.'});
+  regAI('r_scatter',{title:'Risk Map',meta:'score vs inactivity',stats:[[d.atRisk,'at risk']],purpose:'This plots every student by score and days since they practised.',means:'The dangerous corner is low score and long silence together.',action:'Reach out to anyone low-scoring and inactive first.'});
+  regAI('r_funnel',{title:'Readiness Pipeline',meta:'tier stack',stats:[[d.ready,'ready']],purpose:'This shows how many clear each readiness threshold.',action:'Focus on moving the middle band up one tier.'});
+  regAI('r_inact',{title:'Days Since Last Active',meta:'freshness',stats:[[d.all.filter(s=>s.lastActive>14).length,'14d+']],purpose:'This shows how recently students last practised.',means:'A long right tail is a re-engagement problem forming.',action:'Nudge anyone past two weeks.'});
+  regAI('r_stt',{title:'Sessions to Job-Ready',meta:'distance',stats:[[d.scored.filter(s=>s.stt&&s.stt<=4).length,'within 4']],purpose:'This projects how many more interviews recoverable students need.',means:'Students on the left are quick wins.',action:'Prioritise the near-ready students.'});
+  regAI('r_mom',{title:'Momentum Distribution',meta:'improvement rate',stats:[[d.stuck,'flat/negative']],purpose:'This shows the spread of improvement rates.',means:'Bars at or below zero are going nowhere.',action:'Target the flat-and-negative students.'});
+  regAI('r_trend',{title:'At-Risk Trend',meta:'weekly',stats:[[d.atRisk,'now']],purpose:'This tracks the at-risk count week by week.',means:'A rising line is a red flag.',action:'If it rises two weeks running, escalate.'});
+  regAI('r_proj',{title:'Recovery Projection',meta:'now vs intervention',stats:[[d.ready,'ready now']],purpose:'This compares ready-student counts with and without intervention.',means:'The gap between the lines is the value of acting now.',action:'Commit to the intervention path.'});
+}
+function viewSkills(host){const pv=viewFor('__page');
+  host.innerHTML=focusBanner()+
+    (function(){const g=SKILLS.map(s=>round(pv.skillNow[s]-pv.skillFirst[s]));return kpiStrip([
+      {l:'Weakest skill',num:pv.skillNow[pv.weakest],suf:'<small>/100</small>',sub:pv.weakest,delta:'focus here',up:false,col:'#FB7185',trend:-.3},
+      {l:'Strongest skill',num:pv.skillNow[pv.strongest],suf:'<small>/100</small>',sub:pv.strongest,delta:'leverage',up:true,col:'#34D399',trend:1},
+      {l:'Biggest gain',num:Math.max.apply(null,g),suf:'<small> pts</small>',sub:SKILLS[g.indexOf(Math.max.apply(null,g))],delta:'program win',up:true,col:'#818CF8',trend:1.1},
+      {l:'Avg readiness',num:pv.avgNow,suf:'<small>/100</small>',sub:'all skills blended',delta:'+'+round(pv.avgNow-pv.avgFirst,1),up:true,col:'#22D3EE',trend:.9},
+      {l:'Skills above 70',num:SKILLS.filter(s=>pv.skillNow[s]>=70).length,suf:' <small>of '+SKILLS.length+'</small>',sub:'cohort strengths',delta:'',up:true,col:'#34D399',trend:.7}]);})()+
+    '<section class="bento">'+
+      card('s5','Cohort Skill Averages','Where the batch stands on each skill.','s_avg','s_avg')+
+      card('s4','Skill Growth','Points gained per skill since baseline.','s_growth','s_growth')+
+      card('s3','Skill Shape','The cohort fingerprint.','s_radar','s_radar')+
+      card('s3','Relevance','Answer sub-score (0–10).','s_d1','s_sub')+
+      card('s3','Clarity','Answer sub-score (0–10).','s_d2','s_sub')+
+      card('s3','Specificity','Answer sub-score (0–10).','s_d3','s_sub')+
+      card('s3','Structure','Answer sub-score (0–10).','s_d4','s_sub')+
+      card('s6','Technical vs Communication','The classic engineer trade-off.','s_sc1','s_sc1')+
+      card('s6','Specificity vs Readiness','Does concrete detail drive scores?','s_sc2','s_sc2')+
+      card('s4','Weakest-Skill Ranking','Collective blind spots, ordered.','s_rank','s_rank')+
+      card('s4','Communication Spread','Distribution on the key soft skill.','s_dist','s_dist')+
+      card('s4','Top Skill Improvers','Biggest individual jumps.','s_lead','s_lead')+
+    '</section>';
+  const sub=v=>({Relevance:round(v.skillNow['Problem Solving']/10,1),Clarity:round(v.skillNow['Communication']/10,1),Specificity:round(v.skillNow['Specificity']/10,1),Structure:round(v.skillNow['Behavioral']/10,1)});
+  defChart('s_avg',v=>barChart('s_avg',{cats:SKILLS.map(s=>s.replace(' ','\n')),series:[{name:'Avg',data:SKILLS.map(s=>({value:v.skillNow[s],itemStyle:{borderRadius:[5,5,0,0],color:grad((v.skillNow[s]<60?'#FB7185':v.skillNow[s]<72?'#FBBF24':'#34D399')+'cc',(v.skillNow[s]<60?'#FB7185':v.skillNow[s]<72?'#FBBF24':'#34D399')+'44')}})),label:'{c}'}],max:100,bottom:46}));
+  defChart('s_growth',v=>{const g=SKILLS.map(s=>round(v.skillNow[s]-v.skillFirst[s]));barChart('s_growth',{cats:SKILLS.map(s=>s.split(' ')[0]),series:[{name:'Gain',data:g.map(x=>({value:x,itemStyle:{borderRadius:x>=0?[5,5,0,0]:[0,0,5,5],color:grad((x>=6?'#34D399':x>=3?'#818CF8':'#FBBF24')+'cc',(x>=6?'#34D399':x>=3?'#818CF8':'#FBBF24')+'44')}})),label:p=>(p.value>=0?'+':'')+p.value}]});});
+  defChart('s_radar',v=>radarChart('s_radar',{indicators:SKILLS.map(s=>({name:s.split(' ')[0],max:100})),series:[{name:'Now',value:SKILLS.map(s=>v.skillNow[s]),color:'#6366F1',area:true}]}));
+  defChart('s_d1',v=>gaugeChart('s_d1',{value:sub(v).Relevance,max:10,big:26,color:'#6366F1',color2:'#818CF8'}));
+  defChart('s_d2',v=>gaugeChart('s_d2',{value:sub(v).Clarity,max:10,big:26,color:'#22D3EE',color2:'#38BDF8'}));
+  defChart('s_d3',v=>gaugeChart('s_d3',{value:sub(v).Specificity,max:10,big:26,color:'#FBBF24',color2:'#f59e0b'}));
+  defChart('s_d4',v=>gaugeChart('s_d4',{value:sub(v).Structure,max:10,big:26,color:'#34D399',color2:'#10b981'}));
+  defChart('s_sc1',v=>scatterChart('s_sc1',{xName:'Technical Depth →',yName:'Communication ↑',xMin:20,xMax:100,yMin:20,yMax:100,series:[{name:'Students',color:'#6366F1',data:v.scored.map(s=>[s.skillsNow['Technical Depth'],s.skillsNow['Communication'],3,s.name])}],fmt:p=>'<b>'+p.value[3]+'</b><br/>Tech '+p.value[0]+' · Comm '+p.value[1]}));
+  defChart('s_sc2',v=>scatterChart('s_sc2',{xName:'Specificity →',yName:'Readiness ↑',xMin:20,xMax:100,yMin:20,yMax:100,series:[{name:'Students',color:'#22D3EE',data:v.scored.map(s=>[s.skillsNow['Specificity'],s.latestScore,3,s.name])}],fmt:p=>'<b>'+p.value[3]+'</b><br/>Specificity '+p.value[0]+' · Score '+p.value[1]}));
+  defChart('s_rank',v=>{const r=[...SKILLS].sort((a,b)=>v.skillNow[a]-v.skillNow[b]);barChart('s_rank',{cats:r.map(s=>s.replace(' ','\n')),series:[{name:'Avg',data:r.map(s=>v.skillNow[s]),color:'#FB7185',label:'{c}'}],horizontal:true,left:96,max:100});});
+  defChart('s_dist',v=>histChart('s_dist',{values:v.scored.map(s=>s.skillsNow['Communication']),lo:20,hi:100,binW:8,color:'#FBBF24'}));
+  defChart('s_lead',v=>{const l=[...v.scored].sort((a,b)=>(b.latestScore-b.firstScore)-(a.latestScore-a.firstScore)).slice(0,8);barChart('s_lead',{cats:l.map(s=>s.name.split(' ')[0]),series:[{name:'Gain',data:l.map(s=>round(s.latestScore-s.firstScore)),color:'#34D399',label:p=>'+'+p.value}]});});
+  registerSkillsAI(pv);
+}
+function registerSkillsAI(d){const g=SKILLS.map(s=>round(d.skillNow[s]-d.skillFirst[s]));
+  regAI('skills_overview',{title:'Skills briefing',meta:'cohort skill profile',stats:[[d.skillNow[d.weakest],d.weakest],[d.skillNow[d.strongest],d.strongest],[Math.max.apply(null,g),'best gain']],plain:'This screen breaks readiness into the six skills recruiters test, plus the four answer sub-scores. Your weakest skill is '+d.weakest+' at '+d.skillNow[d.weakest]+' and strongest is '+d.strongest+' at '+d.skillNow[d.strongest]+'.',means:'The scatter plots reveal the trade-off: many students are technically strong but weak on '+d.weakest+', and the sub-score dials show whether answers fail on relevance, clarity, specificity or structure.',todo:'Focus the cohort on '+d.weakest+' and the lowest sub-score dial — the two levers that move readiness fastest.'});
+  regAI('s_avg',{title:'Cohort Skill Averages',meta:'per skill',stats:[[d.skillNow[d.weakest],'weakest'],[d.skillNow[d.strongest],'strongest']],purpose:'The cohort average on each of the six skills.',means:'Red bars are collective weak points.',action:'Build a workshop around the reddest bar.'});
+  regAI('s_growth',{title:'Skill Growth',meta:'points gained',stats:[[Math.max.apply(null,g),'best'],[Math.min.apply(null,g),'worst']],purpose:'How many points each skill gained since baseline.',means:'A near-zero bar is a skill the program is not moving.',action:'Investigate the flattest skill.'});
+  regAI('s_radar',{title:'Skill Shape',meta:'fingerprint',stats:[[d.skillNow[d.weakest],d.weakest]],purpose:'The cohort skill balance as one shape.',action:'Round out the dented spoke.'});
+  regAI('s_sub',{title:'Answer Sub-Scores',meta:'0–10 scale',stats:[[round(d.skillNow['Specificity']/10,1),'specificity'],[round(d.skillNow['Communication']/10,1),'clarity']],purpose:'These dials break every answer into relevance, clarity, specificity and structure.',means:'Most students lose marks on one dimension — usually specificity.',action:'Coach the lowest dial.'});
+  regAI('s_sc1',{title:'Technical vs Communication',meta:'per student',stats:[[d.scored.length,'students']],purpose:'Each student technical depth against communication.',means:'A crowd bottom-right are strong coders who cannot present — who fail HR rounds.',action:'Send the bottom-right cluster to communication coaching.'});
+  regAI('s_sc2',{title:'Specificity vs Readiness',meta:'per student',stats:[[d.scored.length,'students']],purpose:'Whether concrete answers correlate with higher readiness.',means:'An upward trend means teaching specificity raises scores.',action:'Make one concrete example per answer a habit.'});
+  regAI('s_rank',{title:'Weakest-Skill Ranking',meta:'ordered',stats:[[d.weakest,'weakest']],purpose:'The six skills ranked weakest to strongest.',action:'Work down from the top.'});
+  regAI('s_dist',{title:'Communication Spread',meta:'distribution',stats:[[d.skillNow['Communication'],'avg']],purpose:'The spread of communication scores.',means:'A left-shifted spread means a batch-wide problem.',action:'A general clinic helps if the spread is broad.'});
+  regAI('s_lead',{title:'Top Skill Improvers',meta:'biggest jumps',stats:[[d.movers.length?round(d.movers[0].latestScore-d.movers[0].firstScore):0,'top gain']],purpose:'The students who improved most.',action:'Study and replicate what they did.'});
+}
+function viewDept(host){const pv=viewFor('__page');const best=[...pv.matrix].sort((a,b)=>b.avgNow-a.avgNow)[0];const worst=[...pv.matrix].sort((a,b)=>a.avgNow-b.avgNow)[0];
+  host.innerHTML=focusBanner()+
+    kpiStrip([
+      {l:'Branches tracked',num:pv.matrix.length,sub:'with active students',delta:'',up:true,col:'#6366F1',trend:.5},
+      {l:'Top branch',num:best?best.avgNow:0,suf:'<small>/100</small>',sub:best?best.dept.code:'—',delta:'leading',up:true,col:'#34D399',trend:1},
+      {l:'Weakest branch',num:worst?worst.avgNow:0,suf:'<small>/100</small>',sub:worst?worst.dept.code:'—',delta:'needs support',up:false,col:'#FB7185',trend:-.3},
+      {l:'Widest gap',num:pv.matrix.length?round(Math.max.apply(null,pv.matrix.map(m=>m.avgNow))-Math.min.apply(null,pv.matrix.map(m=>m.avgNow)),1):0,suf:'<small> pts</small>',sub:'top vs bottom branch',delta:'inequality',up:false,col:'#FBBF24',trend:-.2},
+      {l:'At-risk (all depts)',num:pv.atRisk,sub:'concentrated in few',delta:'triage',up:false,col:'#A78BFA',trend:-.4}
+    ])+
+    '<section class="bento">'+
+      card('s7 mid','Divergence From Institution','Which branches lift or drag the average.','d_div','d_div')+
+      card('s5 mid','Top-3 Branch Shapes','Skill fingerprints compared.','d_radar','d_radar')+
+      card('s6','Current vs Baseline by Branch','How far each branch has come.','d_grouped','d_grouped')+
+      card('s6','Department Growth Grid','Points gained per skill, per branch.','d_heat','d_heat')+
+      card('s4','Students per Branch','Cohort size by department.','d_count','d_count')+
+      card('s4','Readiness Mix by Branch','Tier composition, stacked.','d_mix','d_mix')+
+      card('s4','At-Risk vs Ready','The balance inside each branch.','d_bal','d_bal')+
+      card('s7','Branch Percentile Race','Average percentile across the season.','d_bump','d_bump')+
+      card('s5','Seat Utilisation by Branch','Who is actually using the product.','d_util','d_util')+
+    '</section>';
+  defChart('d_div',v=>{const inst=v.avgNow;const div=v.matrix.map(m=>round(m.avgNow-inst,1));barChart('d_div',{cats:v.matrix.map(m=>m.dept.code),series:[{name:'vs institution',data:div.map(x=>({value:x,itemStyle:{borderRadius:x>=0?[5,5,0,0]:[0,0,5,5],color:grad((x>=0?'#34D399':'#FB7185')+'cc',(x>=0?'#34D399':'#FB7185')+'44')}})),label:p=>(p.value>=0?'+':'')+p.value}]});});
+  defChart('d_radar',v=>{const t3=[...v.matrix].sort((a,b)=>b.avgNow-a.avgNow).slice(0,3);radarChart('d_radar',{indicators:SKILLS.map(s=>({name:s.split(' ')[0],max:100})),series:t3.map((m,i)=>({name:m.dept.code,value:m.skills.map(x=>x||0),color:SERIES[i],area:false}))});});
+  defChart('d_grouped',v=>barChart('d_grouped',{cats:v.matrix.map(m=>m.dept.code),series:[{name:'Baseline',data:v.matrix.map(m=>m.avgFirst),color:'#565C6E'},{name:'Now',data:v.matrix.map(m=>m.avgNow),color:'#6366F1'}],max:100}));
+  defChart('d_heat',v=>{const data=[];const ys=v.matrix.map(m=>m.dept.code);v.matrix.forEach((m,yi)=>m.growth.forEach((x,xi)=>{if(x!==null)data.push([xi,yi,x]);}));const vals=data.map(x=>x[2]);heatmapChart('d_heat',{x:SKILLS.map(s=>s.replace(' ','\n')),y:ys,data,min:0,max:Math.max(15,Math.max.apply(null,vals.concat([1]))),colors:['#1c2230','#26425a','#2f6f8e','#46b3c7','#34D399'],fmt:p=>ys[p.value[1]]+' · '+SKILLS[p.value[0]]+'<br/><b>+'+p.value[2]+'</b> pts'});});
+  defChart('d_count',v=>barChart('d_count',{cats:v.matrix.map(m=>m.dept.code),series:[{name:'Students',data:v.matrix.map(m=>m.total),color:'#22D3EE',label:'{c}'}]}));
+  defChart('d_mix',v=>{const tiers=['Ready','Almost','Developing','At Risk'];barChart('d_mix',{cats:v.matrix.map(m=>m.dept.code),series:tiers.map(t=>({name:t,color:TIER_COLOR[t],data:v.matrix.map(m=>v.all.filter(s=>s.dept===m.dept.code&&s.tier===t).length)})),stack:true});});
+  defChart('d_bal',v=>barChart('d_bal',{cats:v.matrix.map(m=>m.dept.code),series:[{name:'Ready',data:v.matrix.map(m=>m.ready),color:'#34D399'},{name:'At risk',data:v.matrix.map(m=>m.atRisk),color:'#FB7185'}]}));
+  defChart('d_bump',v=>{const o=ech('d_bump');if(!o)return;const series=v.matrix.map((m,i)=>{const r=mulberry32(m.dept.code.length*13+i);const start=40+r()*30;const pts=[];for(let k=0;k<5;k++){pts.push(clamp(round(start+k*(m.avgNow-50)/8+(r()*6-3)),5,95));}return {name:m.dept.code,type:'line',data:pts,smooth:.4,symbol:'circle',symbolSize:5,lineStyle:{width:2.2,color:SERIES[i]},itemStyle:{color:SERIES[i]},endLabel:{show:true,formatter:'{a}',color:SERIES[i],fontSize:10,distance:5}};});o.setOption({grid:{left:40,right:70,top:16,bottom:30},tooltip:{...TIP,trigger:'axis'},xAxis:{type:'category',data:['S1','S2','S3','S4','Now'],boundaryGap:false,...AX},yAxis:{...AX,name:'Avg percentile',nameTextStyle:{color:'#7B8194',fontSize:10},min:0,max:100,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},series,animationDuration:900},true);});
+  defChart('d_util',v=>barChart('d_util',{cats:v.matrix.map(m=>m.dept.code),series:[{name:'Utilisation %',data:v.matrix.map(m=>round(m.n/Math.max(1,m.total)*100)),color:'#818CF8',label:p=>p.value+'%'}],max:100}));
+  registerDeptAI(pv);
+}
+function registerDeptAI(d){const best=[...d.matrix].sort((a,b)=>b.avgNow-a.avgNow)[0];const worst=[...d.matrix].sort((a,b)=>a.avgNow-b.avgNow)[0];
+  regAI('dept_overview',{title:'Department briefing',meta:d.matrix.length+' branches',stats:[[best?best.dept.code:'—','top'],[worst?worst.dept.code:'—','weakest'],[d.atRisk,'at risk']],plain:'This compares your branches head to head. '+(best?best.dept.code:'—')+' leads at '+(best?best.avgNow:0)+' while '+(worst?worst.dept.code:'—')+' trails at '+(worst?worst.avgNow:0)+'.',means:'The divergence chart shows which branches pull the institution average up or down, and the growth grid shows exactly which skill each branch is failing to improve.',todo:'Concentrate support on '+(worst?worst.dept.code:'the weakest branch')+' and the darkest cells in its row, rather than spreading resources evenly.'});
+  regAI('d_div',{title:'Divergence From Institution',meta:'± average',stats:[[worst?worst.dept.code:'—','worst']],purpose:'How far each branch sits above or below the institution average.',means:'Branches below the line drag the overall number down.',action:'Direct budget to the branches furthest below.'});
+  regAI('d_radar',{title:'Top-3 Branch Shapes',meta:'fingerprints',stats:[[Math.min(3,d.matrix.length),'branches']],purpose:'The skill shapes of your three strongest branches overlaid.',means:'Even strong branches have different dents.',action:'Have branches learn from each other.'});
+  regAI('d_grouped',{title:'Current vs Baseline by Branch',meta:'progress',stats:[[best?best.dept.code:'—','top']],purpose:'Each branch baseline and current average side by side.',means:'A small gap means that branch barely improved.',action:'Push the branches with the smallest gaps.'});
+  regAI('d_heat',{title:'Department Growth Grid',meta:'points gained',stats:[[d.matrix.length,'branches']],purpose:'How many points each branch gained in each skill.',means:'Dark cells are skills a branch is not improving.',action:'Target branch-and-skill clinics at the darkest cells.'});
+  regAI('d_count',{title:'Students per Branch',meta:'size',stats:[[d.matrix.length?Math.max.apply(null,d.matrix.map(m=>m.total)):0,'largest']],purpose:'How many students each branch has.',action:'Weight the other charts by branch size.'});
+  regAI('d_mix',{title:'Readiness Mix by Branch',meta:'composition',stats:[[d.ready,'ready']],purpose:'The readiness-tier breakdown inside each branch.',means:'A large at-risk slice needs help even if the average looks fine.',action:'Focus on the biggest at-risk slices.'});
+  regAI('d_bal',{title:'At-Risk vs Ready',meta:'inside each branch',stats:[[d.atRisk,'at risk']],purpose:'Ready and at-risk counts within each branch.',action:'Branches where at-risk outnumbers ready are the priority.'});
+  regAI('d_bump',{title:'Branch Percentile Race',meta:'season',stats:[[d.matrix.length,'branches']],purpose:'Branches raced by average percentile across the season.',means:'Climbing branches are responding; flat ones are not.',action:'Check what the climbing branches do differently.'});
+  regAI('d_util',{title:'Seat Utilisation by Branch',meta:'adoption',stats:[[d.utilisation,'overall %']],purpose:'What share of each branch is actually practising.',means:'Low utilisation means the numbers rest on a small slice.',action:'Drive adoption in the lowest-utilisation branches.'});
+}
+function viewStudents(host){const pv=viewFor('__page');
+  if(state.focus==null){const cand=pv.all.filter(s=>s.atRisk&&s.started).sort((a,b)=>a.latestScore-b.latestScore)[0]||pv.scored[0]||STUDENTS[0];state.focus=cand.id;}
+  const s=STUDENTS.find(x=>x.id===state.focus)||STUDENTS[0];const det=detail(s);const tcol=TIER_COLOR[s.tier];
+  const optList=(pv.all.length?pv.all:STUDENTS).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const opts=optList.map(x=>'<option value="'+x.id+'" '+(x.id===s.id?'selected':'')+'>'+x.name+' · '+x.dept+' · '+(x.started?x.latestScore:'—')+'</option>').join('');
+  host.innerHTML=
+    '<div class="selbar"><span class="sel-tag">Student</span><select class="sel" id="studentSel">'+opts+'</select><span class="pchip">'+s.dept+'</span><span class="pchip">Score <b>'+(s.started?s.latestScore:'—')+'</b></span><span class="pchip">Momentum <b>'+(s.slope>0?'+':'')+s.slope+'</b>/session</span><span class="pchip" style="border-color:'+tcol+'55;color:'+tcol+'">'+s.tier+'</span><span class="pchip">Target: <b>'+s.targetRole+'</b></span></div>'+
+    kpiStrip([
+      {l:'Readiness',num:s.started?s.latestScore:0,suf:'<small>/100</small>',sub:'from '+s.firstScore+' baseline',delta:(s.latestScore-s.firstScore>=0?'+':'')+round(s.latestScore-s.firstScore)+' pts',up:s.latestScore>=s.firstScore,col:tcol,trend:1},
+      {l:'Momentum',num:s.slope,suf:'<small>/session</small>',sub:s.stuck?'plateaued':'improving',delta:s.stuck?'stuck':'on track',up:!s.stuck,col:s.stuck?'#FBBF24':'#34D399',trend:s.stuck?-.3:1},
+      {l:'Percentile',num:s.started?s.pctNow:0,suf:'<small>th</small>',sub:'from '+(s.started?s.pctFirst:0)+'th',delta:(s.started&&s.pctNow>=s.pctFirst?'+':'')+(s.started?round(s.pctNow-s.pctFirst):0),up:s.started?s.pctNow>=s.pctFirst:false,col:'#818CF8',trend:.8},
+      {l:'Interviews taken',num:s.sessions,sub:'this season',delta:'',up:true,col:'#22D3EE',trend:.6},
+      {l:'Sessions to ready',num:s.stt||0,sub:s.stt?'at current pace':'already there / n/a',delta:s.stt?'forecast':'—',up:true,col:'#34D399',trend:.7}
+    ])+
+    '<section class="bento">'+
+      card('s8','Growth Trajectory + Forecast','Score history with a projection to job-ready.','st_growth','st_growth')+
+      card('s4','Skill Radar vs Cohort','Personal shape against the batch.','st_radar','st_radar')+
+      card('s3','Relevance','Answer dial (0–10).','st_d1','st_sub')+
+      card('s3','Clarity','Answer dial (0–10).','st_d2','st_sub')+
+      card('s3','Specificity','Answer dial (0–10).','st_d3','st_sub')+
+      card('s3','Structure','Answer dial (0–10).','st_d4','st_sub')+
+      card('s4','Composure Under Pressure','Freezing, rambling, bailing signals.','st_comp','st_comp')+
+      card('s4','Pacing Rhythm','Time taken per answer.','st_pace','st_pace')+
+      card('s4','Percentile Journey','Movement vs peers across sessions.','st_pj','st_pj')+
+      card('s6','Skill vs Cohort','Where this student leads or lags.','st_vs','st_vs')+
+      card('s6','Session Score History','Score in each interview taken.','st_hist','st_hist')+
+      card('s4','Topic Coverage','Which families have been tested.','st_topics','st_topics')+
+      '<div class="card s8 reveal" data-key="st_verdict" data-cid="st_verdict"><div class="card-h"><div class="ti"><h3>Recruiter\'s Debrief <span class="pill">AI verdict</span></h3><p>How a real hiring manager would read this student.</p></div>'+cfBtn('st_verdict')+exBtn('st_verdict')+'</div><div class="verdict" id="st_verdict"></div></div>'+
+    '</section>';
+  const need=s.stt||0;const steps=Math.min(6,need||3);
+  const proj=[];for(let i=0;i<det.hist.length;i++)proj.push(null);proj[det.hist.length-1]=s.latestScore;let pvv=s.latestScore;for(let i=0;i<steps;i++){pvv=clamp(pvv+(s.slope>0?s.slope:1.5),0,100);proj.push(round(pvv));}
+  const actualPad=det.hist.concat(new Array(steps).fill(null));const cats=[];for(let i=0;i<det.hist.length;i++)cats.push('S'+(i+1));for(let i=0;i<steps;i++)cats.push('+'+(i+1));
+  defChart('st_growth',v=>lineChart('st_growth',{cats,min:Math.max(20,Math.min.apply(null,det.hist)-8),max:100,series:[{name:'Actual',data:actualPad,color:'#6366F1',area:true,markLine:{silent:true,symbol:'none',lineStyle:{color:'#565C6E',type:'dashed'},label:{formatter:'Job-ready 76',color:'#565C6E',fontSize:10,position:'insideEndTop'},data:[{yAxis:76}]}},{name:'Forecast',data:proj,color:'#34D399',dashed:true}]}));
+  defChart('st_radar',v=>radarChart('st_radar',{indicators:SKILLS.map(sk=>({name:sk.split(' ')[0],max:100})),series:[{name:'Cohort',value:SKILLS.map(sk=>v.skillNow[sk]),color:'#565C6E',dashed:true},{name:s.name.split(' ')[0],value:SKILLS.map(sk=>s.skillsNow[sk]),color:'#6366F1',area:true}]}));
+  defChart('st_d1',v=>gaugeChart('st_d1',{value:det.sub.Relevance,max:10,big:26,color:'#6366F1',color2:'#818CF8'}));
+  defChart('st_d2',v=>gaugeChart('st_d2',{value:det.sub.Clarity,max:10,big:26,color:'#22D3EE',color2:'#38BDF8'}));
+  defChart('st_d3',v=>gaugeChart('st_d3',{value:det.sub.Specificity,max:10,big:26,color:'#FBBF24',color2:'#f59e0b'}));
+  defChart('st_d4',v=>gaugeChart('st_d4',{value:det.sub.Structure,max:10,big:26,color:'#34D399',color2:'#10b981'}));
+  const compKeys=Object.keys(det.comp);
+  defChart('st_comp',v=>barChart('st_comp',{cats:compKeys,series:[{name:'Count',data:compKeys.map(k=>({value:det.comp[k],itemStyle:{borderRadius:[5,5,0,0],color:grad((['Timeouts','Silences','Cutoffs'].includes(k)?'#FB7185':'#818CF8')+'cc',(['Timeouts','Silences','Cutoffs'].includes(k)?'#FB7185':'#818CF8')+'44')}})),label:'{c}'}],rotate:18}));
+  defChart('st_pace',v=>scatterChart('st_pace',{xName:'Question #',yName:'Seconds',xMin:0,xMax:det.rt.length+1,yMin:0,yMax:70,series:[{name:'Answer time',color:'#22D3EE',data:det.rt.map((x,i)=>[i+1,x,4])}],fmt:p=>'Q'+p.value[0]+' · '+p.value[1]+'s'}));
+  defChart('st_pj',v=>lineChart('st_pj',{cats:['S1','S2','S3','S4','Now'],series:[{name:'Percentile',data:det.pj,color:'#818CF8',area:true}],min:0,max:100}));
+  defChart('st_vs',v=>barChart('st_vs',{cats:SKILLS.map(sk=>sk.split(' ')[0]),series:[{name:s.name.split(' ')[0],data:SKILLS.map(sk=>s.skillsNow[sk]),color:'#6366F1'},{name:'Cohort',data:SKILLS.map(sk=>v.skillNow[sk]),color:'#565C6E'}],max:100}));
+  defChart('st_hist',v=>barChart('st_hist',{cats:det.hist.map((_,i)=>'S'+(i+1)),series:[{name:'Score',data:det.hist.map(x=>({value:x,itemStyle:{borderRadius:[5,5,0,0],color:grad((x<60?'#FB7185':x<76?'#FBBF24':'#34D399')+'cc',(x<60?'#FB7185':x<76?'#FBBF24':'#34D399')+'44')}})),label:'{c}'}],max:100}));
+  defChart('st_topics',v=>radarChart('st_topics',{indicators:det.covered.slice(0,6).map(c=>({name:c.name,max:5})),series:[{name:'Coverage',value:det.covered.slice(0,6).map(c=>c.val),color:'#22D3EE',area:true}]}));
+  defChart('st_verdict',v=>renderVerdict('st_verdict',s,det,v));
+  registerStudentAI(s,det,pv);
+}
+function renderVerdict(id,s,det,d){const el=document.getElementById(id);if(!el)return;const tcol=TIER_COLOR[s.tier];const blocker=[...SKILLS].sort((a,b)=>s.skillsNow[a]-s.skillsNow[b])[0];const strength=[...SKILLS].sort((a,b)=>s.skillsNow[b]-s.skillsNow[a])[0];
+  const round1=s.latestScore>=76?'Strong — likely to clear Round 1':s.latestScore>=66?'Borderline — could clear with prep':'At risk of stalling in Round 1';
+  const fix=blocker==='Communication'?'practise speaking answers out loud, first sentence first':blocker==='Specificity'?'add one concrete metric or tool to every answer':blocker==='Behavioral'?'build 3 structured STAR stories':'drill fundamentals on '+blocker.toLowerCase();
+  el.innerHTML='<span class="vbadge" style="background:'+tcol+'22;color:'+tcol+'">'+s.tier+' · '+(s.started?s.latestScore+'/100':'no data')+'</span><div class="vsum">'+s.name.split(' ')[0]+' is '+(s.tier==='Ready'?'interview-ready with strong fundamentals':s.tier==='Almost'?'close to ready but needs polish on a key skill':s.tier==='Developing'?'making progress but not yet at placement standard':'currently at risk and needs focused intervention')+'. '+(s.stuck?'Momentum has stalled over recent sessions.':'Trajectory is '+(s.slope>1.5?'strong':'steady')+'.')+'</div><div class="vrow"><div class="vic" style="background:var(--ready-soft);color:#34D399">✓</div><div><div class="vk">Biggest strength</div><div class="vv">'+strength+' ('+s.skillsNow[strength]+'/100) — lead with this.</div></div></div><div class="vrow"><div class="vic" style="background:var(--developing-soft);color:#FBBF24">!</div><div><div class="vk">Main blocker</div><div class="vv">'+blocker+' ('+s.skillsNow[blocker]+'/100) is the weakest link.</div></div></div><div class="vrow"><div class="vic" style="background:rgba(99,102,241,.18);color:#818CF8">→</div><div><div class="vk">Fastest fix</div><div class="vv">'+fix.charAt(0).toUpperCase()+fix.slice(1)+'.</div></div></div><div class="vrow"><div class="vic" style="background:rgba(56,189,248,.18);color:#38BDF8">◎</div><div><div class="vk">Round-1 read</div><div class="vv">'+round1+'.'+(s.targetRole!==s.inferredRole?' Note: target role ('+s.targetRole+') does not match résumé signals ('+s.inferredRole+').':'')+'</div></div></div>';}
+function registerStudentAI(s,det,d){const blocker=[...SKILLS].sort((a,b)=>s.skillsNow[a]-s.skillsNow[b])[0];const strength=[...SKILLS].sort((a,b)=>s.skillsNow[b]-s.skillsNow[a])[0];const fn=s.name.split(' ')[0];
+  regAI('students_overview',{title:fn+' — full profile',meta:s.dept+' · '+s.tier,stats:[[s.started?s.latestScore:'—','score'],[s.slope>0?'+'+s.slope:s.slope,'momentum'],[s.stt||'—','to ready']],plain:'This is everything PrepVista knows about '+fn+'. They score '+(s.started?s.latestScore:'—')+' out of 100, '+(s.stuck?'have plateaued':'are improving at '+s.slope+' points per session')+', and sit in the '+s.tier+' tier.',means:'Their strongest skill is '+strength+' and their main blocker is '+blocker+' at '+s.skillsNow[blocker]+'. The forecast projects '+(s.stt?('readiness in about '+s.stt+' more sessions'):'they are already near the threshold')+'.',todo:'Coach the '+blocker+' blocker directly and keep the practice cadence weekly. '+(s.stuck?'Because momentum stalled, change the drill rather than adding more reps.':'')});
+  regAI('st_growth',{title:'Growth Trajectory + Forecast',meta:fn,stats:[[s.firstScore,'start'],[s.latestScore,'now'],[s.stt||'—','to ready']],plain:'The solid line is this student actual score history; the dashed green line projects where they are heading at their current pace, against the job-ready line.',means:'At '+(s.slope>0?'+'+s.slope:s.slope)+' points per session, the forecast crosses job-ready in about '+(s.stt||'—')+' more interviews.',todo:s.stuck?'The line has flattened — this student needs a new approach, not more reps.':'Keep the cadence; the trajectory is on track.'});
+  regAI('st_radar',{title:'Skill Radar vs Cohort',meta:fn,stats:[[s.skillsNow[blocker],blocker],[s.skillsNow[strength],strength]],plain:'This overlays the student skill shape on the cohort average.',means:'Where their shape caves inside the cohort line — here '+blocker+' — is where they are behind peers.',action:'Prioritise '+blocker+'.'});
+  regAI('st_sub',{title:'Answer Sub-Scores',meta:fn,stats:[[det.sub.Specificity,'specificity'],[det.sub.Clarity,'clarity']],plain:'These dials break this student answers into relevance, clarity, specificity and structure on a 0–10 scale.',means:'The lowest dial is the precise reason their answers lose marks.',action:'Coach the lowest dial.'});
+  regAI('st_comp',{title:'Composure Under Pressure',meta:fn,stats:[[det.comp.Timeouts,'timeouts'],[det.comp.Cutoffs,'cutoffs']],plain:'This counts how the student behaves under pressure — clarifications, timeouts, silences, skips and cutoffs.',means:(det.comp.Timeouts>2?'Frequent timeouts point to freezing, not lack of knowledge.':det.comp.Cutoffs>2?'Frequent cutoffs suggest rambling past the point.':'Composure looks steady.'),action:det.comp.Timeouts>2?'Practise speaking the first sentence quickly to beat the freeze.':'Keep answers tight.'});
+  regAI('st_pace',{title:'Pacing Rhythm',meta:fn,stats:[[round(avg(det.rt),1),'avg seconds']],plain:'This shows how long the student took on each answer.',means:'Very fast answers often score lowest.',action:'If fast answers score low, deliberately slow down.'});
+  regAI('st_pj',{title:'Percentile Journey',meta:fn,stats:[[s.started?s.pctNow:0,'now'],[s.started?s.pctFirst:0,'start']],plain:'This tracks the student rank against peers across sessions.',means:'They moved from the '+(s.started?s.pctFirst:0)+'th to the '+(s.started?s.pctNow:0)+'th percentile.',action:s.started&&s.pctNow<s.pctFirst?'They are sliding — investigate which skill regressed.':'Keep the momentum.'});
+  regAI('st_vs',{title:'Skill vs Cohort',meta:fn,stats:[[s.skillsNow[blocker],blocker]],plain:'This compares the student on each skill against the cohort average.',action:'Focus on the shortest bars relative to the cohort.'});
+  regAI('st_hist',{title:'Session Score History',meta:fn,stats:[[s.sessions,'interviews']],plain:'This shows the score this student earned in each interview.',means:'Erratic bars suggest nerves or uneven prep.',action:'Look for a downward run and intervene.'});
+  regAI('st_topics',{title:'Topic Coverage',meta:fn,stats:[[det.covered.filter(c=>c.val===0).length,'untested']],plain:'This shows which topic families the student has faced.',means:'An empty slice is a topic the student is avoiding.',action:'Push the student into avoided topics.'});
+  regAI('st_verdict',{title:"Recruiter's Debrief",meta:fn,stats:[[s.started?s.latestScore:'—','readiness'],[s.skillsNow[blocker],blocker]],plain:'This reads '+fn+' the way a hiring manager would — a verdict, the strength to lead with, the one blocker, and the fastest fix.',means:'Their strongest card is '+strength+'; the blocker is '+blocker+'. '+(s.targetRole!==s.inferredRole?'Their target role also does not match résumé signals.':''),todo:'Give '+fn+' this debrief directly and assign the fastest fix.'});
+}
+function viewSessions(host){const pv=viewFor('__page');
+  if(state.focus==null){state.focus=(pv.scored[0]||STUDENTS.filter(x=>x.started)[0]||STUDENTS[0]).id;}
+  let s=STUDENTS.find(x=>x.id===state.focus)||STUDENTS[0];if(!s.started){s=pv.scored[0]||STUDENTS.filter(x=>x.started)[0]||s;}
+  const ses=sessionOf(s);const optList=(pv.scored.length?pv.scored:STUDENTS.filter(x=>x.started)).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const opts=optList.map(x=>'<option value="'+x.id+'" '+(x.id===s.id?'selected':'')+'>'+x.name+' · '+x.dept+'</option>').join('');
+  const answered=ses.turns.filter(t=>t.st==='Answered').length,followups=ses.turns.filter(t=>t.st==='Follow-up').length,timeouts=ses.turns.filter(t=>t.st==='Timeout').length,skipped=ses.turns.filter(t=>t.st==='Skipped').length;
+  const fams=[...new Set(ses.turns.map(t=>t.fam))];
+  host.innerHTML=
+    '<div class="selbar"><span class="sel-tag">Session of</span><select class="sel" id="studentSel">'+opts+'</select><span class="pchip">'+ses.turns.length+' questions</span><span class="pchip">'+fams.length+' topics</span><span class="pchip">Answered <b>'+answered+'</b></span><span class="pchip" style="border-color:#FB718555;color:#FB7185">'+timeouts+' timed out</span></div>'+
+    kpiStrip([
+      {l:'Questions asked',num:ses.turns.length,sub:'this interview',delta:'',up:true,col:'#6366F1',trend:.6},
+      {l:'Answered cleanly',num:answered,suf:' <small>of '+ses.turns.length+'</small>',sub:round(answered/ses.turns.length*100)+'% completion',delta:'',up:true,col:'#34D399',trend:.8},
+      {l:'Follow-ups pushed',num:followups,sub:'depth probes',delta:'',up:true,col:'#22D3EE',trend:.5},
+      {l:'Avg response time',num:round(avg(ses.turns.map(t=>t.rt)),1),suf:'<small>s</small>',sub:'per answer',delta:'',up:true,col:'#818CF8',trend:.4},
+      {l:'Timeouts + skips',num:timeouts+skipped,sub:'breakdown points',delta:timeouts+skipped>2?'review':'fine',up:timeouts+skipped<=2,col:'#FB7185',trend:-.3}
+    ])+
+    '<section class="bento">'+
+      card('s7 mid','Interview Journey Flow','How the conversation moved — topics to outcomes.','se_sankey','se_sankey')+
+      card('s5 mid','Topic Coverage','What got tested, and how deep.','se_sun','se_sun')+
+      card('s4','Answer Outcomes','How each question resolved.','se_out','se_out')+
+      card('s4','Score Per Question','Where the student peaked and cracked.','se_score','se_score')+
+      card('s4','Response Time Per Question','Pacing through the interview.','se_rt','se_rt')+
+      card('s4','Topics Covered','Questions per topic family.','se_fam','se_fam')+
+      card('s4','Follow-Up Depth','How hard the AI probed each topic.','se_depth','se_depth')+
+      card('s4','Session Length Spread','Questions per interview, cohort-wide.','se_len','se_len')+
+      '<div class="card s12 reveal" data-key="se_anatomy" data-cid="se_anatomy"><div class="card-h"><div class="ti"><h3>Answer Anatomy <span class="pill">Said vs Ideal</span></h3><p>The student words next to the ideal answer, with feedback.</p></div>'+cfBtn('se_anatomy')+exBtn('se_anatomy')+'</div><div class="anatomy" id="se_anatomy"></div></div>'+
+    '</section>';
+  const outcomes=['Answered','Follow-up','Timeout','Skipped'];
+  defChart('se_sankey',v=>{const nodes=[...fams.map(f=>({name:f})),...outcomes.map(o=>({name:o,itemStyle:{color:o==='Answered'?'#34D399':o==='Follow-up'?'#22D3EE':o==='Timeout'?'#FB7185':'#FBBF24'}}))];const lm={};ses.turns.forEach(t=>{const k=t.fam+'|'+t.st;lm[k]=(lm[k]||0)+1;});const links=Object.entries(lm).map(([k,val])=>{const p=k.split('|');return {source:p[0],target:p[1],value:val};});sankeyChart('se_sankey',{nodes,links});});
+  defChart('se_sun',v=>{const fc={};ses.turns.forEach(t=>fc[t.fam]=(fc[t.fam]||0)+1);sunburstChart('se_sun',{data:Object.entries(fc).map(([f,val],i)=>({name:f,value:val,itemStyle:{color:SERIES[i%SERIES.length]},children:[{name:'answered',value:Math.max(1,ses.turns.filter(t=>t.fam===f&&t.st==='Answered').length),itemStyle:{color:SERIES[i%SERIES.length]+'99'}},{name:'other',value:Math.max(0,val-ses.turns.filter(t=>t.fam===f&&t.st==='Answered').length)+0.1,itemStyle:{color:'#2a2f3a'}}]}))});});
+  defChart('se_out',v=>donutChart('se_out',{data:[{name:'Answered',value:answered,color:'#34D399'},{name:'Follow-up',value:followups,color:'#22D3EE'},{name:'Timeout',value:timeouts,color:'#FB7185'},{name:'Skipped',value:skipped,color:'#FBBF24'}],radius:['48%','72%']}));
+  defChart('se_score',v=>lineChart('se_score',{cats:ses.turns.map(t=>'Q'+t.i),series:[{name:'Score',data:ses.turns.map(t=>t.score),color:'#6366F1',area:true}],min:0,max:100}));
+  defChart('se_rt',v=>lineChart('se_rt',{cats:ses.turns.map(t=>'Q'+t.i),bar:true,series:[{name:'Seconds',data:ses.turns.map(t=>t.rt),bar:true,color:'#818CF8'}]}));
+  defChart('se_fam',v=>{const fc={};ses.turns.forEach(t=>fc[t.fam]=(fc[t.fam]||0)+1);barChart('se_fam',{cats:Object.keys(fc),series:[{name:'Questions',data:Object.values(fc),color:'#22D3EE',label:'{c}'}],rotate:18});});
+  defChart('se_depth',v=>{const depth={};ses.turns.forEach(t=>{if(t.st==='Follow-up')depth[t.fam]=(depth[t.fam]||0)+1;});const ks=Object.keys(depth).length?Object.keys(depth):fams.slice(0,3);barChart('se_depth',{cats:ks,series:[{name:'Follow-ups',data:ks.map(k=>depth[k]||0),color:'#34D399',label:'{c}'}],rotate:18});});
+  defChart('se_len',v=>histChart('se_len',{values:v.scored.map(x=>Math.max(8,Math.min(12,(x.sessions%5)+8))),lo:8,hi:13,binW:1,color:'#6366F1',unit:'sessions',interval:0}));
+  defChart('se_anatomy',v=>renderAnatomy('se_anatomy',s,ses));
+  registerSessionAI(s,ses,pv,{answered,followups,timeouts,skipped,fams});
+}
+function renderAnatomy(id,s,ses){const el=document.getElementById(id);if(!el)return;
+  const samples=[{q:'Tell me about a challenging bug you fixed.',said:'Um, there was this one project where the app kept crashing and I... I looked at the logs and eventually found it was a null thing and fixed it.',ideal:'In my final-year project, the app crashed intermittently on checkout. I reproduced it, traced a null-pointer in the payment handler via the stack trace, added a guard plus a unit test, and crash reports dropped to zero.',good:'Identified a real problem',bad:'No metrics, vague on the fix'},{q:'Why do you want this role?',said:'I think it is a good company and I want to learn and grow and the work seems interesting to me.',ideal:'Your team owns the payments platform I read about in your engineering blog. I have built two payment integrations and want to work on systems at that scale, where reliability really matters.',good:'Positive tone',bad:'Generic, no specifics about the company'}];
+  el.innerHTML=samples.map(a=>'<div class="ana"><div class="q">Q&nbsp;·&nbsp;'+a.q+'</div><div class="seg2"><div class="blk said"><div class="h">What '+s.name.split(' ')[0]+' said</div>'+a.said+'</div><div class="blk ideal"><div class="h">Ideal answer</div>'+a.ideal+'</div></div><div class="fb"><span class="tag good">✓ '+a.good+'</span><span class="tag bad">! '+a.bad+'</span></div></div>').join('');}
+function registerSessionAI(s,ses,d,m){const fn=s.name.split(' ')[0];
+  regAI('sessions_overview',{title:fn+' — session forensics',meta:ses.turns.length+' questions',stats:[[m.answered,'answered'],[m.timeouts,'timed out'],[m.fams.length,'topics']],plain:'This replays '+fn+' interview question by question. They faced '+ses.turns.length+' questions across '+m.fams.length+' topics, answered '+m.answered+' cleanly, and timed out on '+m.timeouts+'.',means:'The journey flow shows where the conversation broke down and which topics the AI probed deepest. '+(m.skipped>0?'A skipped question is usually avoidance.':'Coverage was reasonably complete.'),todo:'Walk '+fn+' through the cracked moments using the Answer Anatomy, where their words sit beside the ideal answer.'});
+  regAI('se_sankey',{title:'Interview Journey Flow',meta:'topics to outcomes',stats:[[m.answered,'answered'],[m.timeouts,'timed out']],plain:'A flight recorder for the interview: each topic flows into how its questions resolved.',means:'Thick amber or grey flows show where and on what topic the interview broke down.',action:'Coach the topic feeding the most timeouts.'});
+  regAI('se_sun',{title:'Topic Coverage',meta:'breadth & depth',stats:[[m.fams.length,'topics']],plain:'This wheel shows which topic families were tested and how much was answered well.',means:'Thin grey slices are weakly covered areas.',action:'Test weakly-covered topics next time.'});
+  regAI('se_out',{title:'Answer Outcomes',meta:'resolution mix',stats:[[m.answered,'answered'],[m.timeouts+m.skipped,'broke down']],plain:'How every question resolved.',means:'A large timeout slice signals composure or knowledge gaps.',action:'If timeouts dominate, work on composure.'});
+  regAI('se_score',{title:'Score Per Question',meta:'turn by turn',stats:[[Math.max.apply(null,ses.turns.map(t=>t.score)),'peak'],[Math.min.apply(null,ses.turns.map(t=>t.score)),'low']],plain:'The score for each answer in order.',means:'A dip reveals which question the student cracked on.',action:'Review the lowest-scoring question.'});
+  regAI('se_rt',{title:'Response Time Per Question',meta:'pacing',stats:[[round(avg(ses.turns.map(t=>t.rt)),1),'avg seconds']],plain:'How long each answer took.',means:'Very short times on hard questions mean rushing.',action:'Match pacing to difficulty.'});
+  regAI('se_fam',{title:'Topics Covered',meta:'per family',stats:[[m.fams.length,'families']],plain:'How many questions hit each topic family.',action:'Ensure important families are not under-tested.'});
+  regAI('se_depth',{title:'Follow-Up Depth',meta:'probe intensity',stats:[[m.followups,'follow-ups']],plain:'How hard the AI drilled into each topic.',means:'Deep follow-ups expose weak understanding.',action:'Prepare for deeper probing on claimed strengths.'});
+  regAI('se_len',{title:'Session Length Spread',meta:'cohort-wide',stats:[[d.scored.length,'sessions']],plain:'How many questions a typical interview runs.',action:'Judge whether this session was unusually short or long.'});
+  regAI('se_anatomy',{title:'Answer Anatomy',meta:'said vs ideal',stats:[[2,'samples']],plain:'The student actual words beside the ideal answer for the same question, with what worked and what was missing.',means:'It shows exactly how to turn a vague answer into a strong one.',todo:'Have the student rewrite weak answers using the ideal as a template.'});
+}
+let currentTab='command';
+const VIEWS={command:viewCommand,risk:viewRisk,skills:viewSkills,dept:viewDept,students:viewStudents,sessions:viewSessions};
+function renderCurrent(){stopSpeech();disposeAll();AIMETA={};const host=document.getElementById('view');
+  VIEWS[currentTab](host);
+  const pv=deriveFrom(pageList());
+  document.getElementById('viewTitle').textContent=TITLES[currentTab];
+  document.getElementById('seatTxt').textContent=pv.scored.length+' / '+SEATS;
+  document.getElementById('seatSub').textContent=pv.utilisation+'% active · renews in 214 days';
+  setTimeout(()=>{const sb=document.getElementById('seatBar');if(sb)sb.style.width=pv.utilisation+'%';},200);
+  attachCard(host);countUp();staggerReveal(host.querySelectorAll('.reveal'),36);
+  const cf=document.getElementById('clearFocus');if(cf)cf.onclick=()=>{state.focus=null;syncFocusSel();renderCurrent();};
+  const ss=document.getElementById('studentSel');if(ss)ss.onchange=()=>{state.focus=Number(ss.value);syncFocusSel();renderCurrent();};
+  const ht=document.getElementById('heatToggle');if(ht)ht.querySelectorAll('button').forEach(b=>b.onclick=()=>{ht.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.heatView=b.dataset.v;rebuildChart('c_heat');});
+  syncFocusSel();
+}
+document.querySelectorAll('.nav-item[data-tab]').forEach(n=>n.onclick=()=>{document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));n.classList.add('active');currentTab=n.dataset.tab;renderCurrent();window.scrollTo({top:0,behavior:'smooth'});});
+const deptPanel=document.getElementById('deptPanel');
+function rebuildDeptPanel(){
+  deptPanel.innerHTML=DEPTS.map(d=>'<div class="dd-opt sel" data-c="'+d.code+'"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg></span>'+d.name+' <span style="margin-left:auto;color:var(--faint);font-size:11px">'+d.code+'</span></div>').join('');
+  deptPanel.querySelectorAll('.dd-opt').forEach(o=>o.onclick=e=>{e.stopPropagation();const c=o.dataset.c;if(state.depts.has(c)&&state.depts.size>1){state.depts.delete(c);o.classList.remove('sel');}else{state.depts.add(c);o.classList.add('sel');}updateDeptBtn();populateFocus();renderCurrent();});
+}
+rebuildDeptPanel();
+function updateDeptBtn(){document.getElementById('deptCount').textContent=state.depts.size;document.getElementById('deptBtn').childNodes[0].nodeValue=state.depts.size===DEPTS.length?'All departments ':state.depts.size+' departments ';}
+document.getElementById('deptBtn').onclick=e=>{e.stopPropagation();deptPanel.classList.toggle('open');};
+deptPanel.onclick=e=>e.stopPropagation();
+document.querySelectorAll('#winSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#winSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.win=b.dataset.v;renderCurrent();});
+document.querySelectorAll('#tierChips .chip').forEach(b=>b.onclick=()=>{const t=b.dataset.t;if(state.tiers.has(t)&&state.tiers.size>1){state.tiers.delete(t);b.classList.add('off');}else if(state.tiers.has(t)&&state.tiers.size===1){return;}else{state.tiers.add(t);b.classList.remove('off');}renderCurrent();});
+const focusSel=document.getElementById('focusSel');
+function populateFocus(){const list=cohortList().slice().sort((a,b)=>a.name.localeCompare(b.name));focusSel.innerHTML='<option value="">— Whole cohort (no focus) —</option>'+list.map(s=>'<option value="'+s.id+'">'+s.name+' · '+s.dept+(s.started?' · '+s.latestScore:'')+'</option>').join('');syncFocusSel();}
+function syncFocusSel(){if(focusSel)focusSel.value=state.focus==null?'':String(state.focus);}
+focusSel.onchange=()=>{state.focus=focusSel.value===''?null:Number(focusSel.value);renderCurrent();};
+document.getElementById('resetBtn').onclick=()=>{state.depts=new Set(DEPTS.map(d=>d.code));state.win='all';state.tiers=new Set(['Ready','Almost','Developing','At Risk']);state.focus=null;for(const k in CHARTF)delete CHARTF[k];deptPanel.querySelectorAll('.dd-opt').forEach(o=>o.classList.add('sel'));updateDeptBtn();document.querySelectorAll('#winSeg button').forEach((x,i)=>x.classList.toggle('on',i===0));document.querySelectorAll('#tierChips .chip').forEach(x=>x.classList.remove('off'));populateFocus();renderCurrent();toast('Filters reset');};
+window.addEventListener('resize',()=>resizeCharts());
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeCF();}});
+if(speechSynthesis.getVoices().length===0){speechSynthesis.onvoiceschanged=function(){};}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function setPdfProg(pct,msg){const b=document.getElementById('pdfBar');if(b)b.style.width=pct+'%';const s=document.getElementById('pdfStat');if(s)s.textContent=msg;}
+function analysisText(C){
+  const readyPct=round(C.ready/Math.max(1,C.all.length)*100),riskPct=round(C.atRisk/Math.max(1,C.all.length)*100);
+  const cpr=Math.round(ANNUAL_FEE/Math.max(1,C.ready));
+  const best=[...C.matrix].sort((a,b)=>b.avgNow-a.avgNow)[0],worst=[...C.matrix].sort((a,b)=>a.avgNow-b.avgNow)[0];
+  const today=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  const lead='As of '+today+', '+C.all.length+' students across '+C.matrix.length+' departments are enrolled on the PrepVista placement-readiness programme for the '+BATCH+' batch at '+COLLEGE+'. '+C.ready+' students ('+readyPct+'%) currently meet the job-ready threshold of 76 out of 100, while '+C.atRisk+' ('+riskPct+'%) are at risk of finishing the season without an offer. The cohort average has risen to '+C.avgNow+' out of 100 from a baseline of '+C.avgFirst+', a measurable '+round(C.avgNow-C.avgFirst,1)+'-point lift attributable to structured interview practice on the platform.';
+  const improving=C.scored.filter(s=>s.slope>0.35).length, quick=C.scored.filter(s=>s.stt&&s.stt<=4).length;
+  const paras=[
+    C.atRisk+' students require intervention. Of these, '+C.stuck+' have plateaued, meaning their recent interviews show no score improvement despite continued practice, and '+C.notStarted+' have never attempted a single mock interview, leaving a portion of the licensed seats entirely unused. Plateaued and dormant students rarely recover without a change in approach, which is why each of them is surfaced by name in the at-risk roster later in this report rather than being hidden inside an average. The encouraging counterpoint is that '+quick+' students sit within four focused sessions of the job-ready line — a pool of quick, high-visibility wins the placement cell can convert before the main recruiting window opens.',
+    'The single highest-leverage opportunity is the cohort\'s weakest skill, '+C.weakest+', which sits at just '+C.skillNow[C.weakest]+' out of 100 against a baseline of '+C.skillFirst[C.weakest]+'. Because this weakness is shared across the batch rather than confined to a handful of students, a single institution-wide clinic on '+C.weakest+' would lift placement outcomes more efficiently than any other intervention, since it is precisely this dimension that balanced interview panels probe when they separate strong candidates from average ones. By contrast, '+C.strongest+' at '+C.skillNow[C.strongest]+' out of 100 is a genuine cohort strength that can be showcased to visiting recruiters and used as an anchor in mock-panel coaching.',
+    'On engagement, '+improving+' of the '+C.scored.length+' active students are demonstrably improving session over session, which is the clearest possible evidence that the programme works on students who commit to it. The risk is concentrated at the two extremes: students who never engaged, and students who engage but have stopped progressing. Both groups are visible in the risk dashboard and both respond to different, well-understood interventions — activation for the first, a change of drill for the second.',
+    'On a value basis, the programme currently delivers a placement-ready student at a cost of approximately ₹'+inr(cpr)+', measured against the annual licence of ₹'+inr(ANNUAL_FEE)+'. Seat utilisation stands at '+C.utilisation+' percent, with '+C.scored.length+' of '+C.all.length+' licensed students having taken at least one interview. Raising utilisation by activating the dormant cohort would lower the effective cost per ready student further and materially strengthen the case at contract renewal — every dormant seat that is activated improves both the placement outcome and the return on the institution\'s investment.'];
+  const college='Across the full college cohort, readiness is unevenly distributed. '+best.dept.name+' ('+best.dept.code+') leads at '+best.avgNow+' out of 100, while '+worst.dept.name+' ('+worst.dept.code+') trails at '+worst.avgNow+' — a spread of '+round(best.avgNow-worst.avgNow,1)+' points between the strongest and weakest branches. This gap means a uniform placement strategy will over-serve some branches and under-serve others; support should be weighted toward the branches furthest below the institution average of '+C.avgNow+'. It is important to read each branch average alongside its size and its at-risk count, because a respectable average can still conceal a sizeable group of stranded students, and a modest average in a large branch represents far more individual risk than the same figure in a small one. The department breakdown below lists every branch with its current average, its baseline, and the number of ready and at-risk students so that effort can be directed where it moves the most outcomes.';
+  const skills='Skill by skill, the cohort is strongest in '+C.strongest+' and weakest in '+C.weakest+'. The four answer-quality dimensions of relevance, clarity, specificity and structure show that most lost marks stem from a lack of specificity: students answer in generalities rather than naming concrete tools, metrics and outcomes. This is a teachable habit rather than a fixed ability, which is why it is such a productive target — coaching the simple discipline of one concrete example per answer addresses the most common single cause of low scores across the entire batch. A recurring secondary pattern is the technically capable student who underperforms on communication and behavioural questions; these students clear the knowledge bar but stumble in the final HR round, and they benefit from structured spoken-answer practice far more than from additional technical drilling.';
+  const recs=[
+    {t:'Run a batch-wide '+C.weakest+' clinic',d:'This is the cohort\'s weakest skill at '+C.skillNow[C.weakest]+' out of 100 and the highest-leverage fix available. A single structured workshop reaches every department at once and lifts the metric that most often decides final rounds.'},
+    {t:'Activate the '+C.notStarted+' dormant students',d:'These students have never practised and represent both unused licence value and concentrated placement risk. A short, time-boxed onboarding drive converts paid-for seats into measurable outcomes.'},
+    {t:'Give the '+C.stuck+' plateaued students a different drill',d:'More of the same practice will not move a stuck student. Switch them to targeted behavioural or fundamentals drills and book one-to-one reviews to diagnose the specific blocker.'},
+    {t:'Weight support toward '+worst.dept.code,d:worst.dept.name+' trails the college by '+round(C.avgNow-worst.avgNow,1)+' points. Branch-specific clinics on its weakest skills will close the gap faster than spreading effort evenly across all branches.'},
+    {t:'Showcase ready students to recruiters early',d:'The '+C.ready+' job-ready students build early placement momentum and free the placement cell to concentrate its energy on the middle and at-risk bands.'}];
+  return {lead,paras,college,skills,recs};
+}
+async function exportPDF(){
+  if(!window.jspdf||!window.jspdf.jsPDF||!window.html2canvas){toast('Report engine still loading — try again in a moment');return;}
+  const over=document.getElementById('pdfOver');over.classList.add('show');document.getElementById('pdfTitle').textContent='Generating report…';
+  const savedTab=currentTab,savedFocus=state.focus;state.focus=null;const College=deriveFrom(STUDENTS);
+  setPdfProg(4,'Preparing dashboards…');await sleep(180);
+  const tabs=[['command','Command Centre'],['risk','Risk & Readiness'],['skills','Skills Analytics'],['dept','Department Analytics'],['students','Student Explorer'],['sessions','Session Forensics']];
+  const sections=[];
+  for(let ti=0;ti<tabs.length;ti++){const tab=tabs[ti][0],name=tabs[ti][1];currentTab=tab;
+    document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
+    renderCurrent();setPdfProg(8+ti*13,'Rendering '+name+' ('+(ti+1)+' of 6)…');await sleep(1300);
+    const cards=[...document.querySelectorAll('#view .card')];const shots=[];
+    const kp=document.querySelector('#view .kpis');if(kp){try{const c=await html2canvas(kp,{backgroundColor:'#0E1015',scale:3,logging:false,useCORS:true});shots.push({kpi:true,img:c.toDataURL('image/png'),w:c.width,h:c.height});}catch(e){}}
+    for(const card of cards){const key=card.dataset.key,cid=card.dataset.cid;const h3=card.querySelector('h3');let title=h3?h3.textContent.replace(/\s+/g,' ').trim():'';const pill=card.querySelector('.pill');if(pill)title=title.replace(pill.textContent,'').trim();
+      const m=AIMETA[key]||{};const parts=[];if(m.plain||m.purpose)parts.push(['What this shows',m.plain||m.purpose]);if(m.means)parts.push(['What it means',m.means]);if(m.todo||m.action)parts.push(['What to do',m.todo||m.action]);let img=null,iw=0,ih=0;
+      if(cid&&charts[cid]){try{img=charts[cid].getDataURL({type:'png',pixelRatio:3.5,backgroundColor:'#0E1015'});iw=charts[cid].getWidth()*3.5;ih=charts[cid].getHeight()*3.5;}catch(e){}}
+      else{const inner=card.querySelector('.wl,.ledger,.verdict,.anatomy');if(inner){try{const c=await html2canvas(inner,{backgroundColor:'#0E1015',scale:3,logging:false,useCORS:true});img=c.toDataURL('image/png');iw=c.width;ih=c.height;}catch(e){}}}
+      if(img)shots.push({title,parts,img,w:iw,h:ih});}
+    sections.push({name,shots});}
+  setPdfProg(92,'Composing the PDF…');
+  currentTab=savedTab;state.focus=savedFocus;document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.tab===savedTab));renderCurrent();await sleep(60);
+  try{buildPDF(sections,College);}catch(e){console.error(e);toast('PDF generation hit an error');over.classList.remove('show');return;}
+  setPdfProg(100,'Done');await sleep(350);over.classList.remove('show');setPdfProg(0,'Preparing…');toast('Report downloaded');
+}
+function buildPDF(sections,C){
+  const jsPDF=window.jspdf.jsPDF;const pdf=new jsPDF('p','pt','a4');
+  const W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight(),M=42,CW=W-M*2;let page=1,y=M;
+  function footer(){pdf.setDrawColor(229,231,235);pdf.setLineWidth(.6);pdf.line(M,H-30,W-M,H-30);pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(99,102,241);pdf.text('PrepVista',M,H-18);pdf.setFont('helvetica','normal');pdf.setTextColor(120,125,135);pdf.text('Placement Intelligence Report',M+50,H-18);pdf.text(COLLEGE+'  ·  '+BATCH,W/2,H-18,{align:'center'});pdf.text('Page '+page,W-M,H-18,{align:'right'});}
+  function newPageWhite(){pdf.addPage();page++;pdf.setFillColor(255,255,255);pdf.rect(0,0,W,H,'F');footer();pdf.setFillColor(99,102,241);pdf.rect(0,0,W,5,'F');y=54;}
+  function header(title,sub){pdf.addPage();page++;pdf.setFillColor(255,255,255);pdf.rect(0,0,W,H,'F');footer();pdf.setFillColor(99,102,241);pdf.rect(0,0,W,5,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(18);pdf.setTextColor(20,22,28);pdf.text(title,M,50);if(sub){pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(120,125,138);pdf.text(sub,M,68);}y=92;}
+  function ensure(h){if(y+h>H-46)newPageWhite();}
+  function para(text,size,color,gap){pdf.setFont('helvetica','normal');pdf.setFontSize(size||10.5);const col=color||[58,62,72];pdf.setTextColor(col[0],col[1],col[2]);pdf.splitTextToSize(text,CW).forEach(ln=>{ensure((size||10.5)+5);pdf.text(ln,M,y);y+=(size||10.5)+5;});y+=(gap||6);}
+  function heading(text){ensure(30);pdf.setFont('helvetica','bold');pdf.setFontSize(13);pdf.setTextColor(99,102,241);pdf.text(text,M,y);y+=8;pdf.setDrawColor(229,231,235);pdf.setLineWidth(.6);pdf.line(M,y,M+CW,y);y+=16;}
+  /* COVER */
+  pdf.setFillColor(14,16,21);pdf.rect(0,0,W,H,'F');
+  for(let i=0;i<70;i++){const t=i/69;pdf.setFillColor(Math.round(139+(34-139)*t),Math.round(92+(211-92)*t),Math.round(246+(238-246)*t));pdf.rect(0,118+i*1.15,W,1.3,'F');}
+  pdf.setFillColor(255,255,255);pdf.roundedRect(M,150,46,46,10,10,'F');pdf.setFillColor(99,102,241);pdf.roundedRect(M+9,159,28,28,7,7,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(13);pdf.setTextColor(255,255,255);pdf.text('PrepVista',M+58,170);pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.setTextColor(180,184,196);pdf.text('Placement Intelligence',M+58,184);
+  pdf.setFont('helvetica','bold');pdf.setFontSize(33);pdf.setTextColor(255,255,255);pdf.text('Placement Readiness',M,298);pdf.text('Report',M,336);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(13);pdf.setTextColor(178,183,197);pdf.text(COLLEGE,M,372);pdf.text(BATCH+' batch  ·  Season 2026',M,392);
+  pdf.text('Prepared '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}),M,412);
+  const cstats=[['Students',C.all.length],['Placement-ready',C.ready],['At risk',C.atRisk],['Avg readiness',C.avgNow+'/100']];const sw=(CW-30)/4;
+  cstats.forEach((s,i)=>{const x=M+i*(sw+10);pdf.setFillColor(25,29,39);pdf.roundedRect(x,468,sw,72,10,10,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(21);pdf.setTextColor(255,255,255);pdf.text(String(s[1]),x+14,506);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(150,155,168);pdf.text(String(s[0]),x+14,524);});
+  pdf.setFontSize(9);pdf.setTextColor(120,125,138);pdf.text('Confidential · For institutional placement review · Powered by PrepVista',M,H-40);
+  const an=analysisText(C);
+  /* EXEC SUMMARY */
+  header('Executive Summary',COLLEGE+'  ·  '+BATCH);
+  para(an.lead,11,[40,43,52],10);
+  heading('The numbers that matter');
+  const krows=[['Placement-ready students',C.ready+' of '+C.all.length+'  ('+round(C.ready/Math.max(1,C.all.length)*100)+'%)'],['At risk of zero offers',C.atRisk+'  ('+round(C.atRisk/Math.max(1,C.all.length)*100)+'%)'],['Average readiness',C.avgNow+' / 100  (up from '+C.avgFirst+')'],['Never started practising',C.notStarted+' students'],['Weakest cohort skill',C.weakest+'  ('+C.skillNow[C.weakest]+'/100)'],['Strongest cohort skill',C.strongest+'  ('+C.skillNow[C.strongest]+'/100)'],['Seat utilisation',C.utilisation+'%'],['Cost per ready student','₹'+inr(Math.round(ANNUAL_FEE/Math.max(1,C.ready)))]];
+  krows.forEach((r,i)=>{ensure(22);if(i%2===0){pdf.setFillColor(247,248,250);pdf.rect(M,y-12,CW,20,'F');}pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(80,84,94);pdf.text(r[0],M+6,y+2);pdf.setFont('helvetica','bold');pdf.setTextColor(28,31,40);pdf.text(String(r[1]),M+CW-6,y+2,{align:'right'});y+=20;});y+=10;
+  heading('What the data says');an.paras.forEach(p=>para(p,10.5,[55,58,68],8));
+  /* SECTION DASHBOARDS */
+  const SECINTRO={'Command Centre':'The Command Centre is the institutional overview: the single screen a placement officer would open first. It answers three questions at a glance — how many students are ready, how many are at risk, and where the cohort\'s biggest skill gap lies — and then supports each answer with the underlying distributions, the at-risk watchlist, and the return-on-investment ledger.','Risk & Readiness':'This dashboard isolates the students who will not be placed unless something changes, and explains why. Rather than a single at-risk label, it separates the distinct causes — never started, low score, plateaued, gone inactive — because each cause calls for a different intervention, and it projects how the ready count moves with and without action.','Skills Analytics':'This dashboard decomposes overall readiness into the six skills recruiters actually test and the four answer-quality dimensions beneath them. It is the diagnostic layer: it turns a vague sense that "the batch needs interview help" into a precise statement of which skill, and which part of an answer, is costing students marks.','Department Analytics':'This dashboard compares branches head to head so that support can be targeted rather than spread evenly. It shows which branches lift or drag the institution average, how far each has progressed from its baseline, and exactly which skill each branch is failing to improve.','Student Explorer':'This dashboard is the individual view: a complete profile for a single student, including their growth trajectory and forecast, their skill shape against the cohort, their composure and pacing under pressure, and a recruiter-style debrief. It is the level at which one-to-one coaching conversations happen.','Session Forensics':'This dashboard replays a single interview question by question. It shows how the conversation flowed from topic to outcome, where the student cracked, how deeply the AI probed, and — in the Answer Anatomy — places the student\'s actual words beside the ideal answer for the same question.'};
+  sections.forEach(sec=>{header(sec.name,'Every visualization on this dashboard, with a full plain-language reading');
+    if(SECINTRO[sec.name])para(SECINTRO[sec.name],10.5,[55,58,68],12);
+    sec.shots.forEach(shot=>{
+      if(shot.kpi){const dh=Math.min(118,CW*shot.h/shot.w);ensure(dh+22);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(99,102,241);pdf.text('Headline metrics',M,y);y+=10;pdf.addImage(shot.img,'PNG',M,y,CW,dh);y+=dh+18;return;}
+      const imgH=Math.min(250,CW*shot.h/shot.w);
+      ensure(imgH+58);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(12.5);pdf.setTextColor(22,25,33);pdf.text(shot.title||'',M,y);y+=10;
+      pdf.setFillColor(14,16,21);pdf.roundedRect(M,y,CW,imgH,6,6,'F');pdf.addImage(shot.img,'PNG',M+5,y+5,CW-10,imgH-10);y+=imgH+14;
+      (shot.parts||[]).forEach(pt=>{ensure(20);pdf.setFont('helvetica','bold');pdf.setFontSize(8.6);pdf.setTextColor(99,102,241);pdf.text(pt[0].toUpperCase(),M,y);y+=12;pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(72,76,86);pdf.splitTextToSize(pt[1],CW).forEach(ln=>{ensure(14);pdf.text(ln,M,y);y+=14;});y+=7;});
+      y+=12;pdf.setDrawColor(238,240,243);pdf.setLineWidth(.5);ensure(8);pdf.line(M,y,M+CW,y);y+=18;});});
+  /* IN-DEPTH */
+  header('In-Depth Analysis','Batch-wide and college-wide interpretation');
+  heading('College-wide readiness');para(an.college,10.5,[55,58,68],8);
+  heading('Department breakdown');
+  C.matrix.forEach(m=>{const valid=m.skills.filter(x=>x!=null);const wk=valid.length?SKILLS[m.skills.indexOf(Math.min.apply(null,valid))]:'—';para(m.dept.name+' ('+m.dept.code+'): '+m.total+' students, average readiness '+m.avgNow+'/100 from a '+m.avgFirst+' baseline, with '+m.ready+' ready and '+m.atRisk+' at risk. Weakest skill: '+wk+'.',10,[60,63,72],4);});y+=6;
+  heading('Skill-level findings');para(an.skills,10.5,[55,58,68],8);
+  /* ROSTER */
+  header('At-Risk Roster','Students needing intervention, ranked by urgency');
+  pdf.setFillColor(99,102,241);pdf.rect(M,y-12,CW,22,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(255,255,255);pdf.text('Student',M+6,y+2);pdf.text('Dept',M+172,y+2);pdf.text('Severity',M+220,y+2);pdf.text('Reason / next action',M+292,y+2);y+=22;
+  C.watch.slice(0,30).forEach((w,i)=>{ensure(24);if(i%2===0){pdf.setFillColor(247,248,250);pdf.rect(M,y-12,CW,22,'F');}pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(30,33,42);pdf.text(w.s.name.slice(0,26),M+6,y+1);pdf.setFont('helvetica','normal');pdf.setTextColor(90,94,104);pdf.text(w.s.dept,M+172,y+1);const sc=w.sev==='crit'?[225,29,72]:w.sev==='high'?[217,119,6]:[14,165,233];pdf.setTextColor(sc[0],sc[1],sc[2]);pdf.setFont('helvetica','bold');pdf.text(w.sev==='crit'?'Critical':w.sev==='high'?'High':'Watch',M+220,y+1);pdf.setFont('helvetica','normal');pdf.setTextColor(72,76,86);pdf.setFontSize(8.5);const rt=pdf.splitTextToSize(w.reason+' → '+w.action,CW-292);pdf.text(rt[0]||'',M+292,y+1);y+=22;});y+=8;
+  /* RECOMMENDATIONS */
+  header('Recommendations','Priority actions for the placement cell');
+  an.recs.forEach((r,i)=>{ensure(46);pdf.setFillColor(99,102,241);pdf.circle(M+9,y-3,9,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.setTextColor(255,255,255);pdf.text(String(i+1),M+9,y,{align:'center'});pdf.setFont('helvetica','bold');pdf.setFontSize(11.5);pdf.setTextColor(24,27,35);pdf.text(r.t,M+28,y);y+=7;pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(75,79,89);pdf.splitTextToSize(r.d,CW-28).forEach(ln=>{ensure(14);pdf.text(ln,M+28,y+8);y+=13;});y+=16;});
+  ensure(46);y+=8;pdf.setDrawColor(229,231,235);pdf.line(M,y,M+CW,y);y+=18;pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.setTextColor(99,102,241);pdf.text('PrepVista',M,y);pdf.setFont('helvetica','normal');pdf.setTextColor(120,125,138);pdf.text(' — turning interview practice into placement outcomes.',M+50,y);
+  pdf.save('PrepVista_Placement_Report_'+BATCH.replace(/\s+/g,'_')+'.pdf');
+}
+document.getElementById('dlBtn').onclick=()=>exportPDF();
+/* ── Real-data seam: parent (org-admin) injects live cohort via PVCC.load ── */
+window.PVCC={load:function(payload){try{
+  if(payload&&Array.isArray(payload.students)&&payload.students.length){STUDENTS=payload.students;computePercentiles();}
+  if(payload&&Array.isArray(payload.depts)&&payload.depts.length)DEPTS=payload.depts;
+  if(payload&&payload.seats)SEATS=payload.seats;
+  if(payload&&payload.annualFee)ANNUAL_FEE=payload.annualFee;
+  if(payload&&payload.college)COLLEGE=payload.college;
+  if(payload&&payload.batch)BATCH=payload.batch;
+  state.depts=new Set(DEPTS.map(d=>d.code));state.tiers=new Set(['Ready','Almost','Developing','At Risk']);state.win='all';state.focus=null;
+  var crumb=document.querySelector('.topbar .crumb');if(crumb)crumb.textContent=COLLEGE+' · '+BATCH;
+  rebuildDeptPanel();updateDeptBtn();populateFocus();renderCurrent();
+}catch(e){console.error('PVCC.load',e);}}};
+window.addEventListener('message',function(e){if(e&&e.data&&e.data.__pvcc==='load')window.PVCC.load(e.data.payload);});
+var __pvEmbed=/[?&]embed=1/.test(location.search);
+if(__pvEmbed){updateDeptBtn();populateFocus();try{window.parent&&window.parent.postMessage({__pvcc:'ready'},'*');}catch(e){}}
+else{updateDeptBtn();populateFocus();renderCurrent();}
+</script>
+</body>
+</html>

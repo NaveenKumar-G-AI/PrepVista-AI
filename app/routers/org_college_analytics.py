@@ -1248,3 +1248,165 @@ async def export_cohort_report(
         perf_rows = await _fetch_perf_aggregate(conn, org_id, extra_clause, extra_params)
 
     return _render_cohort_summary_export(perf_rows, export_format, org_id)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Command Centre — full cohort dataset for the embedded 67-chart dashboard.
+#  Returns the org's real students in the exact shape the dashboard's data layer
+#  (window.PVCC.load) consumes, so every one of the 67 charts renders on live data.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# The dashboard's six canonical skills, mapped to real rubric categories (averaged;
+# fallback = the session's final score). Values are scaled 0–10 → 0–100.
+_CC_SKILLS = ['Technical Depth', 'Problem Solving', 'Communication', 'Behavioral', 'System Design', 'Specificity']
+_CC_SKILL_MAP = {
+    'Technical Depth': ['technical_depth'],
+    'Problem Solving': ['problem_solving', 'reasoning'],
+    'Communication': ['communication', 'vocal_delivery'],
+    'Behavioral': ['structure_star', 'teamwork', 'leadership'],
+    'System Design': ['reasoning', 'technical_depth'],
+    'Specificity': ['conciseness', 'vocabulary'],
+}
+
+
+def _cc_coerce(v: Any) -> dict:
+    """rubric_scores may arrive as a JSON string (text col) or dict (jsonb)."""
+    if v is None:
+        return {}
+    if isinstance(v, dict):
+        return v
+    try:
+        return json.loads(v)
+    except (TypeError, ValueError):
+        return {}
+
+
+def _cc_skills(rubric: dict, fallback: float) -> dict:
+    """Map a session's rubric_scores (0–10 per category) to the 6 skills on 0–100."""
+    out: dict[str, float] = {}
+    for sk in _CC_SKILLS:
+        vals = []
+        for cat in _CC_SKILL_MAP[sk]:
+            c = rubric.get(cat)
+            if c is not None:
+                try:
+                    vals.append(float(c) * 10.0)
+                except (TypeError, ValueError):
+                    pass
+        out[sk] = round(sum(vals) / len(vals)) if vals else round(fallback)
+    return out
+
+
+@router.get("/command-centre")
+async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
+    """Live cohort dataset for the embedded Placement Command Centre dashboard."""
+    org_id = admin.organization_id
+    async with DatabaseConnection() as conn:
+        org = await conn.fetchrow(
+            "SELECT name, seat_limit FROM organizations WHERE id = $1", org_id
+        )
+        roster = await conn.fetch(
+            """SELECT os.user_id, p.full_name, p.email, cd.department_name
+               FROM organization_students os
+               JOIN profiles p ON p.id = os.user_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id
+               WHERE os.organization_id = $1 AND os.status != 'removed'
+               ORDER BY p.full_name NULLS LAST""",
+            org_id,
+        )
+        user_ids = [r["user_id"] for r in roster]
+        session_rows = []
+        if user_ids:
+            session_rows = await conn.fetch(
+                """SELECT user_id, final_score, rubric_scores, created_at, target_role
+                   FROM interview_sessions
+                   WHERE user_id = ANY($1::uuid[]) AND state = 'FINISHED'
+                   ORDER BY user_id, created_at ASC""",
+                user_ids,
+            )
+
+    by_user: dict[str, list] = {}
+    for s in session_rows:
+        by_user.setdefault(str(s["user_id"]), []).append(s)
+
+    now = datetime.now(timezone.utc)
+    students: list[dict] = []
+    depts_seen: dict[str, bool] = {}
+
+    for idx, r in enumerate(roster):
+        uid = str(r["user_id"])
+        dept = ((r["department_name"] or "").strip()) or "Unassigned"
+        depts_seen[dept] = True
+        sess = by_user.get(uid, [])
+        started = len(sess) > 0
+        name = ((r["full_name"] or "") or (r["email"] or "Student").split("@")[0]).strip() or "Student"
+
+        if started:
+            first, last = sess[0], sess[-1]
+            f_final = float(first["final_score"] or 0)
+            l_final = float(last["final_score"] or 0)
+            skills_first = _cc_skills(_cc_coerce(first["rubric_scores"]), f_final)
+            skills_now = _cc_skills(_cc_coerce(last["rubric_scores"]), l_final)
+            first_score = round(f_final)
+            latest_score = round(l_final)
+            n_sess = len(sess)
+            slope = round((latest_score - first_score) / max(2, n_sess) * 3, 2)
+            stuck = n_sess >= 3 and slope <= 0.35
+            if latest_score >= 76:
+                tier = "Ready"
+            elif latest_score >= 66:
+                tier = "Almost"
+            elif latest_score >= 52 and not stuck:
+                tier = "Developing"
+            else:
+                tier = "At Risk"
+            at_risk = tier == "At Risk" or (stuck and latest_score < 60)
+            last_dt = last["created_at"]
+            last_active = max(0, (now - last_dt).days) if last_dt else 90
+            stt = (
+                math.ceil((76 - latest_score) / max(slope, 0.2))
+                if (slope > 0.2 and latest_score < 76)
+                else None
+            )
+            target_role = last["target_role"] or "Software Engineer"
+        else:
+            skills_first = {sk: 0 for sk in _CC_SKILLS}
+            skills_now = dict(skills_first)
+            first_score = latest_score = 0
+            n_sess = 0
+            slope = 0
+            stuck = False
+            tier = "At Risk"
+            at_risk = True
+            last_active = 90
+            stt = None
+            target_role = "Software Engineer"
+
+        students.append({
+            "id": idx,
+            "name": name,
+            "dept": dept,
+            "sessions": n_sess,
+            "started": started,
+            "skillsFirst": skills_first,
+            "skillsNow": skills_now,
+            "firstScore": first_score,
+            "latestScore": latest_score,
+            "slope": slope,
+            "stuck": stuck,
+            "tier": tier,
+            "atRisk": at_risk,
+            "lastActive": last_active,
+            "stt": stt,
+            "targetRole": target_role,
+            "inferredRole": target_role,
+        })
+
+    return {
+        "college": (org["name"] if org and org["name"] else "Your Institution"),
+        "batch": "All students",
+        "seats": (org["seat_limit"] if org and org["seat_limit"] else len(roster)),
+        "annualFee": 100000,
+        "depts": [{"code": d, "name": d} for d in depts_seen],
+        "students": students,
+    }
