@@ -6,9 +6,9 @@
 <title>PrepVista — Placement Command Centre</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<script src="/vendor/echarts.min.js"></script>
-<script defer src="/vendor/jspdf.umd.min.js"></script>
-<script defer src="/vendor/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     --canvas:#090A0E;--surface-0:#0E1015;--surface-1:#13161D;--surface-2:#191D27;--surface-3:#20252F;
@@ -294,7 +294,7 @@
       <div class="grow"></div>
       <button class="dlbtn" id="dlBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Download Report</button>
       <button class="btn-ai" id="globalAi"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7z"/></svg>AI Summary</button>
-      <a class="mini-btn" href="/command-centre-sample.html" target="_blank" rel="noopener" style="text-decoration:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg>View Sample</a>
+      <div class="avatar">RT</div>
     </header>
     <div class="filterbar">
       <div class="fgroup"><span class="flabel">Department</span>
@@ -328,8 +328,8 @@
 <div class="toast" id="toast"><span class="tick">✓</span><span id="toastMsg"></span></div>
 <script>
 const SKILLS=['Technical Depth','Problem Solving','Communication','Behavioral','System Design','Specificity'];
-let DEPTS=[{code:'CSE',name:'Computer Science'},{code:'IT',name:'Information Tech'},{code:'ECE',name:'Electronics & Comm'},{code:'EEE',name:'Electrical'},{code:'MECH',name:'Mechanical'},{code:'CIVIL',name:'Civil'}];
-let SEATS=480, ANNUAL_FEE=100000, COLLEGE='Lakshmi Institute of Technology', BATCH='B.Tech 2026';
+const DEPTS=[{code:'CSE',name:'Computer Science'},{code:'IT',name:'Information Tech'},{code:'ECE',name:'Electronics & Comm'},{code:'EEE',name:'Electrical'},{code:'MECH',name:'Mechanical'},{code:'CIVIL',name:'Civil'}];
+const SEATS=480, ANNUAL_FEE=100000, COLLEGE='Lakshmi Institute of Technology', BATCH='B.Tech 2026';
 const TIER_COLOR={'Ready':'#34D399','Almost':'#38BDF8','Developing':'#FBBF24','At Risk':'#FB7185'};
 const SERIES=['#6366F1','#22D3EE','#34D399','#FBBF24','#FB7185','#A78BFA','#38BDF8','#F472B6','#FCD34D','#4ADE80'];
 const ROLES=['Software Engineer','Data Analyst','Data Scientist','Embedded Engineer','Core Mechanical','Site Engineer','Product Analyst','QA Engineer','Network Engineer'];
@@ -364,10 +364,9 @@ function makeStudents(){
   }
   return out;
 }
-let STUDENTS=makeStudents();
-function computePercentiles(){const sc=STUDENTS.filter(s=>s.started);const denom=Math.max(1,sc.length-1);[...sc].sort((a,b)=>a.firstScore-b.firstScore).forEach((s,i)=>s.pctFirst=round(i/denom*100));[...sc].sort((a,b)=>a.latestScore-b.latestScore).forEach((s,i)=>s.pctNow=round(i/denom*100));STUDENTS.filter(s=>!s.started).forEach(s=>{s.pctFirst=0;s.pctNow=0;});}
-computePercentiles();
-function detail(s){if(s.det){const d=s.det;if(!d.pj){const a=s.pctFirst||0,b=s.pctNow||0;d.pj=[0,1,2,3,4].map(i=>clamp(round(a+(b-a)*(i/4)),1,99));d.pj[0]=a;d.pj[4]=b;}return d;}const r=mulberry32(1000+s.id*97);const n=Math.max(3,s.sessions||3);
+const STUDENTS=makeStudents();
+(function(){const sc=STUDENTS.filter(s=>s.started);[...sc].sort((a,b)=>a.firstScore-b.firstScore).forEach((s,i)=>s.pctFirst=round(i/(sc.length-1)*100));[...sc].sort((a,b)=>a.latestScore-b.latestScore).forEach((s,i)=>s.pctNow=round(i/(sc.length-1)*100));})();
+function detail(s){const r=mulberry32(1000+s.id*97);const n=Math.max(3,s.sessions||3);
   const hist=[];for(let i=0;i<n;i++){const t=i/(n-1||1);hist.push(clamp(round(s.firstScore+(s.latestScore-s.firstScore)*t+(r()*6-3)),20,99));}hist[0]=s.firstScore;hist[n-1]=s.latestScore;
   const sub={Relevance:clamp(round(s.skillsNow['Problem Solving']/10+(r()*2-1),1),1,10),Clarity:clamp(round(s.skillsNow['Communication']/10+(r()*2-1),1),1,10),Specificity:clamp(round(s.skillsNow['Specificity']/10+(r()*2-1),1),1,10),Structure:clamp(round(s.skillsNow['Behavioral']/10+(r()*2-1),1),1,10)};
   const comp={Clarifications:ri(r,0,4),Timeouts:ri(r,0,s.tier==='At Risk'?5:2),Silences:ri(r,0,3),Skips:ri(r,0,3),Cutoffs:ri(r,0,3)};
@@ -375,7 +374,7 @@ function detail(s){if(s.det){const d=s.det;if(!d.pj){const a=s.pctFirst||0,b=s.p
   const pj=[];for(let i=0;i<5;i++){const t=i/4;pj.push(clamp(round(s.pctFirst+(s.pctNow-s.pctFirst)*t+(r()*8-4)),1,99));}pj[0]=s.pctFirst;pj[4]=s.pctNow;
   const fams=['DSA','Databases','System Design','Behavioral','Projects','OOP','Networking','Aptitude'];const covered=fams.map(f=>({name:f,val:ri(r,0,5)}));
   return {hist,sub,comp,rt,pj,covered,n};}
-function sessionOf(s){if(s.ses)return s.ses;const r=mulberry32(s.id*31+7);const fams=['DSA','Databases','System Design','Behavioral','Projects'];const N=ri(r,8,12);const turns=[];
+function sessionOf(s){const r=mulberry32(s.id*31+7);const fams=['DSA','Databases','System Design','Behavioral','Projects'];const N=ri(r,8,12);const turns=[];
   for(let i=0;i<N;i++){const fam=fams[Math.floor(r()*fams.length)];const x=r();const st=x<0.6?'Answered':x<0.78?'Follow-up':x<0.9?'Timeout':'Skipped';turns.push({i:i+1,fam,st,score:clamp(round(40+r()*55),20,99),rt:round(6+r()*50,1)});}return {turns};}
 const state={depts:new Set(DEPTS.map(d=>d.code)),tiers:new Set(['Ready','Almost','Developing','At Risk']),win:'all',heatView:'score',focus:null};
 function filtered(){const w=state.win==='all'?Infinity:Number(state.win);return STUDENTS.filter(s=>state.depts.has(s.dept)&&state.tiers.has(s.tier)&&(state.win==='all'?true:(s.started&&s.lastActive<=w)));}
@@ -837,11 +836,8 @@ function renderCurrent(){stopSpeech();disposeAll();AIMETA={};const host=document
 }
 document.querySelectorAll('.nav-item[data-tab]').forEach(n=>n.onclick=()=>{document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));n.classList.add('active');currentTab=n.dataset.tab;renderCurrent();window.scrollTo({top:0,behavior:'smooth'});});
 const deptPanel=document.getElementById('deptPanel');
-function rebuildDeptPanel(){
-  deptPanel.innerHTML=DEPTS.map(d=>'<div class="dd-opt sel" data-c="'+d.code+'"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg></span>'+d.name+' <span style="margin-left:auto;color:var(--faint);font-size:11px">'+d.code+'</span></div>').join('');
-  deptPanel.querySelectorAll('.dd-opt').forEach(o=>o.onclick=e=>{e.stopPropagation();const c=o.dataset.c;if(state.depts.has(c)&&state.depts.size>1){state.depts.delete(c);o.classList.remove('sel');}else{state.depts.add(c);o.classList.add('sel');}updateDeptBtn();populateFocus();renderCurrent();});
-}
-rebuildDeptPanel();
+deptPanel.innerHTML=DEPTS.map(d=>'<div class="dd-opt sel" data-c="'+d.code+'"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg></span>'+d.name+' <span style="margin-left:auto;color:var(--faint);font-size:11px">'+d.code+'</span></div>').join('');
+deptPanel.querySelectorAll('.dd-opt').forEach(o=>o.onclick=e=>{e.stopPropagation();const c=o.dataset.c;if(state.depts.has(c)&&state.depts.size>1){state.depts.delete(c);o.classList.remove('sel');}else{state.depts.add(c);o.classList.add('sel');}updateDeptBtn();populateFocus();renderCurrent();});
 function updateDeptBtn(){document.getElementById('deptCount').textContent=state.depts.size;document.getElementById('deptBtn').childNodes[0].nodeValue=state.depts.size===DEPTS.length?'All departments ':state.depts.size+' departments ';}
 document.getElementById('deptBtn').onclick=e=>{e.stopPropagation();deptPanel.classList.toggle('open');};
 deptPanel.onclick=e=>e.stopPropagation();
@@ -959,22 +955,7 @@ function buildPDF(sections,C){
   pdf.save('PrepVista_Placement_Report_'+BATCH.replace(/\s+/g,'_')+'.pdf');
 }
 document.getElementById('dlBtn').onclick=()=>exportPDF();
-/* ── Real-data seam: parent (org-admin) injects live cohort via PVCC.load ── */
-window.PVCC={load:function(payload){try{
-  if(payload&&Array.isArray(payload.students)&&payload.students.length){STUDENTS=payload.students;computePercentiles();}
-  if(payload&&Array.isArray(payload.depts)&&payload.depts.length)DEPTS=payload.depts;
-  if(payload&&payload.seats)SEATS=payload.seats;
-  if(payload&&payload.annualFee)ANNUAL_FEE=payload.annualFee;
-  if(payload&&payload.college)COLLEGE=payload.college;
-  if(payload&&payload.batch)BATCH=payload.batch;
-  state.depts=new Set(DEPTS.map(d=>d.code));state.tiers=new Set(['Ready','Almost','Developing','At Risk']);state.win='all';state.focus=null;
-  var crumb=document.querySelector('.topbar .crumb');if(crumb)crumb.textContent=COLLEGE+' · '+BATCH;
-  rebuildDeptPanel();updateDeptBtn();populateFocus();renderCurrent();
-}catch(e){console.error('PVCC.load',e);}}};
-window.addEventListener('message',function(e){if(e&&e.data&&e.data.__pvcc==='load')window.PVCC.load(e.data.payload);});
-var __pvEmbed=/[?&]embed=1/.test(location.search);
-if(__pvEmbed){updateDeptBtn();populateFocus();try{window.parent&&window.parent.postMessage({__pvcc:'ready'},'*');}catch(e){}}
-else{updateDeptBtn();populateFocus();renderCurrent();}
+updateDeptBtn();populateFocus();renderCurrent();
 </script>
 </body>
 </html>
