@@ -1547,3 +1547,111 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
         "depts": [{"code": d, "name": d} for d in depts_seen],
         "students": students,
     }
+
+
+def _lb_year(year_name: Any, grad: Any) -> int | None:
+    """Best numeric graduation year for a student: prefer the college_years label
+    (often a year number), fall back to profiles.graduation_year."""
+    for v in (year_name, grad):
+        if v is None:
+            continue
+        try:
+            return int(str(v).strip())
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+@router.get("/leaderboard")
+async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
+    """Live cohort dataset for the embedded Student Scoreboard / Leaderboard.
+    Returns students in the exact shape the scoreboard asset (window.PVSB.load)
+    consumes: id, name, dept, year, sessions, started, score, slope, tier."""
+    org_id = admin.organization_id
+    async with DatabaseConnection() as conn:
+        org = await conn.fetchrow(
+            "SELECT name FROM organizations WHERE id = $1", org_id
+        )
+        roster = await conn.fetch(
+            """SELECT os.user_id, p.full_name, p.email, cd.department_name,
+                      cy.year_name, p.graduation_year
+               FROM organization_students os
+               JOIN profiles p ON p.id = os.user_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id
+               LEFT JOIN college_years cy ON cy.id = os.year_id
+               WHERE os.organization_id = $1 AND os.status != 'removed'
+               ORDER BY p.full_name NULLS LAST""",
+            org_id,
+        )
+        user_ids = [r["user_id"] for r in roster]
+        session_rows = []
+        if user_ids:
+            session_rows = await conn.fetch(
+                """SELECT user_id, final_score, created_at, target_role
+                   FROM interview_sessions
+                   WHERE user_id = ANY($1::uuid[]) AND state = 'FINISHED'
+                   ORDER BY user_id, created_at ASC""",
+                user_ids,
+            )
+
+    by_user: dict[str, list] = {}
+    for s in session_rows:
+        by_user.setdefault(str(s["user_id"]), []).append(s)
+
+    students: list[dict] = []
+    depts_seen: dict[str, bool] = {}
+    years_seen: set[int] = set()
+
+    for idx, r in enumerate(roster):
+        uid = str(r["user_id"])
+        dept = ((r["department_name"] or "").strip()) or "Unassigned"
+        depts_seen[dept] = True
+        yr = _lb_year(r["year_name"], r["graduation_year"])
+        if yr is not None:
+            years_seen.add(yr)
+        sess = by_user.get(uid, [])
+        started = len(sess) > 0
+        name = ((r["full_name"] or "") or (r["email"] or "Student").split("@")[0]).strip() or "Student"
+
+        if started:
+            first, last = sess[0], sess[-1]
+            first_score = round(float(first["final_score"] or 0))
+            latest_score = round(float(last["final_score"] or 0))
+            n_sess = len(sess)
+            slope = round((latest_score - first_score) / max(2, n_sess) * 3, 2)
+            if latest_score >= 76:
+                tier = "Ready"
+            elif latest_score >= 66:
+                tier = "Almost"
+            elif latest_score >= 52:
+                tier = "Developing"
+            else:
+                tier = "At Risk"
+            score: int | None = latest_score
+            target_role = last["target_role"] or "Software Engineer"
+        else:
+            n_sess = 0
+            slope = 0
+            tier = "Not started"
+            score = None
+            target_role = "Software Engineer"
+
+        students.append({
+            "id": idx,
+            "name": name,
+            "dept": dept,
+            "year": yr,
+            "sessions": n_sess,
+            "started": started,
+            "score": score,
+            "slope": slope,
+            "tier": tier,
+            "targetRole": target_role,
+        })
+
+    return {
+        "college": (org["name"] if org and org["name"] else "Your Institution"),
+        "depts": [{"code": d, "name": d} for d in depts_seen],
+        "years": sorted(years_seen),
+        "students": students,
+    }

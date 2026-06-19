@@ -1115,6 +1115,7 @@ class ApiClient {
   // ── College Admin (Secondary Admin) ───────
   async getCollegeDashboard<T = unknown>() { return this.request<T>('/org/my/dashboard'); }
   async getCommandCentre<T = unknown>() { return this.request<T>('/org/my/command-centre'); }
+  async getLeaderboard<T = unknown>() { return this.request<T>('/org/my/leaderboard'); }
   async listCollegeStudents<T = unknown>(params = '') { return this.request<T>(`/org/my/students${params ? '?' + params : ''}`); }
   async addCollegeStudent<T = unknown>(body: Record<string, unknown>) {
     return this.request<T>('/org/my/students', { method: 'POST', body });
