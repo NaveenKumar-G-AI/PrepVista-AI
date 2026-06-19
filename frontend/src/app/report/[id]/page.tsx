@@ -12,6 +12,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/brand-logo';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { IntelDashboard } from './_intel/dashboard';
 
 interface Evaluation {
   turn_number: number;
@@ -338,6 +339,14 @@ export default function ReportPage() {
                 </div>
               );
             })}
+          </section>
+        ) : null}
+
+        {has_premium_access && evaluations.length > 0 ? (
+          <section className="mb-6 slide-up">
+            <h2 className="text-lg font-semibold text-primary mb-1">Interview Intelligence</h2>
+            <p className="text-sm text-secondary mb-4">Premium analytics derived from this session&apos;s per-question evaluator data.</p>
+            <IntelDashboard report={data} />
           </section>
         ) : null}
 
