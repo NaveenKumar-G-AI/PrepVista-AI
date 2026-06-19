@@ -1549,17 +1549,15 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
     }
 
 
-def _lb_year(year_name: Any, grad: Any) -> int | None:
-    """Best numeric graduation year for a student: prefer the college_years label
-    (often a year number), fall back to profiles.graduation_year."""
-    for v in (year_name, grad):
-        if v is None:
-            continue
-        try:
-            return int(str(v).strip())
-        except (TypeError, ValueError):
-            continue
-    return None
+def _lb_year(year_name: Any) -> int | None:
+    """Numeric graduation year parsed from the org's college_years label (often a
+    year number like '2026'). None when absent or non-numeric (e.g. 'First Year')."""
+    if year_name is None:
+        return None
+    try:
+        return int(str(year_name).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("/leaderboard")
@@ -1574,7 +1572,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
         )
         roster = await conn.fetch(
             """SELECT os.user_id, p.full_name, p.email, cd.department_name,
-                      cy.year_name, p.graduation_year
+                      cy.year_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
                LEFT JOIN college_departments cd ON cd.id = os.department_id
@@ -1606,7 +1604,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
         uid = str(r["user_id"])
         dept = ((r["department_name"] or "").strip()) or "Unassigned"
         depts_seen[dept] = True
-        yr = _lb_year(r["year_name"], r["graduation_year"])
+        yr = _lb_year(r["year_name"])
         if yr is not None:
             years_seen.add(yr)
         sess = by_user.get(uid, [])
