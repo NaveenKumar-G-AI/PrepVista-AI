@@ -137,26 +137,9 @@ const NAV_ITEMS: NavItem[] = [
 
 /** Analytics sub-pages exposed in the expandable desktop sub-nav and mobile bottom nav.
  *  Icons reuse existing imports — no new icon dependencies required. */
-const ANALYTICS_SUB_NAV: SubNavItem[] = [
-  {
-    href: '/org-admin/analytics/performance',
-    label: 'Performance',
-    shortLabel: 'Perf',
-    icon: ChartIcon,
-  },
-  {
-    href: '/org-admin/analytics/growth',
-    label: 'Growth',
-    shortLabel: 'Growth',
-    icon: ChartIcon,
-  },
-  {
-    href: '/org-admin/analytics/readiness',
-    label: 'Readiness',
-    shortLabel: 'Ready',
-    icon: SparklesIcon,
-  },
-];
+// Analytics is a single Command Centre view — no sub-pages. (Performance / Growth /
+// Readiness were placeholders for the old multi-tab analytics and have been removed.)
+const ANALYTICS_SUB_NAV: SubNavItem[] = [];
 
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -485,7 +468,7 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
                               showAnalyticsSub = true when pathname is /org-admin/analytics
                               or any sub-path (/analytics/performance, /growth, /readiness).
                               Indented with a left-border connector line for visual hierarchy. */}
-                          {isAnalyticsItem && showAnalyticsSub && (
+                          {isAnalyticsItem && showAnalyticsSub && ANALYTICS_SUB_NAV.length > 0 && (
                             <ul className="ml-4 mt-1 space-y-0.5 border-l border-white/[0.06] pl-3">
                               {ANALYTICS_SUB_NAV.map(sub => {
                                 const SubIcon = sub.icon;
