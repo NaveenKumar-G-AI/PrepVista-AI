@@ -1297,6 +1297,117 @@ def _cc_skills(rubric: dict, fallback: float) -> dict:
     return out
 
 
+# Human labels for the 14 canonical rubric categories, used as the dashboard's
+# "topic families" in the Session Forensics charts (sankey / sunburst / radar).
+_CC_RUBRIC_LABEL = {
+    'communication': 'Communication', 'technical_depth': 'Technical Depth',
+    'problem_solving': 'Problem Solving', 'confidence': 'Confidence',
+    'structure_star': 'Structure', 'vocabulary': 'Vocabulary',
+    'vocal_delivery': 'Vocal Delivery', 'leadership': 'Leadership',
+    'teamwork': 'Teamwork', 'adaptability': 'Adaptability',
+    'reasoning': 'Reasoning', 'conciseness': 'Conciseness',
+    'professionalism': 'Professionalism', 'role_fit': 'Role Fit',
+}
+
+
+def _cc_fam(rubric_category: Any) -> str:
+    key = (rubric_category or "").strip().lower()
+    return _CC_RUBRIC_LABEL.get(key, (rubric_category or "Other").replace("_", " ").title())
+
+
+def _cc_turn_outcome(answer_status: Any, classification: Any) -> str:
+    """Collapse the engine's answer_status/classification onto the dashboard's four
+    turn outcomes: Answered / Follow-up / Timeout / Skipped. Matched case- and
+    spelling-insensitively because answer_status is free text ('Timed out',
+    'System cut off', 'No answer', 'Clarification requested', …)."""
+    a = (answer_status or "").strip().lower()
+    c = (classification or "").strip().lower()
+    if "clarif" in a:
+        return "Follow-up"
+    if "timed out" in a or "timeout" in a or "system cut" in a or "cutoff" in a:
+        return "Timeout"
+    if "skip" in a or "no answer" in a or "silent" in a or c == "silent":
+        return "Skipped"
+    return "Answered"
+
+
+def _cc_session_forensics(sess: list, evals_by_session: dict) -> tuple:
+    """Build the dashboard's per-student deep-dive (``det``) and single-session
+    forensics (``ses``) from real ``question_evaluations`` rows. Returns
+    ``(det, ses)`` or ``(None, None)`` when the student has no per-turn evaluation
+    data yet, in which case the client falls back to its deterministic seed."""
+    scored = [s for s in sess if evals_by_session.get(str(s["id"]))]
+    if not scored:
+        return None, None
+
+    # hist: final score of every finished session, chronological, clamped to chart range
+    hist = [max(20, min(99, round(float(s["final_score"] or 0)))) for s in sess] or [0]
+
+    latest = scored[-1]
+    latest_turns = evals_by_session[str(latest["id"])]
+
+    # sub: average of the four answer sub-scores across the latest scored session (0–10)
+    def _avg(col: str) -> float:
+        vals = [float(t[col]) for t in latest_turns if t[col] is not None]
+        return round(sum(vals) / len(vals), 1) if vals else 0
+
+    sub = {
+        "Relevance": _avg("relevance_score"),
+        "Clarity": _avg("clarity_score"),
+        "Specificity": _avg("specificity_score"),
+        "Structure": _avg("structure_score"),
+    }
+
+    # comp + covered: outcome composition and topic coverage across ALL scored sessions
+    comp = {"Clarifications": 0, "Timeouts": 0, "Silences": 0, "Skips": 0, "Cutoffs": 0}
+    covered_counts: dict[str, int] = {}
+    for s in scored:
+        for t in evals_by_session[str(s["id"])]:
+            a = (t["answer_status"] or "").strip().lower()
+            c = (t["classification"] or "").strip().lower()
+            if "clarif" in a:
+                comp["Clarifications"] += 1
+            if "timed out" in a or "timeout" in a:
+                comp["Timeouts"] += 1
+            if "system cut" in a or "cutoff" in a:
+                comp["Cutoffs"] += 1
+            if "skip" in a:
+                comp["Skips"] += 1
+            if c == "silent" or "no answer" in a or "silent" in a:
+                comp["Silences"] += 1
+            fam = _cc_fam(t["rubric_category"])
+            covered_counts[fam] = covered_counts.get(fam, 0) + 1
+
+    covered = [
+        {"name": f, "val": min(5, n)}
+        for f, n in sorted(covered_counts.items(), key=lambda kv: -kv[1])[:8]
+    ]
+
+    # rt: per-turn answer durations of the latest scored session (seconds)
+    rt = [
+        round(float(t["answer_duration_seconds"]))
+        for t in latest_turns
+        if t["answer_duration_seconds"] is not None
+    ]
+
+    det = {"hist": hist, "sub": sub, "comp": comp, "rt": rt, "covered": covered, "n": len(hist)}
+
+    # ses: turn-by-turn forensics of the latest scored session
+    turns = [
+        {
+            "i": int(t["turn_number"]),
+            "fam": _cc_fam(t["rubric_category"]),
+            "st": _cc_turn_outcome(t["answer_status"], t["classification"]),
+            "score": max(20, min(99, round(float(t["score"] or 0) * 10))),
+            "rt": (round(float(t["answer_duration_seconds"]))
+                   if t["answer_duration_seconds"] is not None else 0),
+        }
+        for t in latest_turns
+    ]
+    ses = {"turns": turns}
+    return det, ses
+
+
 @router.get("/command-centre")
 async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
     """Live cohort dataset for the embedded Placement Command Centre dashboard."""
@@ -1316,18 +1427,36 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
         )
         user_ids = [r["user_id"] for r in roster]
         session_rows = []
+        eval_rows = []
         if user_ids:
             session_rows = await conn.fetch(
-                """SELECT user_id, final_score, rubric_scores, created_at, target_role
+                """SELECT id, user_id, final_score, rubric_scores, created_at, target_role
                    FROM interview_sessions
                    WHERE user_id = ANY($1::uuid[]) AND state = 'FINISHED'
                    ORDER BY user_id, created_at ASC""",
                 user_ids,
             )
+            # Per-turn evaluations feed the Session Forensics tab. Fetched sequentially
+            # on this same connection (never gathered — see asyncpg single-conn rule).
+            session_ids = [s["id"] for s in session_rows]
+            if session_ids:
+                eval_rows = await conn.fetch(
+                    """SELECT session_id, turn_number, rubric_category, classification,
+                              answer_status, score, relevance_score, clarity_score,
+                              specificity_score, structure_score, answer_duration_seconds
+                       FROM question_evaluations
+                       WHERE session_id = ANY($1::uuid[])
+                       ORDER BY session_id, turn_number ASC""",
+                    session_ids,
+                )
 
     by_user: dict[str, list] = {}
     for s in session_rows:
         by_user.setdefault(str(s["user_id"]), []).append(s)
+
+    evals_by_session: dict[str, list] = {}
+    for e in eval_rows:
+        evals_by_session.setdefault(str(e["session_id"]), []).append(e)
 
     now = datetime.now(timezone.utc)
     students: list[dict] = []
@@ -1382,7 +1511,7 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             stt = None
             target_role = "Software Engineer"
 
-        students.append({
+        student = {
             "id": idx,
             "name": name,
             "dept": dept,
@@ -1400,7 +1529,15 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             "stt": stt,
             "targetRole": target_role,
             "inferredRole": target_role,
-        })
+        }
+        # Real per-turn forensics where we have evaluation data; otherwise the
+        # client keeps its deterministic seed for det()/sessionOf().
+        if started:
+            det, ses = _cc_session_forensics(sess, evals_by_session)
+            if det is not None:
+                student["det"] = det
+                student["ses"] = ses
+        students.append(student)
 
     return {
         "college": (org["name"] if org and org["name"] else "Your Institution"),

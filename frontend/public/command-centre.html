@@ -367,7 +367,7 @@ function makeStudents(){
 let STUDENTS=makeStudents();
 function computePercentiles(){const sc=STUDENTS.filter(s=>s.started);const denom=Math.max(1,sc.length-1);[...sc].sort((a,b)=>a.firstScore-b.firstScore).forEach((s,i)=>s.pctFirst=round(i/denom*100));[...sc].sort((a,b)=>a.latestScore-b.latestScore).forEach((s,i)=>s.pctNow=round(i/denom*100));STUDENTS.filter(s=>!s.started).forEach(s=>{s.pctFirst=0;s.pctNow=0;});}
 computePercentiles();
-function detail(s){if(s.det)return s.det;const r=mulberry32(1000+s.id*97);const n=Math.max(3,s.sessions||3);
+function detail(s){if(s.det){const d=s.det;if(!d.pj){const a=s.pctFirst||0,b=s.pctNow||0;d.pj=[0,1,2,3,4].map(i=>clamp(round(a+(b-a)*(i/4)),1,99));d.pj[0]=a;d.pj[4]=b;}return d;}const r=mulberry32(1000+s.id*97);const n=Math.max(3,s.sessions||3);
   const hist=[];for(let i=0;i<n;i++){const t=i/(n-1||1);hist.push(clamp(round(s.firstScore+(s.latestScore-s.firstScore)*t+(r()*6-3)),20,99));}hist[0]=s.firstScore;hist[n-1]=s.latestScore;
   const sub={Relevance:clamp(round(s.skillsNow['Problem Solving']/10+(r()*2-1),1),1,10),Clarity:clamp(round(s.skillsNow['Communication']/10+(r()*2-1),1),1,10),Specificity:clamp(round(s.skillsNow['Specificity']/10+(r()*2-1),1),1,10),Structure:clamp(round(s.skillsNow['Behavioral']/10+(r()*2-1),1),1,10)};
   const comp={Clarifications:ri(r,0,4),Timeouts:ri(r,0,s.tier==='At Risk'?5:2),Silences:ri(r,0,3),Skips:ri(r,0,3),Cutoffs:ri(r,0,3)};
