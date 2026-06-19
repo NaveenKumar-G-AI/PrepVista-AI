@@ -957,5 +957,20 @@ function buildPDF(sections,C){
 document.getElementById('dlBtn').onclick=()=>exportPDF();
 updateDeptBtn();populateFocus();renderCurrent();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     MERGED: Student Scoreboard / Leaderboard (sample)
+     The full scoreboard asset, embedded intact. Loaded WITHOUT ?embed so it
+     renders its built-in seeded sample data (matching the command-centre sample
+     above). Kept in an isolated iframe on purpose: both dashboards declare the
+     same top-level globals (STUDENTS, DEPTS, state, render), so inlining the two
+     scripts into one document would throw redeclaration errors.
+═══════════════════════════════════════════════════════════════════ -->
+<div style="max-width:1180px;margin:46px auto 10px;padding:0 26px;">
+  <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.35),transparent);"></div>
+  <div style="margin-top:22px;font:700 18px Inter,system-ui,sans-serif;color:#EAECF2;letter-spacing:-.01em;">Student Leaderboard</div>
+  <div style="margin-top:3px;font:500 13px Inter,system-ui,sans-serif;color:#7B8194;">Sample of the ranked cohort scoreboard — podium, top performers, department averages and the full leaderboard table.</div>
+</div>
+<iframe src="/scoreboard.html" title="Student Leaderboard (sample)" style="width:100%;height:1700px;border:none;display:block;background:#090A0E;"></iframe>
 </body>
 </html>

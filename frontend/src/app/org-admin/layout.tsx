@@ -42,7 +42,7 @@ import { usePathname, useRouter } from 'next/navigation';
 
 import { AuthHeader } from '@/components/auth-header';
 import {
-  BuildingIcon, ChartIcon, CreditCardIcon, DownloadIcon, KeyIcon,
+  BuildingIcon, ChartIcon, CreditCardIcon, CrownIcon, DownloadIcon, KeyIcon,
   LayersIcon, SettingsIcon, SparklesIcon, UsersIcon,
 } from '@/components/icons';
 import { api } from '@/lib/api';
@@ -129,6 +129,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/org-admin/departments', label: 'Departments', icon: BuildingIcon },
   { href: '/org-admin/years-batches', label: 'Years & Batches', icon: LayersIcon },
   { href: '/org-admin/analytics', label: 'Analytics', icon: ChartIcon },
+  { href: '/org-admin/leaderboard', label: 'Leaderboard', icon: CrownIcon },
   { href: '/org-admin/access-control', label: 'Access Control', icon: KeyIcon },
   { href: '/org-admin/reports', label: 'Reports', icon: DownloadIcon },
   { href: '/org-admin/billing', label: 'Billing', icon: CreditCardIcon },
