@@ -352,7 +352,7 @@ export default function ReportPage() {
           </section>
         ) : null}
 
-        {has_premium_access && evaluations.length > 0 ? (
+        {has_premium_access ? (
           <section className="mb-6 slide-up">
             <h2 className="text-lg font-semibold text-primary mb-1">Interview Intelligence</h2>
             <p className="text-sm text-secondary mb-4">Premium analytics derived from this session&apos;s per-question evaluator data.</p>
