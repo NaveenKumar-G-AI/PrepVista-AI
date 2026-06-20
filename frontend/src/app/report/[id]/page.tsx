@@ -239,7 +239,17 @@ export default function ReportPage() {
 
     try {
       const blob = await api.downloadPDF(sessionId);
-      const url = URL.createObjectURL(blob);
+      // Append the on-screen Interview Intelligence charts to the end of the
+      // server PDF. If the dashboard isn't present or merging fails, fall back
+      // to the plain server PDF so the download never breaks.
+      let finalBlob = blob;
+      try {
+        const { appendIntelCharts } = await import('./_intel/pdf-append');
+        finalBlob = await appendIntelCharts(blob);
+      } catch {
+        finalBlob = blob;
+      }
+      const url = URL.createObjectURL(finalBlob);
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `prepvista-report-${sessionId.slice(0, 8)}.pdf`;
