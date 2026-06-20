@@ -890,11 +890,11 @@ async function exportPDF(){
     document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
     renderCurrent();setPdfProg(8+ti*13,'Rendering '+name+' ('+(ti+1)+' of 6)…');await sleep(1300);
     const cards=[...document.querySelectorAll('#view .card')];const shots=[];
-    const kp=document.querySelector('#view .kpis');if(kp){try{const c=await html2canvas(kp,{backgroundColor:'#0E1015',scale:3,logging:false,useCORS:true});shots.push({kpi:true,img:c.toDataURL('image/png'),w:c.width,h:c.height});}catch(e){}}
+    const kp=document.querySelector('#view .kpis');if(kp){try{const c=await html2canvas(kp,{backgroundColor:'#0E1015',scale:2,logging:false,useCORS:true});shots.push({kpi:true,img:c.toDataURL('image/jpeg',0.92),w:c.width,h:c.height});}catch(e){}}
     for(const card of cards){const key=card.dataset.key,cid=card.dataset.cid;const h3=card.querySelector('h3');let title=h3?h3.textContent.replace(/\s+/g,' ').trim():'';const pill=card.querySelector('.pill');if(pill)title=title.replace(pill.textContent,'').trim();
       const m=AIMETA[key]||{};const parts=[];if(m.plain||m.purpose)parts.push(['What this shows',m.plain||m.purpose]);if(m.means)parts.push(['What it means',m.means]);if(m.todo||m.action)parts.push(['What to do',m.todo||m.action]);let img=null,iw=0,ih=0;
-      if(cid&&charts[cid]){try{img=charts[cid].getDataURL({type:'png',pixelRatio:3.5,backgroundColor:'#0E1015'});iw=charts[cid].getWidth()*3.5;ih=charts[cid].getHeight()*3.5;}catch(e){}}
-      else{const inner=card.querySelector('.wl,.ledger,.verdict,.anatomy');if(inner){try{const c=await html2canvas(inner,{backgroundColor:'#0E1015',scale:3,logging:false,useCORS:true});img=c.toDataURL('image/png');iw=c.width;ih=c.height;}catch(e){}}}
+      if(cid&&charts[cid]){try{img=charts[cid].getDataURL({type:'jpeg',pixelRatio:2,backgroundColor:'#0E1015'});iw=charts[cid].getWidth()*2;ih=charts[cid].getHeight()*2;}catch(e){}}
+      else{const inner=card.querySelector('.wl,.ledger,.verdict,.anatomy');if(inner){try{const c=await html2canvas(inner,{backgroundColor:'#0E1015',scale:2,logging:false,useCORS:true});img=c.toDataURL('image/jpeg',0.92);iw=c.width;ih=c.height;}catch(e){}}}
       if(img)shots.push({title,parts,img,w:iw,h:ih});}
     sections.push({name,shots});}
   setPdfProg(92,'Composing the PDF…');
@@ -903,7 +903,7 @@ async function exportPDF(){
   setPdfProg(100,'Done');await sleep(350);over.classList.remove('show');setPdfProg(0,'Preparing…');toast('Report downloaded');
 }
 function buildPDF(sections,C){
-  const jsPDF=window.jspdf.jsPDF;const pdf=new jsPDF('p','pt','a4');
+  const jsPDF=window.jspdf.jsPDF;const pdf=new jsPDF({orientation:'p',unit:'pt',format:'a4',compress:true});
   const W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight(),M=42,CW=W-M*2;let page=1,y=M;
   function footer(){pdf.setDrawColor(229,231,235);pdf.setLineWidth(.6);pdf.line(M,H-30,W-M,H-30);pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(99,102,241);pdf.text('PrepVista',M,H-18);pdf.setFont('helvetica','normal');pdf.setTextColor(120,125,135);pdf.text('Placement Intelligence Report',M+50,H-18);pdf.text(COLLEGE+'  ·  '+BATCH,W/2,H-18,{align:'center'});pdf.text('Page '+page,W-M,H-18,{align:'right'});}
   function newPageWhite(){pdf.addPage();page++;pdf.setFillColor(255,255,255);pdf.rect(0,0,W,H,'F');footer();pdf.setFillColor(99,102,241);pdf.rect(0,0,W,5,'F');y=54;}
@@ -935,11 +935,11 @@ function buildPDF(sections,C){
   sections.forEach(sec=>{header(sec.name,'Every visualization on this dashboard, with a full plain-language reading');
     if(SECINTRO[sec.name])para(SECINTRO[sec.name],10.5,[55,58,68],12);
     sec.shots.forEach(shot=>{
-      if(shot.kpi){const dh=Math.min(118,CW*shot.h/shot.w);ensure(dh+22);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(99,102,241);pdf.text('Headline metrics',M,y);y+=10;pdf.addImage(shot.img,'PNG',M,y,CW,dh);y+=dh+18;return;}
+      if(shot.kpi){const dh=Math.min(118,CW*shot.h/shot.w);ensure(dh+22);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(99,102,241);pdf.text('Headline metrics',M,y);y+=10;pdf.addImage(shot.img,'JPEG',M,y,CW,dh);y+=dh+18;return;}
       const imgH=Math.min(250,CW*shot.h/shot.w);
       ensure(imgH+58);
       pdf.setFont('helvetica','bold');pdf.setFontSize(12.5);pdf.setTextColor(22,25,33);pdf.text(shot.title||'',M,y);y+=10;
-      pdf.setFillColor(14,16,21);pdf.roundedRect(M,y,CW,imgH,6,6,'F');pdf.addImage(shot.img,'PNG',M+5,y+5,CW-10,imgH-10);y+=imgH+14;
+      pdf.setFillColor(14,16,21);pdf.roundedRect(M,y,CW,imgH,6,6,'F');pdf.addImage(shot.img,'JPEG',M+5,y+5,CW-10,imgH-10);y+=imgH+14;
       (shot.parts||[]).forEach(pt=>{ensure(20);pdf.setFont('helvetica','bold');pdf.setFontSize(8.6);pdf.setTextColor(99,102,241);pdf.text(pt[0].toUpperCase(),M,y);y+=12;pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(72,76,86);pdf.splitTextToSize(pt[1],CW).forEach(ln=>{ensure(14);pdf.text(ln,M,y);y+=14;});y+=7;});
       y+=12;pdf.setDrawColor(238,240,243);pdf.setLineWidth(.5);ensure(8);pdf.line(M,y,M+CW,y);y+=18;});});
   /* IN-DEPTH */
