@@ -18,10 +18,11 @@ import {
 
 type Tone = 'blue' | 'green' | 'amber' | 'red';
 
-function Card({ n, tone, title, sub, pills, legend, height, note, full, children }: {
+function Card({ n, tone, title, sub, pills, legend, height, note, full, empty, emptyText, children }: {
   n: string; tone: Tone; title: string; sub: string;
   pills?: string[]; legend?: ReactNode; height: number;
   note?: { tone: Tone; text: ReactNode }; children: ReactNode; full?: boolean;
+  empty?: boolean; emptyText?: string;
 }) {
   return (
     <div className={`iid-card${full ? ' full' : ''}`}>
@@ -35,9 +36,13 @@ function Card({ n, tone, title, sub, pills, legend, height, note, full, children
       {pills && pills.length > 0 && (
         <div className="iid-pills">{pills.map(p => <span key={p} className="iid-pill">{p}</span>)}</div>
       )}
-      {legend && <div className="iid-cleg">{legend}</div>}
-      <div style={height > 0 ? { height } : undefined}>{children}</div>
-      {note && <div className={`iid-note n-${note.tone}`}>{note.text}</div>}
+      {legend && !empty && <div className="iid-cleg">{legend}</div>}
+      <div style={height > 0 ? { height } : undefined}>
+        {empty
+          ? <div className="iid-empty">{emptyText || 'Not enough data was captured in this session to plot this chart yet.'}</div>
+          : children}
+      </div>
+      {note && !empty && <div className={`iid-note n-${note.tone}`}>{note.text}</div>}
     </div>
   );
 }
@@ -57,7 +62,9 @@ const heatClass = (v: number) => (v >= 7.5 ? 'c-s' : v >= 6 ? 'c-d' : v >= 4.5 ?
 export function IntelDashboard({ report }: { report: IntelReport }) {
   const m: IntelModel = useMemo(() => buildIntel(report), [report]);
 
-  if (m.turnCount === 0) return null;
+  // Always render all 12 cards; each shows an honest empty state when its source
+  // data is missing, so a sparse or abandoned session still shows the full layout.
+  const noTurns = m.turnCount === 0;
 
   // ── derived insight copy (real numbers) ───────────────────────────────────
   const vagueSilent = m.classification.filter(c => c.name === 'Vague' || c.name === 'Silent').reduce((s, c) => s + c.value, 0);
@@ -92,7 +99,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
           sub="Relevance · clarity · specificity · structure — your average across the session"
           pills={['relevance', 'clarity', 'specificity', 'structure']}
           legend={<><LLine c={COLORS.purple}>Your avg</LLine><LLine c={COLORS.teal} dashed>Ideal target</LLine></>}
-          height={272}
+          height={272} empty={noTurns}
           note={m.weakestDim ? { tone: 'blue', text: <><strong>Hidden insight — </strong>{m.weakestDim.label} is your weakest dimension at {m.weakestDim.value}/10. Lifting it toward the 8.5 target reshapes this radar the fastest — close every answer with one concrete, quantified detail.</> } : undefined}>
           <EChart option={radarOption(m)} />
         </Card>
@@ -102,42 +109,49 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
           sub="Score arc across every turn — peak window and fatigue zone"
           pills={['score (per turn)', 'total_turns']}
           legend={<><LDot c={COLORS.teal}>Strong ≥75</LDot><LDot c={COLORS.purple}>Partial 55–74</LDot><LDot c={COLORS.red}>Weak &lt;55</LDot></>}
-          height={250}
+          height={250} empty={noTurns}
           note={{ tone: dropPct >= 20 ? 'amber' : 'green', text: <><strong>Hidden insight — </strong>Peak was Q{peakIdx + 1} ({peakVal}). {dropPct > 0 ? <>Your score finishes {dropPct}% below that peak — train for longer sessions to extend your endurance window.</> : <>You held your level to the end — strong stamina.</>}</> }}>
           <EChart option={momentumOption(m)} />
         </Card>
 
         {/* 03 timing scatter */}
-        {m.hasTiming && (
-          <Card n="03" tone="amber" title="Response timing intelligence map"
-            sub="Think-time vs answer score — reveals your cognitive sweet spot"
-            pills={['answer_duration_seconds', 'classification', 'score']}
-            legend={<>{m.timing.map(g => <LDot key={g.cls} c={g.hex}>{g.label}</LDot>)}</>}
-            height={262}
-            note={{ tone: 'amber', text: <><strong>Hidden insight — </strong>Each dot is one answer: how long you took (x) against how it scored (y). Clusters far right that score low signal over-thinking; very fast + low signals impulsive answers.</> }}>
-            <EChart option={timingOption(m)} />
-          </Card>
-        )}
+        <Card n="03" tone="amber" title="Response timing intelligence map"
+          sub="Think-time vs answer score — reveals your cognitive sweet spot"
+          pills={['answer_duration_seconds', 'classification', 'score']}
+          legend={<>{m.timing.map(g => <LDot key={g.cls} c={g.hex}>{g.label}</LDot>)}</>}
+          height={262} empty={!m.hasTiming}
+          emptyText="Per-answer response times weren’t recorded for this session, so the timing map has no data to plot."
+          note={{ tone: 'amber', text: <><strong>Hidden insight — </strong>Each dot is one answer: how long you took (x) against how it scored (y). Clusters far right that score low signal over-thinking; very fast + low signals impulsive answers.</> }}>
+          <EChart option={timingOption(m)} />
+        </Card>
 
         {/* 04 decay */}
-        {m.hasDecay && (
-          <Card n="04" tone="red" title="Confidence decay pattern"
-            sub="Response time per turn — the cognitive-fatigue curve across the session"
-            pills={['answer_duration_seconds', 'per_question_response_times']}
-            legend={<><LDot c={COLORS.teal}>Fast &lt;20s</LDot><LDot c={COLORS.amber}>Slow 20–40s</LDot><LDot c={COLORS.red}>Critical &gt;40s</LDot></>}
-            height={244}
-            note={{ tone: 'red', text: <><strong>Risk signal — </strong>Watch for a rising trend: growing response times late in the session point to fatigue, not knowledge gaps. A 30-second reset between questions measurably flattens this curve.</> }}>
-            <EChart option={decayOption(m)} />
-          </Card>
-        )}
+        <Card n="04" tone="red" title="Confidence decay pattern"
+          sub="Response time per turn — the cognitive-fatigue curve across the session"
+          pills={['answer_duration_seconds', 'per_question_response_times']}
+          legend={<><LDot c={COLORS.teal}>Fast &lt;20s</LDot><LDot c={COLORS.amber}>Slow 20–40s</LDot><LDot c={COLORS.red}>Critical &gt;40s</LDot></>}
+          height={244} empty={!m.hasDecay}
+          emptyText="No per-turn response times were captured for this session, so the fatigue curve can’t be drawn."
+          note={{ tone: 'red', text: <><strong>Risk signal — </strong>Watch for a rising trend: growing response times late in the session point to fatigue, not knowledge gaps. A 30-second reset between questions measurably flattens this curve.</> }}>
+          <EChart option={decayOption(m)} />
+        </Card>
+
+        {/* 06 follow-up depth — no source in the report payload, shown as an honest empty card */}
+        <Card n="06" tone="red" title="Rabbit-hole collapse by follow-up depth"
+          sub="How answer quality holds up as the interviewer drills deeper into a topic"
+          pills={['follow_up_depth', 'score']}
+          height={244} empty
+          emptyText="Per-turn follow-up depth isn’t captured in this session’s data, so this chart has no source to draw from yet.">
+          <span />
+        </Card>
 
         <div className="iid-divider" />
 
         {/* 05 heatmap */}
-        {m.hasHeat && (
-          <Card n="05" tone="amber" title="Topic × skill heatmap — the blind-spot matrix"
+        <Card n="05" tone="amber" title="Topic × skill heatmap — the blind-spot matrix"
             sub="Every topic crossed with all four scoring dimensions (0–10)"
             pills={['rubric_category', 'relevance', 'clarity', 'specificity', 'structure']}
+            empty={!m.hasHeat} emptyText="No per-topic rubric scores were captured for this session, so the blind-spot matrix has nothing to show yet."
             height={0} full
             note={weakCell ? { tone: 'amber', text: <><strong>Hidden insight — </strong>Your weakest cell is <strong>{weakCell.dim}</strong> in <strong>{weakCell.topic}</strong> ({weakCell.v}/10). Prepare one concrete story for that topic with a measurable outcome to lift it.</> } : undefined}>
             <div className="iid-heat-wrap">
@@ -159,8 +173,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
               <span><i style={{ background: 'rgba(245,158,11,.22)' }} />Weak 4.5–5.9</span>
               <span><i style={{ background: 'rgba(239,68,68,.28)' }} />Critical &lt;4.5</span>
             </div>
-          </Card>
-        )}
+        </Card>
 
         <div className="iid-divider" />
 
@@ -168,7 +181,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         <Card n="07" tone="green" title="Answer classification breakdown"
           sub="Distribution of strong · partial · vague · silent across the session"
           pills={['classification', 'answer_status']}
-          height={252}
+          height={252} empty={m.classification.length === 0}
           note={{ tone: 'green', text: <><strong>Behaviour insight — </strong>{vagueSilent} of {m.turnCount} answers ({pct(vagueSilent, m.turnCount)}%) were vague or silent. Recruiters mentally fail a candidate after two consecutive weak answers — a partial answer always beats silence.</> }}>
           <EChart option={donutOption(m)} />
         </Card>
@@ -177,23 +190,22 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         <Card n="08" tone="red" title="Communication–content scissor effect"
           sub="Where delivery confidence and answer substance diverge — the most dangerous interview gap"
           pills={['communication_score', 'relevance', 'clarity', 'specificity', 'structure']}
-          height={236}
+          height={236} empty={noTurns}
           legend={<><LLine c={COLORS.teal}>Communication</LLine><LLine c={COLORS.red}>Content avg</LLine></>}
           note={{ tone: 'red', text: <><strong>Risk signal — </strong>When the teal line stays high while the red line drops, you sound confident but say less — the &quot;sounds good, means little&quot; trap. Keep substance rising with delivery.</> }}>
           <EChart option={scissorOption(m)} />
         </Card>
 
         {/* 09 fear vs reality */}
-        {m.hasFear && (
-          <Card n="09" tone="amber" title="Fear vs reality — topic avoidance map"
-            sub="Times skipped vs the score you actually earn when you attempt the topic"
-            pills={['classification = silent', 'rubric_category', 'score']}
-            height={292}
-            legend={<><LDot c={COLORS.red}>Times skipped</LDot><LDot c={COLORS.purple}>Score when attempted</LDot></>}
-            note={m.fear.skipped[fearIdx] > 0 ? { tone: 'amber', text: <><strong>Hidden insight — </strong>You skipped <strong>{m.fear.topics[fearIdx]}</strong> {m.fear.skipped[fearIdx]}× yet scored {m.fear.scoreWhenAttempted[fearIdx]} when you attempted it. Avoidance, not ability, is the bottleneck.</> } : { tone: 'green', text: <><strong>Behaviour insight — </strong>No topics were skipped — you engaged every question. That alone protects your real pass rate.</> }}>
-            <EChart option={fearOption(m)} />
-          </Card>
-        )}
+        <Card n="09" tone="amber" title="Fear vs reality — topic avoidance map"
+          sub="Times skipped vs the score you actually earn when you attempt the topic"
+          pills={['classification = silent', 'rubric_category', 'score']}
+          height={292} empty={!m.hasFear}
+          emptyText="No per-topic attempt/skip data was captured for this session, so the avoidance map is empty."
+          legend={<><LDot c={COLORS.red}>Times skipped</LDot><LDot c={COLORS.purple}>Score when attempted</LDot></>}
+          note={m.fear.skipped[fearIdx] > 0 ? { tone: 'amber', text: <><strong>Hidden insight — </strong>You skipped <strong>{m.fear.topics[fearIdx]}</strong> {m.fear.skipped[fearIdx]}× yet scored {m.fear.scoreWhenAttempted[fearIdx]} when you attempted it. Avoidance, not ability, is the bottleneck.</> } : { tone: 'green', text: <><strong>Behaviour insight — </strong>No topics were skipped — you engaged every question. That alone protects your real pass rate.</> }}>
+          <EChart option={fearOption(m)} />
+        </Card>
 
         {/* 10 readiness gauge */}
         <Card n="10" tone="blue" title="Technical readiness gauge"
@@ -220,21 +232,20 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 11 missing elements */}
-        {m.hasMissing && (
-          <Card n="11" tone="amber" title="Missing elements frequency — systemic gap analysis" full
-            sub="What the evaluator found absent across your answers, ranked by frequency"
-            pills={['missing_elements']}
-            height={Math.max(240, m.missing.length * 44 + 60)}
-            note={topMissing ? { tone: 'amber', text: <><strong>Hidden insight — </strong>&quot;{topMissing.label}&quot; was flagged in {topMissing.count} of {m.turnCount} answers — your highest-frequency gap. Fixing this one habit is the highest-ROI change available.</> } : undefined}>
-            <EChart option={missingOption(m)} />
-          </Card>
-        )}
+        <Card n="11" tone="amber" title="Missing elements frequency — systemic gap analysis" full
+          sub="What the evaluator found absent across your answers, ranked by frequency"
+          pills={['missing_elements']}
+          height={Math.max(240, m.missing.length * 44 + 60)} empty={!m.hasMissing}
+          emptyText="The evaluator didn’t record any missing-element tags for this session, so there’s no gap analysis to chart."
+          note={topMissing ? { tone: 'amber', text: <><strong>Hidden insight — </strong>&quot;{topMissing.label}&quot; was flagged in {topMissing.count} of {m.turnCount} answers — your highest-frequency gap. Fixing this one habit is the highest-ROI change available.</> } : undefined}>
+          <EChart option={missingOption(m)} />
+        </Card>
 
         {/* 12 waterfall */}
         <Card n="12" tone="blue" title={`Score contribution waterfall — what built your ${m.finalScore}`} full
           sub="Each dimension's positive contribution and each penalty's drag on the final score"
           pills={['rubric_scores', 'timeout_count', 'skipped_count', 'classification']}
-          height={300}
+          height={300} empty={noTurns}
           legend={<><LDot c={COLORS.purple}>Base / Final</LDot><LDot c={COLORS.teal}>Contribution</LDot><LDot c={COLORS.red}>Penalty</LDot></>}
           note={biggestPos ? { tone: 'blue', text: <><strong>Performance insight — </strong>{biggestPos.l.replace('+', '')} was your biggest positive (+{biggestPos.v}). Eliminating avoidable penalties — giving even a partial answer instead of silence — is the cleanest path past 70.</> } : undefined}>
           <EChart option={waterfallOption(m)} />
@@ -273,6 +284,7 @@ const CSS = `
 .iid-note.n-red { background:rgba(239,68,68,.07); border-color:#EF4444; } .iid-note.n-red strong { color:#FC8181; }
 .iid-note.n-amber { background:rgba(245,158,11,.07); border-color:#F59E0B; } .iid-note.n-amber strong { color:#FCD34D; }
 .iid-divider { height:1px; background:linear-gradient(90deg, transparent, rgba(139,92,246,.2), transparent); margin:4px 0; }
+.iid-empty { height:100%; min-height:170px; display:flex; align-items:center; justify-content:center; text-align:center; padding:18px 22px; font-size:.78rem; line-height:1.6; color:#5A6B8C; background:rgba(255,255,255,.015); border:1px dashed rgba(255,255,255,.09); border-radius:12px; }
 .iid-heat-wrap { overflow-x:auto; }
 .iid-heat { width:100%; border-collapse:separate; border-spacing:5px; font-size:.78rem; }
 .iid-heat th { padding:5px 10px; color:#8A9BBF; font-weight:500; text-align:center; font-size:.72rem; }
