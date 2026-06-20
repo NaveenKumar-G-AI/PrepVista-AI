@@ -956,7 +956,17 @@ function buildPDF(sections,C){
   header('Recommendations','Priority actions for the placement cell');
   an.recs.forEach((r,i)=>{ensure(46);pdf.setFillColor(99,102,241);pdf.circle(M+9,y-3,9,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.setTextColor(255,255,255);pdf.text(String(i+1),M+9,y,{align:'center'});pdf.setFont('helvetica','bold');pdf.setFontSize(11.5);pdf.setTextColor(24,27,35);pdf.text(r.t,M+28,y);y+=7;pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(75,79,89);pdf.splitTextToSize(r.d,CW-28).forEach(ln=>{ensure(14);pdf.text(ln,M+28,y+8);y+=13;});y+=16;});
   ensure(46);y+=8;pdf.setDrawColor(229,231,235);pdf.line(M,y,M+CW,y);y+=18;pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.setTextColor(99,102,241);pdf.text('PrepVista',M,y);pdf.setFont('helvetica','normal');pdf.setTextColor(120,125,138);pdf.text(' — turning interview practice into placement outcomes.',M+50,y);
-  pdf.save('PrepVista_Placement_Report_'+BATCH.replace(/\s+/g,'_')+'.pdf');
+  /* Robust download: when this dashboard runs inside the analytics <iframe>,
+     Chrome blocks downloads initiated from within the frame, so trigger it from
+     the top-level document instead (same-origin). Falls back to jsPDF's saver. */
+  const _fname='PrepVista_Placement_Report_'+BATCH.replace(/\s+/g,'_')+'.pdf';
+  try{
+    const _blob=pdf.output('blob');const _url=URL.createObjectURL(_blob);
+    let _doc=document;try{if(window.top&&window.top!==window&&window.top.document)_doc=window.top.document;}catch(_e){_doc=document;}
+    const _a=_doc.createElement('a');_a.href=_url;_a.download=_fname;_a.style.display='none';
+    _doc.body.appendChild(_a);_a.click();
+    setTimeout(()=>{try{_doc.body.removeChild(_a);}catch(_e){}URL.revokeObjectURL(_url);},1500);
+  }catch(_e){pdf.save(_fname);}
 }
 document.getElementById('dlBtn').onclick=()=>exportPDF();
 /* ── Real-data seam: parent (org-admin) injects live cohort via PVCC.load ── */
