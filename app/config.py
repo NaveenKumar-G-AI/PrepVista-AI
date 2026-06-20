@@ -794,8 +794,15 @@ def get_cors_origins() -> list[str]:
     raw = get_settings().CORS_ALLOWED_ORIGINS or "http://localhost:3000"
     origins = [o.strip() for o in raw.split(",") if o.strip()]
     
-    # Safely inject production frontend origins to prevent CORS errors even if env vars are misconfigured
-    for required_domain in ["https://www.prepvistaai.com", "https://prepvistaai.com"]:
+    # Safely inject production frontend origins to prevent CORS errors even if env vars are misconfigured.
+    # Includes the Render-hosted frontend (*.onrender.com) — without it, preflight OPTIONS from that
+    # origin get a 400 "Disallowed CORS origin" from Starlette's CORSMiddleware (no ACAO header), which
+    # the browser surfaces as the misleading "No 'Access-Control-Allow-Origin' header is present" error.
+    for required_domain in [
+        "https://www.prepvistaai.com",
+        "https://prepvistaai.com",
+        "https://prepvistaai.onrender.com",
+    ]:
         if required_domain not in origins:
             origins.append(required_domain)
             
