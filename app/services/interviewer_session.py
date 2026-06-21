@@ -470,11 +470,26 @@ async def process_answer(
                LIMIT 60""",  # 60 covers 3× max_turns for any plan — safe upper bound
             session_id,
         )
-        # Split into the two views the rest of the function needs
-        history_rows = list(reversed(all_message_rows[-max_history:])) if max_history else list(reversed(all_message_rows))
+        # Split into the two views the rest of the function needs.
+        # IMPORTANT: history_rows MUST stay in chronological (oldest -> newest)
+        # order. all_message_rows is already ordered ASC, so we only window it;
+        # we do NOT reverse it.
+        #
+        # A previous version wrapped this slice in reversed(), which broke two
+        # things at once:
+        #   1. conversation_history was sent to the LLM newest-first (the model
+        #      saw the interview backwards and kept repeating questions).
+        #   2. last_assistant_row = next(reversed(history_rows) ...) then resolved
+        #      to the OLDEST assistant message in the window (the opening
+        #      "introduce yourself" question) instead of the most recent one, so
+        #      every early turn's evaluation was stored against the wrong
+        #      question_text. That is why Q1-Q8 all showed the opening question.
+        history_rows = list(all_message_rows[-max_history:]) if max_history else list(all_message_rows)
         asked_rows = [row for row in all_message_rows if row["role"] == "assistant"]
 
         conversation_history = [{"role": row["role"], "content": row["content"]} for row in history_rows]
+        # history_rows is chronological, so reversed() here correctly yields the
+        # MOST RECENT assistant question — the one the candidate just answered.
         last_assistant_row = next((row for row in reversed(history_rows) if row["role"] == "assistant"), None)
         asked_question_signatures = _extract_asked_question_signatures(asked_rows)
         asked_questions = _collect_asked_questions(asked_rows)

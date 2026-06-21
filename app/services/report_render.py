@@ -220,30 +220,33 @@ def _render_career_summary(pdf, summary: dict) -> None:
     card_4 = _render_info_card(pdf, grid_x + card_w + gap, row_2_y, card_w, "Main Blocker", main_blocker)
     pdf.set_y(row_2_y + max(card_3, card_4) + 4)
 
-    impression_y = pdf.get_y()
+    box_width = pdf.w - pdf.l_margin - pdf.r_margin
+
+    # Each labeled box must fit as one unit. Pre-measure and move the whole box
+    # to the next page if it would otherwise split (label on one page, body on
+    # the next) — the original cause of the large blank gaps in the report.
+    impression_y = _place_labeled_box(pdf, recruiter_impression, box_width)
     impression_h = _render_labeled_box(
-        pdf, pdf.l_margin, impression_y,
-        pdf.w - pdf.l_margin - pdf.r_margin,
+        pdf, pdf.l_margin, impression_y, box_width,
         "Recruiter Impression", recruiter_impression,
         (23, 37, 84), (238, 242, 255),
     )
     pdf.set_y(impression_y + impression_h + 3)
 
-    risk_y = pdf.get_y()
+    risk_y = _place_labeled_box(pdf, fastest_next, box_width)
     top_risk_h = _render_labeled_box(
-        pdf, pdf.l_margin, risk_y,
-        pdf.w - pdf.l_margin - pdf.r_margin,
+        pdf, pdf.l_margin, risk_y, box_width,
         "Fastest Next Improvement", fastest_next,
         (153, 27, 27), (254, 242, 242),
     )
     pdf.set_y(risk_y + top_risk_h + 3)
 
-    improvement_y = pdf.get_y()
+    best_sample_style = _safe_pdf_text(summary.get("best_sample_answer_style", ""))
+    improvement_y = _place_labeled_box(pdf, best_sample_style, box_width)
     improvement_h = _render_labeled_box(
-        pdf, pdf.l_margin, improvement_y,
-        pdf.w - pdf.l_margin - pdf.r_margin,
+        pdf, pdf.l_margin, improvement_y, box_width,
         "Best Sample Answer Style",
-        _safe_pdf_text(summary.get("best_sample_answer_style", "")),
+        best_sample_style,
         (180, 83, 9), (255, 251, 235),
     )
     pdf.set_y(improvement_y + improvement_h + 3)
@@ -289,22 +292,24 @@ def _render_pro_summary(pdf, summary: dict) -> None:
     )
     pdf.set_y(grid_y + max(card_1, card_2) + 4)
 
-    blocker_y = pdf.get_y()
+    box_width = pdf.w - pdf.l_margin - pdf.r_margin
+
+    main_blocker = _safe_pdf_text(summary.get("main_blocker", ""))
+    blocker_y = _place_labeled_box(pdf, main_blocker, box_width)
     blocker_h = _render_labeled_box(
-        pdf, pdf.l_margin, blocker_y,
-        pdf.w - pdf.l_margin - pdf.r_margin,
+        pdf, pdf.l_margin, blocker_y, box_width,
         "Main Blocker",
-        _safe_pdf_text(summary.get("main_blocker", "")),
+        main_blocker,
         (153, 27, 27), (254, 242, 242),
     )
     pdf.set_y(blocker_y + blocker_h + 3)
 
-    impression_y = pdf.get_y()
+    tech_impression = _safe_pdf_text(summary.get("technical_interview_impression", ""))
+    impression_y = _place_labeled_box(pdf, tech_impression, box_width)
     impression_h = _render_labeled_box(
-        pdf, pdf.l_margin, impression_y,
-        pdf.w - pdf.l_margin - pdf.r_margin,
+        pdf, pdf.l_margin, impression_y, box_width,
         "Technical Interview Impression",
-        _safe_pdf_text(summary.get("technical_interview_impression", "")),
+        tech_impression,
         (37, 99, 235), (239, 246, 255),
     )
     pdf.set_y(impression_y + impression_h + 4)
@@ -313,6 +318,20 @@ def _render_pro_summary(pdf, summary: dict) -> None:
 def _measure_labeled_box_height(pdf, text: str, width: float, line_height: float = 4.8) -> float:
     pdf.set_font("Helvetica", "", 10)
     return max(18.0, _estimate_block_height(pdf, text, width - 8, line_height) + 9.5)
+
+
+def _place_labeled_box(pdf, text: str, width: float, gap: float = 3.0) -> float:
+    """Pre-measure a labeled box and ensure the whole block fits on the current
+    page before it is drawn. Returns the y at which the caller should draw it.
+
+    Without this, a box whose label fits at the bottom of a page but whose body
+    does not would split across two pages — fpdf's auto page-break fires mid
+    multi_cell, stranding the coloured label alone and leaving a large blank
+    gap. Keeping the box intact removes that wasted whitespace.
+    """
+    needed = _measure_labeled_box_height(pdf, _safe_pdf_text(text) or "Not available.", width)
+    _ensure_page_capacity(pdf, needed + gap)
+    return pdf.get_y()
 
 
 def _render_labeled_box(
