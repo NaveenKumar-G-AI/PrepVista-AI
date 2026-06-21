@@ -9,6 +9,12 @@ import { ArrowUpRightIcon, ChartIcon, CrownIcon, PlayIcon, SparklesIcon, TargetI
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { getStartInterviewHref, isUnlimitedUsage, hasRemainingUsage, PlanUsage } from '@/lib/plan-usage';
+import { IntelDashboard } from '@/app/report/[id]/_intel/dashboard';
+import type { IntelReport } from '@/app/report/[id]/_intel/model';
+
+// Full /reports/{id} payload accepted by IntelDashboard, plus the premium flag
+// the report endpoint returns so we only show the charts to premium plans.
+type SessionReport = IntelReport & { has_premium_access?: boolean };
 
 interface DashboardAnalytics {
   user: {
@@ -30,6 +36,7 @@ interface DashboardAnalytics {
     improvement_signal: string;
     next_step: string;
   };
+  current_feedback_session_id?: string | null;
 }
 
 interface SkillTrendResponse {
@@ -71,6 +78,7 @@ export default function AnalyticsPage() {
   const { user, loading: authLoading } = useAuth();
   const [dashboard, setDashboard] = useState<DashboardAnalytics | null>(null);
   const [trends, setTrends] = useState<SkillTrendResponse | null>(null);
+  const [report, setReport] = useState<SessionReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -91,9 +99,21 @@ export default function AnalyticsPage() {
       api.getDashboard<DashboardAnalytics>(),
       api.getSkills<SkillTrendResponse>(),
     ])
-      .then(([dashboardData, trendData]) => {
+      .then(async ([dashboardData, trendData]) => {
         setDashboard(dashboardData);
         setTrends(trendData);
+        // Pull the latest finished session's full report so we can render the
+        // 12-chart Interview Intelligence dashboard (with its per-chart insight
+        // notes) here too. Non-fatal: the rest of the page renders regardless.
+        const latestSessionId = dashboardData.current_feedback_session_id;
+        if (latestSessionId) {
+          try {
+            const reportData = await api.getReport<SessionReport>(latestSessionId);
+            setReport(reportData);
+          } catch {
+            setReport(null);
+          }
+        }
       })
       .catch(err => {
         setError(err instanceof Error ? err.message : 'Failed to load analytics.');
@@ -384,6 +404,21 @@ export default function AnalyticsPage() {
             </div>
           )}
         </section>
+
+        {report && report.has_premium_access ? (
+          <section className="mt-8 slide-up">
+            <div className="mb-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">Interview intelligence</div>
+              <h2 className="mt-2 text-2xl font-semibold text-primary">Your latest session, fully decoded</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-7 text-secondary">
+                Twelve premium analytics with built-in AI coaching insight on each chart, derived from your most recent completed interview.
+              </p>
+            </div>
+            <div className="rounded-[24px] border border-white/10 bg-[#0B1120] p-5 sm:p-7 shadow-[0_28px_70px_rgba(2,8,23,0.32)]">
+              <IntelDashboard report={report} />
+            </div>
+          </section>
+        ) : null}
 
         <section className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_0.9fr] slide-up">
           <div className="card p-6">

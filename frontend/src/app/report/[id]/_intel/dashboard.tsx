@@ -11,18 +11,36 @@
 import { useMemo, type ReactNode } from 'react';
 import { EChart } from '@/components/charts/echart';
 import { buildIntel, COLORS, type IntelReport, type IntelModel } from './model';
+import { buildExplanations, type ChartExplain } from './explain';
 import {
-  radarOption, momentumOption, timingOption, decayOption,
+  radarOption, momentumOption, timingOption, decayOption, followDepthOption,
   donutOption, scissorOption, fearOption, missingOption, waterfallOption,
 } from './options';
 
 type Tone = 'blue' | 'green' | 'amber' | 'red';
 
-function Card({ n, tone, title, sub, pills, legend, height, note, full, empty, emptyText, children }: {
+function ExplainPanel({ x }: { x: ChartExplain }) {
+  return (
+    <details className="iid-explain">
+      <summary>
+        <span className="iid-exp-ic">✦</span> Full coaching breakdown for you
+        <span className="iid-exp-chev">▾</span>
+      </summary>
+      <div className="iid-exp-body">
+        <p><span className="iid-exp-lbl">What it shows</span>{x.whatItShows}</p>
+        <p><span className="iid-exp-lbl t-talent">Your talent</span>{x.talent}</p>
+        <p><span className="iid-exp-lbl t-draw">The drawback</span>{x.drawback}</p>
+        <p><span className="iid-exp-lbl t-att">What needs attention</span>{x.attention}</p>
+      </div>
+    </details>
+  );
+}
+
+function Card({ n, tone, title, sub, pills, legend, height, note, full, empty, emptyText, explain, children }: {
   n: string; tone: Tone; title: string; sub: string;
   pills?: string[]; legend?: ReactNode; height: number;
   note?: { tone: Tone; text: ReactNode }; children: ReactNode; full?: boolean;
-  empty?: boolean; emptyText?: string;
+  empty?: boolean; emptyText?: string; explain?: ChartExplain | null;
 }) {
   return (
     <div className={`iid-card${full ? ' full' : ''}`}>
@@ -43,6 +61,7 @@ function Card({ n, tone, title, sub, pills, legend, height, note, full, empty, e
           : children}
       </div>
       {note && !empty && <div className={`iid-note n-${note.tone}`}>{note.text}</div>}
+      {explain && !empty && <ExplainPanel x={explain} />}
     </div>
   );
 }
@@ -59,8 +78,12 @@ const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / who
 // Cell colour bucket for the heatmap (0–10 scale, mock thresholds).
 const heatClass = (v: number) => (v >= 7.5 ? 'c-s' : v >= 6 ? 'c-d' : v >= 4.5 ? 'c-w' : 'c-c');
 
-export function IntelDashboard({ report }: { report: IntelReport }) {
+export function IntelDashboard({ report, explain = true }: { report: IntelReport; explain?: boolean }) {
   const m: IntelModel = useMemo(() => buildIntel(report), [report]);
+  // Full per-chart student coaching write-ups, recomputed from the live model so
+  // the words always match (and change with) the numbers on screen.
+  const ex = useMemo(() => buildExplanations(m), [m]);
+  const xp = (id: string): ChartExplain | null => (explain ? ex[id] ?? null : null);
 
   // Always render all 12 cards; each shows an honest empty state when its source
   // data is missing, so a sparse or abandoned session still shows the full layout.
@@ -95,7 +118,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
 
       <div className="iid-grid">
         {/* 01 radar */}
-        <Card n="01" tone="blue" title="Answer quality fingerprint"
+        <Card n="01" explain={xp('01')} tone="blue" title="Answer quality fingerprint"
           sub="Relevance · clarity · specificity · structure — your average across the session"
           pills={['relevance', 'clarity', 'specificity', 'structure']}
           legend={<><LLine c={COLORS.purple}>Your avg</LLine><LLine c={COLORS.teal} dashed>Ideal target</LLine></>}
@@ -105,7 +128,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 02 momentum */}
-        <Card n="02" tone="blue" title="Session momentum curve"
+        <Card n="02" explain={xp('02')} tone="blue" title="Session momentum curve"
           sub="Score arc across every turn — peak window and fatigue zone"
           pills={['score (per turn)', 'total_turns']}
           legend={<><LDot c={COLORS.teal}>Strong ≥75</LDot><LDot c={COLORS.purple}>Partial 55–74</LDot><LDot c={COLORS.red}>Weak &lt;55</LDot></>}
@@ -115,7 +138,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 03 timing scatter */}
-        <Card n="03" tone="amber" title="Response timing intelligence map"
+        <Card n="03" explain={xp('03')} tone="amber" title="Response timing intelligence map"
           sub="Think-time vs answer score — reveals your cognitive sweet spot"
           pills={['answer_duration_seconds', 'classification', 'score']}
           legend={<>{m.timing.map(g => <LDot key={g.cls} c={g.hex}>{g.label}</LDot>)}</>}
@@ -126,7 +149,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 04 decay */}
-        <Card n="04" tone="red" title="Confidence decay pattern"
+        <Card n="04" explain={xp('04')} tone="red" title="Confidence decay pattern"
           sub="Response time per turn — the cognitive-fatigue curve across the session"
           pills={['answer_duration_seconds', 'per_question_response_times']}
           legend={<><LDot c={COLORS.teal}>Fast &lt;20s</LDot><LDot c={COLORS.amber}>Slow 20–40s</LDot><LDot c={COLORS.red}>Critical &gt;40s</LDot></>}
@@ -136,19 +159,21 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
           <EChart option={decayOption(m)} />
         </Card>
 
-        {/* 06 follow-up depth — no source in the report payload, shown as an honest empty card */}
-        <Card n="06" tone="red" title="Rabbit-hole collapse by follow-up depth"
+        {/* 06 follow-up depth — derived from runs of consecutive same-topic turns */}
+        <Card n="06" explain={xp('06')} tone="red" title="Rabbit-hole collapse by follow-up depth"
           sub="How answer quality holds up as the interviewer drills deeper into a topic"
-          pills={['follow_up_depth', 'score']}
-          height={244} empty
-          emptyText="Per-turn follow-up depth isn’t captured in this session’s data, so this chart has no source to draw from yet.">
-          <span />
+          pills={['rubric_category', 'score']}
+          legend={<><LDot c={COLORS.teal}>Strong ≥75</LDot><LDot c={COLORS.purple}>Partial 55–74</LDot><LDot c={COLORS.red}>Weak &lt;55</LDot></>}
+          height={244} empty={!m.hasFollowDepth}
+          emptyText="Every topic was asked only once in this session, so there were no deeper follow-ups to chart yet — drilling the same topic across turns unlocks this view."
+          note={{ tone: 'red', text: <><strong>Hidden insight — </strong>Each step right is a deeper follow-up on the same topic. A line that falls as depth grows is a rabbit-hole collapse: you open well but lose ground when pushed for detail — prepare one layer deeper on every core story.</> }}>
+          <EChart option={followDepthOption(m)} />
         </Card>
 
         <div className="iid-divider" />
 
         {/* 05 heatmap */}
-        <Card n="05" tone="amber" title="Topic × skill heatmap — the blind-spot matrix"
+        <Card n="05" explain={xp('05')} tone="amber" title="Topic × skill heatmap — the blind-spot matrix"
             sub="Every topic crossed with all four scoring dimensions (0–10)"
             pills={['rubric_category', 'relevance', 'clarity', 'specificity', 'structure']}
             empty={!m.hasHeat} emptyText="No per-topic rubric scores were captured for this session, so the blind-spot matrix has nothing to show yet."
@@ -178,7 +203,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         <div className="iid-divider" />
 
         {/* 07 classification donut */}
-        <Card n="07" tone="green" title="Answer classification breakdown"
+        <Card n="07" explain={xp('07')} tone="green" title="Answer classification breakdown"
           sub="Distribution of strong · partial · vague · silent across the session"
           pills={['classification', 'answer_status']}
           height={252} empty={m.classification.length === 0}
@@ -187,7 +212,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 08 scissor */}
-        <Card n="08" tone="red" title="Communication–content scissor effect"
+        <Card n="08" explain={xp('08')} tone="red" title="Communication–content scissor effect"
           sub="Where delivery confidence and answer substance diverge — the most dangerous interview gap"
           pills={['communication_score', 'relevance', 'clarity', 'specificity', 'structure']}
           height={236} empty={noTurns}
@@ -197,7 +222,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 09 fear vs reality */}
-        <Card n="09" tone="amber" title="Fear vs reality — topic avoidance map"
+        <Card n="09" explain={xp('09')} tone="amber" title="Fear vs reality — topic avoidance map"
           sub="Times skipped vs the score you actually earn when you attempt the topic"
           pills={['classification = silent', 'rubric_category', 'score']}
           height={292} empty={!m.hasFear}
@@ -208,7 +233,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 10 readiness gauge */}
-        <Card n="10" tone="blue" title="Technical readiness gauge"
+        <Card n="10" explain={xp('10')} tone="blue" title="Technical readiness gauge"
           sub="Composite job-readiness score with zone classification"
           pills={['final_score', 'readiness band']}
           height={0}
@@ -232,7 +257,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 11 missing elements */}
-        <Card n="11" tone="amber" title="Missing elements frequency — systemic gap analysis" full
+        <Card n="11" explain={xp('11')} tone="amber" title="Missing elements frequency — systemic gap analysis" full
           sub="What the evaluator found absent across your answers, ranked by frequency"
           pills={['missing_elements']}
           height={Math.max(240, m.missing.length * 44 + 60)} empty={!m.hasMissing}
@@ -242,7 +267,7 @@ export function IntelDashboard({ report }: { report: IntelReport }) {
         </Card>
 
         {/* 12 waterfall */}
-        <Card n="12" tone="blue" title={`Score contribution waterfall — what built your ${m.finalScore}`} full
+        <Card n="12" explain={xp('12')} tone="blue" title={`Score contribution waterfall — what built your ${m.finalScore}`} full
           sub="Each dimension's positive contribution and each penalty's drag on the final score"
           pills={['rubric_scores', 'timeout_count', 'skipped_count', 'classification']}
           height={300} empty={noTurns}
@@ -283,6 +308,20 @@ const CSS = `
 .iid-note.n-green { background:rgba(16,185,129,.07); border-color:#10B981; } .iid-note.n-green strong { color:#34D399; }
 .iid-note.n-red { background:rgba(239,68,68,.07); border-color:#EF4444; } .iid-note.n-red strong { color:#FC8181; }
 .iid-note.n-amber { background:rgba(245,158,11,.07); border-color:#F59E0B; } .iid-note.n-amber strong { color:#FCD34D; }
+.iid-explain { margin-top:12px; border:1px solid rgba(139,92,246,.18); border-radius:11px; background:rgba(139,92,246,.05); overflow:hidden; }
+.iid-explain > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; padding:10px 14px; font-size:.74rem; font-weight:700; letter-spacing:.02em; color:#C4B5FD; user-select:none; }
+.iid-explain > summary::-webkit-details-marker { display:none; }
+.iid-explain > summary:hover { background:rgba(139,92,246,.09); }
+.iid-exp-ic { color:#A78BFA; }
+.iid-exp-chev { margin-left:auto; transition:transform .2s; font-size:.7rem; color:#8A9BBF; }
+.iid-explain[open] > summary .iid-exp-chev { transform:rotate(180deg); }
+.iid-exp-body { padding:4px 14px 14px; }
+.iid-exp-body p { margin:11px 0 0; font-size:.76rem; line-height:1.7; color:#B7C4DD; }
+.iid-exp-body p:first-child { margin-top:4px; }
+.iid-exp-lbl { display:block; font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; margin-bottom:3px; color:#8A9BBF; }
+.iid-exp-lbl.t-talent { color:#34D399; }
+.iid-exp-lbl.t-draw { color:#FC8181; }
+.iid-exp-lbl.t-att { color:#FCD34D; }
 .iid-divider { height:1px; background:linear-gradient(90deg, transparent, rgba(139,92,246,.2), transparent); margin:4px 0; }
 .iid-empty { height:100%; min-height:170px; display:flex; align-items:center; justify-content:center; text-align:center; padding:18px 22px; font-size:.78rem; line-height:1.6; color:#5A6B8C; background:rgba(255,255,255,.015); border:1px dashed rgba(255,255,255,.09); border-radius:12px; }
 .iid-heat-wrap { overflow-x:auto; }
