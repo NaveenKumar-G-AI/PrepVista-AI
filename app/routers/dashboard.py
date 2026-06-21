@@ -60,6 +60,17 @@ logger = structlog.get_logger("prepvista.dashboard")
 # that any real gap is caught promptly on the next uncached load.
 _BACKFILL_COOLDOWN: TTLCache = TTLCache(maxsize=5_000, ttl=60)
 
+# ── Public-growth banner cache ───────────────────────────────────────────────
+# GET /public-growth is hit by EVERY anonymous landing/login visitor, yet it runs
+# 3 sequential DB round-trips (a full COUNT(*) over profiles + launch-offer reads).
+# With the DB a quarter-second away (cross-region), that's ~750ms on the critical
+# first-paint path for everyone. The payload is global (not per-user) and counts
+# are deliberately fuzzed to "10+", so a few seconds of staleness is invisible.
+# One in-process cache covers all traffic (WEB_CONCURRENCY=1). Result: the first
+# visitor each window pays the DB cost; everyone else gets an instant cache hit.
+_PUBLIC_GROWTH_CACHE: TTLCache = TTLCache(maxsize=1, ttl=30)
+_PUBLIC_GROWTH_KEY = "public_growth"
+
 
 async def _backfill_with_cooldown(conn, user_id: str) -> None:
     """Run backfill only if this user has not had one in the last 60 seconds."""
@@ -329,9 +340,18 @@ async def get_dashboard(user: UserProfile = Depends(get_current_user)):
 
 @router.get("/public-growth")
 async def get_public_growth_banner():
-    """Return public-facing user-count messaging for login and landing UI."""
+    """Return public-facing user-count messaging for login and landing UI.
+
+    Served from a 30s in-process cache so the universal landing/login path does
+    not pay 3 cross-region DB round-trips on every visit. See _PUBLIC_GROWTH_CACHE.
+    """
+    cached = _PUBLIC_GROWTH_CACHE.get(_PUBLIC_GROWTH_KEY)
+    if cached is not None:
+        return cached
     async with DatabaseConnection() as conn:
-        return await get_public_growth_metrics(conn)
+        metrics = await get_public_growth_metrics(conn)
+    _PUBLIC_GROWTH_CACHE[_PUBLIC_GROWTH_KEY] = metrics
+    return metrics
 
 
 @router.get("/sessions")
