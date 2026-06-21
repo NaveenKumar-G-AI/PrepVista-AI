@@ -11,9 +11,9 @@
  *   • relevance/clarity/specificity/structure  0–2 each → surfaced ×5 as 0–10 dims
  *   • `final_score`              0–100
  *
- * The mock's chart #6 (rabbit-hole collapse by follow-up depth) is intentionally
- * omitted: the report payload carries no per-turn follow-up depth, so there is no
- * honest source for it.
+ * Chart #6 (rabbit-hole collapse by follow-up depth) derives "follow-up depth"
+ * from runs of consecutive same-topic turns (see below) — an honest signal built
+ * from the per-turn rubric_category + score already in the payload.
  */
 
 // ── Minimal shape of the report payload this module consumes ──────────────────
@@ -109,6 +109,10 @@ export interface IntelModel {
   heatCells: number[][];        // [topicIdx][dimIdx]
   hasHeat: boolean;
 
+  // 06 — rabbit-hole collapse by follow-up depth (avg score per depth, 0–100)
+  followDepth: { depths: string[]; scores: number[]; counts: number[] };
+  hasFollowDepth: boolean;
+
   // 07 — classification donut
   classification: { name: string; value: number; hex: string }[];
 
@@ -177,6 +181,30 @@ export function buildIntel(report: IntelReport): IntelModel {
     DIMS.map(d => round(avg(byCat[t].map(e => dim10(dimScore(e, d)))), 1)),
   );
   const hasHeat = heatTopics.length > 0 && heatCells.some(row => row.some(v => v > 0));
+
+  // ── 06 rabbit-hole collapse by follow-up depth ──────────────────────────────
+  // "Follow-up depth" = position within a run of consecutive turns on the SAME
+  // topic (rubric_category): depth 1 is the opening question on a topic, depth 2
+  // its first follow-up, and so on. Averaging the answer score at each depth
+  // reveals whether quality collapses as the interviewer drills deeper. Derived
+  // purely from real per-turn data already in the payload — no new source needed.
+  const depthScores: Record<number, number[]> = {};
+  let runDepth = 0;
+  let prevCat: string | null = null;
+  evals.forEach(e => {
+    const cat = e.rubric_category || 'General';
+    runDepth = cat === prevCat ? runDepth + 1 : 1;
+    prevCat = cat;
+    (depthScores[runDepth] ??= []).push(to100(e.score));
+  });
+  const depthKeys = Object.keys(depthScores).map(Number).sort((a, b) => a - b);
+  const followDepth = {
+    depths: depthKeys.map(d => 'Depth ' + d),
+    scores: depthKeys.map(d => round(avg(depthScores[d]))),
+    counts: depthKeys.map(d => depthScores[d].length),
+  };
+  // Honest only when at least one topic was actually drilled to depth ≥ 2.
+  const hasFollowDepth = depthKeys.some(d => d >= 2);
 
   // ── 07 classification donut ─────────────────────────────────────────────────
   const clsCounts: Record<string, number> = {};
@@ -281,6 +309,8 @@ export function buildIntel(report: IntelReport): IntelModel {
     heatDims,
     heatCells,
     hasHeat,
+    followDepth,
+    hasFollowDepth,
     classification,
     scissor,
     fear,

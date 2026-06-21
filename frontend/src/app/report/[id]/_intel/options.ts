@@ -105,6 +105,30 @@ export function decayOption(m: IntelModel): EChartsOption {
   } as EChartsOption;
 }
 
+// ── 06 rabbit-hole collapse by follow-up depth ───────────────────────────────
+export function followDepthOption(m: IntelModel): EChartsOption {
+  return {
+    grid: { left: 42, right: 18, top: 16, bottom: 28 },
+    tooltip: {
+      ...TIP, trigger: 'axis',
+      formatter: (p: any) => {
+        const i = p[0].dataIndex;
+        const c = m.followDepth.counts[i];
+        return `${m.followDepth.depths[i]}<br/>Avg score ${p[0].value}<br/>${c} answer${c === 1 ? '' : 's'}`;
+      },
+    },
+    xAxis: { type: 'category', data: m.followDepth.depths, ...AXIS },
+    yAxis: { type: 'value', name: 'Avg score', nameLocation: 'middle', nameGap: 32, nameTextStyle: { color: '#8A9BBF', fontSize: 10.5 }, min: 0, max: 100, ...AXIS },
+    series: [{
+      type: 'line', data: m.followDepth.scores, smooth: 0.3, symbolSize: 8,
+      lineStyle: { width: 2.5, color: COLORS.coral },
+      itemStyle: { color: (p: any) => ptColor(p.value), borderWidth: 0 },
+      areaStyle: { color: vgrad('rgba(249,115,22,.26)', 'rgba(249,115,22,.01)') },
+    }],
+    animationDuration: 800,
+  } as EChartsOption;
+}
+
 // ── 07 classification donut ──────────────────────────────────────────────────
 export function donutOption(m: IntelModel): EChartsOption {
   return {
