@@ -40,6 +40,37 @@ from app.services.transcript import normalize_transcript, clean_for_display
 
 logger = structlog.get_logger("prepvista.interviewer")
 
+# Banned conversational preambles (Master Prompt Gate 1 / TEST_004). A real
+# interviewer opens with the question itself, not filler acknowledgement. These
+# are stripped only when they LEAD the message, so a question that legitimately
+# contains the word "interesting" mid-sentence is untouched.
+_BANNED_PREAMBLES = (
+    "that gives me useful context",
+    "that's helpful",
+    "that is helpful",
+    "great answer",
+    "good answer",
+    "interesting",
+    "thank you for sharing that",
+    "thank you for sharing",
+    "thanks for sharing",
+    "i appreciate that",
+    "got it",
+)
+_BANNED_PREAMBLE_RE = re.compile(
+    r"^\s*(?:" + "|".join(re.escape(p) for p in _BANNED_PREAMBLES) + r")\b[\s.,!:;—-]*",
+    flags=re.IGNORECASE,
+)
+
+
+def _strip_banned_preamble(text: str) -> str:
+    """Remove a single leading banned acknowledgement and re-capitalise."""
+    stripped = _BANNED_PREAMBLE_RE.sub("", text, count=1).lstrip()
+    if stripped and stripped != text:
+        stripped = stripped[0].upper() + stripped[1:]
+    return stripped or text
+
+
 def _clean_ai_response(text: str) -> str:
     """Strip leaked internal classifier labels and keep one clean interviewer message.
 
@@ -75,6 +106,8 @@ def _clean_ai_response(text: str) -> str:
             # Otherwise join as a single space-separated string to avoid rendering
             # issues while still keeping the full question content.
             cleaned = " ".join(lines)
+
+    cleaned = _strip_banned_preamble(cleaned)
 
     return cleaned
 

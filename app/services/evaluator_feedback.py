@@ -115,6 +115,19 @@ def _trim_to_sentence_count(text: str, max_sentences: int = 3, max_chars: int = 
     return value
 
 
+# Single-letter concept stand-ins (Master Prompt Prohibition 1): a verb or
+# connector followed by a lone capital letter used where a real term belongs,
+# e.g. "strengthen C", "work with C", "my role was to C", "improve X".
+# The char class excludes A (article) and I (pronoun) to avoid false positives;
+# the trailing \b means real words like "Class" or "Plan C" wording stays safe.
+_PLACEHOLDER_LETTER_RE = re.compile(
+    r"\b(?:strengthen|strengthening|improve|improving|improved|work with|working with|"
+    r"worked on|work on|working on|use|using|used|leverage|apply|applied|build|building|"
+    r"built|handle|handled|own|owned|implement|implemented|focus on|focused on|"
+    r"role was to|my role was to|was to)\s+([B-HJ-Z])\b"
+)
+
+
 def _looks_like_placeholder_rewrite(text: str) -> bool:
     normalized = _safe_text(text).lower()
     if not normalized:
@@ -134,7 +147,52 @@ def _looks_like_placeholder_rewrite(text: str) -> bool:
         "i was balancing two useful options",
         "in the project, i worked on make a practical decision",
     )
-    return any(normalized.startswith(prefix) for prefix in placeholder_prefixes)
+    if any(normalized.startswith(prefix) for prefix in placeholder_prefixes):
+        return True
+    # A grounded better answer is always first person; a slip into "the candidate"
+    # means the model narrated about the student instead of speaking as them.
+    if "the candidate" in normalized:
+        return True
+    raw = _safe_text(text)
+    # Bracketed/braced/angled template placeholders: [X], [tool name], {name}, <role>.
+    # The inner pattern requires a leading letter so math like "x < 5 and y > 3" is safe.
+    if re.search(r"[\[\{]\s*[A-Za-z_][\w\s]{0,28}[\]\}]", raw):
+        return True
+    if re.search(r"<\s*[A-Za-z_][\w\s]{0,28}>", raw):
+        return True
+    # "option A" / "Option B" used as a concept stand-in.
+    if re.search(r"\boption\s+[A-Z]\b", raw):
+        return True
+    # Scan the original casing — single-letter stand-ins are upper-case.
+    return bool(_PLACEHOLDER_LETTER_RE.search(raw))
+
+
+# Metric-like number: a percentage, a multiplier (3x / "times"), or any figure
+# of two or more digits. Single small counts ("two checks", "3 steps") are left
+# alone because the grounded templates use them legitimately.
+_METRIC_NUMBER_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(%|percent|x|times)?", re.IGNORECASE)
+
+
+def _contains_invented_metric(text: str, *sources: str) -> bool:
+    """True if ``text`` states a metric-like number absent from every source.
+
+    Enforces Master Prompt Prohibition 3 — a better answer may use directional
+    language but must never invent a percentage or figure the candidate (or
+    their resume / the question) never stated.
+    """
+    answer = _safe_text(text)
+    if not answer:
+        return False
+    source_blob = " ".join(_safe_text(source) for source in sources).lower()
+    for match in _METRIC_NUMBER_RE.finditer(answer):
+        number = match.group(1)
+        unit = (match.group(2) or "").lower()
+        metric_like = bool(unit) or len(number.replace(".", "")) >= 2
+        if not metric_like:
+            continue
+        if number not in source_blob:
+            return True
+    return False
 
 
 def _looks_too_generic_for_question(text: str, question_text: str, rubric_category: str) -> bool:
@@ -179,6 +237,14 @@ def _normalize_user_facing_feedback(text: str, fallback: str = "") -> str:
         (r"\bcandidate\b", "you"),
         (r"\byou did manage to\b", "you"),
         (r"\byou managed to\b", "you"),
+        # Mixed-pronoun errors (Master Prompt v4 Phase 7): a second-person clause
+        # that slips back into third person about the same candidate. Restricted to
+        # a verb whitelist so legitimate "their trust" / "users' needs" survive.
+        (
+            r"\byou (mentioned|described|said|gave|showed|shared|explained|referenced|noted|talked about|spoke about) (their|his|her)\b",
+            r"you \1 your",
+        ),
+        (r"\btheir (answer|response|reply|intro|introduction)\b", r"your \1"),
     )
     for pattern, replacement in replacements:
         value = re.sub(pattern, replacement, value, flags=re.IGNORECASE)
@@ -1124,7 +1190,7 @@ def _fallback_free_evaluation(
         "what_was_missing": _sentence(missing_signal, "The answer needs one clearer detail."),
         "how_to_improve": _sentence(improve, "Speak in 2-3 short sentences and include one clear example."),
         "answer_blueprint": "",
-        "corrected_intent": "",
+        "corrected_intent": _fallback_corrected_intent(normalized_answer, question_text, resume_summary),
         "raw_answer": raw_answer,
         "normalized_answer": normalized_answer,
     }
@@ -1186,11 +1252,20 @@ def _normalize_free_result(
         _safe_text(llm_result.get("better_answer")) or fallback["ideal_answer"],
         max_sentences=3,
     )
+    if _looks_like_placeholder_rewrite(better_answer):
+        better_answer = fallback["ideal_answer"]
     if _looks_too_generic_for_question(better_answer, question_text, rubric_category):
+        better_answer = fallback["ideal_answer"]
+    if _contains_invented_metric(better_answer, normalized_answer, question_text, resume_summary):
         better_answer = fallback["ideal_answer"]
     why_score = _sentence(
         _normalize_user_facing_feedback(llm_result.get("why_score"), fallback["scoring_rationale"]),
         fallback["scoring_rationale"],
+    )
+
+    corrected_intent = _sentence(
+        llm_result.get("corrected_intent"),
+        fallback["corrected_intent"] or normalized_answer,
     )
 
     missing_elements = _coerce_list(llm_result.get("missing_elements"))
@@ -1217,7 +1292,7 @@ def _normalize_free_result(
         "what_was_missing": what_was_missing,
         "how_to_improve": how_to_improve,
         "answer_blueprint": "",
-        "corrected_intent": "",
+        "corrected_intent": corrected_intent,
         "raw_answer": raw_answer,
         "normalized_answer": normalized_answer,
     }
@@ -1368,6 +1443,8 @@ def _normalize_pro_result(
         else _trim_to_sentence_count(llm_better_answer, max_sentences=4, max_chars=420)
     )
     if _looks_too_generic_for_question(better_answer, question_text, rubric_category):
+        better_answer = fallback["ideal_answer"]
+    if _contains_invented_metric(better_answer, normalized_answer, question_text, resume_summary):
         better_answer = fallback["ideal_answer"]
     why_score = _sentence(
         _normalize_user_facing_feedback(llm_result.get("why_score"), fallback["scoring_rationale"]),
@@ -1595,6 +1672,8 @@ def _normalize_career_result(
         better_answer = fallback["ideal_answer"]
     better_answer = _trim_to_sentence_count(better_answer, max_sentences=4, max_chars=430) or fallback["ideal_answer"]
     if _looks_too_generic_for_question(better_answer, question_text, rubric_category):
+        better_answer = fallback["ideal_answer"]
+    if _contains_invented_metric(better_answer, normalized_answer, question_text, resume_summary):
         better_answer = fallback["ideal_answer"]
     why_score = _sentence(
         _normalize_user_facing_feedback(llm_result.get("why_score"), fallback["scoring_rationale"]),
