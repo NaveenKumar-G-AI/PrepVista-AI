@@ -169,11 +169,12 @@ export function buildExplanations(m: IntelModel): Record<string, ChartExplain | 
     const partial = get('Partial');
     const vagueSilent = get('Vague') + get('Silent');
     const vsPct = turns > 0 ? r0((vagueSilent / turns) * 100) : 0;
+    const usableMajority = strong + partial > turns / 2;
     out['07'] = {
       whatItShows: `This breaks your ${turns} answers into how the evaluator classified each one — Strong, Partial, Vague, or Silent — so you can see the quality mix at a glance.`,
-      talent: strong + partial > 0
+      talent: usableMajority
         ? `${strong + partial} of your ${turns} answers landed as Strong or Partial — most of your answers were usable, which is the foundation a recruiter needs to keep listening.`
-        : `You stayed engaged across the session, which keeps the door open even on a tough round.`,
+        : `You attempted every question — that baseline engagement is the foundation to build on. The priority now is converting vague answers into partial, structured ones.`,
       drawback: vagueSilent > 0
         ? `${vagueSilent} of ${turns} answers (${vsPct}%) were Vague or Silent. Recruiters tend to mentally fail a candidate after two consecutive weak answers, so this share is the riskiest part of your profile.`
         : `Nothing landed as Vague or Silent — there's no weak-answer cluster to worry about here.`,

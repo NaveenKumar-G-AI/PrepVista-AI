@@ -181,6 +181,7 @@ Return EXACTLY this JSON:
   "answer_status": "No answer|Answered briefly|Answered partly|Answered clearly",
   "content_understanding": "None|Basic|Fair|Good|Strong",
   "communication_clarity": "None|Weak|Basic|Clear|Strong",
+  "corrected_intent": "<the candidate's intended meaning in 1 clear sentence, recovered from speech-to-text noise>",
   "why_score": "<1 sentence: why this score>",
   "what_worked": "<1 sentence>",
   "what_was_missing": "<1 sentence>",
