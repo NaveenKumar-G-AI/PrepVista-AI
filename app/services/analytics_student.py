@@ -38,6 +38,7 @@ from app.services.analytics_helpers import (
     READINESS_TIER_COLOR,
     _STUCK_MIN_SESSIONS,
 )
+from app.services.placement_readiness import build_placement_readiness
 
 logger = structlog.get_logger("prepvista.analytics")
 
@@ -581,6 +582,40 @@ def compute_student_readiness(overall_growth: dict) -> dict:
         "is_stuck": is_stuck,
         "risk_reasons": risk_reasons,
     }
+
+
+def build_student_placement_readiness(
+    category_history: dict[str, list[dict]],
+    overall_growth: dict | None = None,
+) -> dict:
+    """Student-level Placement Readiness Score + per-company hiring odds. [Q1]
+
+    Derives the student's *latest* per-category averages from category_history
+    — the same source build_student_radar_data uses (rows are chronological;
+    rows[-1] is the most recent session for that category) — so the readiness
+    score reflects current standing, not a lifetime average that would mask
+    recent improvement. Trend slope and session count are passed through from
+    overall_growth for display context.
+
+    Returns the placement_readiness block (see
+    app/services/placement_readiness.build_placement_readiness). Empty/no-data
+    history yields score=None / tier="Not Started" / no probabilities, which the
+    UI should render as a "take an interview to unlock this" state.
+    """
+    growth = overall_growth or {}
+    latest_category_averages: dict[str, float] = {}
+    for category, rows in (category_history or {}).items():
+        if not rows:
+            continue
+        latest = _to_float(rows[-1].get("average_score"))
+        if latest is not None:
+            latest_category_averages[category] = latest
+
+    return build_placement_readiness(
+        latest_category_averages,
+        session_count=growth.get("session_count"),
+        trend_slope=growth.get("trend_slope"),
+    )
 
 
 def compute_percentile_shift(

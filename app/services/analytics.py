@@ -67,6 +67,7 @@ from app.services.analytics_student import (  # noqa: F401
     compute_student_overall_growth,
     compute_student_category_growth,
     compute_student_readiness,
+    build_student_placement_readiness,
     compute_percentile_shift,
     build_student_radar_data,
     build_student_category_trend_lines,
