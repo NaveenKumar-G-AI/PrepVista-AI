@@ -362,19 +362,85 @@ def build_placement_readiness(
     }
 
 
-def category_averages_from_feedback(category_feedback: Iterable[dict]) -> dict[str, float]:
-    """Adapter: pull a {category: average_score} map out of the
-    category_feedback list compute_premium_interview_report already builds.
+# Per-question rubric scores are persisted on a 0-10 scale (evaluator_scoring
+# clamps each to 10.0; the five [0,2] components sum to <=10). The readiness
+# engine works on the 0-100 scale shared by final_score and the readiness
+# tiers, so the adapters below rescale 0-10 -> 0-100. Mirrors
+# interview_summary.QUESTION_SCORE_SCALE_MAX / normalize_score_to_100 without
+# importing them (keeps this module dependency-light and cycle-free).
+QUESTION_SCORE_SCALE_MAX = 10.0
 
-    Keeps the report call site a one-liner and isolates the shape knowledge
-    here so a future change to category_feedback only touches this function.
+
+def _rescale_to_100(value: object, scale_max: float) -> float | None:
+    """Coerce a raw stored score and rescale it from [0, scale_max] to [0, 100].
+
+    Returns None for unusable input. The result is clamped to [0, 100] so a
+    stray out-of-range evaluator value can't push a category above 100.
+    """
+    if scale_max <= 0:
+        return None
+    try:
+        if value is None:
+            return None
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(score) or math.isinf(score):
+        return None
+    rescaled = (max(0.0, score) / scale_max) * 100.0
+    return min(100.0, round(rescaled, 1))
+
+
+def category_averages_from_feedback(
+    category_feedback: Iterable[dict],
+    *,
+    scale_max: float = QUESTION_SCORE_SCALE_MAX,
+) -> dict[str, float]:
+    """Adapter: pull a 0-100 {category: average_score} map out of the
+    category_feedback list compute_premium_interview_report builds.
+
+    category_feedback's average_score is on the 0-10 per-question scale, so it
+    is rescaled to 0-100 here. Isolates the shape + scale knowledge so a future
+    change to category_feedback only touches this function.
     """
     averages: dict[str, float] = {}
     for entry in category_feedback or []:
         if not isinstance(entry, dict):
             continue
         category = str(entry.get("category") or "").strip().lower()
-        score = _coerce_score(entry.get("average_score"))
+        raw = entry.get("average_score")
+        score = _rescale_to_100(raw, scale_max)
         if category and score is not None and score > 0:
             averages[category] = score
     return averages
+
+
+def category_averages_from_evaluations(
+    evaluations: Iterable[dict],
+    *,
+    scale_max: float = QUESTION_SCORE_SCALE_MAX,
+) -> dict[str, float]:
+    """Adapter: aggregate raw per-question evaluations into a 0-100
+    {category: average_score} map.
+
+    Groups by rubric_category (falling back to "category"), averages the 0-10
+    per-question scores within each, and rescales to 0-100. This is the direct
+    path used by the live report summaries (build_pro/career_readiness_summary)
+    so placement readiness is computed from the same evaluations the rest of the
+    report already trusts — no dependency on persisted skill_scores.
+    """
+    buckets: dict[str, list[float]] = {}
+    for ev in evaluations or []:
+        if not isinstance(ev, dict):
+            continue
+        category = str(ev.get("rubric_category") or ev.get("category") or "").strip().lower()
+        if not category:
+            continue
+        score = _rescale_to_100(ev.get("score"), scale_max)
+        if score is not None and score > 0:
+            buckets.setdefault(category, []).append(score)
+    return {
+        category: round(sum(values) / len(values), 1)
+        for category, values in buckets.items()
+        if values
+    }
