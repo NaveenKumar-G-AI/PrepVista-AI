@@ -458,6 +458,15 @@ QUESTION_FAMILIES = (
     "situational_judgment",
     "creative_thinking",
     "ai_tool_fluency",
+    # ✅ ADDED: four new families (PRO + CAREER only).
+    # programming_language — language-specific knowledge probes.
+    # skill_verification   — depth-probe a declared resume skill, independent of any project.
+    # certification        — authenticity / application of a resume certification.
+    # self_assessment      — self-rating ("rate yourself") AND self-critique sub-angles.
+    "programming_language",
+    "skill_verification",
+    "certification",
+    "self_assessment",
 )
 
 QUESTION_PLAN_CATEGORY_ALIASES = {
@@ -494,6 +503,24 @@ QUESTION_PLAN_CATEGORY_ALIASES = {
     "ai_tool_fluency": "ai_tool_fluency",
     "ai_fluency": "ai_tool_fluency",
     "ai_tools": "ai_tool_fluency",
+    # ✅ ADDED: aliases for the four new families so LLM-emitted variants normalize cleanly.
+    "programming_language": "programming_language",
+    "programming": "programming_language",
+    "language": "programming_language",
+    "coding_language": "programming_language",
+    "skill_verification": "skill_verification",
+    "skill": "skill_verification",
+    "skills_verification": "skill_verification",
+    "skill_based": "skill_verification",
+    "certification": "certification",
+    "certifications": "certification",
+    "certification_based": "certification",
+    "cert": "certification",
+    "self_assessment": "self_assessment",
+    "self_judgement": "self_assessment",
+    "self_judgment": "self_assessment",
+    "self_evaluation": "self_assessment",
+    "self_rating": "self_assessment",
 }
 
 VALID_QUESTION_PLAN_CATEGORIES = set(QUESTION_FAMILIES) | set(QUESTION_PLAN_CATEGORY_ALIASES)

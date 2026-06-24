@@ -269,6 +269,13 @@ def _summary_dimension_labels(evaluations: list[dict]) -> tuple[list[str], list[
         "problem_solving": "problem-solving",
         "behavioral": "behavioral examples",
         "communication": "role-fit communication",
+        "situational_judgment": "situational judgment",
+        "creative_thinking": "creative thinking",
+        "ai_tool_fluency": "AI tool fluency",
+        "programming_language": "programming language depth",
+        "skill_verification": "skill verification",
+        "certification": "certification depth",
+        "self_assessment": "self-assessment",
     }
     for evaluation in evaluations:
         category = _safe_pdf_text(evaluation.get("rubric_category", "")).lower()

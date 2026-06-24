@@ -68,8 +68,15 @@ def _planned_turn_limit(plan: str, question_plan) -> int:
 def _family_base_difficulty(family: str) -> str:
     if family in {"introduction", "studies_background"}:
         return "easy"
-    if family in {"ownership", "workflow_process", "tool_method", "communication_explain", "teamwork_pressure", "learning_growth", "role_fit", "closeout"}:
+    if family in {
+        "ownership", "workflow_process", "tool_method", "communication_explain",
+        "teamwork_pressure", "learning_growth", "role_fit", "closeout",
+        # ✅ ADDED: certification recall and self-assessment sit at medium depth.
+        "certification", "self_assessment",
+    }:
         return "medium"
+    # programming_language and skill_verification fall through to "hard" — they
+    # probe genuine technical depth, so they should not feel like warm-ups.
     return "hard"
 
 
@@ -419,6 +426,54 @@ def _compose_family_targets(plan: str, resume_summary: dict, variant_seed: int) 
     creative_target = _pick_target_variant(creative_options, variant_seed, offset=6)
     ai_fluency_target = _pick_target_variant(ai_fluency_options, variant_seed, offset=7)
 
+    # ✅ ADDED: target pools for the four new families (PRO + CAREER only).
+    # Resume-personalized where the new resume fields exist, with safe generic
+    # fallbacks so the planner still produces a sensible question on thin resumes.
+    _languages = [str(lang).strip() for lang in (summary.get("programming_languages") or []) if str(lang).strip()]
+    _all_skills = [str(skill).strip() for skill in (summary.get("skills") or []) if str(skill).strip()]
+    _certs = [str(cert).strip() for cert in (summary.get("certifications") or []) if str(cert).strip()]
+
+    _primary_language = _pick_target_variant(_languages, variant_seed, offset=8)
+    _verify_skill = _pick_target_variant(_all_skills, variant_seed, offset=9) or (primary_skill or "")
+    _primary_cert = _pick_target_variant(_certs, variant_seed, offset=10)
+
+    programming_language_target = (
+        f"your hands-on knowledge of {_primary_language}"
+        if _primary_language
+        else (
+            f"the main programming language behind {primary_label}"
+            if primary_project_name
+            else "the programming language you know best"
+        )
+    )
+    skill_verification_target = (
+        f"your real depth in {_verify_skill}"
+        if _verify_skill
+        else "one technical skill from your resume you can prove in detail"
+    )
+    certification_target = (
+        f"your {_primary_cert} certification"
+        if _primary_cert
+        else "a certification, course, or credential you completed"
+    )
+    self_assessment_target = _pick_target_variant(
+        (
+            [
+                "rating your strongest skill honestly and justifying that score",
+                "where you would rate yourself today versus where you want to be",
+                "the gap between how you see your work and how others might rate it",
+                "one area where you over- or under-estimate yourself, and why",
+            ]
+            if plan in {"pro", "career"}
+            else [
+                "rating your strongest skill and explaining why",
+                "where you would rate yourself right now and what would raise that score",
+            ]
+        ),
+        variant_seed,
+        offset=11,
+    )
+
     return {
         "introduction": "your background, strongest area, and next goal",
         "studies_background": education[0] if education else "your current studies or background",
@@ -439,6 +494,11 @@ def _compose_family_targets(plan: str, resume_summary: dict, variant_seed: int) 
         "situational_judgment": sjt_target,
         "creative_thinking": creative_target,
         "ai_tool_fluency": ai_fluency_target,
+        # ✅ ADDED: targets for the four new families (PRO + CAREER only)
+        "programming_language": programming_language_target,
+        "skill_verification": skill_verification_target,
+        "certification": certification_target,
+        "self_assessment": self_assessment_target,
     }
 
 
@@ -516,6 +576,9 @@ def _plan_family_sequence(plan: str, resume_summary: dict, difficulty_mode: str,
                 ["introduction", "role_fit", "tool_method", "ownership", "challenge_debugging", "workflow_process", "teamwork_pressure", "communication_explain", "learning_growth", "closeout"],
                 ["introduction", "ownership", "workflow_process", "tool_method", "role_fit", "teamwork_pressure", "communication_explain", "challenge_debugging", "learning_growth", "closeout"],
                 ["introduction", "tool_method", "ownership", "role_fit", "communication_explain", "challenge_debugging", "workflow_process", "teamwork_pressure", "learning_growth", "closeout"],
+                # ✅ ADDED: basic-mode blueprints including the new families (PRO).
+                ["introduction", "ownership", "skill_verification", "role_fit", "programming_language", "communication_explain", "teamwork_pressure", "self_assessment", "learning_growth", "closeout"],
+                ["introduction", "role_fit", "ownership", "certification", "tool_method", "skill_verification", "teamwork_pressure", "self_assessment", "learning_growth", "closeout"],
             ]
         elif selected_mode == "difficult":
             blueprints = [
@@ -527,6 +590,9 @@ def _plan_family_sequence(plan: str, resume_summary: dict, difficulty_mode: str,
                 ["introduction", "role_fit", "tradeoff_decision", "ownership", "challenge_debugging", "workflow_process", "validation_metrics", "communication_explain", "tool_method", "teamwork_pressure", "learning_growth", "closeout"],
                 ["introduction", "ownership", "validation_metrics", "role_fit", "tradeoff_decision", "challenge_debugging", "communication_explain", "workflow_process", "tool_method", "learning_growth", "teamwork_pressure", "closeout"],
                 ["introduction", "challenge_debugging", "ownership", "role_fit", "workflow_process", "validation_metrics", "tradeoff_decision", "tool_method", "teamwork_pressure", "communication_explain", "learning_growth", "closeout"],
+                # ✅ ADDED: difficult-mode blueprints including the new families (PRO).
+                ["introduction", "role_fit", "ownership", "programming_language", "challenge_debugging", "skill_verification", "validation_metrics", "self_assessment", "tradeoff_decision", "teamwork_pressure", "communication_explain", "closeout"],
+                ["introduction", "ownership", "skill_verification", "role_fit", "programming_language", "certification", "challenge_debugging", "validation_metrics", "self_assessment", "communication_explain", "learning_growth", "closeout"],
             ]
         else:
             blueprints = [
@@ -538,6 +604,10 @@ def _plan_family_sequence(plan: str, resume_summary: dict, difficulty_mode: str,
                 ["introduction", "role_fit", "workflow_process", "ownership", "tool_method", "challenge_debugging", "communication_explain", "validation_metrics", "teamwork_pressure", "learning_growth", "closeout"],
                 ["introduction", "ownership", "challenge_debugging", "tool_method", "role_fit", "workflow_process", "validation_metrics", "teamwork_pressure", "communication_explain", "learning_growth", "closeout"],
                 ["introduction", "tool_method", "ownership", "role_fit", "workflow_process", "validation_metrics", "challenge_debugging", "communication_explain", "learning_growth", "teamwork_pressure", "closeout"],
+                # ✅ ADDED: blueprints weaving the four new families across sessions (PRO).
+                ["introduction", "role_fit", "ownership", "skill_verification", "workflow_process", "programming_language", "validation_metrics", "self_assessment", "teamwork_pressure", "closeout"],
+                ["introduction", "ownership", "programming_language", "role_fit", "challenge_debugging", "skill_verification", "communication_explain", "certification", "learning_growth", "closeout"],
+                ["introduction", "role_fit", "ownership", "certification", "tool_method", "skill_verification", "self_assessment", "validation_metrics", "teamwork_pressure", "closeout"],
             ]
         base = choose_blueprint(blueprints)
         if thin_resume:
@@ -644,15 +714,64 @@ def _plan_family_sequence(plan: str, resume_summary: dict, difficulty_mode: str,
             "learning_growth",
             "closeout",
         ],
+        # ✅ ADDED: three CAREER blueprints weaving the four new families
+        # (programming_language, skill_verification, certification, self_assessment)
+        # alongside the existing trio. They rotate across a student's sessions so
+        # all four surface over a semester of practice without crowding one round.
+        [
+            "introduction",
+            "role_fit",
+            "ownership",
+            "programming_language",
+            "workflow_process",
+            "skill_verification",
+            "tradeoff_decision",
+            "situational_judgment",
+            "self_assessment",
+            "communication_explain",
+            "ai_tool_fluency",
+            "learning_growth",
+            "closeout",
+        ],
+        [
+            "introduction",
+            "ownership",
+            "role_fit",
+            "skill_verification",
+            "validation_metrics",
+            "certification",
+            "challenge_debugging",
+            "creative_thinking",
+            "self_assessment",
+            "teamwork_pressure",
+            "ai_tool_fluency",
+            "learning_growth",
+            "closeout",
+        ],
+        [
+            "introduction",
+            "role_fit",
+            "ownership",
+            "certification",
+            "programming_language",
+            "tool_method",
+            "tradeoff_decision",
+            "situational_judgment",
+            "skill_verification",
+            "communication_explain",
+            "self_assessment",
+            "learning_growth",
+            "closeout",
+        ],
     ]
     base = choose_blueprint(blueprints)
     if selected_mode == "basic":
-        # Basic mode: keep the three new families but move them later so core topics land first
+        # Basic mode: keep the new families but move them later so core topics land first
         base = [
             "introduction",
             "studies_background",
             "ownership",
-            "workflow_process",
+            "skill_verification",  # ✅ ADDED (was workflow_process)
             "teamwork_pressure",
             "communication_explain",
             "situational_judgment",
@@ -660,6 +779,7 @@ def _plan_family_sequence(plan: str, resume_summary: dict, difficulty_mode: str,
             "ai_tool_fluency",
             "role_fit",
             "creative_thinking",
+            "self_assessment",  # ✅ ADDED
             "closeout",
         ]
     elif selected_mode == "difficult":
@@ -668,10 +788,10 @@ def _plan_family_sequence(plan: str, resume_summary: dict, difficulty_mode: str,
             "role_fit",
             "ownership",
             "tradeoff_decision",
-            "validation_metrics",
+            "skill_verification",  # ✅ ADDED (was validation_metrics)
             "workflow_process",
             "situational_judgment",
-            "creative_thinking",
+            "programming_language",  # ✅ ADDED (was creative_thinking)
             "ai_tool_fluency",
             "teamwork_pressure",
             "challenge_debugging",

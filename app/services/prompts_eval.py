@@ -60,6 +60,58 @@ Evaluate on these 5 dimensions (0-2 each):
 RED FLAGS: vague_usage ("I use ChatGPT to help me" with no specific example); no_verification
 (no awareness that AI output needs checking); overclaiming (always trusts AI); defensive (claims never to use AI)."""
 
+    if cat == "programming_language":
+        return """
+CATEGORY-SPECIFIC CRITERIA: Programming Language Knowledge
+Evaluate on these 5 dimensions (0-2 each):
+- Conceptual accuracy: was what they said about the language correct?
+- Applied grounding: did they tie it to real code they have written, not a textbook definition?
+- Depth: did they show understanding of WHY, trade-offs, or edge cases — not just surface syntax?
+- Specificity: did they name a concrete feature, construct, or example?
+- Communication: was the explanation clear and well-structured?
+A STRONG answer is accurate, tied to real usage, and shows reasoning about trade-offs.
+A WEAK answer recites a generic definition or cannot give a concrete example.
+RED FLAGS: generic_templated_answer (textbook definition with no real usage); resume_inconsistency (claims a language they clearly cannot discuss); overclaiming (states a level the answer does not support)."""
+
+    if cat == "skill_verification":
+        return """
+CATEGORY-SPECIFIC CRITERIA: Skill Verification
+Evaluate whether the candidate can back a resume skill with real depth (0-2 each):
+- Evidence: did they give concrete proof of using the skill, not just restate the resume line?
+- Depth: did they reach an advanced or non-obvious use, or stay shallow?
+- Honesty: did they acknowledge their actual gaps and boundaries?
+- Specificity: named tools, problems, or outcomes rather than vague claims?
+- Communication: clear, structured account of their ability.
+A STRONG answer proves the skill with a specific, fairly advanced example and is honest about limits.
+A WEAK answer repeats the resume keyword with no real substance.
+RED FLAGS: generic_templated_answer (no concrete evidence); resume_inconsistency (cannot support a claimed skill); overclaiming (claims expertise the answer contradicts)."""
+
+    if cat == "certification":
+        return """
+CATEGORY-SPECIFIC CRITERIA: Certification (Authenticity & Application)
+Evaluate what the candidate genuinely took from a certification (0-2 each):
+- Authentic learning: did they describe a real concept or skill gained, beyond "I passed it"?
+- Application: did they show where they applied it in real work or study?
+- Motivation: was there a credible reason they pursued it?
+- Specificity: concrete detail rather than the certificate's marketing blurb?
+- Communication: clear and grounded.
+A STRONG answer names a real takeaway AND a concrete application.
+A WEAK answer can only state the certificate's name or its syllabus.
+RED FLAGS: generic_templated_answer (recites the syllabus, no personal application); overclaiming (implies expertise a single certificate would not grant); resume_inconsistency (cannot discuss a certificate they listed)."""
+
+    if cat == "self_assessment":
+        return """
+CATEGORY-SPECIFIC CRITERIA: Self-Assessment (Self-Awareness)
+Evaluate the candidate's metacognition and honesty (0-2 each):
+- Calibration: is their self-rating realistic given the evidence in their other answers?
+- Evidence: did they justify the rating or self-critique with specific proof, not a vague claim?
+- Honesty: did they acknowledge genuine gaps instead of a humble-brag ("I'm a perfectionist")?
+- Self-awareness: do they understand where they over- or under-estimate themselves?
+- Communication: clear, candid, and non-defensive.
+A STRONG answer gives a realistic rating backed by real evidence and names a genuine area to grow.
+A WEAK answer gives an unjustified number, a humble-brag, or a defensive non-answer.
+RED FLAGS: arrogance_overclaiming (an unrealistically high self-rating with no proof); generic_templated_answer (cliché weakness with no substance); no_accountability (cannot name a real gap)."""
+
     if cat in {
         "teamwork_pressure", "teamwork", "ownership", "accountability",
         "leadership", "conflict_resolution", "adaptability", "ethics_integrity",
@@ -454,6 +506,8 @@ Return exactly this JSON structure:
   "candidate_name": "<name or 'Unknown'>",
   "education": ["<degree and institution>"],
   "skills": ["<skill1>", "<skill2>"],
+  "programming_languages": ["<only actual programming/query/markup languages the candidate knows, e.g. Python, Java, SQL, C++. Empty list if none or non-technical profile.>"],
+  "certifications": ["<certification name with issuer if visible, e.g. 'AWS Certified Solutions Architect', 'Google Data Analytics'. Empty list if none.>"],
   "projects": [
     {{"name": "<project name>", "description": "<1-2 sentence summary>", "tech_stack": ["<tech1>"]}}
   ],
@@ -724,6 +778,31 @@ QUESTION_PREAMBLE_TEMPLATES: dict[str, dict[str, list[str]]] = {
             "Let's discuss your real workflow with AI tools.",
             "AI fluency is a differentiator — show me yours.",
         ],
+        # ✅ ADDED: four new families (PRO)
+        "programming_language": [
+            "Let's get specific about a language you actually use.",
+            "I want to test your real understanding of a programming language, not trivia.",
+            "Let's talk about one language on your resume in depth.",
+            "Time to go below the surface on a language you know.",
+        ],
+        "skill_verification": [
+            "Let's pressure-test one skill on your resume.",
+            "I want to separate a resume keyword from real ability.",
+            "Let's verify how deep one of your listed skills actually goes.",
+            "Pick a skill you claim — let's see how far it holds up.",
+        ],
+        "certification": [
+            "Let's talk about one of your certifications.",
+            "I'm curious what a certification on your resume actually taught you.",
+            "Beyond the certificate, I want to know what stuck.",
+            "Let's see how a certification you earned shows up in real work.",
+        ],
+        "self_assessment": [
+            "Let's do a quick, honest self-assessment.",
+            "I want to understand how accurately you read your own ability.",
+            "Self-awareness is a real signal — let's test yours.",
+            "Time for an honest rating of where you stand.",
+        ],
     },
     "career": {
         "introduction": [
@@ -854,6 +933,31 @@ QUESTION_PREAMBLE_TEMPLATES: dict[str, dict[str, list[str]]] = {
             "Every strong hire in 2025-2026 has a clear AI working practice. Tell me yours.",
             "How you use AI reflects your judgment. Walk me through it.",
             "AI is a tool. Let's see how good you are with it.",
+        ],
+        # ✅ ADDED: four new families (CAREER)
+        "programming_language": [
+            "Let's go deep on a language you claim to know well.",
+            "I want to see genuine depth in one of your languages, not surface familiarity.",
+            "A strong engineer can defend their language choices. Let's test that.",
+            "Let's pick one language and go below the syntax.",
+        ],
+        "skill_verification": [
+            "Let's pressure-test one skill on your resume until it either holds or breaks.",
+            "I want hard evidence behind one of your listed skills.",
+            "Strong candidates can prove every line on their resume. Let's check one.",
+            "Pick a skill you list — I want to see how deep it really goes.",
+        ],
+        "certification": [
+            "Let's talk about a certification and what it actually changed in your work.",
+            "A certification is only as good as what you do with it. Let's see yours.",
+            "I want to know the real value you took from a certification, not the syllabus.",
+            "Let's connect a certification you earned to real, applied work.",
+        ],
+        "self_assessment": [
+            "Honest self-assessment is one of the strongest hiring signals. Let's test yours.",
+            "I want to see how accurately you judge your own ability.",
+            "Strong hires know exactly where they stand. Let's find out if you do.",
+            "Let's do a candid rating — and I'll be listening for the evidence behind it.",
         ],
     },
 }

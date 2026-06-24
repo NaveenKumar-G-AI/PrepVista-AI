@@ -318,6 +318,12 @@ def enrich_resume_summary(summary: dict | None, resume_text: str = "") -> dict:
     base.setdefault("projects", [])
     base.setdefault("experience", [])
     base.setdefault("inferred_role", "other")
+    # ✅ ADDED: first-class fields for the four new question families
+    # (programming_language, skill_verification, certification, self_assessment).
+    # Previously languages were buried inside `skills` and certifications were not
+    # extracted at all, so the planner had no structured signal to probe them.
+    base.setdefault("certifications", [])
+    base.setdefault("programming_languages", [])
 
     field_profile = infer_resume_field_profile(base)
     for key, value in field_profile.items():
@@ -336,4 +342,6 @@ def _default_resume_summary(resume_text: str) -> dict:
         "projects": [],
         "experience": [],
         "inferred_role": "other",
+        "certifications": [],
+        "programming_languages": [],
     }, resume_text=resume_text)
