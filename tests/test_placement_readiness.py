@@ -13,6 +13,7 @@ from app.services.placement_readiness import (
     COMPANY_PROFILES,
     PILLAR_WEIGHTS,
     build_placement_readiness,
+    category_averages_from_evaluations,
     category_averages_from_feedback,
     compute_hiring_probabilities,
     compute_pillar_scores,
@@ -170,11 +171,12 @@ def test_build_placement_readiness_at_risk_tier():
 
 # ── Adapter ──────────────────────────────────────────────────────────────────
 
-def test_category_averages_from_feedback_filters_zero_and_bad_rows():
+def test_category_averages_from_feedback_rescales_and_filters():
+    # average_score is on the 0-10 per-question scale; adapter rescales to 0-100.
     feedback = [
-        {"category": "Technical_Depth", "average_score": 80.0},
-        {"category": "communication", "average_score": 0.0},      # zero -> dropped
-        {"category": "", "average_score": 70.0},                   # no category -> dropped
+        {"category": "Technical_Depth", "average_score": 8.0},     # -> 80.0
+        {"category": "communication", "average_score": 0.0},       # zero -> dropped
+        {"category": "", "average_score": 7.0},                    # no category -> dropped
         {"category": "ownership", "average_score": None},          # bad score -> dropped
         "not a dict",                                              # ignored
     ]
@@ -182,12 +184,27 @@ def test_category_averages_from_feedback_filters_zero_and_bad_rows():
     assert averages == {"technical_depth": 80.0}
 
 
+def test_category_averages_from_evaluations_groups_and_rescales():
+    evals = [
+        {"rubric_category": "technical_depth", "score": 8.0},
+        {"rubric_category": "technical_depth", "score": 6.0},   # avg 7.0 -> 70.0
+        {"category": "communication", "score": 9.0},           # fallback key -> 90.0
+        {"rubric_category": "ownership", "score": 0},          # zero -> dropped
+        {"rubric_category": "", "score": 5.0},                 # no category -> dropped
+        "not a dict",
+    ]
+    averages = category_averages_from_evaluations(evals)
+    assert averages == {"technical_depth": 70.0, "communication": 90.0}
+
+
 def test_adapter_feeds_build_end_to_end():
+    # 0-10 inputs flow through the adapter and produce a sensible 0-100 score.
     feedback = [
-        {"category": "technical_depth", "average_score": 78.0},
-        {"category": "problem_solving", "average_score": 72.0},
-        {"category": "communication", "average_score": 80.0},
+        {"category": "technical_depth", "average_score": 7.8},
+        {"category": "problem_solving", "average_score": 7.2},
+        {"category": "communication", "average_score": 8.0},
     ]
     block = build_placement_readiness(category_averages_from_feedback(feedback))
     assert block["score"] is not None
+    assert 70 <= block["score"] <= 80
     assert block["hiring_probabilities"]

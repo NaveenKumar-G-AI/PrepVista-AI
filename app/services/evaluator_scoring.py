@@ -16,6 +16,10 @@ import structlog
 
 from app.config import CATEGORY_WEIGHTS, PLAN_CONFIG
 from app.services.llm import call_llm_json
+from app.services.placement_readiness import (
+    build_placement_readiness,
+    category_averages_from_evaluations,
+)
 from app.services.prompts import build_per_question_eval_prompt
 from app.services.resume_parser import infer_resume_field_profile
 from app.services.transcript import (
@@ -598,6 +602,18 @@ def _derive_pro_strengths_and_improvements(question_evaluations: list[dict]) -> 
     return strengths[:3], improvements[:4]
 
 
+def _placement_readiness_block(question_evaluations: list[dict]) -> dict:
+    """Placement Readiness Score + per-company hiring probabilities for this
+    session, derived from its per-question evaluations. Shared by the Pro and
+    Career readiness summaries so both reports (and the report API) surface the
+    same number. Pure — see app/services/placement_readiness.py.
+    """
+    return build_placement_readiness(
+        category_averages_from_evaluations(question_evaluations),
+        session_count=1,
+    )
+
+
 def build_pro_readiness_summary(
     question_evaluations: list[dict],
     expected_questions: int | None = None,
@@ -617,6 +633,7 @@ def build_pro_readiness_summary(
             "current_technical_readiness": "Early",
             "main_blocker": "Too little completed technical interview evidence",
             "fastest_next_improvement": "Complete a full Pro interview with short but usable technical answers.",
+            "placement_readiness": _placement_readiness_block(question_evaluations),
         }
 
     avg_score = round(sum(float(item.get("score", 0)) for item in question_evaluations) / total, 1)
@@ -673,6 +690,7 @@ def build_pro_readiness_summary(
             if improvements
             else "Answer technical questions in the order: method -> reason -> result."
         ),
+        "placement_readiness": _placement_readiness_block(question_evaluations),
     }
 
 
@@ -823,6 +841,7 @@ def build_career_readiness_summary(
             "best_fit_role": role_fit,
             "main_hiring_blocker": main_blocker,
             "next_practice_goals": next_goals,
+            "placement_readiness": _placement_readiness_block(question_evaluations),
         }
 
     avg_score = round(sum(float(item.get("score", 0)) for item in question_evaluations) / total, 1)
@@ -898,6 +917,7 @@ def build_career_readiness_summary(
         "best_fit_role": role_fit,
         "main_hiring_blocker": main_blocker,
         "next_practice_goals": next_goals,
+        "placement_readiness": _placement_readiness_block(question_evaluations),
     }
 
 

@@ -186,6 +186,81 @@ def _render_empty_state(pdf, message: str) -> None:
     pdf.set_y(y + 15)
 
 
+_READINESS_RGB: dict[str, tuple[int, int, int]] = {
+    "green":  (20, 83, 45),
+    "yellow": (161, 98, 7),
+    "orange": (154, 52, 18),
+    "red":    (153, 27, 27),
+    "gray":   (71, 85, 105),
+}
+
+
+def _render_placement_readiness(pdf, readiness: dict) -> None:
+    """Render the Placement Readiness Score + per-company hiring probabilities.
+
+    Safe no-op when the block is absent or has no scored data yet (an older
+    report or an empty session) so it never breaks an existing report layout.
+    """
+    if not isinstance(readiness, dict):
+        return
+    score = readiness.get("score")
+    if score is None:
+        return  # "Not started" — nothing meaningful to show on a static report.
+
+    tier = _safe_pdf_text(readiness.get("tier") or "")
+    accent = _READINESS_RGB.get(str(readiness.get("tier_color") or "gray"), _READINESS_RGB["gray"])
+
+    _section_heading(
+        pdf,
+        "Placement Readiness",
+        "A single placement-readiness score and the most likely company matches based on this interview.",
+        fill_rgb=(30, 41, 59),
+    )
+
+    box_width = pdf.w - pdf.l_margin - pdf.r_margin
+    headline = _safe_pdf_text(readiness.get("headline") or "")
+    score_y = _place_labeled_box(pdf, headline, box_width)
+    score_h = _render_labeled_box(
+        pdf, pdf.l_margin, score_y, box_width,
+        f"Score {int(round(float(score)))}/100  -  {tier}",
+        headline or f"Placement readiness {int(round(float(score)))}/100.",
+        accent, (248, 250, 252),
+    )
+    pdf.set_y(score_y + score_h + 4)
+
+    probabilities = readiness.get("hiring_probabilities") or []
+    if probabilities:
+        _section_heading(
+            pdf,
+            "Hiring Probability by Company",
+            "Estimated likelihood per company archetype. Heuristic guidance, not a guarantee.",
+            fill_rgb=(23, 37, 84),
+        )
+        gap = 4
+        card_w = (pdf.w - pdf.l_margin - pdf.r_margin - gap) / 2
+        idx = 0
+        while idx < len(probabilities):
+            _ensure_page_capacity(pdf, 24)
+            row_y = pdf.get_y()
+            left = probabilities[idx]
+            h_left = _render_info_card(
+                pdf, pdf.l_margin, row_y, card_w,
+                _safe_pdf_text(left.get("company", "")),
+                f"{int(left.get('probability', 0))}%",
+            )
+            h_right = 0.0
+            if idx + 1 < len(probabilities):
+                right = probabilities[idx + 1]
+                h_right = _render_info_card(
+                    pdf, pdf.l_margin + card_w + gap, row_y, card_w,
+                    _safe_pdf_text(right.get("company", "")),
+                    f"{int(right.get('probability', 0))}%",
+                )
+            pdf.set_y(row_y + max(h_left, h_right) + gap)
+            idx += 2
+        pdf.ln(1)
+
+
 def _render_career_summary(pdf, summary: dict) -> None:
     if not isinstance(summary, dict) or not summary:
         return
@@ -261,6 +336,8 @@ def _render_career_summary(pdf, summary: dict) -> None:
     _render_bullets(pdf, _coerce_list(summary.get("next_practice_goals", [])), "Keep practicing to surface the next improvement goals.")
     pdf.ln(2)
 
+    _render_placement_readiness(pdf, summary.get("placement_readiness") or {})
+
 
 def _render_pro_summary(pdf, summary: dict) -> None:
     if not isinstance(summary, dict) or not summary:
@@ -313,6 +390,8 @@ def _render_pro_summary(pdf, summary: dict) -> None:
         (37, 99, 235), (239, 246, 255),
     )
     pdf.set_y(impression_y + impression_h + 4)
+
+    _render_placement_readiness(pdf, summary.get("placement_readiness") or {})
 
 
 def _measure_labeled_box_height(pdf, text: str, width: float, line_height: float = 4.8) -> float:

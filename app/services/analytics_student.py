@@ -38,7 +38,10 @@ from app.services.analytics_helpers import (
     READINESS_TIER_COLOR,
     _STUCK_MIN_SESSIONS,
 )
-from app.services.placement_readiness import build_placement_readiness
+from app.services.placement_readiness import (
+    build_placement_readiness,
+    QUESTION_SCORE_SCALE_MAX,
+)
 
 logger = structlog.get_logger("prepvista.analytics")
 
@@ -597,6 +600,10 @@ def build_student_placement_readiness(
     recent improvement. Trend slope and session count are passed through from
     overall_growth for display context.
 
+    skill_scores.average_score is persisted on the 0-10 per-question scale, so
+    each value is rescaled to the 0-100 scale the readiness engine and tiers use
+    (mirrors interview_summary.normalize_score_to_100).
+
     Returns the placement_readiness block (see
     app/services/placement_readiness.build_placement_readiness). Empty/no-data
     history yields score=None / tier="Not Started" / no probabilities, which the
@@ -609,7 +616,9 @@ def build_student_placement_readiness(
             continue
         latest = _to_float(rows[-1].get("average_score"))
         if latest is not None:
-            latest_category_averages[category] = latest
+            latest_category_averages[category] = round(
+                (latest / QUESTION_SCORE_SCALE_MAX) * 100.0, 1
+            )
 
     return build_placement_readiness(
         latest_category_averages,
