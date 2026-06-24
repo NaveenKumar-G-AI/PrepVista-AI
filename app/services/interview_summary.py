@@ -1411,6 +1411,20 @@ def compute_premium_interview_report(
     tier_order = {l: i for i, l in enumerate(tier_priority)}
     category_feedback.sort(key=lambda x: (tier_order.get(x["strength_level"], 5), x["category"]))
 
+    # ✅ NEW: single 0-100 Placement Readiness Score + per-company hiring
+    # probabilities, derived from this session's per-category averages. Pure,
+    # additive top-level key ("placement_readiness") — existing callers ignore
+    # it safely; the PDF/report and dashboard surface it. See
+    # app/services/placement_readiness.py for the pillar weighting + calibration.
+    from app.services.placement_readiness import (
+        build_placement_readiness,
+        category_averages_from_feedback,
+    )
+    placement_readiness = build_placement_readiness(
+        category_averages_from_feedback(category_feedback),
+        session_count=1,
+    )
+
     # ✅ CHANGED: _analyze_answer_quality now runs once per non-empty answer
     # via _compute_answer_quality_rows, shared by both assessment functions
     # below. Previously _assess_communication_style ran it itself and only
@@ -1472,6 +1486,7 @@ def compute_premium_interview_report(
         "per_question_insights": per_question,
         "improvement_roadmap":   improvement_tips,
         "hiring_assessment":     hiring_assessment,
+        "placement_readiness":   placement_readiness,
     }
 
 
@@ -1496,9 +1511,16 @@ def extract_cohort_session_metrics(premium_report: dict) -> dict:
     strength_dist = premium_report.get("answer_strength_distribution", {}) or {}
     integrity     = premium_report.get("integrity_and_ownership_signals", {}) or {}
     communication = premium_report.get("communication_assessment", {}) or {}
+    readiness     = premium_report.get("placement_readiness", {}) or {}
 
     return {
         "hr_readiness_level":    premium_report.get("hr_readiness_level"),
+        # ✅ NEW: the single 0-100 Placement Readiness Score + top company match
+        # for this session, so cohort views can chart it without recomputing a
+        # premium report per student.
+        "placement_readiness_score": readiness.get("score"),
+        "placement_readiness_tier":  readiness.get("tier"),
+        "top_hiring_match":          readiness.get("top_company"),
         "score_band":            premium_report.get("score_band"),
         "final_score":           premium_report.get("final_score"),
         "completion_rate":       premium_report.get("completion_rate"),
