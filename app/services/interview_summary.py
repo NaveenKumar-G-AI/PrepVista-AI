@@ -520,6 +520,34 @@ _CATEGORY_FEEDBACK: dict[str, dict[str, str]] = {
         "weak":    "AI tool understanding was surface-level. Practice explaining specific AI tools you use, their limitations, and when human judgment is still essential.",
         "silent":  "No AI tool fluency answers were recorded.",
     },
+    "programming_language": {
+        "strong":  "Language knowledge was solid — you explained a real concept accurately and tied it to code you have actually written.",
+        "good":    "Language understanding came through. Adding a trade-off or edge case you have reasoned about would show deeper command.",
+        "partial": "Language answers stayed at surface level. Connect each concept to real code and explain WHY, not just WHAT.",
+        "weak":    "Language answers were closer to textbook definitions than real usage. Practice explaining features through code you have written.",
+        "silent":  "No programming-language answers were recorded.",
+    },
+    "skill_verification": {
+        "strong":  "You backed a listed skill with concrete, fairly advanced evidence and were honest about its boundaries.",
+        "good":    "The skill was supported with some evidence. A more advanced example and a clear note on your gaps would strengthen it.",
+        "partial": "The skill was claimed but only lightly evidenced. Prove it with a specific, non-trivial example next time.",
+        "weak":    "A resume skill was not backed by real depth. Prepare one concrete, advanced example for every skill you list.",
+        "silent":  "No skill-verification answers were recorded.",
+    },
+    "certification": {
+        "strong":  "You showed real value from a certification — a genuine takeaway plus where you applied it in practice.",
+        "good":    "The certification answer was solid. Make the real-world application more concrete to show lasting value.",
+        "partial": "The certification was named but its practical application was thin. Show where you actually used what it taught.",
+        "weak":    "The certification answer recited the syllabus with no personal application. Connect it to real work you did.",
+        "silent":  "No certification answers were recorded.",
+    },
+    "self_assessment": {
+        "strong":  "Self-assessment was honest and well-calibrated — a realistic rating backed by specific evidence and a genuine growth area.",
+        "good":    "Your self-assessment was reasonable. Tie the rating more tightly to concrete proof to make it convincing.",
+        "partial": "The self-assessment lacked evidence. Justify your rating with real examples instead of an unsupported number.",
+        "weak":    "Self-assessment was a humble-brag or an unjustified score. Practice naming a realistic level with honest, specific proof.",
+        "silent":  "No self-assessment answers were recorded.",
+    },
 }
 
 _CATEGORY_DISPLAY_NAMES: dict[str, str] = {
@@ -540,6 +568,10 @@ _CATEGORY_DISPLAY_NAMES: dict[str, str] = {
     "situational_judgment":  "Situational Judgment & Decision-Making",
     "creative_thinking":     "Creative & Lateral Thinking",
     "ai_tool_fluency":       "AI Tool Fluency & Critical Use",
+    "programming_language":  "Programming Language Knowledge",
+    "skill_verification":    "Skill Verification",
+    "certification":         "Certification Depth",
+    "self_assessment":       "Self-Assessment & Honesty",
 }
 
 
@@ -731,6 +763,26 @@ _IMPROVEMENT_TIPS: dict[str, list[str]] = {
         "For every AI tool you mention, explain: what it does well, what it cannot do reliably, and how you verify its output.",
         "Practice answering: 'When would you NOT use AI for this task?' — interviewers value critical judgment over enthusiasm.",
         "Prepare one example where AI helped your workflow and one where human judgment was essential despite AI availability.",
+    ],
+    "programming_language": [
+        "For each language on your resume, prepare one concept you have used in real code and can explain under the hood.",
+        "Know one trade-off, edge case, or common mistake for your strongest language — that is what separates real users from list-fillers.",
+        "Avoid textbook definitions: anchor every language answer to something you actually built or debugged.",
+    ],
+    "skill_verification": [
+        "For every skill you list, prepare your most advanced concrete example and be ready to state where your limits are.",
+        "Do not just repeat the resume line — prove the skill with a specific problem you solved using it.",
+        "Honesty wins: naming a real gap in a skill is stronger than overclaiming and being exposed by a follow-up.",
+    ],
+    "certification": [
+        "For each certification, prepare one genuine takeaway and one place you applied it in real work or study.",
+        "Interviewers test authenticity, not the syllabus — be ready to go beyond 'I passed it'.",
+        "Connect the certification to your target role: what does it let you do that you could not do before?",
+    ],
+    "self_assessment": [
+        "Practice rating yourself with a number AND the specific evidence behind it — '7/10 because I shipped X but have not done Y'.",
+        "Avoid humble-brags like 'I'm a perfectionist'; name a real, specific area you are working to improve.",
+        "Calibrate honestly: a realistic self-rating with proof reads far stronger than an unjustified '9 out of 10'.",
     ],
 }
 

@@ -231,6 +231,50 @@ AI TOOL FLUENCY QUESTION GUIDE (Category: ai_tool_fluency)
 - A strong answer names a specific tool, a specific use case, and describes what the candidate did with the output.
 
 ==================================================
+PROGRAMMING LANGUAGE QUESTION GUIDE (Category: programming_language — PRO/CAREER only)
+==================================================
+
+- Probe a SPECIFIC language the candidate actually lists (Python, Java, SQL, C++, JavaScript, etc.). Name the language.
+- Test understanding, not trivia: a concept they used in real code, a feature and its trade-off, a common mistake, or a correctness/performance consideration.
+- Always tie it back to something they have actually written, not a textbook definition.
+- Skip this category entirely if the resume shows no programming languages (e.g. a non-technical profile).
+- Good examples:
+  "You work in Python — explain how you would handle a large dataset that doesn't fit in memory, and which Python tools you'd reach for."
+  "In SQL, walk me through the difference between a JOIN you have used and one you avoid, with a real query in mind."
+
+==================================================
+SKILL VERIFICATION QUESTION GUIDE (Category: skill_verification — PRO/CAREER only)
+==================================================
+
+- Pick ONE concrete skill the candidate listed and pressure-test its real depth — independent of any single project.
+- The goal is to separate a resume keyword from genuine ability: ask for the most advanced thing they have done, where their gaps are, or to solve a small real problem with it.
+- A strong answer gives specific evidence; a weak answer repeats the resume line without depth.
+- Good examples:
+  "You list Docker as a skill. What is the most advanced thing you have actually done with it, and where do you still have gaps?"
+  "You put down 'data analysis' — walk me through a real analysis you ran end to end, including what you'd do differently."
+
+==================================================
+CERTIFICATION QUESTION GUIDE (Category: certification — PRO/CAREER only)
+==================================================
+
+- Ask about a SPECIFIC certification on the resume. Test authenticity and application, not the syllabus.
+- A strong answer shows what they genuinely learned and where they applied it; a weak answer can only name the certificate.
+- Skip entirely if the resume lists no certifications.
+- Good examples:
+  "You hold the AWS Solutions Architect certification. Beyond passing it, what is one thing it taught you that you now use in real work?"
+  "What made you pursue your Google Data Analytics certificate, and where have you actually applied it?"
+
+==================================================
+SELF-ASSESSMENT QUESTION GUIDE (Category: self_assessment — PRO/CAREER only)
+==================================================
+
+- Two sub-angles (use one per session):
+  self_rating: "On a scale of 1 to 10, how would you rate yourself on [skill], and why exactly that number?" — push for evidence behind the number.
+  self_critique: "Where do you think you over-estimate or under-estimate yourself, and what makes you say that?" — tests honest self-awareness.
+- A strong answer is specific and evidence-backed; a weak answer is a humble-brag ("I'm a perfectionist") or an unjustified number.
+- This tests metacognition and honesty — reward candidates who give a realistic number with real proof over those who simply say "9 out of 10".
+
+==================================================
 RED FLAG AWARENESS (Report §5 — do not surface scores, only inform question choices)
 ==================================================
 
@@ -649,7 +693,7 @@ Generate a question plan with exactly {max_turns} turns.
 {difficulty_rule_block}
 {recent_memory_block}
 
-Categories: introduction, studies_background, ownership, workflow_process, tool_method, challenge_debugging, validation_metrics, tradeoff_decision, communication_explain, teamwork_pressure, learning_growth, role_fit, closeout, situational_judgment, creative_thinking, ai_tool_fluency
+Categories: introduction, studies_background, ownership, workflow_process, tool_method, challenge_debugging, validation_metrics, tradeoff_decision, communication_explain, teamwork_pressure, learning_growth, role_fit, closeout, situational_judgment, creative_thinking, ai_tool_fluency, programming_language, skill_verification, certification, self_assessment
 Plan style: {plan_cfg['opening_style']}
 """
     # ✅ ADDED: branch-aware technical guidance (Report §6.3)
@@ -725,6 +769,11 @@ Rules:
   situational_judgment: a realistic "what would you do if..." workplace scenario. Target should describe the scenario, e.g. "handling a teammate not contributing before a deadline"
   creative_thinking: a thinking challenge — estimation, analogy, product improvement, pitch, or constraint removal. Target should name the challenge angle.
   ai_tool_fluency: one of four sub-angles — usage, verification, limits, or integrity. Target should name the sub-angle explicitly.
+- For CAREER and PRO only (NEVER for FREE), you may also use these four categories. Use them only when the resume supports them; rotate which ones appear across sessions:
+  programming_language: probe a SPECIFIC language the candidate lists (e.g. Python, Java, SQL, C++). Target should name the language, e.g. "hands-on Python knowledge". Skip if the resume lists no programming languages.
+  skill_verification: pick ONE concrete skill from the resume and probe its real depth, independent of any project. Target should name the skill, e.g. "real depth in SQL".
+  certification: ask what the candidate genuinely learned and applied from a SPECIFIC certification on the resume. Target should name the certification. Skip entirely if the resume has no certifications.
+  self_assessment: ask the candidate to rate themselves and justify it (self_rating), or to name where they over/under-estimate themselves (self_critique). Target should name the self-assessment angle.
 - For CAREER, include at least one strong hireability angle from this set: why should we hire you, what makes you stand out, what proves you fit the role, what would you focus on first if hired, or what should the panel remember about you.
 - For PRO, include at least one proof-oriented role-fit angle and one concrete validation or trade-off angle.
 - For FREE, include at least one simple HR-style angle such as role target, teamwork, growth area, or what kind of role the candidate wants next.

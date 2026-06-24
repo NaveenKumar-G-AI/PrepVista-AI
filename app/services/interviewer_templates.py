@@ -576,6 +576,15 @@ def _question_template_for_category(
         return _creative_template(plan, simple_target, simplified, variant_index)
     if family == "ai_tool_fluency":
         return _ai_fluency_template(plan, simple_target, simplified, variant_index)
+    # ✅ ADDED: dispatch to the four new-family template helpers (PRO + CAREER).
+    if family == "programming_language":
+        return _programming_language_template(plan, simple_target, simplified, variant_index)
+    if family == "skill_verification":
+        return _skill_verification_template(plan, simple_target, simplified, variant_index)
+    if family == "certification":
+        return _certification_template(plan, simple_target, simplified, variant_index)
+    if family == "self_assessment":
+        return _self_assessment_template(plan, simple_target, simplified, variant_index)
 
     return (
         f"Can you walk me through {simple_target}?"
@@ -724,6 +733,109 @@ def _ai_fluency_template(plan: str, target: str, simplified: bool, variant_index
     return choose(
         "Tell me honestly — how do you use AI tools in your studies or projects, and how do you check the results?",
         "Give me a real example of using an AI tool in your work and what you did with the output.",
+    )
+
+
+# ✅ ADDED: Template blocks for the four new families (PRO + CAREER only).
+# Reached by _question_template_for_category after all existing family checks, so
+# these families get grounded questions instead of the generic "walk me through" catch-all.
+def _programming_language_template(plan: str, target: str, simplified: bool, variant_index: int) -> str:
+    """Fallback programming-language knowledge question."""
+    def choose(*options: str) -> str:
+        usable = [o for o in options if o]
+        return usable[variant_index % len(usable)] if usable else ""
+
+    subject = target.strip() or "the programming language you know best"
+    if simplified:
+        return choose(
+            f"Tell me one thing you understand well about {subject}, with an example.",
+            f"What is one feature of {subject} you have actually used, and what for?",
+        )
+    if plan == "career":
+        return choose(
+            f"Let's go deep on {subject}. Pick one concept you have used in real code and explain how it works under the hood.",
+            f"On {subject}, tell me about a specific feature you relied on and one common mistake people make with it.",
+            f"For {subject}, explain one thing you have to reason about carefully for correctness or performance, with a real example.",
+        )
+    return choose(
+        f"Let's talk about {subject}. Explain one concept you have used and how it actually works.",
+        f"On {subject}, what is one feature you rely on, and when would you avoid it?",
+        f"Give me a concrete example of something you built with {subject}, and one tricky part of the language you hit.",
+    )
+
+
+def _skill_verification_template(plan: str, target: str, simplified: bool, variant_index: int) -> str:
+    """Fallback skill-verification question — prove a declared resume skill."""
+    def choose(*options: str) -> str:
+        usable = [o for o in options if o]
+        return usable[variant_index % len(usable)] if usable else ""
+
+    subject = target.strip() or "one skill from your resume"
+    if simplified:
+        return choose(
+            f"Let's check {subject} — tell me one real thing you have done with it.",
+            f"What is one thing about {subject} you are confident explaining?",
+        )
+    if plan == "career":
+        return choose(
+            f"Let's pressure-test {subject}. Walk me through the most advanced thing you have actually done with it.",
+            f"On {subject}, where would you honestly rate yourself, and what specific work backs that up?",
+            f"Take {subject} and explain a real problem you solved with it, end to end.",
+        )
+    return choose(
+        f"Let's verify {subject}. Tell me about the deepest thing you have actually done with it.",
+        f"On {subject}, what can you do confidently, and where do you still have gaps?",
+        f"Give me a concrete example that proves your level with {subject}.",
+    )
+
+
+def _certification_template(plan: str, target: str, simplified: bool, variant_index: int) -> str:
+    """Fallback certification question — what was learned and applied."""
+    def choose(*options: str) -> str:
+        usable = [o for o in options if o]
+        return usable[variant_index % len(usable)] if usable else ""
+
+    subject = target.strip() or "a certification, course, or credential you completed"
+    if simplified:
+        return choose(
+            f"Tell me one useful thing you learned from {subject}.",
+            f"What made you take {subject}, and what did you get out of it?",
+        )
+    if plan == "career":
+        return choose(
+            f"Let's talk about {subject}. Beyond the certificate itself, what did you genuinely learn, and where have you applied it?",
+            f"On {subject}, give me a concrete example of using what it taught you in real work.",
+            f"What made you pursue {subject}, and what is one thing from it you now use regularly?",
+        )
+    return choose(
+        f"Let's talk about {subject}. What did you actually learn, and where have you used it?",
+        f"On {subject}, give me one concrete example of applying what you learned.",
+        f"What is the most useful thing {subject} taught you, and how do you use it?",
+    )
+
+
+def _self_assessment_template(plan: str, target: str, simplified: bool, variant_index: int) -> str:
+    """Fallback self-assessment question — self-rating AND self-critique angles."""
+    def choose(*options: str) -> str:
+        usable = [o for o in options if o]
+        return usable[variant_index % len(usable)] if usable else ""
+
+    subject = target.strip() or "rating your strongest skill honestly and justifying that score"
+    if simplified:
+        return choose(
+            "On a scale of 1 to 10, how would you rate your strongest skill, and why that number?",
+            "Where would you rate yourself right now, and what would push that number higher?",
+        )
+    if plan == "career":
+        return choose(
+            f"Let's do an honest self-assessment: {subject}. Be specific about the evidence.",
+            "On a scale of 1 to 10, rate yourself on your strongest skill, then justify that exact number with real proof.",
+            "Where do you think you over-estimate or under-estimate yourself, and what makes you say that?",
+        )
+    return choose(
+        f"Give me an honest self-assessment: {subject}.",
+        "On a scale of 1 to 10, how would you rate your strongest skill, and what evidence justifies that score?",
+        "What is one area where your self-rating and a manager's rating might differ, and why?",
     )
 
 

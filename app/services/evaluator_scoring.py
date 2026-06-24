@@ -421,6 +421,10 @@ def _top_readiness_dimensions(question_evaluations: list[dict], limit: int = 2) 
         "situational_judgment": "situational judgment",
         "creative_thinking": "creative thinking",
         "ai_tool_fluency": "AI tool fluency",
+        "programming_language": "programming language depth",
+        "skill_verification": "skill verification",
+        "certification": "certification depth",
+        "self_assessment": "self-assessment",
     }
     grouped: dict[str, list[float]] = {}
     for item in question_evaluations:

@@ -324,8 +324,26 @@ def normalize_rubric_category(question_text: str, rubric_category: str, plan: st
         "creative": "creative_thinking",
         "ai_tool_fluency": "ai_tool_fluency",
         "ai_fluency": "ai_tool_fluency",
+        # ✅ ADDED: keep the four new families as first-class rubric categories so
+        # their dedicated eval criteria are reached (they are NOT folded into
+        # technical_depth/behavioral, mirroring the situational/creative/ai trio).
+        "programming_language": "programming_language",
+        "programming": "programming_language",
+        "skill_verification": "skill_verification",
+        "skill": "skill_verification",
+        "certification": "certification",
+        "certifications": "certification",
+        "self_assessment": "self_assessment",
+        "self_judgement": "self_assessment",
+        "self_judgment": "self_assessment",
     }
     category = category_aliases.get(category.lower(), category)
+    # ✅ ADDED: trust the planner's explicit categorization for the new first-class
+    # families. Otherwise the generic token heuristics below (e.g. "python", "sql",
+    # "tool") would collapse a planned programming_language / skill_verification
+    # question into technical_depth and bypass its dedicated eval criteria.
+    if category in {"programming_language", "skill_verification", "certification", "self_assessment"}:
+        return category
     if not question:
         return category
 

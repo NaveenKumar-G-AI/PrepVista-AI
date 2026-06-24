@@ -389,6 +389,17 @@ def _question_angle_from_text(question_text: str, fallback_category: str = "comm
         if any(term in normalized for term in ["integrity", "disclose", "yours", "genuinely"]):
             return "ai_integrity"
         return "ai_usage"
+    # ✅ ADDED: sub-angles for the four new families so angle-repeat rules work.
+    if family == "self_assessment":
+        if any(term in normalized for term in ["rate yourself", "scale of", "score yourself", "where would you rate", "rate your"]):
+            return "self_rating"
+        return "self_critique"
+    if family == "programming_language":
+        return "language_depth"
+    if family == "skill_verification":
+        return "skill_depth"
+    if family == "certification":
+        return "cert_application"
     return family
 
 
@@ -451,6 +462,38 @@ def _question_family_from_text(question_text: str, fallback_category: str = "com
         return "closeout"
     if any(phrase in normalized for phrase in ["explain that simply", "simple terms", "clear way", "non technical"]):
         return "communication_explain"
+    # ✅ ADDED: classifiers for the four new families. Placed BEFORE the
+    # situational/creative/ai checks because those use broad phrases (e.g.
+    # "how would you handle", "how many") that would otherwise swallow a
+    # specific programming/skill question. Each phrase below is deliberately
+    # narrow so genuine SJT/creative questions are not mis-attributed.
+    if any(phrase in normalized for phrase in [
+        "rate yourself", "how would you rate yourself", "on a scale of", "score yourself",
+        "where would you rate yourself", "how do you assess your own", "honest self assessment",
+        "estimate yourself", "overestimate", "underestimate", "over-estimate", "under-estimate",
+        "how do you evaluate your own", "how strong would you say you are",
+        "rate your strongest", "rate your own",
+    ]):
+        return "self_assessment"
+    if any(phrase in normalized for phrase in [
+        "certification", "certificate", "certified", "credential",
+        "the course you completed", "what did you learn from the", "online course you",
+        "from your aws", "from your google", "from your azure",
+    ]):
+        return "certification"
+    if any(phrase in normalized for phrase in [
+        "in python", "in java", "in c++", "in javascript", "in sql", "in c#", "in golang",
+        "syntax", "language feature", "list and tuple", "list vs tuple", "pointer",
+        "memory management", "time complexity", "garbage collection", "data type",
+        "this language", "that language", "the language you", "language behind",
+    ]):
+        return "programming_language"
+    if any(phrase in normalized for phrase in [
+        "you list", "you listed", "rate your skill", "prove your skill", "how proficient",
+        "how strong is your", "how deep is your", "you put down", "skill on your resume",
+        "your real depth in", "your depth in", "how comfortable are you with",
+    ]):
+        return "skill_verification"
     # ✅ ADDED: Three new families (Report §3.3, §3.4, §3.8 / §6.2 categories #15-17).
     # These are already in QUESTION_FAMILIES/QUESTION_PLAN_CATEGORY_ALIASES (lines 443-481)
     # but were never classifiable from question text, so retry / followup / coverage
@@ -559,6 +602,11 @@ def _violates_family_repeat_rules(
             "situational_judgment": 1,
             "creative_thinking": 1,
             "ai_tool_fluency": 1,
+            # ✅ ADDED: four new families — one appearance per session each.
+            "programming_language": 1,
+            "skill_verification": 1,
+            "certification": 1,
+            "self_assessment": 1,
         },
         "career": {
             "introduction": 1,
@@ -571,6 +619,11 @@ def _violates_family_repeat_rules(
             "situational_judgment": 1,
             "creative_thinking": 1,
             "ai_tool_fluency": 1,
+            # ✅ ADDED: four new families — one appearance per session each.
+            "programming_language": 1,
+            "skill_verification": 1,
+            "certification": 1,
+            "self_assessment": 1,
         },
     }.get(plan, {})
     if family_counts.get(candidate_family, 0) >= int(hard_limits.get(candidate_family, 99)):
@@ -594,6 +647,9 @@ def _violates_family_repeat_rules(
             "early_impact": 1,
             "motivation": 1,
             "future_growth": 1,
+            # ✅ ADDED: self-assessment sub-angles capped once each (pro + career).
+            "self_rating": 1,
+            "self_critique": 1,
         },
         "career": {
             "hireability": 1,
@@ -603,6 +659,9 @@ def _violates_family_repeat_rules(
             "early_impact": 1,
             "motivation": 1,
             "future_growth": 1,
+            # ✅ ADDED: self-assessment sub-angles capped once each (pro + career).
+            "self_rating": 1,
+            "self_critique": 1,
         },
     }.get(plan, {})
     if angle_counts.get(candidate_angle, 0) >= int(angle_limits.get(candidate_angle, 99)):
@@ -870,6 +929,11 @@ def _humanize_question_target(target: str, family: str) -> str:
         "learning_growth": "your current growth area",
         "role_fit": "the role you want next",
         "closeout": "your fit for the role",
+        # ✅ ADDED: defaults for the four new families.
+        "programming_language": "a programming language you know well",
+        "skill_verification": "one skill from your resume",
+        "certification": "a certification you completed",
+        "self_assessment": "an honest self-assessment of your skills",
     }
     if not lowered:
         return default_targets.get(family, "your recent work")
@@ -1772,6 +1836,11 @@ def _build_career_retry_question(previous_question: str, fallback_category: str,
             "situational_judgment": "What would your first instinct be, and why?",
             "creative_thinking": "Walk me through your first few steps — no right answer here.",
             "ai_tool_fluency": "Give me one real example — how you used it and what you did with the output.",
+            # ✅ ADDED: four new families
+            "programming_language": "Name one concept in that language you have used, and what for.",
+            "skill_verification": "Tell me one real thing you have done with that skill.",
+            "certification": "What is one useful thing that certification taught you?",
+            "self_assessment": "On a scale of 1 to 10, how would you rate yourself, and why?",
         }
         return retry_questions.get(category, "What project or experience best shows your ownership?")
 
@@ -1793,6 +1862,11 @@ def _build_career_retry_question(previous_question: str, fallback_category: str,
             "situational_judgment": "Just name the first step you would take.",
             "creative_thinking": "Name one assumption you are making and go from there.",
             "ai_tool_fluency": "Name one AI tool and one way you have actually used it.",
+            # ✅ ADDED: four new families
+            "programming_language": "Name one feature of that language you have used.",
+            "skill_verification": "Name one concrete thing you did with that skill.",
+            "certification": "Name one thing you learned from that certification.",
+            "self_assessment": "Just give yourself a number from 1 to 10 and one reason.",
         }
         return narrowed_questions.get(category, "Give one short answer with the main point first.")
 
@@ -1812,6 +1886,11 @@ def _build_career_retry_question(previous_question: str, fallback_category: str,
         "situational_judgment": "What value or principle guides how you make hard calls?",
         "creative_thinking": "Pick any problem from your project and walk me through your thinking.",
         "ai_tool_fluency": "How do you decide whether to trust an AI output?",
+        # ✅ ADDED: four new families
+        "programming_language": "Which skill or language are you most confident explaining in depth?",
+        "skill_verification": "Which skill from your resume are you most confident proving?",
+        "certification": "Which thing you have learned recently are you most proud of applying?",
+        "self_assessment": "What is one strength you would rate yourself highest on, and why?",
     }
     return switch_questions.get(category, "Which project best proves you are ready for the role you want?")
 

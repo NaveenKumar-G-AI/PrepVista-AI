@@ -64,12 +64,14 @@ from app.services.interview_summary import (
     coerce_runtime_state,
 )
 from app.services.interviewer import (
+    QUESTION_FAMILIES,
     _apply_cross_session_question_cooldown,
     _build_fallback_question_plan,
     _build_opening_question,
     _build_repeat_question,
     _is_duplicate_question,
     _plan_target_signature,
+    _question_angle_from_text,
     _question_family_from_text,
     _question_signature,
     _question_template_for_category,
@@ -1230,6 +1232,68 @@ class TestTemplateQuality:
         )
         assert "next 3 to 5 years" in q.lower() or "grow" in q.lower() or "future" in q.lower(), \
             "closeout template must reference growth or the 3-to-5 year timeline"
+
+
+# ---------------------------------------------------------------------------
+# Section 24b: New-family integration safety net
+# ---------------------------------------------------------------------------
+# These guard against the "silent fallback" trap: a family that is in the enum
+# but missing a template (renders the generic "Can you walk me through…" catch-
+# all) or missing a classifier branch (mis-attributed to communication_explain),
+# which makes the family look wired while it silently degrades.
+
+_GENERIC_TEMPLATE_FALLBACK = "can you walk me through"
+
+_NEW_FAMILIES = (
+    "programming_language",
+    "skill_verification",
+    "certification",
+    "self_assessment",
+)
+
+
+class TestNewFamilyIntegration:
+
+    def test_every_family_renders_a_nonempty_template(self):
+        # No family in the enum may render an empty string for any plan.
+        for plan in ("free", "pro", "career"):
+            for family in QUESTION_FAMILIES:
+                q = _question_template_for_category(family, "", 0, plan=plan)
+                assert q and q.strip(), f"{family} rendered empty on {plan}"
+
+    def test_new_families_do_not_hit_generic_catch_all(self):
+        # PRO + CAREER are where the new families live; they must have a real
+        # template, not the generic "Can you walk me through {target}?" fallback.
+        targets = {
+            "programming_language": "your hands-on knowledge of Python",
+            "skill_verification": "your real depth in SQL",
+            "certification": "your AWS Solutions Architect certification",
+            "self_assessment": "rating your strongest skill honestly",
+        }
+        for plan in ("pro", "career"):
+            for family, target in targets.items():
+                q = _question_template_for_category(family, target, 0, plan=plan)
+                assert _GENERIC_TEMPLATE_FALLBACK not in q.lower(), \
+                    f"{family} fell through to the generic catch-all on {plan}: {q!r}"
+
+    def test_new_family_questions_classify_back_to_their_family(self):
+        # Representative questions must be recognised by the text classifier,
+        # otherwise retry/follow-up/coverage de-duplication silently breaks.
+        cases = {
+            "programming_language": "In Python, how would you handle a dataset that does not fit in memory?",
+            "skill_verification": "You list Docker as a skill. How deep is your experience with it?",
+            "certification": "What did you genuinely learn from your AWS certification, and where did you apply it?",
+            "self_assessment": "On a scale of 1 to 10, how would you rate yourself on your strongest skill?",
+        }
+        for family, question in cases.items():
+            assert _question_family_from_text(question) == family, \
+                f"{question!r} should classify as {family}, got {_question_family_from_text(question)!r}"
+
+    def test_self_assessment_sub_angles_split(self):
+        rating = _question_angle_from_text("On a scale of 1 to 10, how would you rate yourself?")
+        critique = _question_angle_from_text("Where do you over-estimate or under-estimate yourself?")
+        assert rating == "self_rating"
+        assert critique == "self_critique"
 
 
 # ---------------------------------------------------------------------------
