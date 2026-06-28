@@ -14,7 +14,7 @@ from collections import defaultdict
 
 import structlog
 
-from app.config import CATEGORY_WEIGHTS, PLAN_CONFIG
+from app.config import CATEGORY_WEIGHTS, PLAN_CONFIG, get_settings
 from app.services.llm import call_llm_json
 from app.services.placement_readiness import (
     build_placement_readiness,
@@ -29,6 +29,7 @@ from app.services.transcript import (
     recover_career_intent,
     summarize_recovered_intent,
 )
+from app.services.transcript_repair import repair_transcript
 
 from app.services.evaluator_grounding import (
     STOPWORDS,
@@ -94,9 +95,82 @@ from app.services.evaluator_feedback import (
     _fallback_better_answer,
     _fallback_pro_better_answer,
     _fallback_career_better_answer,
+    _grounding_quality,
+    _MIN_GROUNDING_QUALITY,
+    _suppress_and_note_answer,
+    _contains_banned_fallback_phrase,
+    _contains_invented_metric,
 )
 
 logger = structlog.get_logger("prepvista.evaluator")
+
+
+async def _maybe_rewrite_ideal_answer(
+    result: dict,
+    *,
+    plan: str,
+    question_text: str,
+    normalized_answer: str,
+    resume_summary,
+    rubric_category: str,
+) -> dict:
+    """Fix 5 — grounding-gated LLM rewrite of the model answer.
+
+    When the candidate's answer is too thin to ground a specific model answer
+    (grounding_quality < _MIN_GROUNDING_QUALITY), the deterministic path has
+    already produced an honest suppress+note ``ideal_answer``. If
+    BETTER_ANSWER_REWRITE_ENABLED is set, attempt one targeted LLM rewrite that
+    stays grounded in the candidate's own words; keep it only if it passes the
+    same anti-fabrication guards. Otherwise the suppress+note answer stands.
+    No-op (and no extra LLM call) when the flag is off or grounding is adequate.
+    """
+    if not get_settings().BETTER_ANSWER_REWRITE_ENABLED:
+        return result
+    summary = _coerce_resume_summary_dict(resume_summary)
+    facts = _extract_grounding_facts(question_text, normalized_answer, summary)
+    if _grounding_quality(facts) >= _MIN_GROUNDING_QUALITY:
+        return result
+
+    rewrite_prompt = (
+        "You rewrite an interview model answer. Produce a concise, first-person "
+        "answer of at most 3 sentences to the QUESTION below, grounded ONLY in "
+        "the candidate's ANSWER and RESUME. Do NOT invent projects, tools, "
+        "numbers, metrics, employers, or outcomes that are not present. If there "
+        "is not enough real material, reply with exactly the single word "
+        "INSUFFICIENT.\n\n"
+        f"QUESTION: {question_text}\n\n"
+        f"CANDIDATE ANSWER: {normalized_answer or '(no answer given)'}\n\n"
+        f"RESUME SUMMARY: {json.dumps(summary)[:1500]}\n\n"
+        'Return JSON: {"better_answer": "..."}'
+    )
+    try:
+        rewrite = await call_llm_json(
+            [{"role": "system", "content": rewrite_prompt}],
+            temperature=0.2,
+            max_tokens=200,
+            retries=1,
+            timeout=3.0,
+            fallback_timeout=3.6,
+            retry_delay=0.12,
+            allow_provider_fallback=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("better_answer_rewrite_failed", error=str(exc), question=question_text[:80])
+        return result
+
+    candidate = _safe_text(rewrite.get("better_answer") if isinstance(rewrite, dict) else "")
+    if not candidate or candidate.strip().upper().startswith("INSUFFICIENT"):
+        return result
+    candidate = _trim_to_sentence_count(candidate, max_sentences=3, max_chars=430)
+    if (
+        _looks_like_placeholder_rewrite(candidate)
+        or _looks_too_generic_for_question(candidate, question_text, rubric_category)
+        or _contains_invented_metric(candidate, normalized_answer, question_text, resume_summary)
+        or _contains_banned_fallback_phrase(candidate)
+    ):
+        return result
+    result["ideal_answer"] = candidate
+    return result
 
 async def evaluate_single_question(
     question_text: str,
@@ -104,20 +178,70 @@ async def evaluate_single_question(
     resume_summary: str,
     rubric_category: str,
     plan: str,
+    *,
+    session_id: object = None,
+    turn_id: object = None,
 ) -> dict:
     """
     Evaluate a single question-answer pair using the rubric system.
     Returns structured evaluation data.
+
+    Fix 2 — LLM transcript repair pass:
+    Before the dictionary-based normalize/recover chain runs, the raw STT
+    transcript is sent through ``repair_transcript`` (resume-grounded LLM
+    correction of mis-heard proper nouns / college / company / tool names that
+    the static 250-term dictionary cannot cover). The repair is best-effort and
+    returns the raw text unchanged on any failure, so it can never break
+    scoring. Both the original and repaired transcript are returned in the
+    result dict (``raw_answer`` / ``repaired_answer``) for the audit trail.
+    """
+    repaired_answer = await repair_transcript(
+        raw_answer,
+        resume_summary,
+        plan,
+        session_id=session_id,
+        turn_id=turn_id,
+    )
+    result = await _evaluate_question_core(
+        question_text=question_text,
+        raw_answer=raw_answer,
+        repaired_answer=repaired_answer,
+        resume_summary=resume_summary,
+        rubric_category=rubric_category,
+        plan=plan,
+    )
+    if isinstance(result, dict):
+        # Preserve the TRUE raw transcript and surface the repaired one so the
+        # report/audit trail can show both. The recovery chain already ran on
+        # the repaired text inside the core.
+        result.setdefault("raw_answer", raw_answer)
+        result["repaired_answer"] = repaired_answer
+    return result
+
+
+async def _evaluate_question_core(
+    question_text: str,
+    raw_answer: str,
+    repaired_answer: str,
+    resume_summary: str,
+    rubric_category: str,
+    plan: str,
+) -> dict:
+    """
+    Core rubric evaluation. ``repaired_answer`` is the transcript-repaired text
+    (see ``evaluate_single_question``); the dictionary recovery chain runs on it
+    instead of the raw transcript. System-marker / empty-answer detection stays
+    on the TRUE ``raw_answer`` so a repair pass can never mask a no-answer turn.
     """
     rubric_category = normalize_rubric_category(question_text, rubric_category, plan)
     normalized_answer = (
-        recover_spoken_meaning(raw_answer)
+        recover_spoken_meaning(repaired_answer)
         if plan == "free"
-        else recover_technical_intent(raw_answer, question_text, resume_summary)
+        else recover_technical_intent(repaired_answer, question_text, resume_summary)
         if plan == "pro"
-        else recover_career_intent(raw_answer, question_text, resume_summary)
+        else recover_career_intent(repaired_answer, question_text, resume_summary)
         if plan == "career"
-        else normalize_transcript(raw_answer)
+        else normalize_transcript(repaired_answer)
     )
 
     if _has_answer_marker(raw_answer) or not normalized_answer or normalized_answer in ["[NO_ANSWER_TIMEOUT]", ""]:
@@ -199,13 +323,20 @@ async def evaluate_single_question(
                 retry_delay=0.12,
                 allow_provider_fallback=False,
             )
-            return _normalize_free_result(
-                raw_answer=raw_answer,
-                normalized_answer=normalized_answer,
+            return await _maybe_rewrite_ideal_answer(
+                _normalize_free_result(
+                    raw_answer=raw_answer,
+                    normalized_answer=normalized_answer,
+                    question_text=question_text,
+                    resume_summary=resume_summary,
+                    rubric_category=rubric_category,
+                    llm_result=result if isinstance(result, dict) else {},
+                ),
+                plan=plan,
                 question_text=question_text,
+                normalized_answer=normalized_answer,
                 resume_summary=resume_summary,
                 rubric_category=rubric_category,
-                llm_result=result if isinstance(result, dict) else {},
             )
         except Exception as exc:
             logger.warning("free_question_evaluation_failed", error=str(exc), question=question_text[:100])
@@ -236,13 +367,20 @@ async def evaluate_single_question(
                 retry_delay=0.12,
                 allow_provider_fallback=False,
             )
-            return _normalize_pro_result(
-                raw_answer=raw_answer,
-                normalized_answer=normalized_answer,
+            return await _maybe_rewrite_ideal_answer(
+                _normalize_pro_result(
+                    raw_answer=raw_answer,
+                    normalized_answer=normalized_answer,
+                    question_text=question_text,
+                    resume_summary=resume_summary,
+                    rubric_category=rubric_category,
+                    llm_result=result if isinstance(result, dict) else {},
+                ),
+                plan=plan,
                 question_text=question_text,
+                normalized_answer=normalized_answer,
                 resume_summary=resume_summary,
                 rubric_category=rubric_category,
-                llm_result=result if isinstance(result, dict) else {},
             )
         except Exception as exc:
             logger.warning("pro_question_evaluation_failed", error=str(exc), question=question_text[:100])
@@ -273,13 +411,20 @@ async def evaluate_single_question(
                 retry_delay=0.12,
                 allow_provider_fallback=True,
             )
-            return _normalize_career_result(
-                raw_answer=raw_answer,
-                normalized_answer=normalized_answer,
+            return await _maybe_rewrite_ideal_answer(
+                _normalize_career_result(
+                    raw_answer=raw_answer,
+                    normalized_answer=normalized_answer,
+                    question_text=question_text,
+                    resume_summary=resume_summary,
+                    rubric_category=rubric_category,
+                    llm_result=result if isinstance(result, dict) else {},
+                ),
+                plan=plan,
                 question_text=question_text,
+                normalized_answer=normalized_answer,
                 resume_summary=resume_summary,
                 rubric_category=rubric_category,
-                llm_result=result if isinstance(result, dict) else {},
             )
         except Exception as exc:
             logger.warning("career_question_evaluation_failed", error=str(exc), question=question_text[:100])

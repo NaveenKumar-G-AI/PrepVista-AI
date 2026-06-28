@@ -85,6 +85,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
+from app.config import get_settings
 from app.services.groq_client import FALLBACK_SIGNAL, get_groq_client
 
 logger = logging.getLogger(__name__)
@@ -200,6 +201,97 @@ class _QuestionDeduplicator:
             self._sig_set.discard(old_sig)
 
 
+# Global Upstash key holding the rolling dedup window as a sorted set
+# (member = question signature, score = epoch seconds). Shared across all
+# uvicorn/gunicorn workers so multi-process deploys dedup correctly.
+_REDIS_DEDUP_KEY = "pv:qdedup"
+
+
+class _RedisQuestionDeduplicator:
+    """
+    Fix 4 — cross-process question dedup backed by Upstash Redis (REST API).
+
+    Replaces the per-process :class:`_QuestionDeduplicator` so that two students
+    served by *different* workers in the same batch window still can't receive
+    the identical opening question. Uses the same Upstash REST pipeline pattern
+    as ``app.middleware.rate_limiter`` (ZADD/ZSCORE/ZREMRANGEBYSCORE sliding
+    window) and shares its pooled httpx client.
+
+    Degrades gracefully: when Upstash is not configured *or* any request fails,
+    it falls back to an in-process :class:`_QuestionDeduplicator`, so single
+    -process deploys and Redis outages keep working (only losing cross-worker
+    visibility for the affected calls).
+    """
+
+    def __init__(self, window_s: float = _DEDUP_WINDOW_S, max_entries: int = _DEDUP_MAX_ENTRIES):
+        self._window_s = window_s
+        self._fallback = _QuestionDeduplicator(window_s, max_entries)
+        self._warned = False
+
+    def _config(self) -> tuple[str, str] | tuple[None, None]:
+        settings = get_settings()
+        url = getattr(settings, "UPSTASH_REDIS_URL", "") or ""
+        token = getattr(settings, "UPSTASH_REDIS_TOKEN", "") or ""
+        return (url, token) if url and token else (None, None)
+
+    async def _pipeline(self, commands: list[list]) -> list:
+        """Run a Redis command pipeline via the Upstash REST API."""
+        url, token = self._config()
+        # Imported lazily to avoid a hard import-time dependency on the
+        # middleware layer (and any future import cycle through it).
+        from app.middleware.rate_limiter import _get_redis_client
+
+        client = _get_redis_client()
+        resp = await client.post(
+            f"{url}/pipeline",
+            headers={"Authorization": f"Bearer {token}"},
+            json=commands,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _warn_once(self, message: str, exc: Exception) -> None:
+        if not self._warned:
+            self._warned = True
+            logger.warning("[prefetch] %s (%s) — using in-process dedup fallback", message, exc)
+
+    async def is_duplicate(self, sig: str) -> bool:
+        url, _ = self._config()
+        if not url:
+            return await self._fallback.is_duplicate(sig)
+        try:
+            now = time.time()
+            cutoff = now - self._window_s
+            results = await self._pipeline(
+                [
+                    ["ZREMRANGEBYSCORE", _REDIS_DEDUP_KEY, "0", f"{cutoff:.6f}"],
+                    ["ZSCORE", _REDIS_DEDUP_KEY, sig],
+                ]
+            )
+            score = results[1].get("result") if len(results) > 1 else None
+            return score is not None
+        except Exception as exc:  # noqa: BLE001
+            self._warn_once("redis dedup is_duplicate failed", exc)
+            return await self._fallback.is_duplicate(sig)
+
+    async def record(self, sig: str, session_id: str) -> None:
+        url, _ = self._config()
+        if not url:
+            await self._fallback.record(sig, session_id)
+            return
+        try:
+            now = time.time()
+            await self._pipeline(
+                [
+                    ["ZADD", _REDIS_DEDUP_KEY, f"{now:.6f}", sig],
+                    ["EXPIRE", _REDIS_DEDUP_KEY, str(int(self._window_s))],
+                ]
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._warn_once("redis dedup record failed", exc)
+            await self._fallback.record(sig, session_id)
+
+
 # ─── In-process prefetch cache ────────────────────────────────────────────────
 
 @dataclass
@@ -271,7 +363,8 @@ class SessionPrefetchManager:
 
     def __init__(self) -> None:
         self._cache     = _PrefetchCache()
-        self._dedup     = _QuestionDeduplicator()
+        # Fix 4 — Redis-backed cross-process dedup (falls back to in-process).
+        self._dedup     = _RedisQuestionDeduplicator()
         self._semaphore = asyncio.Semaphore(_PREFETCH_CONCURRENCY)
         self._active: dict[str, asyncio.Task] = {}  # session_id → task
         self._lock = asyncio.Lock()

@@ -3,16 +3,18 @@ PrepVista AI — Reports Router
 Retrieve interview reports and download PDFs.
 """
 
+import asyncio
 import json
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import structlog
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import Response
 
 from app.dependencies import get_current_user, require_plan, UserProfile
-from app.config import PLAN_CONFIG
+from app.config import PLAN_CONFIG, get_settings
 from app.database.connection import DatabaseConnection
+from app.services.audio_storage import create_signed_url
 from app.services.evaluator import (
     build_career_readiness_summary,
     build_pro_readiness_summary,
@@ -117,10 +119,20 @@ async def get_report(
                       relevance_score, clarity_score, specificity_score, structure_score,
                       answer_status, content_understanding, depth_quality, communication_clarity,
                       what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
-                      answer_duration_seconds
+                      answer_duration_seconds, repaired_answer
                FROM question_evaluations
                WHERE session_id = $1
                ORDER BY turn_number""",
+            session_id,
+        )
+
+        # Per-turn audio audit records (Fix 7) — present only when server-side STT
+        # was enabled for the session. Used to re-mint signed playback URLs and
+        # surface transcription confidence in the report's audit trail.
+        audio_rows = await conn.fetch(
+            """SELECT turn_number, audio_object_path, stt_confidence, stt_provider
+               FROM interview_audio_turns
+               WHERE session_id = $1""",
             session_id,
         )
 
@@ -164,6 +176,16 @@ async def get_report(
             "answer_duration_seconds": row["answer_duration_seconds"],
         }
         evaluations.append(q)
+
+    # --- Fix 7: audit trail (corrected transcript, signed audio, confidence) ----
+    # Attach a per-question `audit` block and a session-level audit notice so the
+    # report can show the student exactly what was transcribed, let them replay the
+    # audio, and dispute a mis-hearing. The corrected transcript is always present
+    # (Fix 2 repair); audio link + confidence appear only when server-side STT was
+    # used. Owner-only endpoint, so no extra plan gating on the student's own record.
+    audit_meta = await _attach_audit_trail(
+        evaluations, eval_rows, audio_rows, created_at=session_data["created_at"]
+    )
 
     rubric_scores = json.loads(session_data["rubric_scores"]) if session_data["rubric_scores"] else {}
     violations = json.loads(session_data["proctoring_violations"]) if session_data["proctoring_violations"] else []
@@ -241,6 +263,114 @@ async def get_report(
         "has_free_guidance": has_free_guidance,
         "pro_summary": pro_summary,
         "career_summary": career_summary,
+        "audit": audit_meta,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Fix 7 — report audit trail builder
+# ---------------------------------------------------------------------------
+
+# Where a student disputes a mis-transcribed answer. Kept here (not a setting) so
+# the line always renders even on minimally-configured environments.
+_DISPUTE_CONTACT_EMAIL = "support@prepvista.in"
+
+
+def _transcript_was_corrected(raw_answer: str, repaired_answer: str | None) -> bool:
+    """True when Fix 2's repair pass meaningfully changed the transcript."""
+    if not repaired_answer:
+        return False
+    raw = (raw_answer or "").strip()
+    repaired = repaired_answer.strip()
+    return bool(repaired) and repaired.casefold() != raw.casefold()
+
+
+async def _attach_audit_trail(
+    evaluations: list[dict],
+    eval_rows: list,
+    audio_rows: list,
+    *,
+    created_at,
+) -> dict:
+    """Attach a per-question `audit` block to each evaluation and return the
+    session-level audit notice (retention date + dispute line).
+
+    Per question: the corrected transcript (when Fix 2 changed it), a freshly
+    minted signed audio URL + STT confidence (when server STT recorded audio),
+    and a flag for whether any audio exists. Audio links are minted concurrently
+    so a 15-question report does not serialize 15 sign calls.
+    """
+    settings = get_settings()
+    retention_days = int(getattr(settings, "AUDIO_RETENTION_DAYS", 90) or 90)
+
+    audio_by_turn = {row["turn_number"]: row for row in audio_rows}
+
+    # Mint all signed URLs concurrently (HTTP, no DB connection held).
+    sign_targets = [
+        (row["turn_number"], row["audio_object_path"])
+        for row in audio_rows
+        if row["audio_object_path"]
+    ]
+    signed_by_turn: dict[int, str | None] = {}
+    if sign_targets:
+        signed_urls = await asyncio.gather(
+            *(create_signed_url(path) for _, path in sign_targets)
+        )
+        signed_by_turn = {
+            turn: url for (turn, _), url in zip(sign_targets, signed_urls)
+        }
+
+    any_audio = False
+    any_correction = False
+    for q, row in zip(evaluations, eval_rows):
+        turn = row["turn_number"]
+        repaired = row["repaired_answer"]
+        corrected = _transcript_was_corrected(row["raw_answer"] or "", repaired)
+        audio_row = audio_by_turn.get(turn)
+        audio_url = signed_by_turn.get(turn)
+        confidence = None
+        provider = None
+        if audio_row is not None:
+            confidence = (
+                round(float(audio_row["stt_confidence"]) * 100, 1)
+                if audio_row["stt_confidence"] is not None
+                else None
+            )
+            provider = audio_row["stt_provider"]
+        if audio_url:
+            any_audio = True
+        if corrected:
+            any_correction = True
+
+        q["audit"] = {
+            "transcript_corrected": corrected,
+            # Only expose the corrected text when it actually differs — avoids
+            # implying an edit was made when the repair was a no-op.
+            "corrected_transcript": repaired.strip() if corrected else None,
+            "audio_url": audio_url,
+            "stt_confidence_pct": confidence,
+            "stt_provider": provider,
+        }
+
+    retention_date = None
+    if created_at is not None:
+        base = created_at
+        if base.tzinfo is None:
+            base = base.replace(tzinfo=timezone.utc)
+        retention_date = (base + timedelta(days=retention_days)).date().isoformat()
+
+    return {
+        "has_audio": any_audio,
+        "has_corrections": any_correction,
+        "retention_days": retention_days,
+        "audio_retention_until": retention_date,
+        "dispute_contact_email": _DISPUTE_CONTACT_EMAIL,
+        "dispute_note": (
+            "Your spoken answers were transcribed automatically and, where needed, "
+            "corrected against your resume before scoring. If you believe an answer "
+            "was mis-transcribed, you can replay the saved audio above and dispute it "
+            f"at {_DISPUTE_CONTACT_EMAIL} before the retention date."
+        ),
     }
 
 

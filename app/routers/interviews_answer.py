@@ -287,6 +287,8 @@ async def _evaluate_and_store(
                 resume_summary=str(resume_summary),
                 rubric_category=rubric_category,
                 plan=plan,
+                session_id=session_id,
+                turn_id=turn_number,
             )
         if not isinstance(eval_result, dict):
             logger.warning(
@@ -317,11 +319,11 @@ async def _evaluate_and_store(
                     answer_status, content_understanding, depth_quality,
                     communication_clarity, what_worked, what_was_missing,
                     how_to_improve, answer_blueprint, corrected_intent,
-                    answer_duration_seconds)
+                    answer_duration_seconds, repaired_answer)
                    VALUES
                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
                     $12,$13,$14,$15,$16,$17,$18,$19,$20,
-                    $21,$22,$23,$24,$25,$26,$27)
+                    $21,$22,$23,$24,$25,$26,$27,$28)
                    ON CONFLICT (session_id, turn_number) DO NOTHING""",
                 session_id,
                 turn_number,
@@ -352,6 +354,7 @@ async def _evaluate_and_store(
                 eval_result.get("answer_blueprint", ""),
                 eval_result.get("corrected_intent", ""),
                 answer_duration_seconds,
+                eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
             )
 
         logger.info(

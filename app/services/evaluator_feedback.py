@@ -115,6 +115,35 @@ def _trim_to_sentence_count(text: str, max_sentences: int = 3, max_chars: int = 
     return value
 
 
+# Fix 5 — generic filler that signals an *ungrounded*, fabricated model answer.
+# These read like confident specifics but contain no real candidate-derived
+# content, so they must never reach a student's report. _grounded_better_answer
+# no longer emits any of them as defaults; this list is the defense-in-depth
+# guard (and the invariant the Fix 10 regression suite asserts): if a built
+# answer ever contains one, we fall back to the honest suppress+note answer.
+_BANNED_FALLBACK_PHRASES = (
+    "more reliable output",
+    "improve the weakest part of the workflow",
+    "strengthen the method",
+    "strengthen the workflow",
+    "one area i still want to strengthen",
+    "a real project pressure point",
+    "two useful options under a real constraint",
+)
+# "strengthen {tool}" / "strengthen {method}" used as a fabricated decision.
+_BANNED_FALLBACK_RE = re.compile(r"\bstrengthen (?:the method|the workflow|it)\b", re.IGNORECASE)
+
+
+def _contains_banned_fallback_phrase(text: str) -> bool:
+    """True when text contains ungrounded filler that must not ship in a report."""
+    lowered = _safe_text(text).lower()
+    if not lowered:
+        return False
+    if any(phrase in lowered for phrase in _BANNED_FALLBACK_PHRASES):
+        return True
+    return bool(_BANNED_FALLBACK_RE.search(lowered))
+
+
 # Single-letter concept stand-ins (Master Prompt Prohibition 1): a verb or
 # connector followed by a lone capital letter used where a real term belongs,
 # e.g. "strengthen C", "work with C", "my role was to C", "improve X".
@@ -762,7 +791,98 @@ def _answer_blueprint_for_family(question_text: str, rubric_category: str) -> st
     return blueprints.get(family, "Use this structure: context -> what you did -> why you did it -> result.")
 
 
+# Fix 5 — minimum number of genuinely candidate-specific signals required before
+# we will build a *specific* model answer. Below this we suppress+note instead of
+# fabricating project details the candidate never gave.
+_MIN_GROUNDING_QUALITY = 3
+
+
+def _grounding_quality(facts: dict) -> int:
+    """Count genuinely candidate-specific signals extracted from the answer/resume.
+
+    Drives Fix 5's gate: below _MIN_GROUNDING_QUALITY grounded signals there is
+    not enough real material to safely build a specific model answer.
+    """
+    score = 0
+    if facts.get("project_grounded") and _safe_text(facts.get("project_name")) not in ("", "the project"):
+        score += 1
+    if facts.get("tool_grounded") and _safe_text(facts.get("tool")):
+        score += 1
+    method = _safe_text(facts.get("method"))
+    if method and method != "the method":
+        score += 1
+    if _safe_text(facts.get("decision")):
+        score += 1
+    if _safe_text(facts.get("outcome")):
+        score += 1
+    if any(_safe_text(part) for part in (facts.get("workflow_parts") or [])):
+        score += 1
+    if any(_safe_text(part) for part in (facts.get("validation_parts") or [])):
+        score += 1
+    if _safe_text(facts.get("fit_proof")):
+        score += 1
+    if _safe_text(facts.get("strength_signal")):
+        score += 1
+    if _safe_text(facts.get("background")):
+        score += 1
+    return score
+
+
+def _suppress_and_note_answer(
+    question_text: str,
+    rubric_category: str,
+    field_label: str,
+    target_role: str,
+) -> str:
+    """Fix 5 — honest fallback when grounding is too low to build a specific answer.
+
+    Returns interview-ready scaffolding that names the *shape* of a strong answer
+    without inventing any project facts the candidate never provided.
+    """
+    family = _question_family(question_text, rubric_category)
+    structure = {
+        "intro": "name who you are, your strongest area, one real proof point, and the role you want",
+        "studies_background": "name what you are studying or focusing on now and tie it to one concrete piece of work",
+        "ownership": "name the part you personally owned, the decision you made, and the result it produced",
+        "workflow": "walk through the main steps in order and say why each step mattered",
+        "tool_method": "name the tool or method, what it handled, and why it was the right fit",
+        "validation": "say what you checked, how you compared before and after, and what the result told you",
+        "tradeoff": "name the two real options, the constraint you faced, the choice you made, and why",
+        "behavioral": "use situation, action, result, and the lesson you took from it",
+        "communication": "explain it simply first, then say why it mattered to the user or team",
+        "role_fit": f"connect one real strength or project to {target_role} and back it with proof",
+        "learning_growth": "name one real growth area, what you are doing about it, and why it matters",
+        "closeout": "give one hiring reason, one proof point, and the impact you want remembered",
+    }.get(family, "name the context, the part you handled, the decision you made, and the result")
+    return _trim_to_sentence_count(
+        f"A strong answer would {structure}. Use a specific example from your own work in {field_label} with a concrete, real result rather than a general statement.",
+        max_sentences=3,
+        max_chars=430,
+    )
+
+
 def _grounded_better_answer(plan: str, question_text: str, normalized_answer: str, resume_summary, rubric_category: str) -> str:
+    """Build a grounded model answer, gating on grounding quality (Fix 5).
+
+    When too few candidate-specific signals were extracted, or the built answer
+    still slips into banned filler, return the honest suppress+note answer
+    instead of fabricating project specifics.
+    """
+    summary = _coerce_resume_summary_dict(resume_summary)
+    facts = _extract_grounding_facts(question_text, normalized_answer, summary)
+    target_role = _safe_text(facts.get("target_role")) or "the role"
+    field_label = _field_label_for_feedback(summary)
+
+    if _grounding_quality(facts) < _MIN_GROUNDING_QUALITY:
+        return _suppress_and_note_answer(question_text, rubric_category, field_label, target_role)
+
+    answer = _grounded_better_answer_build(plan, question_text, normalized_answer, resume_summary, rubric_category)
+    if _contains_banned_fallback_phrase(answer):
+        return _suppress_and_note_answer(question_text, rubric_category, field_label, target_role)
+    return answer
+
+
+def _grounded_better_answer_build(plan: str, question_text: str, normalized_answer: str, resume_summary, rubric_category: str) -> str:
     summary = _coerce_resume_summary_dict(resume_summary)
     family = _question_family(question_text, rubric_category)
     field_label = _field_label_for_feedback(summary)
@@ -772,8 +892,11 @@ def _grounded_better_answer(plan: str, question_text: str, normalized_answer: st
     tool = _safe_text(facts.get("tool"))
     method = _safe_text(facts.get("method")) or tool or "the method"
     decision = _safe_text(facts.get("decision"))
-    decision_phrase = decision or (f"strengthen {method}" if method and method != "the method" else "improve the weakest part of the workflow")
-    outcome = _safe_text(facts.get("outcome")) or "more reliable output"
+    # Fix 5 — honest-generic defaults (never the banned filler). These only ever
+    # surface when grounding_quality already cleared _MIN_GROUNDING_QUALITY, so
+    # the surrounding sentence still carries real candidate-specific content.
+    decision_phrase = decision or "make one clear, deliberate improvement"
+    outcome = _safe_text(facts.get("outcome")) or "a clearer, more useful result"
     target_role = _safe_text(facts.get("target_role")) or "the role"
     candidate_name = _safe_text(facts.get("candidate_name"))
     background = _safe_text(facts.get("background"))

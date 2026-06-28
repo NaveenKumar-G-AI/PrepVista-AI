@@ -23,11 +23,13 @@ from fastapi import APIRouter
 from app.routers.org_college_students import router as students_router
 from app.routers.org_college_config import router as config_router
 from app.routers.org_college_analytics import router as analytics_router
+from app.routers.tpo_config import router as placement_config_router
 
 router = APIRouter()
 router.include_router(students_router)
 router.include_router(config_router)
 router.include_router(analytics_router)
+router.include_router(placement_config_router)  # Fix 9 — /org/my/placement-config
 
 # ── Re-export: Helpers & Constants ───────────────────────────────────────────
 from app.routers.org_college_helpers import (  # noqa: F401

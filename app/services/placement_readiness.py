@@ -188,6 +188,61 @@ _MAX_PROBABILITY = 98
 
 
 # ---------------------------------------------------------------------------
+# Calibration overlay (Fix 3)
+# ---------------------------------------------------------------------------
+# The bars/steepness above are documented heuristics. Once a college has fed
+# back >= 30 real placement outcomes for a company (see placement_outcomes +
+# app/services/calibration.py), a logistic fit replaces those heuristics with
+# data-derived values. To keep THIS module pure (no DB / no I/O — it is called
+# from the per-session report path, the student dashboard, and cohort rollups),
+# the fitted values are not loaded here. Instead calibration.py writes them into
+# this in-process registry via set_calibration_overrides(); the compute
+# functions read it synchronously and fall back to the hardcoded heuristic when
+# a company has no calibrated entry.
+#
+#   _CALIBRATION_OVERRIDES["TCS"] = {"bar": 53.1, "steepness": 0.091, "sample_n": 47}
+#
+# This is a plain dict swapped atomically by set_calibration_overrides(), so a
+# concurrent reader either sees the whole old map or the whole new map.
+_CALIBRATION_OVERRIDES: dict[str, dict] = {}
+
+
+def set_calibration_overrides(overrides: dict[str, dict] | None) -> None:
+    """Replace the calibrated-parameter registry (called by calibration.py).
+
+    `overrides` maps company name -> {"bar": float, "steepness": float,
+    "sample_n": int}. Pass an empty dict / None to clear all overrides and fall
+    back to the hardcoded heuristics everywhere.
+    """
+    global _CALIBRATION_OVERRIDES
+    cleaned: dict[str, dict] = {}
+    for name, params in (overrides or {}).items():
+        try:
+            bar = float(params["bar"])
+            steepness = float(params["steepness"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if steepness <= 0 or math.isnan(bar) or math.isinf(bar):
+            continue
+        cleaned[str(name)] = {
+            "bar": bar,
+            "steepness": steepness,
+            "sample_n": int(params.get("sample_n", 0) or 0),
+        }
+    _CALIBRATION_OVERRIDES = cleaned
+
+
+def _effective_curve(profile: "CompanyProfile") -> tuple[float, float, int | None]:
+    """Return (bar, steepness, sample_n) for a company, preferring a calibrated
+    entry over the hardcoded heuristic. sample_n is None when uncalibrated.
+    """
+    override = _CALIBRATION_OVERRIDES.get(profile.name)
+    if override:
+        return override["bar"], override["steepness"], override.get("sample_n")
+    return profile.bar, profile.steepness, None
+
+
+# ---------------------------------------------------------------------------
 # Core math
 # ---------------------------------------------------------------------------
 def _coerce_score(value: object) -> float | None:
@@ -288,9 +343,14 @@ def compute_hiring_probabilities(category_averages: dict[str, float]) -> list[di
         weighted = _weighted_mean(pillars, profile.emphasis)
         if weighted is None:
             continue
+        bar, steepness, sample_n = _effective_curve(profile)
         results.append({
             "company": profile.name,
-            "probability": _logistic_probability(weighted, profile.bar, profile.steepness),
+            "probability": _logistic_probability(weighted, bar, steepness),
+            # Honesty signals for the report (Fix 3 §5): is this number grounded
+            # in real outcomes, and how many?
+            "calibrated": sample_n is not None,
+            "sample_n": sample_n,
         })
     results.sort(key=lambda row: row["probability"], reverse=True)
     return results
@@ -359,7 +419,27 @@ def build_placement_readiness(
         "session_count": session_count,
         "trend_slope": trend_slope,
         "headline": _headline(score, tier, top),
+        # Fix 3 §5 — report transparency. The honest provenance of the numbers
+        # the TPO is looking at: data-grounded vs. heuristic. A TPO respects
+        # "estimated using scoring model" far more than a confident percentage
+        # with no source.
+        "calibration_note": _calibration_note(probabilities),
     }
+
+
+def _calibration_note(probabilities: list[dict]) -> str:
+    """One honest sentence on where these probabilities come from.
+
+    "Based on N placement outcomes" when the displayed companies are calibrated
+    against real outcomes; otherwise the scoring-model disclaimer.
+    """
+    if not probabilities:
+        return "Take an interview to unlock placement probabilities."
+    calibrated = [p for p in probabilities if p.get("calibrated")]
+    if calibrated:
+        total_n = sum(int(p.get("sample_n") or 0) for p in calibrated)
+        return f"Based on {total_n} placement outcomes."
+    return "Estimated using scoring model."
 
 
 # Per-question rubric scores are persisted on a 0-10 scale (evaluator_scoring

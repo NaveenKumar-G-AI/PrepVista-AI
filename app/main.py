@@ -20,7 +20,7 @@ from app.config import get_settings, get_cors_origins, get_allowed_hosts
 from app.middleware.error_handler import build_server_error_response, register_error_handlers
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.database.connection import DatabaseConnection, init_db_pool, close_db_pool
-from app.routers import account, admin, admin_grants, auth, interviews, reports, dashboard, billing, referrals, feedback, support, admin_support, events, org_admin, org_college
+from app.routers import account, admin, admin_grants, auth, interviews, reports, dashboard, billing, referrals, feedback, support, admin_support, events, org_admin, org_college, outcomes, stt_ws
 from app.services.user_activity import refresh_user_activity_stats
 
 
@@ -203,6 +203,17 @@ async def _bootstrap_runtime_services(app: FastAPI):
             except Exception as exc:
                 logger.warning(
                     "initial_user_activity_refresh_failed",
+                    error=_describe_startup_error(exc),
+                )
+            # Fix 3 — load any calibrated placement-probability parameters into
+            # the in-process readiness override registry. Best-effort: a failure
+            # here just keeps the hardcoded heuristics, never blocks startup.
+            try:
+                from app.services.calibration import load_calibrated_parameters
+                await load_calibrated_parameters(force=True)
+            except Exception as exc:
+                logger.warning(
+                    "calibration_warmup_failed",
                     error=_describe_startup_error(exc),
                 )
             logger.info("runtime_services_ready", attempt=attempt)
@@ -391,6 +402,10 @@ def create_app() -> FastAPI:
     app.include_router(events.router, prefix="/events", tags=["Events"])
     app.include_router(org_admin.router, prefix="/org/admin", tags=["Org Admin"])
     app.include_router(org_college.router, prefix="/org/my", tags=["College Admin"])
+    app.include_router(outcomes.router, prefix="/api/outcomes", tags=["Placement Outcomes"])
+    # STT WebSocket (/ws/stt/{session_id}) + REST fallback (/api/stt/transcribe).
+    # Mounted at root so the paths match the Fix 1 spec exactly.
+    app.include_router(stt_ws.router, tags=["Speech-to-Text"])
 
     # ── Health Check ─────────────────────────────
     @app.api_route("/", methods=["GET", "HEAD"])

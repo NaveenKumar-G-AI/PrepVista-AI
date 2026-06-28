@@ -109,6 +109,41 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_URL: str = Field(default="", description="Upstash Redis REST URL")
     UPSTASH_REDIS_TOKEN: str = Field(default="", description="Upstash Redis REST token")
 
+    # ── Server-side STT (Fix 1) ──────────────────────────
+    # Master gate for the server-side speech-to-text pipeline (MediaRecorder ->
+    # WebSocket -> Groq Whisper -> Supabase audio storage). Defaults OFF so the
+    # new path can be rolled out to colleges deliberately; while OFF the
+    # frontend continues to use the existing client-side recognition.
+    STT_SERVER_ENABLED: bool = Field(
+        default=False,
+        description="Enable the server-side STT pipeline (WebSocket + Groq Whisper).",
+    )
+    # Groq Whisper is the primary STT engine and reuses GROQ_API_KEY.
+    GROQ_WHISPER_MODEL: str = "whisper-large-v3"
+    # Deepgram Nova-2 is the OPTIONAL secondary fallback. Inert unless a key is
+    # set — when blank, STT runs Groq-only and fails gracefully if Groq is down.
+    DEEPGRAM_API_KEY: str = Field(default="", description="Deepgram API key (optional STT fallback)")
+    DEEPGRAM_MODEL: str = "nova-2"
+    # Private Supabase Storage bucket holding retained interview audio for the
+    # dispute/audit trail. Must be created out-of-band (see deployment notes).
+    INTERVIEW_AUDIO_BUCKET: str = Field(default="interview-audio", description="Supabase Storage bucket for interview audio")
+    # Minimum retention for dispute resolution. Surfaced in the report header.
+    AUDIO_RETENTION_DAYS: int = Field(default=90, description="Days interview audio is retained for dispute resolution")
+    # Default spoken-language hint passed to the STT engine.
+    STT_LANGUAGE_HINT: str = "en"
+
+    # ── Better-answer LLM rewrite (Fix 5) ────────────────
+    # When a candidate's answer is too thin to ground a *specific* model answer,
+    # the evaluator returns an honest suppress+note answer. With this flag ON it
+    # first attempts one targeted LLM rewrite to produce a grounded answer,
+    # falling back to suppress+note if the rewrite is unavailable or still
+    # ungrounded. Defaults OFF: it adds one extra LLM call per low-grounding
+    # question, so colleges enable it deliberately once Groq headroom allows.
+    BETTER_ANSWER_REWRITE_ENABLED: bool = Field(
+        default=False,
+        description="Attempt a grounded LLM rewrite of the model answer when grounding is low (Fix 5).",
+    )
+
     # Resend (Email)
     RESEND_API_KEY: str = Field(default="", description="Resend API key for transactional email")
     FROM_EMAIL: str = "PrepVista <noreply@prepvista.ai>"

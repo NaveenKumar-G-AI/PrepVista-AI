@@ -1153,6 +1153,11 @@ class ApiClient {
   async deleteCollegeDepartment<T = unknown>(id: string) {
     return this.request<T>(`/org/my/departments/${id}`, { method: 'DELETE' });
   }
+  // Fix 9 — TPO placement config
+  async getPlacementConfig<T = unknown>() { return this.request<T>('/org/my/placement-config'); }
+  async updatePlacementConfig<T = unknown>(body: Record<string, unknown>) {
+    return this.request<T>('/org/my/placement-config', { method: 'PUT', body });
+  }
   async listCollegeYears<T = unknown>() { return this.request<T>('/org/my/years'); }
   async createCollegeYear<T = unknown>(body: Record<string, unknown>) {
     return this.request<T>('/org/my/years', { method: 'POST', body });

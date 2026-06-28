@@ -469,7 +469,7 @@ def _extract_grounding_facts(question_text: str, normalized_answer: str, resume_
         ("speed", "better speed"),
         ("accurate", "more accurate answers"),
         ("accuracy", "better accuracy"),
-        ("reliable", "more reliable output"),
+        ("reliable", "more reliable results"),
         ("stable", "more stable output"),
         ("consisten", "more consistent output"),
         ("focus", "more focused output"),
