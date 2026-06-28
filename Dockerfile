@@ -7,6 +7,16 @@ WORKDIR /app
 #     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 \
 #     && rm -rf /var/lib/apt/lists/*
 
+# Fix 6 — multi-format resume parsing system deps:
+#   tesseract-ocr     → pytesseract OCR for image / image-only-PDF resumes
+#   poppler-utils      → pdf2image (convert_from_bytes) PDF→image rasterization
+#   libreoffice-writer → headless .doc→txt conversion (soffice --convert-to)
+# All three degrade gracefully in code if absent, but are required for the
+# DOCX/DOC/image/scan upload paths to actually work in production.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr poppler-utils libreoffice-writer \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

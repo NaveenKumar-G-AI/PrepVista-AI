@@ -25,7 +25,7 @@ from app.config import (
 from app.database.connection import DatabaseConnection
 from app.dependencies import UserProfile, get_current_user
 from app.routers.interviews_helpers import (
-    _normalize_plan, _MAX_PDF_SIZE_BYTES, _validate_pdf_magic, _SETUP_SEMAPHORE,
+    _normalize_plan, _MAX_PDF_SIZE_BYTES, _SETUP_SEMAPHORE,
     _check_prompt_injection, _compute_resume_fingerprint, _MIN_DURATION_SECONDS,
     _MAX_DURATION_SECONDS, _normalize_proctoring_mode, _normalize_candidate_name,
     _validate_session_id, _session_is_active, _safe_json_loads, _normalize_violation_text,
@@ -37,7 +37,12 @@ from app.services.evaluator import evaluate_single_question, normalize_rubric_ca
 from app.services.funnel_tracking import track_funnel_event
 from app.services.interviewer import create_session, finish_session, process_answer
 from app.services.quota import enforce_quota
-from app.services.resume_parser import extract_text_from_pdf, parse_resume_structured, validate_pdf_upload
+from app.services.resume_parser import (
+    extract_text_from_resume,
+    parse_resume_structured,
+    validate_resume_upload,
+    SUPPORTED_RESUME_EXTENSIONS,
+)
 
 from app.routers.interviews_schemas import (
     AnswerRequest,
@@ -93,10 +98,13 @@ async def setup_interview(
 
     if not resume.filename:
         raise HTTPException(status_code=400, detail="A resume file is required.")
-    if not resume.filename.lower().endswith(".pdf"):
+    if not resume.filename.lower().endswith(SUPPORTED_RESUME_EXTENSIONS):
         raise HTTPException(
             status_code=400,
-            detail="Only PDF resumes are supported. Please upload a .pdf file.",
+            detail=(
+                "Unsupported resume format. Please upload one of: "
+                f"{', '.join(SUPPORTED_RESUME_EXTENSIONS)}."
+            ),
         )
 
     # --- PDF size guard (DoS prevention) ------------------------------------
@@ -124,39 +132,24 @@ async def setup_interview(
             detail=f"Resume PDF must be under {_MAX_PDF_SIZE_BYTES // (1024*1024)} MB.",
         )
 
-    # --- PDF magic byte validation (file-type spoofing prevention) ----------
-    # Reject files that don't start with %PDF- regardless of their extension.
-    # A renamed .exe, .html, or .zip would pass a filename-only check but fail
-    # this content-level check before reaching the PDF parser.
-    _validate_pdf_magic(pdf_bytes)
+    # --- Content-level validation (file-type spoofing prevention) -----------
+    # Per-format magic-byte checks: a renamed .exe/.html/.zip passes a filename
+    # -only check but fails here before reaching any parser (Fix 6 — supports
+    # PDF, DOCX, DOC, and image uploads, not just PDF).
+    validate_resume_upload(pdf_bytes, resume.filename or "resume", resume.content_type)
 
-    # Validate PDF structure before attempting text extraction
-    validate_pdf_upload(pdf_bytes, resume.filename or "resume.pdf")
-
-    # Acquire the setup semaphore before the CPU-bound PDF extraction and the
-    # network-bound LLM parse.  This caps concurrent work at _SETUP_SEMAPHORE
-    # slots regardless of how many users hit /setup simultaneously, preventing
-    # CPU spikes and LLM rate-limit exhaustion during peak load (e.g. college
-    # placement drive where 200 students start within minutes of each other).
+    # Acquire the setup semaphore before the CPU-bound extraction (PDF parse /
+    # OCR / LibreOffice conversion) and the network-bound LLM parse.  This caps
+    # concurrent work at _SETUP_SEMAPHORE slots regardless of how many users hit
+    # /setup simultaneously, preventing CPU spikes and LLM rate-limit exhaustion
+    # during peak load (e.g. a college placement drive where 200 students start
+    # within minutes of each other).
     async with _SETUP_SEMAPHORE:
-        resume_text = extract_text_from_pdf(pdf_bytes)
-        if not resume_text or not resume_text.strip():
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Could not extract readable text from the uploaded resume. "
-                    "Please ensure the PDF is not scanned, image-only, or password-protected."
-                ),
-            )
-
-        if len(resume_text.strip()) < 100:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "The extracted resume content is too short to generate a meaningful interview. "
-                    "Please upload a more complete resume."
-                ),
-            )
+        # Format-aware extraction; raises 400 on unreadable files and a clear
+        # message when the extracted text is under the 200-char quality gate.
+        resume_text = extract_text_from_resume(
+            pdf_bytes, resume.filename or "resume", resume.content_type
+        )
 
         # Check for prompt injection patterns in the resume text.
         # We log (not reject) to avoid blocking legitimate resumes that

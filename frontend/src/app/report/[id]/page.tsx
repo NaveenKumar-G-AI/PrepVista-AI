@@ -41,6 +41,24 @@ interface Evaluation {
   answer_blueprint?: string | null;
   corrected_intent?: string | null;
   answer_duration_seconds?: number | null;
+  audit?: EvaluationAudit | null;
+}
+
+interface EvaluationAudit {
+  transcript_corrected: boolean;
+  corrected_transcript?: string | null;
+  audio_url?: string | null;
+  stt_confidence_pct?: number | null;
+  stt_provider?: string | null;
+}
+
+interface AuditMeta {
+  has_audio: boolean;
+  has_corrections: boolean;
+  retention_days: number;
+  audio_retention_until?: string | null;
+  dispute_contact_email: string;
+  dispute_note: string;
 }
 
 interface CareerSummary {
@@ -110,6 +128,7 @@ interface ReportData {
   interpretation?: string;
   pro_summary?: ProSummary | null;
   career_summary?: CareerSummary | null;
+  audit?: AuditMeta | null;
   expected_questions?: number;
   answered_questions?: number;
   duration_seconds?: number | null;
@@ -398,6 +417,17 @@ export default function ReportPage() {
           <h2 className="text-lg font-semibold text-primary mb-4">
             {isFreeSession ? 'Per-Question Coaching' : showProReview ? 'Pro Answer Review' : showCareerReview ? 'Career Answer Review' : 'Per-Question Breakdown'}
           </h2>
+          {data.audit && (data.audit.has_audio || data.audit.has_corrections) ? (
+            <div className="rounded-lg border border-border bg-surface-secondary p-4 mb-4 text-sm text-secondary">
+              <p className="font-medium text-primary mb-1">Transcript &amp; audio audit trail</p>
+              <p>{data.audit.dispute_note}</p>
+              {data.audit.audio_retention_until ? (
+                <p className="text-xs mt-2">
+                  Saved audio is retained until {data.audit.audio_retention_until} ({data.audit.retention_days} days), then permanently deleted.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="space-y-4">
             {evaluations.map((evaluation, index) => {
               const clsColors: Record<string, string> = {
@@ -429,6 +459,31 @@ export default function ReportPage() {
 
                   <p className="text-sm text-primary mb-2"><strong>Question:</strong> {evaluation.question_text}</p>
                   <p className="text-sm text-secondary mb-2"><strong>Your answer:</strong> {evaluation.normalized_answer || evaluation.raw_answer || 'No answer'}</p>
+                  {evaluation.audit && (evaluation.audit.transcript_corrected || evaluation.audit.audio_url || evaluation.audit.stt_confidence_pct != null) ? (
+                    <div className="rounded-lg border border-border bg-surface-secondary p-3 my-2">
+                      <p className="text-xs uppercase tracking-wide text-secondary mb-2">Transcript &amp; audio record</p>
+                      {evaluation.audit.transcript_corrected && evaluation.audit.corrected_transcript ? (
+                        <p className="text-sm text-secondary mb-2">
+                          <strong>Corrected transcript:</strong> {evaluation.audit.corrected_transcript}
+                          <span className="block text-xs text-secondary mt-1">
+                            Auto-corrected against your resume before scoring (e.g. mis-heard names or tools).
+                          </span>
+                        </p>
+                      ) : null}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {evaluation.audit.audio_url ? (
+                          <audio controls preload="none" src={evaluation.audit.audio_url} className="h-8 max-w-full">
+                            Your browser does not support audio playback.
+                          </audio>
+                        ) : null}
+                        {evaluation.audit.stt_confidence_pct != null ? (
+                          <span className="text-xs text-secondary">
+                            Transcription confidence: {evaluation.audit.stt_confidence_pct}%
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                   {evaluation.answer_duration_seconds ? (
                     <p className="text-xs text-secondary mb-2">Response time: {evaluation.answer_duration_seconds}s</p>
                   ) : null}

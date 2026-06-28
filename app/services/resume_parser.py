@@ -15,6 +15,39 @@ from app.services.prompts import build_resume_extraction_prompt
 
 logger = structlog.get_logger("prepvista.resume")
 
+# Fix 6 — accepted resume formats beyond PDF. Images and image-only PDFs go
+# through OCR; .docx via python-docx; legacy .doc via LibreOffice headless.
+_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif")
+SUPPORTED_RESUME_EXTENSIONS = (".pdf", ".docx", ".doc") + _IMAGE_EXTENSIONS
+
+# Quality gate: below this many extracted characters there is not enough signal
+# to build a meaningful interview (covers blank scans, failed OCR, near-empty docs).
+_MIN_RESUME_TEXT_CHARS = 200
+
+# Max pages to OCR from an image-only PDF — bounds Tesseract cost on huge scans.
+_MAX_OCR_PDF_PAGES = 10
+
+_CONTENT_TYPE_EXTENSIONS = {
+    "application/pdf": ".pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "application/msword": ".doc",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/bmp": ".bmp",
+    "image/tiff": ".tiff",
+}
+
+
+def _resume_extension(filename: str, content_type: str | None = None) -> str:
+    """Resolve a supported resume extension from filename, then content-type."""
+    name = (filename or "").lower().strip()
+    for ext in SUPPORTED_RESUME_EXTENSIONS:
+        if name.endswith(ext):
+            return ext
+    ct = (content_type or "").split(";")[0].strip().lower()
+    return _CONTENT_TYPE_EXTENSIONS.get(ct, "")
+
 FIELD_BUCKETS = (
     "software_backend_frontend",
     "ai_ml_data",
@@ -162,10 +195,198 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     except Exception as e:
         logger.error("pdfplumber_extraction_also_failed", error=str(e))
 
+    # Fix 6 — last resort: OCR an image-only / scanned PDF (best-effort; only
+    # runs if pdf2image + pytesseract + their system binaries are available).
+    ocr_text = _ocr_pdf(pdf_bytes)
+    if ocr_text:
+        return ocr_text[:settings.MAX_RESUME_TEXT_LENGTH]
+
     raise HTTPException(
         status_code=400,
-        detail="Could not extract text from the resume PDF. Please ensure it's not an image-only scan.",
+        detail="Could not extract text from the resume PDF. Please ensure it's not an image-only scan, or upload a clearer copy.",
     )
+
+
+def _ocr_pdf(pdf_bytes: bytes) -> str:
+    """OCR a scanned/image-only PDF. Returns "" if OCR is unavailable or fails."""
+    try:
+        import pytesseract
+        from pdf2image import convert_from_bytes
+    except ImportError:
+        logger.info("pdf_ocr_unavailable", reason="pytesseract/pdf2image not installed")
+        return ""
+    try:
+        images = convert_from_bytes(pdf_bytes, dpi=200, fmt="png")
+    except Exception as e:  # poppler missing or corrupt PDF
+        logger.warning("pdf_ocr_convert_failed", error=str(e))
+        return ""
+    chunks: list[str] = []
+    for image in images[:_MAX_OCR_PDF_PAGES]:
+        try:
+            chunks.append(pytesseract.image_to_string(image) or "")
+        except Exception as e:  # tesseract binary missing
+            logger.warning("pdf_ocr_page_failed", error=str(e))
+            break
+    return "\n".join(chunk.strip() for chunk in chunks if chunk.strip()).strip()
+
+
+def extract_text_from_docx(file_bytes: bytes) -> str:
+    """Extract text from a .docx resume (paragraphs + tables) via python-docx."""
+    settings = get_settings()
+    try:
+        import docx  # python-docx
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="DOCX resumes are not supported on this server. Please upload a PDF.",
+        )
+    try:
+        document = docx.Document(io.BytesIO(file_bytes))
+    except Exception as e:
+        logger.warning("docx_extraction_failed", error=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read the DOCX resume. Please re-save it as PDF and try again.",
+        )
+    parts = [p.text.strip() for p in document.paragraphs if p.text and p.text.strip()]
+    for table in document.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text and cell.text.strip()]
+            if cells:
+                parts.append(" | ".join(cells))
+    return "\n".join(parts).strip()[:settings.MAX_RESUME_TEXT_LENGTH]
+
+
+def extract_text_from_doc(file_bytes: bytes) -> str:
+    """Extract text from a legacy .doc resume via LibreOffice headless conversion."""
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    settings = get_settings()
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise HTTPException(
+            status_code=503,
+            detail="Legacy .doc resumes are not supported on this server. Please upload a PDF or DOCX.",
+        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src = os.path.join(tmpdir, "resume.doc")
+        with open(src, "wb") as fh:
+            fh.write(file_bytes)
+        try:
+            subprocess.run(
+                [soffice, "--headless", "--convert-to", "txt:Text", "--outdir", tmpdir, src],
+                check=True,
+                capture_output=True,
+                timeout=60,
+            )
+        except Exception as e:
+            logger.warning("doc_libreoffice_failed", error=str(e))
+            raise HTTPException(
+                status_code=400,
+                detail="Could not convert the .doc resume. Please upload a PDF or DOCX.",
+            )
+        out = os.path.join(tmpdir, "resume.txt")
+        if not os.path.exists(out):
+            raise HTTPException(
+                status_code=400,
+                detail="Could not convert the .doc resume. Please upload a PDF or DOCX.",
+            )
+        with open(out, "r", encoding="utf-8", errors="ignore") as fh:
+            text = fh.read().strip()
+    return text[:settings.MAX_RESUME_TEXT_LENGTH]
+
+
+def extract_text_from_image(file_bytes: bytes) -> str:
+    """OCR a resume uploaded as an image (PNG/JPG/etc.) via pytesseract."""
+    settings = get_settings()
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Image resumes are not supported on this server. Please upload a PDF.",
+        )
+    try:
+        image = Image.open(io.BytesIO(file_bytes))
+        text = pytesseract.image_to_string(image) or ""
+    except Exception as e:
+        logger.warning("image_ocr_failed", error=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read text from the image. Please upload a clearer scan or a PDF.",
+        )
+    return text.strip()[:settings.MAX_RESUME_TEXT_LENGTH]
+
+
+def extract_text_from_resume(file_bytes: bytes, filename: str, content_type: str | None = None) -> str:
+    """Fix 6 — format-aware resume text extraction with a <200-char quality gate.
+
+    Routes PDF/DOCX/DOC/image uploads to the right extractor (image-only PDFs and
+    image uploads go through OCR) and rejects anything that yields too little
+    text to build a meaningful interview.
+    """
+    ext = _resume_extension(filename, content_type)
+    if ext == ".pdf":
+        text = extract_text_from_pdf(file_bytes)
+    elif ext == ".docx":
+        text = extract_text_from_docx(file_bytes)
+    elif ext == ".doc":
+        text = extract_text_from_doc(file_bytes)
+    elif ext in _IMAGE_EXTENSIONS:
+        text = extract_text_from_image(file_bytes)
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported resume format. Please upload one of: {', '.join(SUPPORTED_RESUME_EXTENSIONS)}.",
+        )
+
+    text = (text or "").strip()
+    if len(text) < _MIN_RESUME_TEXT_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The extracted resume text was too short to build a meaningful interview "
+                f"(under {_MIN_RESUME_TEXT_CHARS} characters). Please upload a more complete "
+                "resume or a clearer scan."
+            ),
+        )
+    return text
+
+
+def validate_resume_upload(file_bytes: bytes, filename: str, content_type: str | None = None) -> str:
+    """Validate a multi-format resume upload (size + extension + content magic).
+
+    Returns the resolved extension. Mirrors validate_pdf_upload but for all
+    formats accepted by extract_text_from_resume.
+    """
+    settings = get_settings()
+    if len(file_bytes) > settings.MAX_RESUME_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is {settings.MAX_RESUME_SIZE_BYTES // (1024*1024)}MB.",
+        )
+    ext = _resume_extension(filename, content_type)
+    if ext not in SUPPORTED_RESUME_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file extension. Please upload one of: {', '.join(SUPPORTED_RESUME_EXTENSIONS)}.",
+        )
+    # Content-level magic-byte checks defeat extension spoofing.
+    if ext == ".pdf" and not file_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Invalid file. The .pdf does not look like a real PDF.")
+    if ext == ".docx" and not file_bytes.startswith(b"PK\x03\x04"):  # OOXML is a zip
+        raise HTTPException(status_code=400, detail="Invalid file. The .docx does not look like a real Word document.")
+    if ext == ".doc" and not file_bytes.startswith(b"\xd0\xcf\x11\xe0"):  # OLE2 compound file
+        raise HTTPException(status_code=400, detail="Invalid file. The .doc does not look like a real Word document.")
+    if ext in _IMAGE_EXTENSIONS:
+        image_magics = (b"\x89PNG", b"\xff\xd8\xff", b"RIFF", b"BM", b"II*\x00", b"MM\x00*")
+        if not any(file_bytes.startswith(magic) for magic in image_magics):
+            raise HTTPException(status_code=400, detail="Invalid file. The image does not look like a real image.")
+    return ext
 
 
 def sanitize_resume_text(text: str) -> str:

@@ -92,6 +92,7 @@ from app.services.interviewer_question_engine import (  # noqa: F401
     _extract_question_portion,
     _strip_question_intro,
     _load_recent_session_question_memory,
+    load_recent_session_question_memory_cached,
     _is_duplicate_question,
     _dedupe_preserve_order,
     _answer_signal_profile,

@@ -7,12 +7,13 @@ Re-exported by interviewer.py (barrel file) for backward compatibility.
 """
 
 import json
+import os
 import re
 from typing import Any
 
 import structlog
 
-from app.config import PLAN_CONFIG, SESSION_COVERAGE_TARGETS, normalize_difficulty_mode
+from app.config import PLAN_CONFIG, SESSION_COVERAGE_TARGETS, get_settings, normalize_difficulty_mode
 from app.services.llm import call_llm
 from app.services.transcript import normalize_transcript, clean_for_display
 from app.services.interview_summary import (
@@ -1237,6 +1238,123 @@ async def _load_recent_session_question_memory(
     }
 
 
+# ─── Fix 8: Redis-backed cache for cross-session question memory ───────────────
+#
+# _load_recent_session_question_memory runs a 50-session + ~200-message double
+# query. It was called on EVERY answer turn (interviewer_session.process_answer),
+# even though the cross-session memory is stable for the whole interview (it
+# excludes the current session). At 300-college scale that is the heaviest
+# per-turn DB cost. We cache the computed memory per (user_id, plan) in Upstash
+# Redis — the same REST pattern as the Fix 4 dedup — so every turn after session
+# creation is a single Redis GET shared across all workers, with a transparent
+# DB fallback whenever Redis is unset or errors (zero behaviour change off-Redis).
+
+# Comfortably outlasts a single interview; cross-session freshness is guaranteed
+# by force_refresh=True at session creation, not by TTL expiry.
+_QMEM_CACHE_TTL_S = int(os.getenv("PREPVISTA_QMEM_CACHE_TTL_S", "3600"))
+
+# Sets in the memory dict are JSON-serialized as sorted lists and rehydrated to
+# sets on read so downstream membership checks behave identically to the DB path.
+_QMEM_SET_KEYS = (
+    "recent_target_signatures",
+    "recent_angle_signatures",
+    "recent_position_signatures",
+    "recent_question_signatures",
+)
+
+
+def _qmem_cache_key(user_id: str, plan: str) -> str:
+    return f"pv:qmem:{user_id}:{plan}"
+
+
+def _qmem_redis_config() -> tuple[str, str] | tuple[None, None]:
+    settings = get_settings()
+    url = getattr(settings, "UPSTASH_REDIS_URL", "") or ""
+    token = getattr(settings, "UPSTASH_REDIS_TOKEN", "") or ""
+    return (url, token) if url and token else (None, None)
+
+
+async def _qmem_redis_pipeline(commands: list[list]) -> list:
+    """Run an Upstash REST pipeline, reusing the rate limiter's pooled client."""
+    url, token = _qmem_redis_config()
+    from app.middleware.rate_limiter import _get_redis_client
+
+    client = _get_redis_client()
+    resp = await client.post(
+        f"{url}/pipeline",
+        headers={"Authorization": f"Bearer {token}"},
+        json=commands,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _serialize_recent_memory(memory: dict[str, Any]) -> str:
+    payload = dict(memory)
+    for key in _QMEM_SET_KEYS:
+        value = payload.get(key)
+        if isinstance(value, set):
+            payload[key] = sorted(value)
+    return json.dumps(payload)
+
+
+def _deserialize_recent_memory(raw: str) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    for key in _QMEM_SET_KEYS:
+        payload[key] = set(payload.get(key) or [])
+    return payload
+
+
+async def load_recent_session_question_memory_cached(
+    conn,
+    user_id: str,
+    plan: str,
+    exclude_session_id: str | None = None,
+    *,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """Fix 8 — cached wrapper around :func:`_load_recent_session_question_memory`.
+
+    force_refresh=True (use at session creation) recomputes from the DB and
+    repopulates the cache so a new interview always reflects every finished
+    session. force_refresh=False (use per answer turn) returns the cached value
+    when present. Falls back to the direct DB query when Redis is not configured
+    or any Redis call fails, so behaviour is unchanged off-Redis.
+    """
+    url, _ = _qmem_redis_config()
+    key = _qmem_cache_key(user_id, plan)
+
+    if url and not force_refresh:
+        try:
+            results = await _qmem_redis_pipeline([["GET", key]])
+            cached_raw = results[0].get("result") if results else None
+            if cached_raw:
+                hydrated = _deserialize_recent_memory(cached_raw)
+                if hydrated is not None:
+                    return hydrated
+        except Exception as exc:  # noqa: BLE001 — cache miss is always recoverable
+            logger.warning("qmem_cache_read_failed", error=str(exc))
+
+    memory = await _load_recent_session_question_memory(
+        conn, user_id=user_id, plan=plan, exclude_session_id=exclude_session_id
+    )
+
+    if url:
+        try:
+            await _qmem_redis_pipeline(
+                [["SET", key, _serialize_recent_memory(memory), "EX", str(_QMEM_CACHE_TTL_S)]]
+            )
+        except Exception as exc:  # noqa: BLE001 — never let cache writes break a turn
+            logger.warning("qmem_cache_write_failed", error=str(exc))
+
+    return memory
+
+
 def _is_duplicate_question(
     candidate_text: str,
     asked_question_signatures: set[str] | None,
@@ -2005,4 +2123,121 @@ def _build_emergency_unique_question(
             planned_difficulty="medium",
         ),
     )
+
+
+def _live_question_is_rejected(
+    candidate: str,
+    *,
+    is_greeting: bool,
+    asked_question_signatures: set[str] | None,
+    asked_questions: list[str] | None,
+    combined_avoid_families: set[str] | None,
+    plan: str,
+    allow_duplicate_retry: bool,
+) -> bool:
+    """Single source of truth for whether a live interviewer turn must be rejected.
+
+    Mirrors the inline acceptance checks in interviewer_session.process_answer so
+    the regeneration loop (Fix 4) and the downstream safety net agree on what a
+    "bad" question is: empty, not actually a question, a banned family, a
+    duplicate of an earlier turn, or a family/angle-repeat violation.
+    """
+    if not candidate:
+        return True
+    if is_greeting:
+        return False
+    if not _looks_like_interviewer_question(candidate):
+        return True
+    if _question_family_from_text(candidate) in (combined_avoid_families or set()):
+        return True
+    if not allow_duplicate_retry and _is_duplicate_question(
+        candidate, asked_question_signatures or set(), asked_questions or []
+    ):
+        return True
+    if _violates_family_repeat_rules(candidate, asked_questions or [], plan=plan):
+        return True
+    return False
+
+
+async def generate_live_followup_with_dedup(
+    *,
+    messages: list[dict],
+    base_temperature: float,
+    max_tokens: int,
+    is_greeting: bool,
+    asked_question_signatures: set[str] | None,
+    asked_questions: list[str] | None,
+    combined_avoid_families: set[str] | None,
+    plan: str,
+    allow_duplicate_retry: bool,
+    session_id: str | None = None,
+    upcoming_turn: int | None = None,
+    max_regenerations: int = 3,
+) -> str:
+    """Fix 4 — hard dedup gate on live LLM follow-ups.
+
+    Calls the interview LLM and, when the produced question is rejected
+    (duplicate / banned family / family-repeat violation / not a question),
+    regenerates with the temperature bumped by +0.1 each attempt, up to
+    ``max_regenerations`` extra tries. Returns the first accepted question.
+
+    If every attempt is rejected the *last* finalized candidate is returned so
+    the caller's existing template-fallback safety net can replace it (the spec's
+    "else template fallback"). On an LLM exception an empty string is returned,
+    which the caller also treats as a fallback trigger.
+    """
+    last_candidate = ""
+    total_attempts = max(1, max_regenerations + 1)
+    for attempt in range(total_attempts):
+        # Cap at 1.0 so a high base temperature never overflows the provider range.
+        temperature = min(1.0, round(base_temperature + 0.1 * attempt, 3))
+        try:
+            raw = await call_llm(
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                retries=1,
+                timeout=3.6,
+                fallback_timeout=4.4,
+                retry_delay=0.15,
+                allow_provider_fallback=False,
+            )
+        except Exception as exc:
+            logger.warning(
+                "interview_llm_fallback_used",
+                session_id=session_id,
+                turn=upcoming_turn,
+                attempt=attempt,
+                error=str(exc),
+            )
+            return ""
+
+        candidate = _finalize_interviewer_turn(raw, is_greeting=is_greeting)
+        if not _live_question_is_rejected(
+            candidate,
+            is_greeting=is_greeting,
+            asked_question_signatures=asked_question_signatures,
+            asked_questions=asked_questions,
+            combined_avoid_families=combined_avoid_families,
+            plan=plan,
+            allow_duplicate_retry=allow_duplicate_retry,
+        ):
+            if attempt > 0:
+                logger.info(
+                    "interview_dedup_regen_succeeded",
+                    session_id=session_id,
+                    turn=upcoming_turn,
+                    attempt=attempt,
+                )
+            return candidate
+
+        last_candidate = candidate or last_candidate
+
+    logger.info(
+        "interview_dedup_regen_exhausted",
+        session_id=session_id,
+        turn=upcoming_turn,
+        attempts=total_attempts,
+    )
+    return last_candidate
 

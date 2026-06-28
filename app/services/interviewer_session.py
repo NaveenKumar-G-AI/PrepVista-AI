@@ -25,7 +25,7 @@ from app.config import (
 )
 from app.database.connection import DatabaseConnection
 from app.services.technical_taxonomy import get_technical_categories
-from app.services.llm import call_llm, call_llm_json
+from app.services.llm import call_llm_json
 from app.services.prompts import (
     build_followup_prompt,
     build_greeting_prompt,
@@ -78,6 +78,7 @@ from app.services.interviewer_question_engine import (
     _safe_json_dumps,
     _question_signature,
     _load_recent_session_question_memory,
+    load_recent_session_question_memory_cached,
     _extract_asked_question_signatures,
     _collect_asked_questions,
     _collect_recent_asked_questions,
@@ -120,6 +121,7 @@ from app.services.interviewer_question_engine import (
     _build_timeout_retry_question,
     _build_free_followup_question,
     _build_emergency_unique_question,
+    generate_live_followup_with_dedup,
 )
 from app.services.interviewer_templates import (
     _build_pro_followup_question,
@@ -202,7 +204,12 @@ async def create_session(
     sanitized_resume = sanitize_resume_text(resume_text)
 
     async with DatabaseConnection() as conn:
-        recent_memory = await _load_recent_session_question_memory(conn, user_id=user_id, plan=safe_plan)
+        # Fix 8 — recompute fresh at session creation and repopulate the Redis
+        # cache so this interview's turns reuse it (and it reflects every finished
+        # session up to now).
+        recent_memory = await load_recent_session_question_memory_cached(
+            conn, user_id=user_id, plan=safe_plan, force_refresh=True
+        )
         # ✅ FIXED: session_variant previously used only session_count as seed.
         _user_id_hash = sum(ord(ch) * (i + 1) for i, ch in enumerate(str(user_id or "")[:32])) % 65521
         session_variant = (recent_memory.get("recent_session_count", 0) * 31 + _user_id_hash) % 65521
@@ -494,7 +501,9 @@ async def process_answer(
         asked_question_signatures = _extract_asked_question_signatures(asked_rows)
         asked_questions = _collect_asked_questions(asked_rows)
         recent_asked_questions = asked_questions[-8:]
-        recent_session_memory = await _load_recent_session_question_memory(
+        # Fix 8 — per-turn read served from the Redis cache populated at session
+        # creation; falls back to the DB query on a cache miss / Redis outage.
+        recent_session_memory = await load_recent_session_question_memory_cached(
             conn,
             user_id=str(session["user_id"]),
             plan=str(plan),
@@ -985,41 +994,25 @@ async def process_answer(
                 avoid_families=combined_avoid_families,
             )
         else:
-            try:
-                ai_response = await call_llm(
-                    messages=messages,
-                    temperature=cfg["temperature"],
-                    max_tokens=max(120, cfg["max_words"] * 5),
-                    retries=1,
-                    timeout=3.6,
-                    fallback_timeout=4.4,
-                    retry_delay=0.15,
-                    allow_provider_fallback=False,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "interview_llm_fallback_used",
-                    session_id=session_id,
-                    turn=total_turns + 1,
-                    error=str(exc),
-                )
-                ai_response = _build_fallback_ai_response(
-                    plan=plan,
-                    upcoming_turn=total_turns + 1,
-                    question_plan=question_plan,
-                    resume_summary=resume_summary,
-                    silence_count=new_silence,
-                    is_greeting=is_greeting,
-                    difficulty_signal=difficulty_signal,
-                    previous_question=question_for_eval,
-                    latest_user_text=normalized_user_text or raw_user_text,
-                    asked_question_signatures=asked_question_signatures,
-                    asked_questions=asked_questions,
-                    boost_prefix=positive_boost,
-                    difficulty_mode=difficulty_mode,
-                    preferred_plan_item=next_plan_item,
-                    avoid_families=combined_avoid_families,
-                )
+            # Fix 4 — hard dedup gate: when the model returns a duplicate / banned
+            # / repeat-rule-violating question, regenerate with temperature +0.1
+            # up to 3 extra times before falling back to the deterministic template
+            # below. An exhausted regeneration returns the last candidate (still a
+            # duplicate) which the rejection check that follows replaces with the
+            # template fallback; an LLM exception returns "" which it also catches.
+            ai_response = await generate_live_followup_with_dedup(
+                messages=messages,
+                base_temperature=cfg["temperature"],
+                max_tokens=max(120, cfg["max_words"] * 5),
+                is_greeting=is_greeting,
+                asked_question_signatures=asked_question_signatures,
+                asked_questions=asked_questions,
+                combined_avoid_families=combined_avoid_families,
+                plan=plan,
+                allow_duplicate_retry=allow_duplicate_retry,
+                session_id=session_id,
+                upcoming_turn=total_turns + 1,
+            )
         ai_response = _finalize_interviewer_turn(ai_response, is_greeting=is_greeting)
         ai_signature = _question_signature(ai_response)
         if (
@@ -1300,6 +1293,8 @@ async def _ensure_pending_evaluations(
                 resume_summary=_safe_json_dumps(resume_summary) if isinstance(resume_summary, dict) else str(resume_summary or "{}"),
                 rubric_category=rubric_category,
                 plan=plan,
+                session_id=session_id,
+                turn_id=turn_number,
             )
             if not isinstance(eval_result, dict):
                 return
@@ -1314,11 +1309,11 @@ async def _ensure_pending_evaluations(
                         answer_status, content_understanding, depth_quality,
                         communication_clarity, what_worked, what_was_missing,
                         how_to_improve, answer_blueprint, corrected_intent,
-                        answer_duration_seconds)
+                        answer_duration_seconds, repaired_answer)
                        VALUES
                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
                         $12,$13,$14,$15,$16,$17,$18,$19,$20,
-                        $21,$22,$23,$24,$25,$26,$27)
+                        $21,$22,$23,$24,$25,$26,$27,$28)
                        ON CONFLICT (session_id, turn_number) DO NOTHING""",
                     session_id,
                     turn_number,
@@ -1347,6 +1342,7 @@ async def _ensure_pending_evaluations(
                     eval_result.get("answer_blueprint", ""),
                     eval_result.get("corrected_intent", ""),
                     None,
+                    eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
                 )
         except Exception as exc:
             logger.warning(

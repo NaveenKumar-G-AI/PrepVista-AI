@@ -7,8 +7,17 @@ import { useParams, useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { ServerSttSession, serverSttSupported } from '@/lib/serverStt';
 
 import styles from './page.module.css';
+
+// Fix 1 — server-side STT feature flag. Default OFF: while off, the interview
+// uses the existing client-side Web Speech recognition. Flip
+// NEXT_PUBLIC_STT_SERVER_ENABLED=true to route capture through MediaRecorder +
+// the backend WebSocket (cross-browser, audio retained for disputes).
+const STT_SERVER_ENABLED =
+  (process.env.NEXT_PUBLIC_STT_SERVER_ENABLED || '').toLowerCase() === 'true';
+const STT_BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 
 type InterviewUiState =
   | 'INIT'
@@ -551,6 +560,8 @@ export default function LiveInterviewPage() {
   const [endInterviewOpen, setEndInterviewOpen] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // Fix 1 — active server-side STT session (only used when STT_SERVER_ENABLED).
+  const serverSttRef = useRef<ServerSttSession | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioAnalyserRef = useRef<AnalyserNode | null>(null);
   const audioSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -732,6 +743,11 @@ export default function LiveInterviewPage() {
   }
 
   function stopRecognition() {
+    // Fix 1 — tear down the server-side STT session too, so every existing
+    // stop path (submit, silence timeout, end interview, unmount) covers both
+    // capture modes.
+    stopServerStt();
+
     const recognition = recognitionRef.current;
     if (!recognition) {
       return;
@@ -1047,6 +1063,13 @@ export default function LiveInterviewPage() {
   }
 
   function ensureRecognition() {
+    // Fix 1 — when server-side STT is enabled, the Web Speech API is not used
+    // at all (and the "Please use Chrome" error must never appear). Capture is
+    // handled by the MediaRecorder/WebSocket path in startServerStt().
+    if (STT_SERVER_ENABLED) {
+      return null;
+    }
+
     if (recognitionRef.current) {
       return recognitionRef.current;
     }
@@ -1152,10 +1175,75 @@ export default function LiveInterviewPage() {
     return recognition;
   }
 
-  function startListeningLoop(promptOverride = '', resetQuestionTimer = true) {
-    const recognition = ensureRecognition();
-    if (!recognition) {
+  // Fix 1 — start the server-side STT capture for the current answer turn.
+  // Streams MediaRecorder windows to the backend WebSocket; each returned
+  // transcript is appended to the SAME refs the Web Speech path uses, so the
+  // synchronous "read currentTranscriptRef at submit" flow is unchanged.
+  function startServerStt() {
+    if (serverSttRef.current) {
+      // A session is already running for this turn.
       return;
+    }
+    const activeSession = sessionDataRef.current;
+    const token = activeSession?.access_token || '';
+    if (!token || !STT_BACKEND_URL || !serverSttSupported()) {
+      setPageError('Audio capture is not available in this browser. Please try Chrome, Firefox, Edge, or Safari.');
+      setUiState('ERROR');
+      return;
+    }
+
+    const session = new ServerSttSession({
+      sessionId,
+      token,
+      backendUrl: STT_BACKEND_URL,
+      turnNumber: currentTurn || 0,
+      language: 'en-IN',
+      onTranscript: (full) => {
+        if (uiStateRef.current !== 'USER_LISTENING') return;
+        accumulatedTranscriptRef.current = full;
+        currentTranscriptRef.current = normalizeLiveTranscript(full);
+        setLiveTranscript(currentTranscriptRef.current ? `"${currentTranscriptRef.current}"` : '');
+        if (currentTranscriptRef.current.trim().length > 0) {
+          noteAnswerActivity(true);
+        }
+      },
+      onStatus: (status) => {
+        if (uiStateRef.current !== 'USER_LISTENING') return;
+        if (status === 'listening') {
+          noteAnswerActivity(true, 'Listening...');
+        }
+      },
+      onError: (message) => {
+        if (uiStateRef.current === 'USER_LISTENING') {
+          setTimerMessage(message || 'Audio issue detected. Please keep speaking or press Submit Answer.');
+        }
+      },
+    });
+    serverSttRef.current = session;
+    session.start().catch(() => {
+      setPageError('Could not access the microphone. Please allow mic access and reload.');
+      setUiState('ERROR');
+      serverSttRef.current = null;
+    });
+  }
+
+  function stopServerStt() {
+    const session = serverSttRef.current;
+    if (!session) return;
+    serverSttRef.current = null;
+    // Fire-and-forget: the rolling transcript is already in the refs; stop()
+    // also flushes the last in-flight window and tears down the mic + socket.
+    session.stop().catch(() => {});
+  }
+
+  function startListeningLoop(promptOverride = '', resetQuestionTimer = true) {
+    // The Web Speech path needs a recognition object up front; the server path
+    // does not. Validate the active capture path before doing turn bookkeeping.
+    if (!STT_SERVER_ENABLED) {
+      const recognition = ensureRecognition();
+      if (!recognition) {
+        return;
+      }
     }
 
     // Consume and display any pending coaching hint from the backend quality
@@ -1177,10 +1265,14 @@ export default function LiveInterviewPage() {
       'Listening live. Press Submit Answer when you finish, or wait for 20 seconds of silence.',
     );
 
-    try {
-      recognition.start();
-    } catch {
-      /* no-op */
+    if (STT_SERVER_ENABLED) {
+      startServerStt();
+    } else {
+      try {
+        recognitionRef.current?.start();
+      } catch {
+        /* no-op */
+      }
     }
 
     resetSilenceTimer(promptOverride || hintMessage);
