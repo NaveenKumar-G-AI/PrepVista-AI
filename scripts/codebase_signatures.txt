@@ -1,0 +1,742 @@
+--- .env.example ---
+File type: .example
+
+--- .gitignore ---
+File type: 
+
+--- clean.py ---
+Classes: []
+Functions: []
+
+--- Dockerfile ---
+File type: 
+
+--- prepvista.html ---
+File type: .html
+
+--- render.yaml ---
+File type: .yaml
+
+--- test_queue.py ---
+Classes: []
+Functions: []
+
+--- app\config.py ---
+Classes: ['Settings', 'AdminUnlimitedGrant']
+Functions: ['generate_org_code', 'is_valid_org_category', 'get_org_category_config', 'get_plan_config', 'is_valid_plan', 'is_valid_difficulty_mode', 'normalize_difficulty_mode', 'get_difficulty_mode_config', 'can_access_plan', 'normalize_department', 'is_valid_department', 'get_department_display_name', 'get_env', 'get_allowed_hosts', 'get_cors_origins', 'get_settings', '_strip_string_values', '_normalize_urls', '_enforce_https_in_production', '_validate_environment', '_validate_positive_ints', '_validate_timeout', '_validate_provider_config']
+
+--- app\dependencies.py ---
+Classes: ['UserProfile', 'OrgAdminProfile']
+Functions: ['_token_cache_key', '_get_cached_user', '_set_cached_user', '_safe_log_snippet', '_decode_token_identity', 'require_plan', 'require_org_admin', 'require_main_admin', '__init__', 'effective_plan', 'effective_config', 'has_feature', 'has_expired_paid_plan', 'premium_lock_message', '__init__', 'user_id', 'email', 'is_active']
+
+--- app\main.py ---
+Classes: []
+Functions: ['_init_sentry', '_validate_runtime_environment', '_describe_startup_error', '_health_payload', 'create_app', 'before_send']
+
+--- app\__init__.py ---
+Classes: []
+Functions: []
+
+--- app\database\connection.py ---
+Classes: ['DatabaseNotReadyError', 'AnalyticsDatabaseNotReadyError', 'DatabaseConnection', 'AnalyticsConnection']
+Functions: ['_describe_db_error', '_require_db_pool', '_require_analytics_pool', '_validate_migration_path', '_compute_migration_checksum', '__init__', '__init__']
+
+--- app\database\__init__.py ---
+Classes: []
+Functions: []
+
+--- app\middleware\error_handler.py ---
+Classes: []
+Functions: ['_scrub_pii', '_should_log_error', 'get_error_metrics', '_utc_now_iso', '_safe_request_path', '_build_response', '_json_response_with_id', 'register_error_handlers']
+
+--- app\middleware\rate_limiter.py ---
+Classes: []
+Functions: ['_is_trusted_proxy', '_get_client_ip', '_safe_key', '_get_redis_client', '_get_endpoint_limits']
+
+--- app\middleware\security_headers.py ---
+Classes: ['SecurityHeadersMiddleware']
+Functions: ['_build_csp', '__init__']
+
+--- app\middleware\__init__.py ---
+Classes: []
+Functions: []
+
+--- app\routers\account.py ---
+Classes: []
+Functions: []
+
+--- app\routers\admin.py ---
+Classes: []
+Functions: ['require_admin', '_serialize_dt', '_paid_status']
+
+--- app\routers\admin_grants.py ---
+Classes: ['AdminGrantRequest']
+Functions: ['require_admin']
+
+--- app\routers\admin_support.py ---
+Classes: ['AdminReplyRequest']
+Functions: ['require_admin']
+
+--- app\routers\auth.py ---
+Classes: ['SignupRequest', 'SignupCodeRequest', 'LoginRequest', 'AccountStatusRequest', 'OnboardingRequest']
+Functions: ['_get_supabase_client', '_login_rate_limit_key', '_check_login_rate_limit', '_record_login_failure', '_clear_login_failures', '_is_admin_email', '_require_deliverable_signup_email']
+
+--- app\routers\billing.py ---
+Classes: ['CreateOrderRequest', 'VerifyPaymentRequest', 'SwitchPlanRequest']
+Functions: []
+
+--- app\routers\dashboard.py ---
+Classes: ['BulkDeleteSessionsRequest']
+Functions: ['_score_to_percent', '_validate_session_ids']
+
+--- app\routers\events.py ---
+Classes: ['TrackEventRequest']
+Functions: ['_extract_bearer_token', '_decode_auth_user_id']
+
+--- app\routers\feedback.py ---
+Classes: ['FeedbackCreateRequest']
+Functions: ['_strip_feedback']
+
+--- app\routers\interviews.py ---
+Classes: []
+Functions: []
+
+--- app\routers\interviews_answer.py ---
+Classes: []
+Functions: []
+
+--- app\routers\interviews_helpers.py ---
+Classes: []
+Functions: ['_safe_json_dumps', '_safe_json_loads', '_normalize_candidate_name', '_normalize_plan', '_normalize_proctoring_mode', '_clip_text', '_normalize_violation_text', '_strip_control_chars', '_validate_session_id', '_validate_pdf_magic', '_check_prompt_injection', '_build_proctoring_event', '_compute_resume_fingerprint', '_pre_validate_answer']
+
+--- app\routers\interviews_schemas.py ---
+Classes: ['AnswerRequest', 'FinishRequest', 'TerminateRequest', 'ViolationRequest']
+Functions: ['_strip_strings', '_check_token_len', '_check_request_id', '_validate_durations', '_strip_access_token', '_check_token_len', '_validate_duration', '_strip_fields', '_check_token_len', '_validate_duration', '_strip_fields', '_check_token_len', '_check_violation_type']
+
+--- app\routers\interviews_session.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_admin.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_admin_analytics.py ---
+Classes: []
+Functions: ['_rank_entry']
+
+--- app\routers\org_admin_billing.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_admin_helpers.py ---
+Classes: []
+Functions: ['_validate_uuid', '_sanitize_csv_cell', '_safe_round', '_readiness_tier', '_zero_offer_risk', '_extract_cat_scores', '_cohort_category_averages', '_sorted_categories', '_build_traffic_light', '_build_score_distribution', '_days_to_expiry', '_renewal_risk_label', '_compute_org_perf_summary', '_paginate', '_pct']
+
+--- app\routers\org_admin_orgs.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_admin_schemas.py ---
+Classes: ['CreateOrgRequest', 'UpdateOrgRequest', 'CreateOrgAdminRequest', 'UpdateOrgAdminRequest', 'AssignPlanRequest', 'RecordPaymentRequest']
+Functions: []
+
+--- app\routers\org_admin_users.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_college.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_college_analytics.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_college_config.py ---
+Classes: []
+Functions: []
+
+--- app\routers\org_college_helpers.py ---
+Classes: []
+Functions: ['_validate_uuid', '_sanitize_csv_cell', '_compute_slope', '_readiness_tier', '_zero_offer_risk', '_is_stuck', '_compute_percentile', '_build_score_distribution', '_time_to_threshold', '_safe_round', '_extract_cat_scores', '_cohort_category_averages', '_sorted_categories', '_build_radar_shape', '_build_diverging_bar', '_build_dept_comparison', '_build_traffic_light', '_build_answer_flag_aggregates', '_segment_filter_clause', '_compute_student_growth_map', '_paginate', '_render_cohort_summary_export', '_pct', '_segment_summary']
+
+--- app\routers\org_college_schemas.py ---
+Classes: ['AddStudentRequest', 'UpdateStudentRequest', 'SegmentRequest', 'BatchRequest']
+Functions: ['_validate_email', '_cap_code_fields', '_cap_notes', '_cap_code_fields', '_cap_notes', '_cap_name', '_cap_code', '_cap_notes', '_cap_name', '_cap_code', '_cap_notes']
+
+--- app\routers\org_college_students.py ---
+Classes: []
+Functions: []
+
+--- app\routers\referrals.py ---
+Classes: ['QueueReferralRequest']
+Functions: []
+
+--- app\routers\reports.py ---
+Classes: []
+Functions: ['_build_pdf_filename', '_safe_pdf_response_headers', '_is_valid_pdf']
+
+--- app\routers\support.py ---
+Classes: ['SupportMessageRequest']
+Functions: ['check_empty']
+
+--- app\routers\__init__.py ---
+Classes: []
+Functions: []
+
+--- app\services\analytics.py ---
+Classes: []
+Functions: []
+
+--- app\services\analytics_cohort.py ---
+Classes: []
+Functions: ['compute_cohort_category_rollups', 'compute_department_comparison', 'compute_cohort_percentile_distribution', 'compute_readiness_distribution', 'compute_zero_offer_risk_roster', 'compute_cohort_growth_heatmap', 'compute_role_fit_sankey']
+
+--- app\services\analytics_helpers.py ---
+Classes: []
+Functions: ['_to_float', '_format_category_name', '_safe_str', '_validate_uuid_str', '_safe_department', '_safe_graduation_year', '_iso_date', '_linear_regression_slope', '_percentile_rank', '_sessions_to_threshold', '_bucket_into_tier', '_growth_metrics_from_series']
+
+--- app\services\analytics_student.py ---
+Classes: []
+Functions: ['build_dashboard_feedback', 'build_interview_neural_feedback', 'derive_skill_score_rows', 'compute_student_overall_growth', 'compute_student_category_growth', 'compute_student_readiness', 'compute_percentile_shift', 'build_student_radar_data', 'build_student_category_trend_lines']
+
+--- app\services\auth_identity.py ---
+Classes: []
+Functions: ['resolve_auth_provider', 'extract_auth_identity']
+
+--- app\services\email_service.py ---
+Classes: []
+Functions: []
+
+--- app\services\email_validation.py ---
+Classes: []
+Functions: ['_extract_email_parts', '_is_blocked_domain', '_reject_known_fake_email_patterns', 'validate_deliverable_email_address']
+
+--- app\services\evaluator.py ---
+Classes: []
+Functions: []
+
+--- app\services\evaluator_feedback.py ---
+Classes: []
+Functions: ['_extract_resume_terms', '_clamp_score', '_sentence', '_trim_to_sentence_count', '_looks_like_placeholder_rewrite', '_looks_too_generic_for_question', '_normalize_user_facing_feedback', '_normalize_content_label', '_normalize_communication_label', 'normalize_rubric_category', '_normalize_pro_answer_status', '_pro_classification', '_build_pro_communication_note', '_build_career_interview_note', '_fallback_corrected_intent', '_timeout_status_from_raw', '_has_answer_marker', '_fallback_pro_better_answer', '_normalize_career_answer_status', '_career_classification', '_heuristic_pro_components', '_answer_blueprint_for_family', '_grounded_better_answer', '_career_answer_blueprint', '_fallback_career_better_answer', '_heuristic_career_components', '_free_status_from_metrics', '_normalize_free_answer_status', '_free_classification', '_fallback_better_answer', '_heuristic_free_components', '_fallback_free_evaluation', '_normalize_free_result', '_fallback_pro_evaluation', '_normalize_pro_result', '_career_marker_response', '_fallback_career_evaluation', '_normalize_career_result', '_fallback_evaluation', 'result_phrase']
+
+--- app\services\evaluator_grounding.py ---
+Classes: []
+Functions: ['_tokenize', '_join_phrases_natural', '_safe_text', '_coerce_list', '_coerce_resume_summary_dict', '_resume_field_profile', '_best_resume_project', '_best_resume_tool', '_question_family', '_is_low_value_strength', '_fallback_strength_from_evaluation', '_field_label_for_feedback', '_contains_any', '_extract_grounding_facts', '_worked_signal_for_family', '_missing_signal_for_family', '_improvement_for_family', '_score_summary_for_family']
+
+--- app\services\evaluator_scoring.py ---
+Classes: []
+Functions: ['_response_time_stats', '_apply_response_time_guidance', '_resolve_expected_questions', '_top_readiness_dimensions', '_best_answer_style_for_evaluations', '_derive_free_strengths_and_improvements', '_derive_pro_strengths_and_improvements', 'build_pro_readiness_summary', '_is_valid_career_strength', '_derive_career_strengths_and_improvements', '_infer_best_fit_role', 'build_career_readiness_summary', 'compute_final_score', 'get_score_interpretation']
+
+--- app\services\funnel_tracking.py ---
+Classes: []
+Functions: ['normalize_funnel_event_name', '_sanitize_scalar', 'sanitize_funnel_metadata']
+
+--- app\services\groq_client.py ---
+Classes: ['_CBState', '_CircuitBreaker', '_TokenBucket', '_PromptCache', '_KeyRotator', 'AsyncGroqClient']
+Functions: ['_backoff', '_jitter', 'get_groq_client', '__init__', '_refill', '__init__', '_key', 'get', 'set', '__init__', 'key_count', '__init__']
+
+--- app\services\history_retention.py ---
+Classes: []
+Functions: ['get_history_limit']
+
+--- app\services\interviewer.py ---
+Classes: []
+Functions: []
+
+--- app\services\interviewer_constants.py ---
+Classes: []
+Functions: ['_scan_for_prompt_injection']
+
+--- app\services\interviewer_coverage.py ---
+Classes: []
+Functions: ['_planned_turn_limit', '_family_base_difficulty', '_rotate_question_families', '_pick_target_variant', '_compose_family_targets', '_plan_family_sequence', '_build_fallback_question_plan', '_apply_cross_session_question_cooldown', '_build_opening_question', 'choose_blueprint', '_cached_build', '_pool_novelty_score', '_try_add']
+
+--- app\services\interviewer_helpers.py ---
+Classes: []
+Functions: ['_clean_ai_response', '_coerce_question_plan', '_resume_highlight', '_coerce_resume_summary_dict', '_resume_field_profile', '_resume_primary_project', '_resume_primary_skill', '_resume_target_role', '_field_focus_angle', '_get_next_plan_item', '_normalize_topic_label', '_contains_any', '_extract_family_history', '_trim_family_history', '_normalize_candidate_name', '_resume_answer_terms', '_short_target_role_label', '_extract_answer_anchor_facts', '_build_answer_anchor_summary', '_extract_answer_coverage', '_derive_redundant_followup_families', '_build_answer_led_followup', '_should_force_answer_led_followup']
+
+--- app\services\interviewer_question_engine.py ---
+Classes: []
+Functions: ['_answer_signal_profile', '_is_ambiguous_followup_question', '_is_easy_to_understand_question', '_select_next_plan_item', '_extract_skip_topics', '_trim_skip_topics', '_safe_json_dumps', '_question_retry_limit', '_record_turn_outcome', '_dedupe_preserve_order', '_plan_target_signature', '_question_angle_from_text', '_plan_target_angle', '_is_recruiter_language_question', '_question_family_from_text', '_recent_question_families', '_recent_question_angles', '_violates_family_repeat_rules', '_resolve_item_difficulty', '_normalize_plan_category', '_normalize_plan_difficulty', '_sanitize_plan_target', '_normalize_generated_question_plan', '_style_variant_index', '_humanize_question_target', '_humanize_live_question_text', '_apply_question_style_hints', '_extract_question_portion', '_looks_like_interviewer_question', '_finalize_interviewer_turn', '_strip_question_intro', '_question_signature', '_question_core_tokens', '_extract_asked_question_signatures', '_collect_asked_questions', '_collect_recent_asked_questions', '_is_duplicate_question', '_build_positive_boost', '_merge_boost_with_question', '_get_future_plan_items', '_get_plan_item_for_turn', '_infer_free_retry_category', '_build_free_retry_question', '_build_repeat_question', '_build_clarification_question', '_build_timeout_retry_question', '_infer_pro_retry_category', '_build_free_followup_question', '_build_pro_retry_question', '_infer_career_retry_category', '_build_career_retry_question', '_build_emergency_unique_question', '_normalize_candidate', '_take_category_candidate', 'pick', '_pick']
+
+--- app\services\interviewer_session.py ---
+Classes: []
+Functions: []
+
+--- app\services\interviewer_templates.py ---
+Classes: []
+Functions: ['_question_template_for_category', '_sjt_template', '_creative_template', '_ai_fluency_template', '_adapt_question_for_difficulty', '_build_question_preamble', '_render_question_template', '_select_live_difficulty_signal', '_infer_difficulty_signal', '_build_pro_followup_hint', '_build_free_followup_hint', '_build_pro_followup_question', '_build_career_followup_hint', '_build_career_followup_question', '_is_probably_followup', '_should_force_topic_change', '_is_repeat_request', '_build_fallback_ai_response', 'choose', 'choose', 'choose', 'choose']
+
+--- app\services\interview_summary.py ---
+Classes: []
+Functions: ['coerce_runtime_state', 'coerce_question_plan_items', '_safe_int', '_safe_float', '_safe_duration_list', '_safe_str', '_evaluation_is_answered', '_classify_answer_strength', '_analyze_answer_quality', '_compute_answer_quality_rows', 'normalize_score_to_100', '_get_category_feedback', '_generate_improvement_roadmap', '_compute_hr_readiness_level', '_assess_communication_style', '_assess_integrity_and_ownership_signals', '_generate_per_question_insights', '_generate_hiring_assessment', '_get_score_band', 'compute_interview_summary', 'compute_premium_interview_report', 'extract_cohort_session_metrics', 'generate_report_export_summary']
+
+--- app\services\launch_offer.py ---
+Classes: []
+Functions: ['_utcnow', '_coerce_dt']
+
+--- app\services\llm.py ---
+Classes: []
+Functions: ['_get_groq', '_get_openai']
+
+--- app\services\manual_signup_verification.py ---
+Classes: []
+Functions: ['_utcnow', '_normalize_email', 'normalize_verification_code', '_verification_code_hash', '_generate_verification_code', '_mail_from_email', '_gmail_api_is_configured', '_email_delivery_is_configured', '_email_not_configured_message', '_extract_gmail_api_error', '_gmail_api_access_token', '_gmail_api_send_message', '_deliver_message', '_send_verification_email_sync', '_send_admin_new_user_notification_sync']
+
+--- app\services\plan_access.py ---
+Classes: []
+Functions: ['_utcnow', '_coerce_dt', '_expiry_from', 'normalize_plans', '_normalize_paid_plans', 'highest_plan', 'admin_override_state', '_plan_status']
+
+--- app\services\prompts.py ---
+Classes: []
+Functions: []
+
+--- app\services\prompts_eval.py ---
+Classes: []
+Functions: ['_category_eval_criteria', '_red_flag_json_fields', 'build_per_question_eval_prompt', 'build_resume_extraction_prompt']
+
+--- app\services\prompts_helpers.py ---
+Classes: []
+Functions: ['_select_tone_variant', '_session_progression_block', '_select_greeting_structure', '_coerce_resume_summary', '_normalize_candidate_name', '_build_resume_highlight_text', '_difficulty_prompt_block']
+
+--- app\services\prompts_interview.py ---
+Classes: []
+Functions: ['build_master_prompt', 'build_greeting_prompt', 'build_followup_prompt', 'build_question_plan_prompt']
+
+--- app\services\public_growth.py ---
+Classes: []
+Functions: ['_display_label', '_candidate_noun']
+
+--- app\services\quota.py ---
+Classes: []
+Functions: ['_coerce_dt', '_period_needs_reset', '_selected_plan_limit', '_effective_limit']
+
+--- app\services\razorpay_service.py ---
+Classes: []
+Functions: ['_get_client', '_coerce_webhook_time']
+
+--- app\services\referrals.py ---
+Classes: []
+Functions: ['_is_admin_referral_email', '_get_referral_limit', 'normalize_email', '_generate_referral_code', '_build_referral_url']
+
+--- app\services\report_builder.py ---
+Classes: []
+Functions: []
+
+--- app\services\report_generator.py ---
+Classes: ['ReportPDF']
+Functions: ['_build_professional_fpdf_report', 'footer']
+
+--- app\services\report_helpers.py ---
+Classes: []
+Functions: ['_coerce_json_object', '_safe_text', '_safe_pdf_text', '_coerce_list', '_clamp_score', '_score_palette', '_classification_palette', '_format_duration', '_format_timestamp', '_response_time_summary', '_count_wrapped_lines', '_estimate_block_height', '_ensure_page_capacity', '_build_improvement_points', '_build_improved_answer', '_summary_dimension_labels', '_build_overall_summary', '_escape_pdf_literal', '_wrap_raw_lines', '_minimal_pdf_report']
+
+--- app\services\report_render.py ---
+Classes: []
+Functions: ['_section_heading', '_draw_chip', '_render_info_card', '_render_bullets', '_render_empty_state', '_render_career_summary', '_render_pro_summary', '_measure_labeled_box_height', '_render_labeled_box', '_render_question_header', '_render_rubric_row', '_render_question_block']
+
+--- app\services\resume_parser.py ---
+Classes: []
+Functions: ['extract_text_from_pdf', 'sanitize_resume_text', 'validate_pdf_upload', '_collect_resume_signal_parts', 'infer_resume_field_profile', 'enrich_resume_summary', '_default_resume_summary']
+
+--- app\services\session_prefetch.py ---
+Classes: ['_QuestionDeduplicator', '_PrefetchEntry', '_PrefetchCache', 'SessionPrefetchManager']
+Functions: ['compute_variant_seed', '_question_signature', '_max_turns_for_plan', '_select_model_for_plan', '_temperature_from_seed', '_build_first_question_prompt', '_parse_question_plan', 'get_prefetch_manager', '__init__', '_evict', '__init__', '__init__', '_cleanup_task']
+
+--- app\services\technical_taxonomy.py ---
+Classes: []
+Functions: ['get_technical_categories', 'list_all_categories']
+
+--- app\services\transcript.py ---
+Classes: []
+Functions: ['_coerce_resume_summary_dict', '_resume_field', '_collect_resume_context_terms', '_apply_replacements', '_collapse_stretched_words', 'normalize_transcript', 'recover_spoken_meaning', '_recover_contextual_intent', 'summarize_recovered_intent', 'recover_technical_intent', 'recover_career_intent', 'clean_for_display']
+
+--- app\services\user_activity.py ---
+Classes: []
+Functions: []
+
+--- app\services\__init__.py ---
+Classes: []
+Functions: []
+
+--- frontend\.gitignore ---
+File type: 
+
+--- frontend\eslint.config.mjs ---
+File type: .mjs
+
+--- frontend\next-env.d.ts ---
+Classes: []
+Functions: []
+Exports: []
+
+--- frontend\next.config.ts ---
+Classes: []
+Functions: []
+Exports: []
+
+--- frontend\postcss.config.mjs ---
+File type: .mjs
+
+--- frontend\tsconfig.tsbuildinfo ---
+File type: .tsbuildinfo
+
+--- frontend\src\app\layout.tsx ---
+Classes: []
+Functions: ['RootLayout']
+Exports: ['metadata', 'RootLayout']
+
+--- frontend\src\app\page.tsx ---
+Classes: []
+Functions: ['PrepVistaLandingPage', 'primaryLabel', 'trackCtaClick']
+Exports: ['PrepVistaLandingPage']
+
+--- frontend\src\app\admin\page.tsx ---
+Classes: []
+Functions: ['formatDateTime', 'formatPlanName', 'statusBadgeClass', 'StatCard', 'OverviewSection', 'ApprovalsSection', 'GrantsSection', 'SupportChatSection', 'UsersSection', 'ReferralsSection', 'FeedbackSection', 'RevenueSection', 'AdminPage', 'pendingApprovals', 'handleSubmit', 'fetchUsers', 'fetchThread', 'handleImageFile', 'handleSend', 'filteredUsers', 'query', 'formatINR', 'loadOverview', 'response', 'handleApprove', 'handleReject']
+Exports: ['AdminPage']
+
+--- frontend\src\app\admin\college-admins\page.tsx ---
+Classes: []
+Functions: ['statusBadge', 'formatDate', 'CollegeAdminsPage', 'loadData', 'filtered', 'handleCreate', 'handleToggle']
+Exports: ['CollegeAdminsPage']
+
+--- frontend\src\app\admin\colleges\page.tsx ---
+Classes: []
+Functions: ['useDebounce', 'sanitizeError', 'statusBadge', 'formatDate', 'CollegeAdminsPage', 'id', 'flashSuccess', 'loadData', 'handler', 'filtered', 'stats', 'toggleSort', 'handleCreate', 'handleToggle']
+Exports: ['CollegeAdminsPage']
+
+--- frontend\src\app\admin\colleges\[id]\page.tsx ---
+Classes: []
+Functions: ['formatDate', 'formatDateTime', 'statusBadge', 'StatCard', 'CollegeDetailPage', 'loadOrg', 'loadStudents', 'loadAnalytics', 'loadBilling', 'res']
+Exports: ['CollegeDetailPage']
+
+--- frontend\src\app\analytics\loading.tsx ---
+Classes: []
+Functions: ['Loading']
+Exports: ['Loading']
+
+--- frontend\src\app\analytics\page.tsx ---
+Classes: []
+Functions: ['formatCategoryName', 'normalizeCategoryKey', 'getDifficultyLabel', 'getEstimatedTime', 'AnalyticsPage', 'fetchedRef', 'skillEntries', 'categorySnapshots', 'trendKey', 'skillKey']
+Exports: ['AnalyticsPage']
+
+--- frontend\src\app\api\awake\route.ts ---
+Classes: []
+Functions: ['getBackendAwakeUrl', 'getBackendCandidateUrls', 'pingBackendAwake', 'probeBackendWithFallbacks', 'GET', 'timeoutHandle']
+Exports: ['dynamic', 'runtime']
+
+--- frontend\src\app\auth\callback\page.tsx ---
+Classes: []
+Functions: ['AuthCallbackLogic', 'AuthCallbackPage', 'handleCallback']
+Exports: ['AuthCallbackPage']
+
+--- frontend\src\app\dashboard\page.tsx ---
+Classes: []
+Functions: ['formatPlanName', 'getCycleResetDateLabel', 'formatExpiryDate', 'formatDateTime', 'getPlanExpiryBadge', 'DashboardPage', 'fetchedRef', 'fetchDashboard', 'dashboardData', 'currentFeedbackSessionId', 'handleCopyReferralLink']
+Exports: ['DashboardPage']
+
+--- frontend\src\app\feedback\page.tsx ---
+Classes: []
+Functions: ['FeedbackPage', 'fetchedRef', 'handleSubmit', 'response']
+Exports: ['FeedbackPage']
+
+--- frontend\src\app\history\loading.tsx ---
+Classes: []
+Functions: ['Loading']
+Exports: ['Loading']
+
+--- frontend\src\app\history\page.tsx ---
+Classes: []
+Functions: ['HistoryPage', 'fetchedRef', 'deleteCandidate', 'allVisibleSelected', 'toggleSessionSelection', 'toggleSelectAllVisible', 'merged', 'handleDeleteSession', 'handleBulkDelete', 'confirmDeleteSession', 'deletedIds', 'nextSessions']
+Exports: ['HistoryPage']
+
+--- frontend\src\app\interview\setup\loading.tsx ---
+Classes: []
+Functions: ['Loading']
+Exports: ['Loading']
+
+--- frontend\src\app\interview\setup\page.tsx ---
+Classes: []
+Functions: ['InterviewSetupPage', 'handleFile', 'handleSubmit']
+Exports: ['InterviewSetupPage']
+
+--- frontend\src\app\interview\[id]\page.tsx ---
+Classes: []
+Functions: ['getVoicePreferenceScore', 'isInterviewActiveState', 'formatClock', 'isRepeatRequest', 'formatDurationSummary', 'normalizeNameForSpeech', 'getTimestamp', 'isBrowserMobile', 'normalizeLiveTranscript', 'normalizeSpeechForVoice', 'buildSpeechChunks', 'createSubmissionKey', 'getClosingName', 'LiveInterviewPage', 'clearSilenceTimers', 'clearGlobalClock', 'syncElapsedClock', 'clearStoredInterviewSession', 'clearWaveformMonitor', 'stopRecognition', 'stopAllMedia', 'appendTranscript', 'startWaveformMonitor', 'pickVoice', 'transitionTo', 'resetSilenceTimer', 'noteAnswerActivity', 'ensureRecognition', 'startListeningLoop', 'speak', 'finishInterviewLocally', 'closeInterviewWithFarewell', 'terminateInterviewLocally', 'submitToBackend', 'hardTerminate', 'runGlobalClock', 'initializeHardware', 'handleStartInterview', 'LIVE_WAVEFORM_BARS', 'normalized', 'hasQuestionShape', 'joined', 'sessionId', 'setLiveTranscript', 'hardTerminateRef', 'rafPendingRef', 'handleBeforeUnload', 'cleanText', 'resetBarsDom', 'updateBars', 'englishVoices', 'rankedEnglishVoices', 'preferredVoice', 'finalizeSpeech', 'speakChunk', 'fallbackTimer', 'delay', 'deferState', 'stored', 'logViolationSilently', 'handleBlur', 'handleVisibilityChange', 'handleManualSubmit', 'handleEndInterview', 'handleConfirmEndInterview', 'farewellMessage', 'resultSummaryBits', 'orbClassName']
+Exports: ['LiveInterviewPage']
+
+--- frontend\src\app\login\page.tsx ---
+Classes: []
+Functions: ['LoginForm', 'LoginPage', 'LaunchOfferBanner', 'hasToken', 'detail', 'handleSubmit', 'handleResendCode', 'resetVerificationStep', 'handleGoogle']
+Exports: ['LoginPage']
+
+--- frontend\src\app\org-admin\layout.tsx ---
+Classes: ['strings', 'below']
+Functions: ['useOrgContext', 'computeDaysToExpiry', 'formatPlanLabel', 'OrgAdminLayout', 'OrgCtx', 'diff', 'refreshOrg', 'isActive', 'seatUsagePercent', 'barColour']
+Exports: ['useOrgContext', 'OrgAdminLayout']
+
+--- frontend\src\app\org-admin\page.tsx ---
+Classes: ['interpolation', 'names', 'string', 'strings', 'below']
+Functions: ['formatDate', 'formatCategoryName', 'scoreBarColor', 'scoreTextColor', 'avgScoreAccent', 'StatCard', 'SeatUsageBar', 'ReadinessMiniGrid', 'WeakestCategoriesWidget', 'ZeroRiskAlert', 'DashboardSkeleton', 'OrgAdminDashboard', 'd']
+Exports: ['OrgAdminDashboard']
+
+--- frontend\src\app\org-admin\access-control\page.tsx ---
+Classes: []
+Functions: ['formatDate', 'AccessControlPage', 'load', 'res', 'handleGrant', 'handleRevoke']
+Exports: ['AccessControlPage']
+
+--- frontend\src\app\org-admin\analytics\[[...slug]]\page.tsx ---
+Classes: []
+Functions: ['sanitizeCSVCell', 'buildCSV', 'triggerCSVDownload', 'isValidAnalyticsPayload', 'isValidCohortReadiness', 'isValidCategoryRollups', 'isValidDeptComparison', 'isValidRiskRoster', 'isValidGrowthHeatmap', 'isValidRoleFit', 'sanitizeStatItem', 'toSafeError', 'isAuthError', 'safeDrillParam', 'makeCooldown', 'safeGradientId', 'safeDeptFilter', 'safeYearFilter', 'formatUpdateTime', 'safeArrayMax', 'fmtScore', 'deltaLabel', 'deltaHeatColor', 'activityColor', 'Shimmer', 'AnalyticsSkeleton', 'ChartTooltip', 'TrendBadge', 'StatCard', 'BarChart', 'ReadinessDonut', 'CohortHistogram', 'ReadinessTierGrid', 'SkillGapRanking', 'DeptDivergingList', 'GrowthHeatmapGrid', 'ActivityCalendar', 'RoleFitFlowTable', 'StudentRiskTable', 'SectionLoader', 'CollegeAnalyticsPage', 'row', 'r', 'r', 'r', 'hardFlags', 'msg', 'access', 'remainder', 'chartData', 'scored', 'maxCount', 'withData', 'maxAbs', 'cells', 'totalSessions', 'roles', 'tierNodes', 'getCount', 'total', 'filtered', 'hardCount', 'filterKey', 'handleSWRError', 'handleRefresh', 'handleExport', 'handleDeptClick', 'handleStudentClick', 'handleClearFilters', 'readyCount', 'atRiskCount', 'hardRiskBadge', 'deptItems', 's', 'yearItems', 's', 'batchItems', 's', 'deptMax', 'yearMax', 'batchMax', 'DEPT_OPTIONS', 'YEAR_OPTIONS', 'years']
+Exports: ['CollegeAnalyticsPage']
+
+--- frontend\src\app\org-admin\billing\page.tsx ---
+Classes: []
+Functions: ['isValidBillingPayload', 'safeAmountDisplay', 'maskPaymentId', 'toSafeError', 'isAuthError', 'safeSeatCount', 'makeCooldown', 'normalisePlan', 'safeParseDays', 'formatDate', 'StatCard', 'PlanCard', 'BillingPage', 'getPlanCooldown', 'msg', 'planCooldowns', 'res', 't', 'handleRequest', 'daysUntilExpiry', 'safeSeatsUsed', 'safeSeatLimit', 'seatsRemaining', 'usagePct', 'capturedTotal', 'planDisplay', 'handlePrint']
+Exports: ['BillingPage']
+
+--- frontend\src\app\org-admin\departments\page.tsx ---
+Classes: []
+Functions: ['normalizeDepartmentCode', 'RoutingBadge', 'BranchTopicsPreview', 'BranchCombobox', 'DeleteButton', 'DepartmentsPage', 'BRANCH_BY_CODE', 'ref', 'handler', 'showToast', 'load', 'res', 'openCreate', 'openEdit', 'handleSave', 'handleDelete', 'mappedCount', 'visibleDepts']
+Exports: ['DepartmentsPage']
+
+--- frontend\src\app\org-admin\profile\page.tsx ---
+Classes: []
+Functions: ['OrgAdminProfilePage']
+Exports: ['OrgAdminProfilePage']
+
+--- frontend\src\app\org-admin\reports\page.tsx ---
+Classes: ['RateLimiter']
+Functions: ['scrubError', 'sanitizeInput', 'isValidUUID', 'isValidEmail', 'sanitizes', 'sanitizeDisplayValue', 'sanitizeFilename', 'safeArray', 'safeNum', 'formatScore', 'scoreColour', 'SortIndicator', 'ReportsPage', 'scheduleLimiter', 'successDismissTimer', 'showError', 'showSuccess', 'loadPreview', 'handleCSVDownload', 'deptLabel', 'yearLabel', 'batchLabel', 'handleScheduleSave', 'handleSort', 'sortedStudents', 'topPerformers', 'needsAttention', 'scoredStudents', 'buckets', 'maxBucketCount', 'clearFilters', 'scoredRows', 'kpiAvg', 'kpiBest', 'kpiCareerPct', 'SortableTh']
+Exports: ['ReportsPage']
+
+--- frontend\src\app\org-admin\students\page.tsx ---
+Classes: ['that', 'RateLimiter']
+Functions: ['sanitizeInput', 'scrubError', 'isValidEmail', 'csvHasFormulaInjection', 'isFileSafeCSV', 'isSortKeySafe', 'isSortDirSafe', 'sanitizeFilename', 'formatDate', 'genOptimisticId', 'safeArray', 'SortIndicator', 'StudentsPage', 'lines', 'cells', 'bytes', 'successDismissTimer', 'showError', 'showSuccess', 'loadStudents', 'loadSegments', 'handleSort', 'handleFilterChange', 'handleAdd', 'handleRemove', 'rl', 'handleBulkUpload', 'clearFilters', 'SortableTh']
+Exports: ['StudentsPage']
+
+--- frontend\src\app\org-admin\students\[id]\page.tsx ---
+Classes: []
+Functions: ['isValidUUID', 'sanitizeLine', 'sanitizeMultiline', 'toSafeError', 'isAuthError', 'makeActionGuard', 'isAllowed', 'isValidStudentPayload', 'safeClone', 'useToast', 'ToastContainer', 'formatDateTime', 'Shimmer', 'StudentDetailSkeleton', 'StudentDetailPage', 'msg', 'id', 'res', 'studentRef', 'loadDropdowns', 'openEdit', 'handler', 'handleGrant', 'handleRevoke', 'handleRemove', 'handleEdit', 'infoItems']
+Exports: ['StudentDetailPage']
+
+--- frontend\src\app\org-admin\years-batches\page.tsx ---
+Classes: ['RateLimiter']
+Functions: ['sanitizeInput', 'scrubError', 'isValidUUID', 'safeUUID', 'safeArray', 'genSecureId', 'ModalForm', 'YearsBatchesPage', 'inlineRenameLimiter', 'successDismissTimer', 'showError', 'showSuccess', 'load', 'handleYearDragStart', 'handleYearDragOver', 'handleYearDragEnd', 'handleYearDrop', 'fromIdx', 'toIdx', 'safeIds', 'startInlineEdit', 'cancelInlineEdit', 'commitInlineEdit', 'existing', 'existing', 'handleInlineKeyDown', 'openYearCreate', 'openYearEdit', 'handleYearSave', 'handleYearDelete', 'assigned', 'openBatchCreate', 'openBatchEdit', 'handleBatchSave', 'handleBatchDelete', 'rl', 'batchesByYearId', 'unassignedBatches', 'BatchCard', 'batchCount']
+Exports: ['YearsBatchesPage']
+
+--- frontend\src\app\pricing\page.tsx ---
+Classes: []
+Functions: ['PricingPage', 'expiredPlans', 'handleSwitch', 'handleCheckout', 'order', 'razorpay', 'handleBack']
+Exports: ['PricingPage']
+
+--- frontend\src\app\privacy\page.tsx ---
+Classes: []
+Functions: ['PrivacyPage']
+Exports: ['metadata', 'PrivacyPage']
+
+--- frontend\src\app\profile\loading.tsx ---
+Classes: []
+Functions: ['Loading']
+Exports: ['Loading']
+
+--- frontend\src\app\profile\page.tsx ---
+Classes: []
+Functions: ['formatPlanName', 'formatBillingDateTime', 'ProfilePage', 'fetchedRef', 'handleDeleteAccount']
+Exports: ['ProfilePage']
+
+--- frontend\src\app\referral\[code]\page.tsx ---
+Classes: []
+Functions: ['ReferralInvitePage', 'referralCode', 'loadReferral', 'handleSubmit']
+Exports: ['ReferralInvitePage']
+
+--- frontend\src\app\report\[id]\page.tsx ---
+Classes: []
+Functions: ['formatDurationLabel', 'getFreeBadgeClass', 'getStatusBadgeClass', 'ReportPage', 'handleBack', 'answeredQuestions', 'handleDownloadPDF']
+Exports: ['ReportPage']
+
+--- frontend\src\app\settings\page.tsx ---
+Classes: []
+Functions: ['formatBillingDateTime', 'SettingsPage', 'fetchedRef']
+Exports: ['SettingsPage']
+
+--- frontend\src\app\student-dashboard\layout.tsx ---
+Classes: []
+Functions: ['StudentDashboardLayout', 'router']
+Exports: ['StudentDashboardLayout']
+
+--- frontend\src\app\student-dashboard\page.tsx ---
+Classes: []
+Functions: ['formatDateTime', 'formatDuration', 'StudentDashboardPage', 'fetchedRef', 'fetchDashboard', 'dashboardData', 'currentFeedbackSessionId']
+Exports: ['StudentDashboardPage']
+
+--- frontend\src\app\terms\page.tsx ---
+Classes: []
+Functions: ['TermsPage']
+Exports: ['metadata', 'TermsPage']
+
+--- frontend\src\components\ambient-effects.tsx ---
+Classes: []
+Functions: ['AmbientEffects', 'updatePointer', 'parkGlow', 'handleMqlChange', 'handleMove', 'handleDown', 'handleLeave', 'handleCancel', 'handleVisibilityChange', 'supportsPointer']
+Exports: ['AmbientEffects']
+
+--- frontend\src\components\auth-header.tsx ---
+Classes: []
+Functions: ['matchesPath', 'NavLink', 'ThemeToggle', 'AuthHeader', 'navItems', 'handleBack', 'handleLogoutClick']
+Exports: ['AuthHeader']
+
+--- frontend\src\components\awake-keeper.tsx ---
+Classes: []
+Functions: ['getKeepaliveIntervalMs', 'pingEndpoint', 'AwakeKeeper', 'timeoutHandle', 'pingAll', 'pingWithCooldown', 'initialWarmup', 'intervalHandle', 'handleFocus', 'handleOnline', 'handleVisibilityChange']
+Exports: ['AwakeKeeper']
+
+--- frontend\src\components\brand-logo.tsx ---
+Classes: []
+Functions: ['BrandLogo']
+Exports: ['BrandLogo']
+
+--- frontend\src\components\confirm-dialog.tsx ---
+Classes: []
+Functions: ['ConfirmDialog', 'handleKeyDown']
+Exports: ['ConfirmDialog']
+
+--- frontend\src\components\difficulty-selector.tsx ---
+Classes: []
+Functions: ['DifficultySelector', 'currentOption', 'handlePointerDown']
+Exports: ['DifficultySelector']
+
+--- frontend\src\components\icons.tsx ---
+Classes: []
+Functions: ['baseProps', 'HomeIcon', 'UserIcon', 'HistoryIcon', 'SettingsIcon', 'LogoutIcon', 'SunIcon', 'MoonIcon', 'CrownIcon', 'LockIcon', 'ArrowLeftIcon', 'BoltIcon', 'FileIcon', 'InfoIcon', 'ShieldIcon', 'CameraIcon', 'MicIcon', 'MonitorIcon', 'AlertIcon', 'CreditCardIcon', 'GiftIcon', 'BellIcon', 'ChartIcon', 'SparklesIcon', 'TargetIcon', 'ArrowUpRightIcon', 'ShareIcon', 'PlayIcon', 'ClockIcon', 'FolderIcon', 'ChevronDownIcon', 'CheckIcon', 'PaletteIcon', 'TrashIcon', 'FeedbackIcon', 'BuildingIcon', 'UsersIcon', 'DownloadIcon', 'UploadIcon', 'KeyIcon', 'LayersIcon', 'PlusIcon', 'SearchIcon', 'FilterIcon', 'XIcon', 'EditIcon', 'CalendarIcon']
+Exports: ['HomeIcon', 'UserIcon', 'HistoryIcon', 'SettingsIcon', 'LogoutIcon', 'SunIcon', 'MoonIcon', 'CrownIcon', 'LockIcon', 'ArrowLeftIcon', 'BoltIcon', 'FileIcon', 'InfoIcon', 'ShieldIcon', 'CameraIcon', 'MicIcon', 'MonitorIcon', 'AlertIcon', 'CreditCardIcon', 'GiftIcon', 'BellIcon', 'ChartIcon', 'SparklesIcon', 'TargetIcon', 'ArrowUpRightIcon', 'ShareIcon', 'PlayIcon', 'ClockIcon', 'FolderIcon', 'ChevronDownIcon', 'CheckIcon', 'PaletteIcon', 'TrashIcon', 'FeedbackIcon', 'BuildingIcon', 'UsersIcon', 'DownloadIcon', 'UploadIcon', 'KeyIcon', 'LayersIcon', 'PlusIcon', 'SearchIcon', 'FilterIcon', 'XIcon', 'EditIcon', 'CalendarIcon']
+
+--- frontend\src\components\launch-offer-banner.tsx ---
+Classes: []
+Functions: ['LaunchOfferBanner', 'offerText', 'startTimeout', 'stopTimeout']
+Exports: ['LaunchOfferBanner']
+
+--- frontend\src\components\lazy-support-chat.tsx ---
+Classes: []
+Functions: ['LazySupportChat', 'SupportChatWidgetLazy']
+Exports: ['LazySupportChat']
+
+--- frontend\src\components\legal-document-page.tsx ---
+Classes: []
+Functions: ['LegalDocumentPage']
+Exports: ['LegalDocumentPage']
+
+--- frontend\src\components\main-side-rail.tsx ---
+Classes: []
+Functions: ['isActive', 'RailLink', 'MainSideRail']
+Exports: ['MainSideRail']
+
+--- frontend\src\components\plan-selector.tsx ---
+Classes: []
+Functions: ['PlanSelector', 'currentOption', 'handlePointerDown', 'handleSwitch']
+Exports: ['PlanSelector']
+
+--- frontend\src\components\student-side-rail.tsx ---
+Classes: []
+Functions: ['isActive', 'RailLink', 'StudentSideRail']
+Exports: ['StudentSideRail']
+
+--- frontend\src\components\SupportChatWidget.tsx ---
+Classes: []
+Functions: ['SupportChatWidget', 'loadMessages', 'handleImageFile', 'handleSend']
+Exports: ['SupportChatWidget']
+
+--- frontend\src\lib\api-types.ts ---
+Classes: []
+Functions: []
+Exports: []
+
+--- frontend\src\lib\api.ts ---
+Classes: ['ApiClient']
+Functions: ['generateRequestId', 'isValidJwtShape', 'promise', 'promise', 'jitter', 'timeoutHandle', 'normalizeDownloadError', 'doFetch', 'timeoutHandle', 'timeoutHandle']
+Exports: ['api']
+
+--- frontend\src\lib\auth-context.tsx ---
+Classes: []
+Functions: ['AuthProvider', 'useAuth', 'buildMinimalUser', 'refreshUser', 'applyOptimisticPlan', 'normalizedPlan', 'initAuth', 'login', 'signup', 'loginWithGoogle', 'logout']
+Exports: ['AuthProvider', 'useAuth']
+
+--- frontend\src\lib\legal-content.ts ---
+Classes: []
+Functions: []
+Exports: ['PRIVACY_POLICY_TEXT', 'TERMS_TEXT']
+
+--- frontend\src\lib\plan-usage.ts ---
+Classes: []
+Functions: ['getPlanInterviewLimit', 'deriveUsageForPlan', 'isUnlimitedUsage', 'hasRemainingUsage', 'getStartInterviewHref', 'getPlanLimitLabel', 'getUsageHeadline', 'getLowLimitNotice']
+Exports: ['getPlanInterviewLimit', 'deriveUsageForPlan', 'isUnlimitedUsage', 'hasRemainingUsage', 'getStartInterviewHref', 'getPlanLimitLabel', 'getUsageHeadline', 'getLowLimitNotice']
+
+--- frontend\src\lib\supabase.ts ---
+Classes: []
+Functions: ['getSupabase']
+Exports: ['getSupabase', 'supabase']
+
+--- frontend\src\lib\theme-context.tsx ---
+Classes: []
+Functions: ['getInitialTheme', 'applyTheme', 'ThemeProvider', 'useTheme', 'setTheme', 'toggleTheme']
+Exports: ['ThemeProvider', 'useTheme']
+
+--- frontend\src\types\speech.d.ts ---
+Classes: []
+Functions: []
+Exports: []
+
+--- scripts\append_chunk2.py ---
+Classes: []
+Functions: []
+
+--- scripts\append_chunk3.py ---
+Classes: []
+Functions: []
+
+--- scripts\append_chunk4.py ---
+Classes: []
+Functions: []
+
+--- scripts\ast_extractor.py ---
+Classes: []
+Functions: ['parse_file', 'process_dir']
+
+--- scripts\gen_other_docs.py ---
+Classes: []
+Functions: []
+
+--- scripts\staging_smoke.py ---
+Classes: []
+Functions: ['_require_env', '_make_headers', '_request_json', '_build_multipart_form', 'main', 'submit_answer']
+
+--- scripts\ts_extractor.py ---
+Classes: []
+Functions: ['process_dir']
+
+--- tests\test_50_questions_validation.py ---
+Classes: ['TestOriginalStructureIntact', 'TestCrossResumeConsistency']
+Functions: ['_is_grounded', '_ai_resume', '_business_resume', '_fullstack_resume', 'test_question_is_grounded', 'test_free_builder_returns_str', 'test_free_builder_works_without_resume', 'test_pro_builder_returns_str', 'test_pro_builder_works_without_resume', 'test_career_builder_returns_str', 'test_career_builder_works_with_none_resume', 'test_career_builder_works_with_empty_resume', 'test_humanize_target_returns_str', 'test_humanize_target_no_banned_defaults', 'test_question_family_detection_still_works', 'test_free_intro_grounded_all_resumes', 'test_pro_intro_grounded_all_resumes', 'test_career_intro_grounded_all_resumes']
+
+--- tests\test_auth_identity.py ---
+Classes: ['_FakeConn']
+Functions: ['test_extract_auth_identity_reads_google_metadata', 'test_extract_auth_identity_falls_back_to_name_picture_and_email_provider', 'test_auth_identity_links_resolve_canonical_profile', '__init__']
+
+--- tests\test_email_validation.py ---
+Classes: ['_ValidatedEmail', '_FakeConn']
+Functions: ['test_validate_deliverable_email_address_returns_normalized_email', 'test_validate_deliverable_email_address_rejects_undeliverable_email', 'test_validate_deliverable_email_address_rejects_common_provider_typos', 'test_validate_deliverable_email_address_rejects_disposable_domains', 'test_pro_deactivation_does_not_change_other_unlimited_markers', '__init__', 'fake_validate_email', 'fake_validate_email', 'fake_validate_email', 'fake_validate_email', '__init__']
+
+--- tests\test_grounded_questions.py ---
+Classes: []
+Functions: ['_ai_resume', '_non_software_resume', '_has_no_vague_phrases', '_has_resume_context', 'test_free_intro_followup_no_vague_with_resume', 'test_free_intro_followup_has_context_with_resume', 'test_free_ownership_followup_no_vague', 'test_free_communication_explain_no_vague', 'test_free_fallback_with_no_signal_still_grounded', 'test_pro_intro_followup_no_vague', 'test_pro_ownership_fallback_no_vague', 'test_pro_workflow_followup_no_vague', 'test_pro_tool_method_no_vague', 'test_career_intro_followup_no_vague', 'test_career_ownership_no_vague', 'test_career_role_fit_no_vague', 'test_career_studies_followup_no_vague', 'test_free_non_software_resume_still_grounded', 'test_career_non_software_resume_still_grounded', 'test_humanize_target_no_that_work_defaults', 'test_humanize_target_workflow_returns_your_work']
+
+--- tests\test_interview_logic.py ---
+Classes: ['TestConfigValidation', 'TestQuestionPlanGeneration', 'TestOpeningQuestionDiversity', 'TestRepeatQuestion', 'TestDuplicateDetection', 'TestLiveDifficultySignal', 'TestFinalScoreComputation', 'TestAnswerQualityDetection', 'TestEvaluationIsAnswered', 'TestClassifyAnswerStrength', 'TestComputeInterviewSummary', 'TestHRReadinessLevel', 'TestCategoryFeedback', 'TestScoreBand', 'TestCommunicationAssessment', 'TestPerQuestionInsights', 'TestImprovementRoadmap', 'TestPremiumReport', 'TestResumeFieldInference', 'TestCareerDifficultPlanQuality', 'TestFamilyRepeatRules', 'TestTranscriptRecovery', 'TestBetterAnswerGeneration', 'TestTemplateQuality', 'TestCoercionHelpers']
+Functions: ['_sample_resume', '_ai_backend_resume', '_non_software_resume', '_make_evaluation', '_make_plan', '_make_runtime', 'test_normalize_difficulty_mode_preserves_known_modes', 'test_normalize_difficulty_mode_falls_back_to_auto_for_unknown', 'test_is_valid_difficulty_mode_accepts_known_values', 'test_is_valid_difficulty_mode_rejects_unknown_values', 'test_fallback_plan_basic_mode_produces_only_easy_questions', 'test_fallback_plan_difficult_mode_includes_hard_questions', 'test_fallback_plan_first_item_is_always_introduction', 'test_fallback_plan_never_exceeds_max_turns', 'test_cross_session_cooldown_changes_targets_when_resume_has_depth', 'test_opening_questions_avoid_repeats_across_seeds', 'test_opening_question_is_non_empty', 'test_repeat_question_differs_from_original', 'test_repeat_question_contains_ownership_keywords', 'test_exact_match_is_detected', 'test_near_match_is_detected', 'test_unrelated_question_is_not_flagged', 'test_empty_asked_list_never_flags_duplicate', 'test_basic_mode_always_stays_easy', 'test_medium_mode_recovers_from_easier_to_steady', 'test_difficult_mode_escalates_on_steady', 'test_timeout_resets_difficulty_even_in_difficult_mode', 'test_score_scales_by_expected_questions', 'test_all_strong_answers_produces_high_score', 'test_all_zero_scores_produces_low_score', 'test_clarification_does_not_count_as_answered', 'test_no_division_by_zero_with_empty_evaluations', 'test_short_precise_answer_not_penalized_vs_long_vague', 'test_mixed_answers_produce_middle_range_score', 'test_empty_answer_is_flagged', 'test_whitespace_only_is_flagged', 'test_filler_heavy_answer_is_detected', 'test_generic_opener_is_detected', 'test_result_signal_detected_in_strong_answer', 'test_example_signal_detected', 'test_structure_signal_detected', 'test_normal_short_precise_answer_not_flagged_as_filler', 'test_silent_classification_is_not_answered', 'test_clarification_status_is_not_answered', 'test_timeout_status_is_not_answered', 'test_strong_answer_with_text_is_answered', 'test_partial_answer_with_text_is_answered', 'test_non_dict_input_returns_false_safely', 'test_strong_classification_maps_to_strong', 'test_high_score_without_label_maps_to_strong', 'test_mid_score_partial_maps_to_partial', 'test_zero_score_silent_maps_to_silent', 'test_low_score_no_label_maps_to_weak', 'test_open_question_reduces_closed_count', 'test_waiting_clarification_reduces_closed_count', 'test_closed_question_state_does_not_reduce_count', 'test_zero_evaluations_produces_safe_zero_counts', 'test_completion_rate_never_exceeds_100', 'test_runtime_counters_come_from_runtime_state', 'test_answer_strength_distribution_is_correct', 'test_zero_answered_is_not_ready', 'test_very_low_score_is_not_ready', 'test_medium_score_partial_completion_is_progressing', 'test_high_score_full_completion_is_strong', 'test_good_score_is_interview_ready', 'test_strong_technical_depth_feedback_is_specific', 'test_weak_ownership_feedback_is_actionable', 'test_unknown_category_returns_non_empty_generic_fallback', 'test_all_strength_levels_produce_different_feedback_for_same_category', 'test_score_bands_are_correct', 'test_empty_evaluations_returns_unknown_level', 'test_high_comm_scores_with_results_produce_clear_structured', 'test_filler_heavy_answers_produce_needs_improvement', 'test_insights_match_evaluation_count', 'test_strong_insight_references_what_worked', 'test_silent_insight_states_no_answer', 'test_question_preview_is_truncated_correctly', 'test_roadmap_for_weak_technical_is_actionable', 'test_roadmap_for_no_weak_categories_uses_generic_defaults', 'test_roadmap_respects_max_tips_limit', 'test_roadmap_produces_no_duplicate_tips', '_make_full_evals', 'test_premium_report_has_all_required_keys', 'test_premium_report_score_matches_input', 'test_premium_report_hiring_assessment_is_non_generic', 'test_premium_report_all_strong_produces_strong_or_interview_ready', 'test_premium_report_all_silent_produces_not_ready', 'test_premium_report_category_feedback_is_non_empty', 'test_premium_report_improvement_roadmap_has_tips', 'test_ai_backend_resume_maps_to_ai_ml_data', 'test_non_software_resume_maps_to_business_analyst', 'test_career_difficult_plan_avoids_recruiter_loop', 'test_career_difficult_plan_escalates_to_depth_categories_early', 'test_free_basic_plan_is_field_aware_for_non_software', 'test_second_communication_explain_is_blocked_in_career', 'test_question_family_detects_hire_question', 'test_question_family_detects_future_growth_question', 'test_technical_recovery_corrects_fastapi_typo', 'test_career_recovery_preserves_role_fit_language', 'test_summarize_recovered_intent_corrects_tool_names', 'test_pro_better_answer_preserves_tool_name', 'test_career_better_answer_references_project', 'test_career_better_answer_preserves_user_decision_and_outcome', 'test_role_fit_template_references_hiring_or_fit', 'test_closeout_template_references_growth_timeline', 'test_coerce_runtime_state_handles_dict', 'test_coerce_runtime_state_handles_json_string', 'test_coerce_runtime_state_returns_empty_on_invalid', 'test_coerce_question_plan_items_handles_list', 'test_coerce_question_plan_items_handles_json_string', 'test_coerce_question_plan_items_returns_empty_on_invalid']
+
+--- tests\verify_upgrades.py ---
+Classes: ['FakeConn']
+Functions: ['check']
+
