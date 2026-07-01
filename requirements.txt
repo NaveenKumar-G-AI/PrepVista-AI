@@ -41,7 +41,7 @@ fpdf2==2.8.1
 python-docx==1.1.2
 pytesseract==0.3.13
 pdf2image==1.17.0
-Pillow==11.0.0
+Pillow==12.2.0            # must satisfy pdfplumber>=12.2.0 (see line 31); pytesseract/pdf2image have no upper bound
 
 # ── Logging ─────────────────────────
 structlog==24.4.0
