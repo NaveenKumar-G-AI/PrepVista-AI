@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepVista — AI Placement Officer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#17233D; --ink-soft:#4A5875; --paper:#ECE7DA; --paper-raised:#F8F5EC;
+    --rule:#CBC2A8; --stamp-red:#A63A2E; --stamp-red-soft:#F1DDD8;
+    --brass:#93731F; --brass-soft:#EFE3C8; --verify:#2F6B5E; --verify-soft:#DCEAE4;
+    --font-display:'IBM Plex Serif',serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} }
+  body{
+    margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-body);
+    background-image:
+      linear-gradient(var(--paper), var(--paper)),
+      repeating-linear-gradient(0deg, rgba(23,35,61,0.028) 0px, rgba(23,35,61,0.028) 1px, transparent 1px, transparent 26px);
+    min-height:100vh;
+  }
+  .sheet{ max-width:760px; margin:0 auto; padding:0 20px 80px; }
+  header.masthead{
+    padding:34px 0 18px; border-bottom:3px double var(--ink); margin-bottom:26px;
+    display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;
+  }
+  .masthead .brand{ font-family:var(--font-display); font-weight:700; font-size:1.7rem; letter-spacing:.02em; }
+  .masthead .brand small{ display:block; font-family:var(--font-mono); font-weight:500; font-size:.62rem; letter-spacing:.24em; color:var(--ink-soft); margin-top:4px; }
+  .masthead .meta{ font-family:var(--font-mono); font-size:.72rem; color:var(--ink-soft); text-align:right; line-height:1.6; }
+
+  .command{
+    background:var(--paper-raised); border:1px solid var(--ink); border-radius:2px;
+    padding:14px 16px; display:flex; gap:10px; align-items:center; box-shadow:3px 3px 0 rgba(23,35,61,.09);
+  }
+  .command .glyph{ font-family:var(--font-mono); color:var(--ink-soft); }
+  .command input{
+    flex:1; border:none; background:transparent; font-family:var(--font-body); font-size:.98rem; color:var(--ink);
+    outline:none;
+  }
+  .command input::placeholder{ color:var(--ink-soft); }
+  .command button{
+    font-family:var(--font-mono); font-size:.68rem; letter-spacing:.08em; text-transform:uppercase;
+    background:var(--ink); color:var(--paper-raised); border:none; padding:8px 12px; border-radius:2px; cursor:pointer;
+  }
+  .command button:focus-visible, .req-actions button:focus-visible, .suggested button:focus-visible{ outline:2px solid var(--stamp-red); outline-offset:2px; }
+
+  .suggested{ display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 0; }
+  .suggested button{
+    font-family:var(--font-mono); font-size:.68rem; color:var(--ink-soft); background:none;
+    border:1px solid var(--rule); border-radius:20px; padding:6px 12px; cursor:pointer;
+  }
+  .suggested button:hover{ border-color:var(--ink); color:var(--ink); }
+
+  section.block{ margin-top:44px; }
+  .block-label{
+    font-family:var(--font-mono); font-size:.68rem; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--ink-soft); display:flex; align-items:center; gap:10px; margin-bottom:16px;
+  }
+  .block-label::after{ content:""; flex:1; height:1px; background:var(--rule); }
+
+  .greeting{ font-family:var(--font-display); font-size:1.18rem; line-height:1.5; margin:0 0 18px; }
+
+  .entry{
+    display:grid; grid-template-columns:52px 1fr; gap:14px; padding:14px 0; border-top:1px solid var(--rule);
+    opacity:0; transform:translateY(6px); animation:rise .5s ease forwards;
+  }
+  .entry:last-child{ border-bottom:1px solid var(--rule); }
+  @keyframes rise{ to{ opacity:1; transform:translateY(0); } }
+  .entry .no{ font-family:var(--font-mono); font-size:.72rem; color:var(--ink-soft); padding-top:2px; }
+  .entry .no b{ display:block; font-size:.95rem; color:var(--ink); }
+  .entry .cat{ font-family:var(--font-mono); font-size:.64rem; letter-spacing:.12em; text-transform:uppercase; }
+  .entry .detail{ font-size:.94rem; margin-top:3px; line-height:1.5; }
+  .entry.urgent{ border-left:3px solid var(--stamp-red); padding-left:12px; margin-left:-15px; }
+  .entry.urgent .cat{ color:var(--stamp-red); }
+  .entry.caution .cat{ color:var(--brass); }
+  .tag{
+    display:inline-block; font-family:var(--font-mono); font-size:.6rem; letter-spacing:.1em; padding:2px 7px;
+    border-radius:2px; margin-left:8px; vertical-align:middle;
+  }
+  .tag.urgent{ background:var(--stamp-red-soft); color:var(--stamp-red); border:1px solid var(--stamp-red); }
+  .tag.caution{ background:var(--brass-soft); color:var(--brass); border:1px solid var(--brass); }
+
+  .thread{ display:flex; flex-direction:column; gap:14px; }
+  .turn{ display:grid; grid-template-columns:74px 1fr; gap:14px; opacity:0; animation:rise .45s ease forwards; }
+  .turn .who{ font-family:var(--font-mono); font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); padding-top:3px; }
+  .turn.tpo .who{ color:var(--ink); font-weight:600; }
+  .turn .msg{ font-size:.95rem; line-height:1.55; padding-bottom:10px; border-bottom:1px dotted var(--rule); }
+  .turn.ai .msg{ font-style:normal; }
+
+  .next-wrap{ margin-top:6px; }
+  .next-wrap button{
+    font-family:var(--font-mono); font-size:.7rem; letter-spacing:.06em; background:var(--paper-raised);
+    border:1px solid var(--ink); padding:9px 14px; border-radius:2px; cursor:pointer; color:var(--ink);
+  }
+  .next-wrap button:hover{ background:var(--ink); color:var(--paper-raised); }
+
+  .requisition{
+    margin-top:18px; border:1px solid var(--ink); background:var(--paper-raised); border-radius:2px;
+    box-shadow:4px 4px 0 rgba(23,35,61,.08); opacity:0; animation:rise .5s ease forwards; position:relative; overflow:hidden;
+  }
+  .requisition .rq-head{
+    font-family:var(--font-mono); font-size:.66rem; letter-spacing:.16em; text-transform:uppercase;
+    background:var(--ink); color:var(--paper-raised); padding:8px 14px;
+  }
+  .requisition .rq-body{ padding:16px; }
+  .rq-row{ display:grid; grid-template-columns:100px 1fr; gap:10px; font-size:.88rem; padding:5px 0; }
+  .rq-row .k{ font-family:var(--font-mono); font-size:.68rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.06em; padding-top:2px; }
+  .rq-row .v.quote{ font-style:italic; }
+  .req-actions{ display:flex; justify-content:flex-end; gap:10px; padding:12px 16px; border-top:1px solid var(--rule); }
+  .req-actions button{ font-family:var(--font-mono); font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; padding:9px 16px; border-radius:2px; cursor:pointer; }
+  .req-actions .cancel{ background:none; border:1px solid var(--rule); color:var(--ink-soft); }
+  .req-actions .confirm{ background:var(--stamp-red); border:1px solid var(--stamp-red); color:#fff; }
+  .req-actions .confirm:disabled{ opacity:.45; cursor:default; }
+
+  .result-wrap{ display:flex; align-items:center; gap:18px; padding:18px 16px; }
+  .stamp{
+    width:96px; height:96px; border:3px solid var(--verify); border-radius:50%; color:var(--verify);
+    display:flex; align-items:center; justify-content:center; text-align:center; flex-shrink:0;
+    font-family:var(--font-mono); font-weight:600; font-size:.62rem; letter-spacing:.06em; line-height:1.3;
+    transform:rotate(-9deg) scale(1.5); opacity:0; animation:stampPress .55s cubic-bezier(.2,1.4,.4,1) forwards;
+    box-shadow:0 0 0 3px var(--verify-soft) inset;
+  }
+  @keyframes stampPress{ 0%{opacity:0; transform:rotate(-9deg) scale(1.7);} 60%{opacity:1;} 100%{opacity:1; transform:rotate(-9deg) scale(1);} }
+  .result-text{ font-size:.94rem; line-height:1.5; }
+  .result-text b{ font-family:var(--font-mono); }
+
+  .context-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .context-chips .chip{
+    font-family:var(--font-mono); font-size:.66rem; border:1px solid var(--rule); border-radius:20px;
+    padding:5px 11px; color:var(--ink-soft);
+  }
+
+  footer.notes{ margin-top:56px; padding-top:16px; border-top:1px solid var(--rule); font-family:var(--font-mono); font-size:.68rem; color:var(--ink-soft); line-height:1.7; }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="masthead">
+    <div class="brand">PrepVista<small>AI PLACEMENT OFFICER — DEMO DOSSIER</small></div>
+    <div class="meta">Sunrise Institute of Technology<br>Season 2026 · TPO: Priya Menon</div>
+  </header>
+
+  <div class="command">
+    <span class="glyph">⌕</span>
+    <input type="text" id="cmdInput" placeholder="Ask PrepVista anything…" aria-label="Ask PrepVista anything">
+    <button id="cmdGo" type="button">Ask</button>
+  </div>
+  <div class="suggested">
+    <button type="button" data-q="What needs attention?">What needs attention?</button>
+    <button type="button" data-q="Why is placement below target?">Why is placement below target?</button>
+    <button type="button" data-q="Show today's priorities">Show today's priorities</button>
+    <button type="button" data-q="Generate today's briefing">Generate today's briefing</button>
+  </div>
+
+  <section class="block">
+    <div class="block-label">Morning briefing · 15 Aug 2026</div>
+    <p class="greeting">"Good morning. I found 6 things worth your attention."</p>
+    <div id="briefingList"></div>
+  </section>
+
+  <section class="block">
+    <div class="block-label">Conversation</div>
+    <div class="thread" id="thread"></div>
+    <div class="next-wrap" id="nextWrap"></div>
+  </section>
+
+  <section class="block hidden" id="reqSection">
+    <div class="block-label">Action</div>
+    <div class="requisition" id="requisition">
+      <div class="rq-head">Requisition — Send Reminder</div>
+      <div class="rq-body">
+        <div class="rq-row"><div class="k">Audience</div><div class="v">83 students (unapplied, eligible — ABC Technologies)</div></div>
+        <div class="rq-row"><div class="k">Channel</div><div class="v">In-app</div></div>
+        <div class="rq-row"><div class="k">Message</div><div class="v quote">"Reminder: applications for ABC Technologies (Software Engineer) close today. You are eligible but haven't applied yet — apply now to be considered."</div></div>
+      </div>
+      <div class="req-actions">
+        <button class="cancel" type="button" id="cancelBtn">Cancel</button>
+        <button class="confirm" type="button" id="confirmBtn">Confirm Send</button>
+      </div>
+      <div class="result-wrap hidden" id="resultWrap">
+        <div class="stamp">SENT<br>81 / 83</div>
+        <div class="result-text"><b>83</b> messages sent.<br><b>81</b> delivered, <b>2</b> failed.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="block-label">Ask about this</div>
+    <div class="context-chips">
+      <span class="chip">ABC Technologies — Drive</span>
+      <span class="chip">23 high-readiness students</span>
+      <span class="chip">ECE — Department</span>
+      <span class="chip">Communication Bootcamp</span>
+    </div>
+  </section>
+
+  <footer class="notes">
+    Every figure on this page was produced by a real tool call against a mock institutional dataset in the same build session — see demo/run_demo.js. This page itself is a visual mockup of the command bar and AI panel (spec sections 67-69), not wired to a live server.
+  </footer>
+</div>
+
+<script>
+(function(){
+  const briefing = [
+    {cat:'Application deadline', tag:'urgent', tagLabel:'Urgent', detail:'Applications for Software Engineer close today. 83 eligible student(s) haven\u2019t applied.'},
+    {cat:'High-readiness unapplied', detail:'23 of those 83 are high-readiness (75+) students.'},
+    {cat:'Pending interview results', detail:'12 interview result(s) have been pending for more than 24 hours.'},
+    {cat:'Expiring offers', detail:'7 offer(s) expire within 48 hours.'},
+    {cat:'Department interview conversion gap', detail:'ECE interview progression is 10 points below the institutional median (56.7%).'},
+    {cat:'Data quality', tag:'caution', tagLabel:'Caution', detail:'7 joining record(s) are recorded but not yet verified \u2014 treat placement figures as provisional.'},
+  ];
+
+  const list = document.getElementById('briefingList');
+  briefing.forEach((b, i) => {
+    const el = document.createElement('div');
+    el.className = 'entry' + (b.tag ? ' ' + b.tag : '');
+    el.style.animationDelay = (i * 0.09) + 's';
+    el.innerHTML = `<div class="no">No.<b>${String(i+1).padStart(2,'0')}</b></div>
+      <div><div class="cat">${b.cat}${b.tag ? `<span class="tag ${b.tag}">${b.tagLabel}</span>` : ''}</div>
+      <div class="detail">${b.detail}</div></div>`;
+    list.appendChild(el);
+  });
+
+  // Scripted conversation matching the actual verified demo/run_demo.js output.
+  const steps = [
+    { who:'tpo', label:'TPO', text:'What should I do first?' },
+    { who:'ai', label:'AI', text:'Software Engineer at ABC Technologies: 198 eligible, 115 applied (58.1%), 83 unapplied. Deadline in 9h. Deadline risk flagged.' },
+    { who:'tpo', label:'TPO', text:'Show them.' },
+    { who:'ai', label:'AI', text:'23 eligible student(s) haven\u2019t applied (12 CSE, 7 IT, 4 ECE).' },
+    { who:'tpo', label:'TPO', text:'Prepare a reminder.' },
+    { who:'ai', label:'AI', text:'Draft prepared for 83 recipient(s). Review it below before it sends.', action:'showRequisition' },
+  ];
+  const thread = document.getElementById('thread');
+  const nextWrap = document.getElementById('nextWrap');
+  let stepIndex = 0;
+
+  function renderNextButton(){
+    nextWrap.innerHTML = '';
+    if (stepIndex >= steps.length) return;
+    const s = steps[stepIndex];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = s.who === 'tpo' ? `\u25B8 ${s.text}` : '\u25B8 Continue';
+    btn.addEventListener('click', playStep);
+    nextWrap.appendChild(btn);
+  }
+
+  function playStep(){
+    const s = steps[stepIndex];
+    const el = document.createElement('div');
+    el.className = 'turn ' + s.who;
+    el.innerHTML = `<div class="who">${s.label}</div><div class="msg">${s.text}</div>`;
+    thread.appendChild(el);
+    stepIndex++;
+    if (s.action === 'showRequisition') {
+      document.getElementById('reqSection').classList.remove('hidden');
+      nextWrap.innerHTML = '';
+      return;
+    }
+    renderNextButton();
+  }
+  renderNextButton();
+
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    document.getElementById('reqSection').classList.add('hidden');
+  });
+  document.getElementById('confirmBtn').addEventListener('click', function(){
+    document.getElementById('resultWrap').classList.remove('hidden');
+    this.disabled = true;
+    this.textContent = 'Sent \u2713';
+  });
+
+  function askSuggested(q){
+    document.getElementById('cmdInput').value = q;
+  }
+  document.querySelectorAll('.suggested button').forEach(b => {
+    b.addEventListener('click', () => askSuggested(b.dataset.q));
+  });
+  document.getElementById('cmdGo').addEventListener('click', () => {
+    const input = document.getElementById('cmdInput');
+    if (!input.value.trim()) return;
+    input.placeholder = 'This mockup replays the scripted walkthrough below \u2014 try the \u25B8 buttons.';
+    input.value = '';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "$comment": "Example only - every field here is a per-institution choice, not a hardcoded default. See spec sections 29 and 70.",
+
+  "multipleOffers": {
+    "allowMultipleActive": true,
+    "maxActiveOffers": 3,
+    "mustDeclinePreviousOnAccept": false,
+    "restrictApplicationsAfterAccepted": true,
+    "dreamCompanyPolicy": {
+      "enabled": false,
+      "companyIds": []
+    }
+  },
+
+  "acceptanceDeadline": {
+    "autoExpireOnDeadline": false,
+    "_note": "If false, offers past their deadline surface on the Expiring/Overdue workbench (section 27) but stay ACCEPTANCE_PENDING until a TPO explicitly calls expireOffer()."
+  },
+
+  "verifiedPlacementOutcomes": [
+    "PLACED_JOINED"
+  ],
+  "_verifiedPlacementOutcomes_note": "Outcomes in this list count toward the headline 'Verified Placement' KPI (section 70). Some institutions may also include PLACED_OFFER_ACCEPTED_JOINING_PENDING for early-season reporting - that's a policy choice, made here, not in code."
+}

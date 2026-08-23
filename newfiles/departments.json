@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "description": "Academic-department registry for PrepVista's 8 engineering branches. Each entry binds a department to its technical branch bank (topic and seed-question counts), the number of eligible fresher roles, its typical roles, and the company types those roles hire into. Used at student onboarding to bind a branch to the right technical content and role suggestions. Counts are introspected from the branch banks and roles.json.",
+  "departments": [
+    {
+      "key": "cse",
+      "label": "Computer Science & Engineering",
+      "short_label": "CSE",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_cse.json",
+      "technical_topics": 9,
+      "technical_seed_questions": 108,
+      "seed_questions_by_difficulty": {
+        "easy": 36,
+        "medium": 36,
+        "hard": 36
+      },
+      "eligible_roles": 39,
+      "typical_roles": [
+        "software_engineer",
+        "backend_developer",
+        "full_stack_developer",
+        "data_scientist",
+        "devops_engineer",
+        "cybersecurity_analyst"
+      ],
+      "primary_company_types": [
+        "general",
+        "product",
+        "service",
+        "analytics",
+        "core"
+      ],
+      "description": "Broadest software and computing department; routes to nearly every software, data, and security role."
+    },
+    {
+      "key": "aids",
+      "label": "Artificial Intelligence & Data Science",
+      "short_label": "AI&DS",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_aids.json",
+      "technical_topics": 8,
+      "technical_seed_questions": 72,
+      "seed_questions_by_difficulty": {
+        "easy": 24,
+        "medium": 24,
+        "hard": 24
+      },
+      "eligible_roles": 29,
+      "typical_roles": [
+        "data_scientist",
+        "data_analyst",
+        "data_engineer",
+        "machine_learning_engineer",
+        "ai_engineer",
+        "business_intelligence_analyst"
+      ],
+      "primary_company_types": [
+        "general",
+        "product",
+        "service",
+        "analytics",
+        "core"
+      ],
+      "description": "Data-and-AI focused department feeding analytics, data-engineering, and ML roles."
+    },
+    {
+      "key": "aiml",
+      "label": "Artificial Intelligence & Machine Learning",
+      "short_label": "AI&ML",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_aiml.json",
+      "technical_topics": 8,
+      "technical_seed_questions": 72,
+      "seed_questions_by_difficulty": {
+        "easy": 24,
+        "medium": 24,
+        "hard": 24
+      },
+      "eligible_roles": 11,
+      "typical_roles": [
+        "machine_learning_engineer",
+        "ai_engineer",
+        "data_scientist",
+        "nlp_engineer",
+        "computer_vision_engineer",
+        "mlops_engineer"
+      ],
+      "primary_company_types": [
+        "product",
+        "analytics",
+        "general",
+        "service",
+        "core"
+      ],
+      "description": "Specialised AI/ML department for model-building and AI-engineering roles."
+    },
+    {
+      "key": "ece",
+      "label": "Electronics & Communication Engineering",
+      "short_label": "ECE",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_ece.json",
+      "technical_topics": 8,
+      "technical_seed_questions": 72,
+      "seed_questions_by_difficulty": {
+        "easy": 24,
+        "medium": 24,
+        "hard": 24
+      },
+      "eligible_roles": 36,
+      "typical_roles": [
+        "electronics_engineer",
+        "embedded_engineer",
+        "vlsi_engineer",
+        "firmware_engineer",
+        "network_engineer",
+        "software_engineer"
+      ],
+      "primary_company_types": [
+        "general",
+        "service",
+        "product",
+        "core",
+        "analytics"
+      ],
+      "description": "Electronics and communication department spanning hardware, embedded, VLSI, and software roles."
+    },
+    {
+      "key": "eee",
+      "label": "Electrical & Electronics Engineering",
+      "short_label": "EEE",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_eee.json",
+      "technical_topics": 8,
+      "technical_seed_questions": 72,
+      "seed_questions_by_difficulty": {
+        "easy": 24,
+        "medium": 24,
+        "hard": 24
+      },
+      "eligible_roles": 21,
+      "typical_roles": [
+        "electrical_engineer",
+        "power_systems_engineer",
+        "control_systems_engineer",
+        "instrumentation_engineer",
+        "embedded_engineer",
+        "graduate_engineer_trainee"
+      ],
+      "primary_company_types": [
+        "general",
+        "core",
+        "product",
+        "service",
+        "analytics"
+      ],
+      "description": "Electrical and electronics department for power, control, instrumentation, and core engineering roles."
+    },
+    {
+      "key": "mech",
+      "label": "Mechanical Engineering",
+      "short_label": "MECH",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_mech.json",
+      "technical_topics": 8,
+      "technical_seed_questions": 72,
+      "seed_questions_by_difficulty": {
+        "easy": 24,
+        "medium": 24,
+        "hard": 24
+      },
+      "eligible_roles": 13,
+      "typical_roles": [
+        "mechanical_design_engineer",
+        "production_engineer",
+        "quality_engineer",
+        "maintenance_engineer",
+        "manufacturing_engineer",
+        "graduate_engineer_trainee"
+      ],
+      "primary_company_types": [
+        "general",
+        "core",
+        "service",
+        "analytics",
+        "product"
+      ],
+      "description": "Mechanical department for design, production, quality, and maintenance roles in manufacturing and core industry."
+    },
+    {
+      "key": "civil",
+      "label": "Civil Engineering",
+      "short_label": "CIVIL",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_civil.json",
+      "technical_topics": 8,
+      "technical_seed_questions": 72,
+      "seed_questions_by_difficulty": {
+        "easy": 24,
+        "medium": 24,
+        "hard": 24
+      },
+      "eligible_roles": 9,
+      "typical_roles": [
+        "civil_engineer",
+        "structural_engineer",
+        "site_engineer",
+        "project_engineer",
+        "construction_manager_trainee",
+        "graduate_engineer_trainee"
+      ],
+      "primary_company_types": [
+        "general",
+        "core",
+        "service",
+        "analytics"
+      ],
+      "description": "Civil department for structural, site, and project-engineering roles in construction and infrastructure."
+    },
+    {
+      "key": "cyber",
+      "label": "Cyber Security",
+      "short_label": "CYBER",
+      "degree": "B.E. / B.Tech",
+      "branch_bank": "branch_cyber.json",
+      "technical_topics": 8,
+      "technical_seed_questions": 72,
+      "seed_questions_by_difficulty": {
+        "easy": 24,
+        "medium": 24,
+        "hard": 24
+      },
+      "eligible_roles": 8,
+      "typical_roles": [
+        "cybersecurity_analyst",
+        "security_engineer",
+        "soc_analyst",
+        "penetration_tester",
+        "network_engineer",
+        "software_engineer"
+      ],
+      "primary_company_types": [
+        "general",
+        "service",
+        "product",
+        "core"
+      ],
+      "description": "Security-focused department for SOC, pen-testing, and security-engineering roles."
+    }
+  ]
+}

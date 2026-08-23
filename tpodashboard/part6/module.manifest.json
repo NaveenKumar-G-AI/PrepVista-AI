@@ -1,0 +1,59 @@
+{
+  "module": "offers-joining",
+  "version": "0.1.0",
+  "description": "Offer -> Acceptance -> Joining -> Verified Placement Outcome. PrepVista Part 6.",
+  "owns": [
+    "Offer",
+    "OfferVersion",
+    "OfferVerification",
+    "OfferDocumentReference",
+    "MultipleOfferPolicy",
+    "JoiningRecord",
+    "PlacementOutcome"
+  ],
+  "does_not_own": ["Student", "Company", "Drive", "Application", "InterviewResult", "Training", "Communication", "Reports"],
+  "routes": ["api/offers/routes.js", "api/joining/routes.js"],
+  "database_tables": [
+    "offers",
+    "offer_versions",
+    "offer_documents",
+    "joining_records",
+    "placement_outcomes",
+    "institution_offer_policy"
+  ],
+  "events_published": [
+    "OFFER_CREATED", "OFFER_UPDATED", "OFFER_RECEIVED", "OFFER_VERIFICATION_STARTED",
+    "OFFER_VERIFIED", "OFFER_PUBLISHED", "OFFER_ACCEPTANCE_PENDING", "OFFER_ACCEPTED",
+    "OFFER_DECLINED", "OFFER_EXPIRED", "OFFER_WITHDRAWN", "OFFER_CANCELLED", "OFFER_CORRECTED",
+    "OFFER_DEADLINE_APPROACHING", "MULTIPLE_OFFER_DETECTED",
+    "JOINING_CREATED", "JOINING_CONFIRMATION_SUBMITTED", "JOINING_CONFIRMATION_VERIFIED",
+    "JOINING_CONFIRMED", "JOINING_DELAYED", "JOINING_DID_NOT_JOIN", "JOINING_DEADLINE_APPROACHING",
+    "PLACEMENT_OUTCOME_CREATED", "PLACEMENT_OUTCOME_UPDATED", "PLACEMENT_OUTCOME_VERIFIED",
+    "PLACEMENT_OUTCOME_CORRECTED"
+  ],
+  "events_consumed": ["FINAL_SELECTION_VERIFIED"],
+  "services_exposed": [
+    "createOfferService", "createJoiningService",
+    "getOffer", "getStudentOffers", "getPendingOffers", "getExpiringOffers",
+    "getOfferAcceptance", "getMultipleOfferStudents", "getOfferAnalytics", "getCtcAnalytics",
+    "getJoiningStatus", "getPendingJoining", "getDidNotJoin",
+    "derivePlacementOutcome", "isVerifiedPlacement",
+    "validateImportRows",
+    "computeFunnel", "computeOfferToJoiningFunnel", "computeOfferTimingMetrics", "computeJoiningTimingMetrics",
+    "compareSegments", "computeCompanyScorecard",
+    "computeUpgradeAnalysis", "computeDeclineReasonBreakdown", "computeCompetitionEdges", "computePackageDifferential",
+    "computeOfferTrend", "compareSeasons",
+    "computeTodayDigest",
+    "getCtcDistribution",
+    "buildSeasonReport", "companyScorecardToCsvRows",
+    "buildMultipleOffersInsight", "buildStaleVerificationInsight", "buildSegmentDeviationInsight"
+  ],
+  "dependencies": ["institution", "season", "students", "companies", "drives", "applications", "interviews"],
+  "preferred_ownership_paths": [
+    "modules/offers/**", "modules/joining/**",
+    "services/offers/**", "services/joining/**", "services/analytics/**",
+    "api/offers/**", "api/joining/**",
+    "schemas/offers/**", "tests/offers/**", "tests/joining/**", "tests/analytics/**",
+    "migrations/001_offers_joining_placement.sql"
+  ]
+}

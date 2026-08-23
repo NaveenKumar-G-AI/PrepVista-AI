@@ -1,0 +1,126 @@
+/*
+ * Signature element here: a "ledger" - a stamped register row with a
+ * baseline rule connecting each entry, rather than a shelf of shadowed
+ * dashboard cards. Numbers are the content; chrome stays out of the way.
+ * Shares tokens with StudentOfferCard.css.
+ */
+
+.pv-summary {
+  --pv-ink: #14213d;
+  --pv-paper: #f6f7f5;
+  --pv-seal: #1f6f54;
+  --pv-amber: #c17817;
+  --pv-rose: #b3261e;
+  --pv-line: #d8dce1;
+  --pv-muted: #5b6472;
+
+  display: grid;
+  gap: 22px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--pv-ink);
+}
+
+.pv-ledger {
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
+  border-radius: 10px;
+  padding: 20px 24px;
+}
+
+.pv-ledger__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--pv-line);
+}
+
+.pv-ledger__title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pv-muted);
+}
+
+.pv-ledger__headline {
+  font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.pv-ledger__headline-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pv-muted);
+  margin-left: 6px;
+}
+
+.pv-ledger__row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.pv-ledger__entry {
+  flex: 1 1 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--pv-line);
+  padding: 2px 16px 2px 0;
+  margin-right: 16px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.pv-ledger__entry:last-child {
+  border-right: none;
+  margin-right: 0;
+}
+
+.pv-ledger__entry:focus-visible {
+  outline: 2px solid var(--pv-ink);
+  outline-offset: 3px;
+}
+
+.pv-ledger__value {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--pv-ink);
+}
+
+.pv-ledger__value--seal { color: var(--pv-seal); }
+.pv-ledger__value--amber { color: var(--pv-amber); }
+.pv-ledger__value--rose { color: var(--pv-rose); }
+
+.pv-ledger__label {
+  font-size: 12px;
+  color: var(--pv-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pv-ledger__entry .pv-ledger__value { transition: opacity 120ms ease; }
+  .pv-ledger__entry:hover .pv-ledger__value { opacity: 0.75; }
+}
+
+@media (max-width: 560px) {
+  .pv-ledger__row { flex-direction: column; }
+  .pv-ledger__entry {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    border-right: none;
+    border-bottom: 1px solid var(--pv-line);
+    padding: 8px 0;
+    margin-right: 0;
+    width: 100%;
+  }
+  .pv-ledger__entry:last-child { border-bottom: none; }
+}

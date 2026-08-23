@@ -1,0 +1,22 @@
+{
+  "name": "prepvista-part10-reports",
+  "version": "1.0.0",
+  "description": "PrepVista AI - Part 10: Reports, Evidence Vault, Management Review, Institutional Intelligence",
+  "type": "module",
+  "scripts": {
+    "seed": "tsx src/seed.ts",
+    "dev": "tsx src/api/server.ts",
+    "test": "tsx tests/run.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
+  }
+}

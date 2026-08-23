@@ -1,0 +1,216 @@
+{
+  "branch": "civil",
+  "label": "Civil Engineering",
+  "schema_version": 1,
+  "notes": "Seed questions for the civil branch.",
+  "topics": [
+    {
+      "topic": "Structural Analysis",
+      "subtopics": [
+        "beams",
+        "trusses",
+        "loads",
+        "moments"
+      ],
+      "questions": {
+        "easy": [
+          "What is a bending moment?",
+          "What's the difference between a beam and a column?",
+          "What is a dead load versus a live load?"
+        ],
+        "medium": [
+          "How would you find reactions for a simply supported beam?",
+          "What's the difference between a determinate and an indeterminate structure?",
+          "What is shear force, and how does it relate to bending moment?"
+        ],
+        "hard": [
+          "Analyse a truss using the method of sections.",
+          "Explain the moment-distribution method at a high level.",
+          "How would you analyse a continuous beam for support moments?"
+        ]
+      }
+    },
+    {
+      "topic": "Concrete Technology",
+      "subtopics": [
+        "mix design",
+        "strength",
+        "RCC",
+        "curing"
+      ],
+      "questions": {
+        "easy": [
+          "What is reinforced cement concrete (RCC)?",
+          "Why is curing important for concrete?",
+          "What is the water-cement ratio?"
+        ],
+        "medium": [
+          "How does the water-cement ratio affect strength?",
+          "What's the difference between compressive and tensile strength of concrete?",
+          "Why is steel used as reinforcement in concrete?"
+        ],
+        "hard": [
+          "How would you approach a concrete mix design for a target strength?",
+          "Explain the factors affecting the durability of concrete.",
+          "What causes cracking in concrete, and how is it controlled?"
+        ]
+      }
+    },
+    {
+      "topic": "Geotechnical Engineering",
+      "subtopics": [
+        "soil",
+        "bearing capacity",
+        "foundations",
+        "compaction"
+      ],
+      "questions": {
+        "easy": [
+          "What is soil bearing capacity?",
+          "What is a foundation?",
+          "What's the difference between sand and clay behaviour?"
+        ],
+        "medium": [
+          "What's the difference between a shallow and a deep foundation?",
+          "Why is soil compaction important?",
+          "What is the angle of internal friction?"
+        ],
+        "hard": [
+          "How would you decide between a raft and a pile foundation?",
+          "Explain consolidation settlement in clay.",
+          "How would you assess the stability of a slope?"
+        ]
+      }
+    },
+    {
+      "topic": "Fluid Mechanics & Hydraulics",
+      "subtopics": [
+        "flow",
+        "pipes",
+        "channels",
+        "pumps"
+      ],
+      "questions": {
+        "easy": [
+          "What is the difference between laminar and turbulent flow?",
+          "What does Bernoulli's principle state?",
+          "What is hydrostatic pressure?"
+        ],
+        "medium": [
+          "What is head loss in a pipe, and what causes it?",
+          "What's the difference between open-channel and pipe flow?",
+          "What is the Reynolds number?"
+        ],
+        "hard": [
+          "How would you size a pipe for a required flow and head?",
+          "Explain the concept of specific energy in open-channel flow.",
+          "How does a hydraulic jump form, and why does it matter?"
+        ]
+      }
+    },
+    {
+      "topic": "Surveying",
+      "subtopics": [
+        "levelling",
+        "theodolite",
+        "contours",
+        "GPS"
+      ],
+      "questions": {
+        "easy": [
+          "What is surveying used for?",
+          "What is a contour line?",
+          "What is levelling in surveying?"
+        ],
+        "medium": [
+          "What's the difference between a theodolite and a level?",
+          "How is the area of an irregular plot estimated?",
+          "What is a benchmark in surveying?"
+        ],
+        "hard": [
+          "How would you set out a curve for a road alignment?",
+          "Explain how total stations improve survey accuracy.",
+          "How would you carry out a topographic survey of a site?"
+        ]
+      }
+    },
+    {
+      "topic": "Transportation Engineering",
+      "subtopics": [
+        "highways",
+        "pavement",
+        "traffic",
+        "geometric design"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between a flexible and a rigid pavement?",
+          "What is traffic volume?",
+          "What is a carriageway?"
+        ],
+        "medium": [
+          "What factors influence highway geometric design?",
+          "Why is superelevation provided on curves?",
+          "What is the purpose of a pavement's sub-base?"
+        ],
+        "hard": [
+          "How would you design the thickness of a flexible pavement?",
+          "Explain how traffic signal timing is determined.",
+          "How would you analyse capacity at a road intersection?"
+        ]
+      }
+    },
+    {
+      "topic": "Environmental Engineering",
+      "subtopics": [
+        "water treatment",
+        "sewage",
+        "quality",
+        "waste"
+      ],
+      "questions": {
+        "easy": [
+          "What is the purpose of water treatment?",
+          "What is BOD (biochemical oxygen demand)?",
+          "What is sewage?"
+        ],
+        "medium": [
+          "What are the main steps in treating drinking water?",
+          "What's the difference between BOD and COD?",
+          "Why is disinfection of water important?"
+        ],
+        "hard": [
+          "How would you design a sedimentation tank for a treatment plant?",
+          "Explain the activated-sludge process for sewage treatment.",
+          "How would you assess and improve the quality of a water source?"
+        ]
+      }
+    },
+    {
+      "topic": "Construction Management",
+      "subtopics": [
+        "scheduling",
+        "estimation",
+        "materials",
+        "safety"
+      ],
+      "questions": {
+        "easy": [
+          "What is a project schedule?",
+          "What is a bill of quantities?",
+          "Why is site safety important?"
+        ],
+        "medium": [
+          "What's the difference between CPM and PERT?",
+          "How would you estimate the cost of a small structure?",
+          "What is the critical path in a project?"
+        ],
+        "hard": [
+          "How would you plan resources to avoid delays on a construction project?",
+          "Explain how you'd manage cost overruns on a site.",
+          "How would you sequence activities to optimise a construction schedule?"
+        ]
+      }
+    }
+  ]
+}

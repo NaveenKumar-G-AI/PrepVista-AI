@@ -1,0 +1,2457 @@
+{
+ "schema_version": "1.0",
+ "description": "Tier-C company directory (Feature #01, M7): every company name from interview/data/companies.json (the 615 across 5 CompanyType groups) mapped to its CompanyType->archetype default, so any name resolves to a relevant generic simulation - never a company-not-found dead-end. type->archetype: service->mass_service, product->product, analytics->analytics, core->core, general->mass_service. Generated from companies.json; regenerate when that file changes.",
+ "type_to_archetype": {
+  "service": "mass_service",
+  "product": "product",
+  "analytics": "analytics",
+  "core": "core",
+  "general": "mass_service"
+ },
+ "companies": {
+  "TCS": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Infosys": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Wipro": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Cognizant": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Accenture": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Capgemini": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "HCLTech": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Tech Mahindra": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "LTIMindtree": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Mphasis": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "IBM": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "DXC Technology": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "NTT Data": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Hexaware": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Birlasoft": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Coforge": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Cyient": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Zensar": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Persistent Systems": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Sonata Software": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Mastek": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "KPIT Technologies": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Tata Elxsi": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "L&T Technology Services": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Infosys BPM": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "TCS BPS": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Genpact": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "WNS Global Services": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Firstsource": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Sutherland": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Conduent": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Atos Syntel": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Unisys": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "CGI": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Virtusa": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Cybage": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Happiest Minds": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Quinnox": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Newgen Software": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Nucleus Software": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Ramco Systems": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Intellect Design Arena": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "3i Infotech": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Datamatics": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Saksoft": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "eClerx": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "HGS": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "CSS Corp (Movate)": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Sify Technologies": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "NIIT Technologies": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Polaris": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Majesco": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Subex": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "R Systems": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "GlobalLogic": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Endava": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "EPAM Systems": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Luxoft": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "ThoughtWorks": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Publicis Sapient": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Deloitte": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "PwC": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "EY": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "KPMG": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "McKinsey & Company": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "BCG": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Bain & Company": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Infosys Consulting": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Capgemini Invent": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Accenture Strategy": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Wipro Consulting": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Bahwan CyberTek": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Trianz": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Oracle Financial Services": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Temenos": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "FIS Global": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Fiserv": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "NCR Corporation": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Automation Anywhere": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "UiPath": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Pegasystems": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Hexaware Technologies": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Brillio": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Nagarro": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Mindtree": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "L&T Infotech": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Mahindra Comviva": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Comviva": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Sasken": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "eInfochips": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Aricent": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "GAVS Technologies": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Marlabs": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Prokarma": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Synechron": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Iris Software": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Xoriant": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "HTC Global Services": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Infogain": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Hexagon": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Trigent": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Saggezza": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Aspire Systems": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Indium Software": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Kanini": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Maveric Systems": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Sun Technologies": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "ValueLabs": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Innominds": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Tavant Technologies": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Altimetrik": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Incedo": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Sutherland Global": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Teleperformance": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "iEnergizer": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Startek": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "NTT Ltd": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Capco": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Slalom": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Mu Sigma": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Fractal": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Wipro Digital": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Cognizant Digital": {
+   "company_type": "service",
+   "archetype": "mass_service"
+  },
+  "Google": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Microsoft": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Amazon": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Adobe": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Atlassian": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Flipkart": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Swiggy": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Razorpay": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Zoho": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Salesforce": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Apple": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Meta": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Netflix": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Uber": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Oracle": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "SAP Labs": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "VMware": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Cisco": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Intel": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Qualcomm": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "NVIDIA": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Nutanix": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "ServiceNow": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Workday": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Twilio": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Stripe": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "PayPal": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Visa": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Mastercard": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Walmart Global Tech": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Target India": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Lowe's India": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "PhonePe": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Paytm": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "CRED": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Zomato": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Ola": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Myntra": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Meesho": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Groww": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Zerodha": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Upstox": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Dream11": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Mobile Premier League": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "ShareChat": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "BigBasket": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Urban Company": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "BookMyShow": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "MakeMyTrip": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Cleartrip": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Ixigo": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Nykaa": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Lenskart": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "FirstCry": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Pepperfry": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Delhivery": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "BlackBuck": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Udaan": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "OfBusiness": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Khatabook": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Vedantu": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Unacademy": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "upGrad": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Physics Wallah": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Coding Ninjas": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Scaler": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "HackerRank": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "HackerEarth": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Freshworks": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Chargebee": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Postman": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "BrowserStack": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Gupshup": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Yellow.ai": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Hasura": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Whatfix": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "MindTickle": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Druva": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Icertis": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Innovaccer": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "HighRadius": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Darwinbox": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Capillary Technologies": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Sprinklr": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Zenoti": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "InMobi": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Glance": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Dailyhunt": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Disney+ Hotstar": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "JioSaavn": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "MoEngage": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "CleverTap": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "WebEngage": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Netcore Cloud": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Locus": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Pixxel": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Ather Energy": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Ola Electric": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Yulu": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Rapido": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Porter": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Shiprocket": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Pine Labs": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "BharatPe": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Slice": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Jupiter": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Fi Money": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Cashfree": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Setu": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "M2P Fintech": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Yubi": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Lendingkart": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Navi": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Open": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Juspay": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Perfios": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Signzy": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Zeta": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Games24x7": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Junglee Games": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Hike": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Eka Software": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Vymo": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Locobuzz": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Wingify": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Mfine": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "PharmEasy": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Tata 1mg": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Cult.fit": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "BimaPe": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Acko": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Digit Insurance": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "PolicyBazaar": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Turtlemint": {
+   "company_type": "product",
+   "archetype": "product"
+  },
+  "Fractal Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Tiger Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "ZS Associates": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "LatentView Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Bain (Advanced Analytics)": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "American Express": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Goldman Sachs (Strats)": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Tredence": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Course5i": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "AbsolutData": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Affine Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Gramener": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Quantiphi": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Sigmoid": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "TheMathCompany": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Polestar Solutions": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Analyttica Datalab": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Convergytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Crayon Data": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Cartesian Consulting": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Aays Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Decision Point": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Ugam (Merkle)": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Genpact Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "EXL Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "WNS Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Cognizant Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Accenture Applied Intelligence": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Deloitte Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "PwC Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "KPMG Lighthouse": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "EY Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Nielsen": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Kantar": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Ipsos": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "GfK": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Dunnhumby": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "IRI": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "McKinsey QuantumBlack": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "BCG Gamma": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Walmart Labs": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Flipkart Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Swiggy Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Ola Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Uber Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "PhonePe Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Paytm Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "CRED Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Razorpay Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Myntra Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Meesho Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Dream11 Data Science": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Goldman Sachs": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Morgan Stanley": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "JP Morgan Chase": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Wells Fargo": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Barclays": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "HSBC": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Standard Chartered": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Citi": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Bank of America": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Mastercard Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Visa Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Optum": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "UnitedHealth Group": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Evernorth (Cigna)": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "CVS Health": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "AB InBev (GCC)": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Lowe's Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Target Data Sciences": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Mad Street Den": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Vue.ai": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Niramai": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "SigTuple": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Qure.ai": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Haptik": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Uniphore": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Observe.ai": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Gnani.ai": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Saama Technologies": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Absolutdata": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Bridgei2i": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Sokrati": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Latentview": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Tredence Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "MathCo": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Aionos": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Convergytics Solutions": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Indegene": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Axtria": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "ZS India": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Fractal India": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Tiger India": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Brillio Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "CitiusTech": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Innovaccer Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Sigmoid Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Quantiphi AI": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Course5 Intelligence": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Affine": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Aays": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Decision Point Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Cuddle.ai": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Mu Sigma Labs": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Genpact Cora": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "EXL Service": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "WNS Triange": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Merkle Sokrati": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Diggintek": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Datawrkz": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "BRIDGEi2i": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "LatentView Labs": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Gartner (Analytics)": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Forrester": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "McKinsey Analytics": {
+   "company_type": "analytics",
+   "archetype": "analytics"
+  },
+  "Larsen & Toubro": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Bosch": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Siemens": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Tata Motors": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Mahindra & Mahindra": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "BHEL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "ISRO": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "ONGC": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Schneider Electric": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Ashok Leyland": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "ABB": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Honeywell": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "General Electric": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Cummins India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Caterpillar": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "John Deere": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Hyundai Motor India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Maruti Suzuki": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Toyota Kirloskar": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Hero MotoCorp": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Bajaj Auto": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "TVS Motor": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Eicher Motors": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Force Motors": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Volvo Group": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Daimler India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "JCB India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "SKF India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Schaeffler India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "ZF India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Continental": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Valeo India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "MAHLE": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Tenneco": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "ZF Wabco": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Sundaram Clayton": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Rane Group": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Amara Raja Batteries": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Exide Industries": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Bharat Forge": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Sundram Fasteners": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Samvardhana Motherson": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Endurance Technologies": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Uno Minda": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Sona BLW": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Wheels India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Lucas-TVS": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "NTPC": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Power Grid Corporation": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "NHPC": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "SAIL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "NMDC": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Coal India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "GAIL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Indian Oil (IOCL)": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "BPCL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "HPCL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Reliance Industries": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Adani Group": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Vedanta": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Hindalco": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Tata Steel": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "JSW Steel": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "JSW Energy": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Jindal Steel & Power": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Thermax": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Voltas": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Blue Star": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Carrier": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Daikin India": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "LG Electronics": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Whirlpool": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Havells": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "CG Power": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Bajaj Electricals": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Polycab": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "KEI Industries": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Finolex Cables": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Kirloskar Brothers": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Kirloskar Oil Engines": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Greaves Cotton": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "VA Tech Wabag": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "L&T Construction": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Shapoorji Pallonji": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Afcons Infrastructure": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "HCC": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "NCC Limited": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Dilip Buildcon": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "KEC International": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Sterling & Wilson": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Tata Projects": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "IRCON International": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "RITES": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "RVNL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "DRDO": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "HAL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "BEL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "BEML": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "BDL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Mazagon Dock": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "GRSE": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Cochin Shipyard": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "NPCIL": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Indian Railways": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Wipro Infrastructure": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Godrej & Boyce": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Atlas Copco": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Ingersoll Rand": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Grundfos": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "KSB Pumps": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Alfa Laval": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Emerson": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Rockwell Automation": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Mitsubishi Electric": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Yokogawa": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "L&T Heavy Engineering": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Forbes Marshall": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Tata Power": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Suzlon Energy": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Inox Wind": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "ReNew Power": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "Sterlite Power": {
+   "company_type": "core",
+   "archetype": "core"
+  },
+  "HDFC Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ICICI Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Axis Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Kotak Mahindra Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "State Bank of India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "IndusInd Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "IDFC First Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Bandhan Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Federal Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "RBL Bank": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Bajaj Finserv": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Bajaj Finance": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "LIC": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "SBI Life": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "HDFC Life": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ICICI Prudential": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Max Life Insurance": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Tata AIA": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Star Health": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ICICI Lombard": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Bajaj Allianz": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "HDFC Ergo": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Muthoot Finance": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Manappuram Finance": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Cholamandalam": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Shriram Finance": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Mahindra Finance": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "L&T Finance": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Aditya Birla Capital": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Piramal Enterprises": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Edelweiss": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Motilal Oswal": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Angel One": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ICICI Securities": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "HDFC Securities": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Kotak Securities": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Hindustan Unilever": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ITC": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "NestlÃ© India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Britannia": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Dabur": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Marico": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Godrej Consumer Products": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Colgate-Palmolive": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Procter & Gamble": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "PepsiCo": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Coca-Cola India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Mondelez": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Parle Products": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Amul (GCMMF)": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Emami": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Jyothy Labs": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Tata Consumer Products": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Adani Wilmar": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Haldiram's": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Varun Beverages": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "United Breweries": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Diageo India (USL)": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Pernod Ricard India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Asian Paints": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Berger Paints": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Kansai Nerolac": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "AkzoNobel India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Pidilite Industries": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "UltraTech Cement": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ACC": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Ambuja Cements": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Shree Cement": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Dalmia Bharat": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "JK Cement": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Ramco Cements": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Reliance Retail": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Avenue Supermarts (DMart)": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Trent (Westside)": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Shoppers Stop": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Lifestyle": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Aditya Birla Fashion": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Titan": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Kalyan Jewellers": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Indian Hotels (Taj)": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Oberoi Hotels": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ITC Hotels": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Marriott India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Lemon Tree Hotels": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Apollo Hospitals": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Fortis Healthcare": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Max Healthcare": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Manipal Hospitals": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Narayana Health": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Cipla": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Sun Pharma": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Dr Reddy's": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Lupin": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Aurobindo Pharma": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Biocon": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Glenmark": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Torrent Pharma": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Zydus Lifesciences": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Mankind Pharma": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Alkem Labs": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Divi's Laboratories": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Abbott India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "GSK Pharma": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Pfizer India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Novartis India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Sanofi India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Reckitt": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Kellogg's India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Wipro Consumer Care": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Nivea India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "L'OrÃ©al India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "ITC Foods": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Berkshire (BFSI roles)": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Deloitte (advisory)": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "Grant Thornton": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "BDO India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  },
+  "RSM India": {
+   "company_type": "general",
+   "archetype": "mass_service"
+  }
+ }
+}

@@ -1299,6 +1299,69 @@ class ApiClient {
   async getCohortRoleFit<T = unknown>(_params?: { department?: string; year?: number }): Promise<T> {
     return { nodes: [], links: [] } as T;
   }
+
+  // ── Part 2: Recruiter Companies CRM ──────────────────────────────────────────
+  async listRecruiterCompanies<T = unknown>(params: Record<string, string | boolean | number> = {}): Promise<T> {
+    const qs = new URLSearchParams(
+      Object.entries(params).map(([k, v]) => [k, String(v)])
+    ).toString();
+    return this.request<T>(`/org/my/companies${qs ? '?' + qs : ''}`);
+  }
+
+  async createRecruiterCompany<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/companies', { method: 'POST', body });
+  }
+
+  async getRecruiterPulse<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/companies/pulse');
+  }
+
+  // ── Part 4: AI Provider Health ────────────────────────────────────────────
+  async getAIProviderHealth<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/ai/health');
+  }
+
+  // ── Part 5: Placement Interviews ──────────────────────────────────────────
+  async getPlacementInterviews<T = unknown>(params?: Record<string, string>): Promise<T> {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<T>(`/org/my/placement-interviews${qs}`);
+  }
+  async getPlacementInterview<T = unknown>(id: string): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/${id}`);
+  }
+  async schedulePlacementInterview<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/placement-interviews', { method: 'POST', body });
+  }
+  async recordPlacementAttendance<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/${id}/attendance`, { method: 'POST', body });
+  }
+  async enterPlacementResult<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/${id}/results`, { method: 'POST', body });
+  }
+  async reviewPlacementResults<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/${id}/results/review`, { method: 'POST', body });
+  }
+  async publishPlacementResults<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/${id}/results/publish`, { method: 'POST', body });
+  }
+  async getPendingPlacementResults<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/placement-interviews/results/pending');
+  }
+  async getPendingReviewPlacementResults<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/placement-interviews/results/pending-review');
+  }
+  async getPlacementAnalytics<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/placement-interviews/analytics/summary');
+  }
+
+  // ── Part 6: Offers & Joining ──────────────────────────────────────────────
+  async getOffersSummary<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/offers/analytics/summary');
+  }
+
+  async getOffersInsights<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/offers/analytics/insights');
+  }
 }
 
 export const api = new ApiClient();

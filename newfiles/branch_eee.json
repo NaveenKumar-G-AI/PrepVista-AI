@@ -1,0 +1,216 @@
+{
+  "branch": "eee",
+  "label": "Electrical & Electronics Engineering",
+  "schema_version": 1,
+  "notes": "Seed questions for the eee branch.",
+  "topics": [
+    {
+      "topic": "Circuit Theory",
+      "subtopics": [
+        "KVL/KCL",
+        "theorems",
+        "AC analysis",
+        "power"
+      ],
+      "questions": {
+        "easy": [
+          "State Kirchhoff's laws.",
+          "What is the difference between AC and DC?",
+          "What is power factor?"
+        ],
+        "medium": [
+          "Explain Thevenin's and Norton's theorems.",
+          "What is resonance in an RLC circuit?",
+          "What's the difference between real, reactive, and apparent power?"
+        ],
+        "hard": [
+          "Analyse a three-phase balanced circuit.",
+          "How would you improve a poor power factor, and why does it matter?",
+          "Explain the transient response of an RL circuit."
+        ]
+      }
+    },
+    {
+      "topic": "Electrical Machines",
+      "subtopics": [
+        "DC machines",
+        "transformers",
+        "induction motors",
+        "synchronous"
+      ],
+      "questions": {
+        "easy": [
+          "What does a transformer do?",
+          "What is the basic principle of a DC motor?",
+          "What is an induction motor?"
+        ],
+        "medium": [
+          "Explain how a transformer steps voltage up or down.",
+          "Why does an induction motor need slip to produce torque?",
+          "What's the difference between a synchronous and an induction motor?"
+        ],
+        "hard": [
+          "Explain the equivalent circuit of a transformer and its losses.",
+          "How would you control the speed of an induction motor?",
+          "Why can't a synchronous motor self-start, and how is it started?"
+        ]
+      }
+    },
+    {
+      "topic": "Power Systems",
+      "subtopics": [
+        "generation",
+        "transmission",
+        "distribution",
+        "faults"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between transmission and distribution?",
+          "Why is power transmitted at high voltage?",
+          "What is a substation?"
+        ],
+        "medium": [
+          "What is a per-unit system, and why is it used?",
+          "What's the difference between a symmetrical and an unsymmetrical fault?",
+          "Why is reactive power important in a grid?"
+        ],
+        "hard": [
+          "How would you analyse a three-phase fault on a transmission line?",
+          "Explain load-flow analysis at a high level.",
+          "How is grid stability maintained under sudden load changes?"
+        ]
+      }
+    },
+    {
+      "topic": "Control Systems",
+      "subtopics": [
+        "transfer function",
+        "stability",
+        "feedback",
+        "PID"
+      ],
+      "questions": {
+        "easy": [
+          "What is feedback in a control system?",
+          "What is a transfer function?",
+          "What does a PID controller do?"
+        ],
+        "medium": [
+          "What's the difference between open-loop and closed-loop control?",
+          "How do you assess stability from a system's poles?",
+          "What does each term in a PID controller contribute?"
+        ],
+        "hard": [
+          "Use the Routh-Hurwitz criterion to assess stability.",
+          "Explain how a root-locus plot helps controller design.",
+          "How would you tune a PID controller for a real plant?"
+        ]
+      }
+    },
+    {
+      "topic": "Power Electronics",
+      "subtopics": [
+        "rectifiers",
+        "inverters",
+        "converters",
+        "thyristors"
+      ],
+      "questions": {
+        "easy": [
+          "What is a rectifier?",
+          "What does an inverter do?",
+          "What is a thyristor (SCR)?"
+        ],
+        "medium": [
+          "What's the difference between a controlled and an uncontrolled rectifier?",
+          "How does a buck converter step voltage down?",
+          "What is pulse-width modulation, and where is it used?"
+        ],
+        "hard": [
+          "Explain the operation of a three-phase inverter.",
+          "How would you design a DC-DC converter for a given output?",
+          "What causes switching losses, and how are they reduced?"
+        ]
+      }
+    },
+    {
+      "topic": "Electrical Measurements",
+      "subtopics": [
+        "instruments",
+        "bridges",
+        "transducers",
+        "errors"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between accuracy and precision?",
+          "What does an ammeter measure, and how is it connected?",
+          "What is a transducer?"
+        ],
+        "medium": [
+          "How does a Wheatstone bridge measure resistance?",
+          "Why is a CT (current transformer) used in measurement?",
+          "What's the difference between systematic and random error?"
+        ],
+        "hard": [
+          "How would you measure power in a three-phase circuit?",
+          "Explain how a digital multimeter measures AC quantities.",
+          "How would you minimise loading error in a measurement?"
+        ]
+      }
+    },
+    {
+      "topic": "Electromagnetic Fields",
+      "subtopics": [
+        "Gauss",
+        "Faraday",
+        "Maxwell",
+        "flux"
+      ],
+      "questions": {
+        "easy": [
+          "What is magnetic flux?",
+          "What is Faraday's law of induction?",
+          "What is an electric field?"
+        ],
+        "medium": [
+          "Explain Gauss's law in simple terms.",
+          "What is the relationship between a changing magnetic field and an induced EMF?",
+          "What is permeability?"
+        ],
+        "hard": [
+          "Summarise Maxwell's equations and what each represents.",
+          "How does electromagnetic induction underpin a generator?",
+          "What is displacement current, and why did Maxwell introduce it?"
+        ]
+      }
+    },
+    {
+      "topic": "Switchgear & Protection",
+      "subtopics": [
+        "relays",
+        "circuit breakers",
+        "fault protection",
+        "earthing"
+      ],
+      "questions": {
+        "easy": [
+          "What is a circuit breaker?",
+          "What is earthing, and why is it important?",
+          "What is a fuse?"
+        ],
+        "medium": [
+          "What does a protective relay do?",
+          "What's the difference between a fuse and a circuit breaker?",
+          "Why is selectivity important in protection?"
+        ],
+        "hard": [
+          "How would you design overcurrent protection for a feeder?",
+          "Explain differential protection for a transformer.",
+          "How does distance protection work on a transmission line?"
+        ]
+      }
+    }
+  ]
+}

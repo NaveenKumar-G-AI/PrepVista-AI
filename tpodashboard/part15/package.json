@@ -1,0 +1,17 @@
+{
+  "name": "@prepvista/placement-strategy-intelligence",
+  "version": "1.0.0",
+  "description": "PrepVista AI — Part 15: Placement Forecasting + Strategy Engine + Institutional Intelligence",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "tsx --test tests/**/*.test.ts",
+    "demo": "tsx demo/run-demo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

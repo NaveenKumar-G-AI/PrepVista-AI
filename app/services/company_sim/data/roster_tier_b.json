@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "description": "Tier-B roster (Feature #01, M7): named companies mapped to an archetype template. Each inherits a working simulation on day one via archetype_factory.materialize_blueprint (format_confidence ~0.6, 'verify before your drive' banner), then gets promoted to a hand-verified Tier-A blueprint as demand/verification allows. Transcribed from 02_COMPANY_ROSTER.md Tier-B. Adding a company here is a pure data edit - zero code.",
+  "by_archetype": {
+    "mass_service": [
+      "Hexaware", "Coforge", "Birlasoft", "Zensar", "Cybage", "Virtusa", "DXC Technology",
+      "Sopra Steria", "NTT Data", "Atos", "Persistent Systems", "Nagarro", "Happiest Minds",
+      "Sonata Software", "Mastek", "Newgen", "KPIT", "Tata Elxsi", "L&T Technology Services",
+      "Cyient", "eInfochips", "GlobalLogic", "Infosys BPM", "Wipro Enterprises", "Genpact",
+      "WNS", "Firstsource", "Concentrix", "Teleperformance", "Tech Mahindra", "LTIMindtree",
+      "Mphasis"
+    ],
+    "product": [
+      "Flipkart", "Myntra", "Swiggy", "Zomato", "Paytm", "PhonePe", "Razorpay", "CRED",
+      "Freshworks", "Postman", "BrowserStack", "Sprinklr", "InMobi", "Chargebee", "Druva",
+      "Nutanix", "Arista Networks", "Juniper Networks", "Palo Alto Networks", "Fortinet",
+      "VMware", "Dell Technologies", "HP", "HPE", "Western Digital", "Micron",
+      "Texas Instruments", "Analog Devices", "MediaTek", "Marvell", "AMD", "Samsung R&D",
+      "LG Soft", "Uber", "PayPal", "Walmart Global Tech", "Target", "Lowe's India", "Wayfair",
+      "Expedia", "Booking.com", "ServiceNow", "Atlassian", "MongoDB", "GitHub", "Twilio",
+      "Intuit", "Autodesk", "Synopsys", "Cadence", "Siemens EDA", "Adobe", "Oracle",
+      "SAP Labs", "Salesforce", "Cisco", "Qualcomm", "NVIDIA"
+    ],
+    "premium_product": [
+      "Apple", "Meta", "Netflix", "Stripe", "Databricks", "Snowflake", "Rubrik", "DE Shaw",
+      "Tower Research", "WorldQuant", "Graviton", "Optiver", "Jane Street"
+    ],
+    "analytics": [
+      "PwC", "EY", "KPMG", "Accenture Strategy", "Bain", "BCG", "McKinsey", "Mu Sigma",
+      "Tiger Analytics", "LatentView", "Tredence", "Barclays", "Wells Fargo",
+      "American Express", "Citi", "HSBC", "Deutsche Bank", "UBS", "Nomura", "BlackRock",
+      "Fidelity", "S&P Global", "Moody's", "Nielsen", "Kantar", "ZS Associates",
+      "Goldman Sachs"
+    ],
+    "core": [
+      "Mahindra", "Ashok Leyland", "TVS Motor", "Hero MotoCorp", "Bajaj Auto", "Maruti Suzuki",
+      "Hyundai", "Toyota Kirloskar", "Cummins", "Caterpillar", "John Deere", "Thermax",
+      "Kirloskar", "BHEL", "NTPC", "Power Grid", "Schneider Electric", "Honeywell", "Emerson",
+      "Rockwell", "GE", "Wipro PARI", "Godrej", "Reliance Industries", "Adani", "Vedanta",
+      "JSW", "Tata Steel", "JSPL", "Hindalco", "UltraTech", "ACC", "Ambuja",
+      "Shapoorji Pallonji", "Larsen & Toubro Construction", "Afcons", "Asian Paints", "Berger",
+      "Pidilite", "ITC", "HUL", "Nestle", "P&G", "Dabur", "Britannia", "Sun Pharma",
+      "Dr Reddy's", "Cipla", "Aurobindo", "Biocon", "ISRO", "DRDO", "BARC", "Bosch", "Siemens"
+    ]
+  }
+}

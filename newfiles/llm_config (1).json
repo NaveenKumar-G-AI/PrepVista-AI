@@ -1,0 +1,436 @@
+{
+  "schema_version": 2,
+  "description": "Comprehensive LLM integration & hardening configuration for PrepVista's Groq-backed engine. Defines the model roster and fallback chain (primary 70B -> fast 8B -> static banks), 14 call-purposes with tuned sampling, per-model rate limits, per-category overrides, caching, batch pre-generation, streaming, moderation, observability, cost tracking, concurrency, retries, a circuit breaker, JSON handling, embedding-dedup, prompt-injection defense, and key-management policy. The real LLMClient reads this. Model names are current as of build time and configurable per Groq plan.",
+  "provider": "groq",
+  "api_base": "https://api.groq.com/openai/v1",
+  "models": {
+    "primary": {
+      "name": "llama-3.3-70b-versatile",
+      "provider": "groq",
+      "role": "high-quality generation & evaluation",
+      "context_tokens": 131072,
+      "strengths": [
+        "quality",
+        "instruction-following"
+      ],
+      "notes": "Best quality; lower rate limit."
+    },
+    "fast": {
+      "name": "llama-3.1-8b-instant",
+      "provider": "groq",
+      "role": "fast/high-throughput fallback & batch",
+      "context_tokens": 131072,
+      "strengths": [
+        "speed",
+        "throughput",
+        "cost"
+      ],
+      "notes": "Used under load or for off-peak batch."
+    },
+    "judge": {
+      "name": "llama-3.3-70b-versatile",
+      "provider": "groq",
+      "role": "answer evaluation (LLM-as-judge)",
+      "context_tokens": 131072,
+      "strengths": [
+        "consistency",
+        "reasoning"
+      ],
+      "notes": "Low-temperature rubric grading."
+    },
+    "reasoning": {
+      "name": "deepseek-r1-distill-llama-70b",
+      "provider": "groq",
+      "role": "hard reasoning (case/puzzle grading)",
+      "context_tokens": 131072,
+      "strengths": [
+        "step-by-step reasoning"
+      ],
+      "notes": "For the toughest analytical grading; configurable."
+    },
+    "cheap": {
+      "name": "gemma2-9b-it",
+      "provider": "groq",
+      "role": "cheap utility calls (summaries, tips)",
+      "context_tokens": 8192,
+      "strengths": [
+        "cost",
+        "latency"
+      ],
+      "notes": "Small utility model."
+    },
+    "guard": {
+      "name": "llama-guard-3-8b",
+      "provider": "groq",
+      "role": "content moderation / safety check",
+      "context_tokens": 8192,
+      "strengths": [
+        "safety classification"
+      ],
+      "notes": "Screens answers/inputs for policy violations."
+    },
+    "embedding": {
+      "name": "all-MiniLM-L6-v2",
+      "provider": "local_or_hosted",
+      "role": "dedup & similarity vectors",
+      "dimensions": 384,
+      "strengths": [
+        "fast embeddings"
+      ],
+      "notes": "Groq has no embedding endpoint; run locally or via a hosted equivalent (e.g. text-embedding-3-small)."
+    }
+  },
+  "model_fallback_chain": [
+    "primary",
+    "fast",
+    "static"
+  ],
+  "purposes": {
+    "generation": {
+      "description": "Generating a fresh interview question.",
+      "model": "primary",
+      "temperature": 0.95,
+      "top_p": 0.95,
+      "max_tokens": 400,
+      "json_mode": true,
+      "note": "High temperature for variety; paired with embedding-dedup."
+    },
+    "followup": {
+      "description": "Generating an adaptive follow-up to an answer.",
+      "model": "primary",
+      "temperature": 0.65,
+      "top_p": 0.9,
+      "max_tokens": 200,
+      "json_mode": true,
+      "note": "Moderate temp; short."
+    },
+    "evaluation": {
+      "description": "Scoring an answer against the rubric (LLM-as-judge).",
+      "model": "judge",
+      "temperature": 0.2,
+      "top_p": 0.8,
+      "max_tokens": 800,
+      "json_mode": true,
+      "note": "Low temp for repeatable grading."
+    },
+    "hard_evaluation": {
+      "description": "Grading the toughest analytical answers (case/estimation/puzzle).",
+      "model": "reasoning",
+      "temperature": 0.3,
+      "top_p": 0.85,
+      "max_tokens": 1200,
+      "json_mode": true,
+      "note": "Step-by-step reasoning model for hard, open-ended grading."
+    },
+    "batch_generation": {
+      "description": "Off-peak bulk pre-generation to fill the question pool.",
+      "model": "fast",
+      "temperature": 0.95,
+      "top_p": 0.95,
+      "max_tokens": 400,
+      "json_mode": true,
+      "note": "Cheaper/faster model; run during low-traffic windows."
+    },
+    "hint_generation": {
+      "description": "Generating an adaptive hint for puzzles/brainteasers.",
+      "model": "primary",
+      "temperature": 0.6,
+      "top_p": 0.9,
+      "max_tokens": 150,
+      "json_mode": true,
+      "note": "Short, guiding."
+    },
+    "topic_generation": {
+      "description": "Generating fresh GD/case topics.",
+      "model": "primary",
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "max_tokens": 300,
+      "json_mode": true,
+      "note": "Maximum variety for topic novelty."
+    },
+    "report_generation": {
+      "description": "Writing the session feedback narrative.",
+      "model": "primary",
+      "temperature": 0.5,
+      "top_p": 0.9,
+      "max_tokens": 1500,
+      "json_mode": true,
+      "note": "Coherent, structured report prose."
+    },
+    "session_summary": {
+      "description": "Summarising a session into a short headline + highlights.",
+      "model": "cheap",
+      "temperature": 0.4,
+      "top_p": 0.9,
+      "max_tokens": 400,
+      "json_mode": true,
+      "note": "Cheap utility summary."
+    },
+    "coaching_tips": {
+      "description": "Turning rubric gaps into actionable coaching tips.",
+      "model": "cheap",
+      "temperature": 0.5,
+      "top_p": 0.9,
+      "max_tokens": 400,
+      "json_mode": true,
+      "note": "Cheap, concrete tips."
+    },
+    "rubric_repair": {
+      "description": "Repairing malformed evaluation JSON to schema.",
+      "model": "fast",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_tokens": 800,
+      "json_mode": true,
+      "note": "Deterministic JSON repair."
+    },
+    "resume_parse": {
+      "description": "Extracting structured fields from a raw resume.",
+      "model": "primary",
+      "temperature": 0.1,
+      "top_p": 0.8,
+      "max_tokens": 1200,
+      "json_mode": true,
+      "note": "Low temp; precise extraction. Input wrapped as untrusted."
+    },
+    "moderation": {
+      "description": "Classifying input/answer for policy safety.",
+      "model": "guard",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_tokens": 100,
+      "json_mode": false,
+      "note": "Guard model; returns safe/unsafe."
+    },
+    "default": {
+      "description": "Any other structured JSON call.",
+      "model": "primary",
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 500,
+      "json_mode": true,
+      "note": "Sensible default."
+    }
+  },
+  "per_category_overrides": {
+    "technical_domain": {
+      "purpose": "generation",
+      "temperature": 0.85,
+      "note": "Slightly tighter for technically correct prompts."
+    },
+    "aptitude_reasoning": {
+      "purpose": "generation",
+      "temperature": 0.8,
+      "note": "Lower temp so generated items stay solvable/well-formed."
+    },
+    "group_discussion": {
+      "purpose": "generation",
+      "temperature": 1.0,
+      "note": "Max variety across the large topic space."
+    },
+    "case_study": {
+      "purpose": "hard_evaluation",
+      "note": "Route case grading to the reasoning model."
+    },
+    "creative_estimation": {
+      "purpose": "hard_evaluation",
+      "note": "Route guesstimate grading to the reasoning model."
+    },
+    "puzzles_brainteasers": {
+      "purpose": "hard_evaluation",
+      "note": "Route puzzle grading to the reasoning model."
+    }
+  },
+  "rate_limits": {
+    "primary": {
+      "requests_per_minute": 30,
+      "tokens_per_minute": 12000,
+      "scope": "per_org",
+      "note": "~70B dev tier; tune to plan."
+    },
+    "fast": {
+      "requests_per_minute": 30,
+      "tokens_per_minute": 30000,
+      "scope": "per_org",
+      "note": "8B higher throughput."
+    },
+    "reasoning": {
+      "requests_per_minute": 15,
+      "tokens_per_minute": 8000,
+      "scope": "per_org",
+      "note": "Reasoning model; lower limits."
+    },
+    "cheap": {
+      "requests_per_minute": 30,
+      "tokens_per_minute": 15000,
+      "scope": "per_org",
+      "note": "Small model."
+    },
+    "guard": {
+      "requests_per_minute": 30,
+      "tokens_per_minute": 15000,
+      "scope": "per_org",
+      "note": "Moderation."
+    },
+    "embedding": {
+      "requests_per_minute": 200,
+      "tokens_per_minute": 100000,
+      "scope": "local",
+      "note": "Local embeddings; high throughput."
+    }
+  },
+  "token_bucket": {
+    "enabled": true,
+    "capacity": 30,
+    "refill_per_second": 0.5,
+    "note": "Smooths request bursts."
+  },
+  "concurrency": {
+    "max_in_flight_requests": 8,
+    "per_user_max_in_flight": 2,
+    "queue_max": 256,
+    "note": "Bounds simultaneous calls so a spike can't blow past rate limits."
+  },
+  "timeouts": {
+    "connect_seconds": 5,
+    "read_seconds": 45,
+    "total_seconds": 60,
+    "note": "Generation/eval should be fast; cap to keep sessions responsive."
+  },
+  "retry": {
+    "max_retries": 4,
+    "base_delay_seconds": 0.5,
+    "max_delay_seconds": 8.0,
+    "backoff": "exponential",
+    "jitter": true,
+    "retry_on": [
+      "429",
+      "500",
+      "502",
+      "503",
+      "timeout"
+    ]
+  },
+  "circuit_breaker": {
+    "enabled": true,
+    "failure_threshold": 5,
+    "cooldown_seconds": 30,
+    "half_open_probes": 1,
+    "note": "Trips to fallback model / static bank after repeated failures."
+  },
+  "streaming": {
+    "enabled": true,
+    "applies_to": [
+      "report_generation"
+    ],
+    "chat_calls_streamed": false,
+    "note": "Stream long report prose to the UI; keep short JSON calls non-streamed for easy parsing."
+  },
+  "caching": {
+    "prompt_cache_enabled": true,
+    "response_cache_enabled": true,
+    "response_cache_ttl_seconds": 3600,
+    "cache_keys": [
+      "purpose",
+      "model",
+      "prompt_hash"
+    ],
+    "do_not_cache_purposes": [
+      "evaluation",
+      "hard_evaluation",
+      "moderation"
+    ],
+    "note": "Cache stable utility calls; never cache gradings (must reflect the specific answer)."
+  },
+  "batch_pregeneration": {
+    "enabled": true,
+    "window": "off-peak (e.g. 01:00-06:00 IST)",
+    "model": "fast",
+    "target_pool_per_category_per_branch": 200,
+    "note": "Pre-generates a tagged pool so peak traffic reads from DB, not the LLM."
+  },
+  "json_handling": {
+    "strict": true,
+    "repair_malformed": true,
+    "max_repair_attempts": 1,
+    "repair_purpose": "rubric_repair",
+    "on_failure": "fall back to static bank"
+  },
+  "dedup": {
+    "embedding_model": "all-MiniLM-L6-v2 (or hosted equivalent)",
+    "cosine_reject_threshold": 0.85,
+    "seen_history_per_user": 50,
+    "rolling_window_global": 2000,
+    "note": "Reject a question if cosine similarity to a recent question for the same user >= threshold."
+  },
+  "moderation": {
+    "enabled": true,
+    "model": "guard",
+    "check_inputs": true,
+    "check_outputs": true,
+    "on_unsafe": "block and log",
+    "note": "Screens untrusted answers/resume text and generated output."
+  },
+  "prompting": {
+    "untrusted_input_wrapped": true,
+    "injection_defense": true,
+    "system_user_split": true,
+    "note": "Resume text and answers are wrapped as untrusted data; instructions inside them are never followed."
+  },
+  "observability": {
+    "log_per_call": [
+      "purpose",
+      "model",
+      "latency_ms",
+      "prompt_tokens",
+      "completion_tokens",
+      "retries",
+      "fallback_used",
+      "cache_hit"
+    ],
+    "metrics": [
+      "requests_per_minute",
+      "p50_latency",
+      "p95_latency",
+      "error_rate",
+      "fallback_rate",
+      "cost_per_session"
+    ],
+    "trace_sampling": 0.1,
+    "note": "Enough to debug quality, latency, and spend."
+  },
+  "cost_tracking": {
+    "enabled": true,
+    "currency": "USD",
+    "approx_per_million_tokens": {
+      "llama-3.3-70b-versatile": {
+        "input": 0.59,
+        "output": 0.79
+      },
+      "llama-3.1-8b-instant": {
+        "input": 0.05,
+        "output": 0.08
+      },
+      "deepseek-r1-distill-llama-70b": {
+        "input": 0.75,
+        "output": 0.99
+      },
+      "gemma2-9b-it": {
+        "input": 0.2,
+        "output": 0.2
+      }
+    },
+    "note": "Indicative Groq pricing for budgeting; verify against current rates."
+  },
+  "key_management": {
+    "sharding_enabled": true,
+    "strategy": "round_robin_within_org",
+    "note": "Rotate only keys belonging to your own org. Using keys from multiple accounts to evade rate limits violates Groq's terms and is NOT supported."
+  },
+  "static_fallback": {
+    "enabled": true,
+    "source": "per-module FALLBACK_QUESTIONS / question banks",
+    "note": "When all live models fail or return invalid output, the module serves a calibrated bank question."
+  }
+}

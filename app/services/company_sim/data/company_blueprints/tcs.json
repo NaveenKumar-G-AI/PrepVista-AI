@@ -1,0 +1,290 @@
+{
+  "company_id": "tcs",
+  "display_name": "Tata Consultancy Services",
+  "aliases": ["TCS", "Tata Consultancy"],
+  "archetype": "mass_service",
+  "tier": "tier1_service",
+  "tier_rank": "A",
+  "hiring_scale": "very_high",
+  "logo_asset": "tcs.svg",
+  "brand_colors": { "primary": "#0A2B5E", "accent": "#00A3E0" },
+  "platform": {
+    "name": "TCS iON",
+    "emulation_profile": "tcs_ion",
+    "proctored": true,
+    "tab_switch_policy": "terminate",
+    "navigation": "locked_forward",
+    "on_screen_calculator": true,
+    "rough_work": "physical_or_scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "ninja",   "label": "TCS Ninja",   "ctc_lpa": [3.5, 3.9],  "gate": "cognitive_only" },
+    { "track": "digital", "label": "TCS Digital", "ctc_lpa": [7.0, 7.5],  "gate": "cognitive+advanced" },
+    { "track": "prime",   "label": "TCS Prime",   "ctc_lpa": [9.0, 11.0], "gate": "cognitive+advanced+strong" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 1,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"],
+    "age_range": [18, 28],
+    "scorecard_validity_years": 2
+  },
+  "re_eligibility_gap_months": 24,
+  "format_confidence": 0.9,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "FY26: ~60% of fresher hires AI-skilled; Prime technical round now includes an AI/data project review."
+  ],
+  "culture_values": ["reliability", "integrity", "learnability", "relocation_flexibility"],
+  "what_they_value": "Breadth, consistency, communication, and clearing every sectional gate.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "tcs_foundation",
+      "round_type": "aptitude_test",
+      "label": "TCS NQT — Foundation (Cognitive Skills)",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 120,
+      "negative_marking": {
+        "enabled": false,
+        "model": "none",
+        "note": "Cognitive section: no negative marking widely reported this cycle. Legacy sources claim 0.33 on Foundation — treat as a per-cycle flag, default OFF, and surface the ambiguity."
+      },
+      "sections": [
+        {
+          "section_id": "verbal",
+          "label": "Verbal Ability",
+          "competency": "aptitude_reasoning",
+          "item_type": "mcq",
+          "count": 24,
+          "minutes": 30,
+          "topics": ["reading_comprehension", "grammar", "vocabulary"]
+        },
+        {
+          "section_id": "reasoning",
+          "label": "Reasoning Ability",
+          "competency": "aptitude_reasoning",
+          "item_type": "mcq",
+          "count": 30,
+          "minutes": 50,
+          "topics": ["series", "coding_decoding", "seating", "syllogism"]
+        },
+        {
+          "section_id": "numerical",
+          "label": "Numerical Ability",
+          "competency": "aptitude_reasoning",
+          "item_type": "mcq",
+          "count": 26,
+          "minutes": 40,
+          "topics": ["percentages", "tsd", "ratio", "pnc", "profit_loss"]
+        }
+      ],
+      "gate_rule": {
+        "type": "sectional_and_overall",
+        "params": {
+          "sections_required": ["verbal", "reasoning", "numerical"],
+          "min_percentile_by_track": {
+            "ninja":   { "overall": 60 },
+            "digital": { "overall": 75 },
+            "prime":   { "overall": 85 }
+          }
+        },
+        "note": "Track percentile cutoffs are candidate-reported estimates (not officially published); tunable config, covered by format_confidence."
+      },
+      "notes": "No section switching once started; question locking (cannot revisit); on-screen calculator available; attempt everything."
+    },
+    {
+      "order": 2,
+      "round_id": "tcs_advanced_logic",
+      "round_type": "technical_mcq",
+      "label": "TCS NQT — Advanced Quantitative & Programming Logic",
+      "is_elimination": true,
+      "applies_to_tracks": ["digital", "prime"],
+      "difficulty_profile": "hard",
+      "total_minutes": 25,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "advanced_reasoning",
+          "label": "Advanced Reasoning & Quantitative",
+          "competency": "problem_solving",
+          "item_type": "mcq",
+          "count": 10,
+          "minutes": 15,
+          "topics": ["advanced_quant", "data_interpretation", "logical_reasoning"]
+        },
+        {
+          "section_id": "programming_logic",
+          "label": "Advanced Programming Logic",
+          "competency": "coding",
+          "item_type": "pseudocode_mcq",
+          "count": 10,
+          "minutes": 10,
+          "topics": ["arrays", "loops", "functions", "recursion", "complexity"]
+        }
+      ],
+      "gate_rule": {
+        "type": "sectional",
+        "params": {
+          "min_percentile_by_track": {
+            "digital": { "overall": 60 },
+            "prime":   { "overall": 80 }
+          }
+        }
+      },
+      "notes": "Candidates who skip Advanced are capped at Ninja."
+    },
+    {
+      "order": 3,
+      "round_id": "tcs_advanced_coding",
+      "round_type": "coding_test",
+      "label": "TCS NQT — Advanced Coding",
+      "is_elimination": true,
+      "applies_to_tracks": ["digital", "prime"],
+      "difficulty_profile": "hard",
+      "total_minutes": 35,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "coding",
+          "label": "Coding Problem",
+          "competency": "coding",
+          "item_type": "coding",
+          "count": 1,
+          "minutes": 35,
+          "topics": ["arrays", "strings", "math", "greedy"],
+          "languages_allowed": ["C", "C++", "Java", "Python"]
+        }
+      ],
+      "gate_rule": {
+        "type": "coding_count",
+        "params": {
+          "min_solved_by_track": { "digital": 1, "prime": 1 },
+          "clean_solve_for": "prime"
+        }
+      },
+      "notes": "Advanced Programming block + 1 coding problem (~+60 min combined with logic). Languages: C / C++ / Java / Python."
+    },
+    {
+      "order": 4,
+      "round_id": "tcs_technical",
+      "round_type": "technical_interview",
+      "label": "Technical Interview",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "tech_qa",
+          "label": "Technical Q&A",
+          "competency": "technical_domain",
+          "item_type": "interview_qa",
+          "count": 6,
+          "minutes": 35,
+          "topics": ["dsa", "cs_fundamentals", "dbms", "oops", "project_deep_dive"]
+        },
+        {
+          "section_id": "resume_probe",
+          "label": "Resume / Project Probe",
+          "competency": "resume_based",
+          "item_type": "interview_qa",
+          "count": 2,
+          "minutes": 10,
+          "topics": ["project_ownership", "tech_choices"]
+        }
+      ],
+      "gate_rule": {
+        "type": "rubric",
+        "params": { "min_score_0_10": 5.0 }
+      },
+      "notes": "Ninja interview ~20-30 min; Digital/Prime 60-90 min and significantly more rigorous (DSA, competitive programming, Big Data/DS/IoT/Cloud, live coding / system design). FY26: Prime technical now includes an AI/data project review.",
+      "config": {
+        "duration_by_track": { "ninja": 25, "digital": 75, "prime": 90 }
+      }
+    },
+    {
+      "order": 5,
+      "round_id": "tcs_managerial",
+      "round_type": "managerial_interview",
+      "label": "Managerial Round (MR)",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 30,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "mr_scenarios",
+          "label": "Scenario + Project + Pressure",
+          "competency": "situational_star",
+          "item_type": "interview_qa",
+          "count": 5,
+          "minutes": 30,
+          "topics": ["pressure_handling", "project_scenarios", "prioritisation", "conflict"]
+        }
+      ],
+      "gate_rule": {
+        "type": "rubric",
+        "params": { "min_score_0_10": 5.0 }
+      },
+      "notes": "TCS's signature MR round: scenario-based, project depth, and pressure testing."
+    },
+    {
+      "order": 6,
+      "round_id": "tcs_hr",
+      "round_type": "hr_interview",
+      "label": "HR Interview",
+      "is_elimination": true,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "hr_qa",
+          "label": "Behavioral + Motivation + Culture + Relocation",
+          "competency": "hr_behavioral",
+          "item_type": "interview_qa",
+          "count": 5,
+          "minutes": 20,
+          "topics": ["motivation", "relocation_flexibility", "strengths_weaknesses", "salary", "candidate_questions"]
+        }
+      ],
+      "gate_rule": {
+        "type": "rubric",
+        "params": { "min_score_0_10": 4.5 }
+      },
+      "notes": "Standard HR; relocation flexibility and service-bond awareness matter."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "percentile_tracks",
+    "attributes": ["verbal", "reasoning", "numerical", "advanced_logic", "coding"],
+    "tracks": [
+      {
+        "track": "ninja",
+        "label": "TCS Ninja",
+        "requires": { "foundation_overall_pct": 60 }
+      },
+      {
+        "track": "digital",
+        "label": "TCS Digital",
+        "requires": { "foundation_overall_pct": 75, "advanced_taken": true, "advanced_overall_pct": 60, "coding_solved": 1 }
+      },
+      {
+        "track": "prime",
+        "label": "TCS Prime",
+        "requires": { "foundation_overall_pct": 85, "advanced_taken": true, "advanced_overall_pct": 80, "coding_clean": true }
+      }
+    ],
+    "params": {
+      "order_high_to_low": ["prime", "digital", "ninja"]
+    },
+    "gap_hints": {
+      "ninja_to_digital": "Attempt the Advanced section and solve the coding problem; lift Foundation reasoning percentile toward 75.",
+      "digital_to_prime": "Clean-solve the Advanced coding problem and raise Advanced Programming Logic accuracy; push Foundation overall toward the 85th percentile."
+    }
+  }
+}

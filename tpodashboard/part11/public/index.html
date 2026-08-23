@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PrepVista — Administration &amp; Governance</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-view">
+  <div class="login-card">
+    <div class="login-mark">
+      <div class="seal">P</div>
+      <div class="brand-text"><div class="t1">PrepVista</div><div class="t2">Institutional Control Center</div></div>
+    </div>
+    <p class="login-sub">Administration, security, governance, RBAC, audit &amp; data quality — sign in with an internal account.</p>
+    <div id="login-error" class="error-banner" style="display:none;"></div>
+    <form id="login-form">
+      <div class="field"><label>Email</label><input type="email" id="login-email" required autocomplete="username" /></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" required autocomplete="current-password" /></div>
+      <button type="submit" class="btn btn-primary">Sign in</button>
+    </form>
+    <div class="demo-hint">
+      Seeded demo accounts (run <code>npm run seed</code> first), password for all: <code>DemoPass!2026</code><br/>
+      <code>super.admin@meridian.demo</code> · <code>tpo.head@meridian.demo</code> · <code>placement.officer@meridian.demo</code><br/>
+      <code>coordinator.cse@meridian.demo</code> · <code>faculty.cse@meridian.demo</code> · <code>management@meridian.demo</code> · <code>student.demo@meridian.demo</code>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app-view">
+  <div class="topbar">
+    <div class="brand">
+      <div class="seal seal-sm">P</div>
+      <div class="brand-text"><div class="t1">PrepVista</div><div class="t2">Institutional Control Center</div></div>
+    </div>
+    <div class="who">
+      <span id="who-name"></span>
+      <span class="role-pill" id="who-role"></span>
+      <button class="btn btn-ghost" id="logout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="users">Users</button>
+    <button class="tab" data-view="audit">Audit &amp; Security</button>
+    <button class="tab" data-view="dataquality">Data Quality</button>
+    <button class="tab" data-view="policies">Policies</button>
+    <button class="tab" data-view="sessions">My Sessions</button>
+    <button class="tab" data-view="system">System</button>
+  </div>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <div class="view-header"><h2>Administration &amp; Governance</h2><p>Who can access what, what changed, and whether the data is trustworthy.</p></div>
+      <div class="grid" id="dashboard-cards"></div>
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><h3>Recent activity</h3></div>
+          <div id="dashboard-recent-audit"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Top data quality issues</h3></div>
+          <div id="dashboard-top-issues"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- USERS -->
+    <section class="view" id="view-users">
+      <div class="view-header">
+        <div><h2>User Management</h2><p>Internal accounts scoped to your institution (and department, if applicable).</p></div>
+        <button class="btn btn-primary" id="invite-user-btn">+ Invite user</button>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr></thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- AUDIT -->
+    <section class="view" id="view-audit">
+      <div class="view-header"><h2>Audit &amp; Security Events</h2><p>Append-only. Nothing here can be edited or deleted — see /api/admin/audit.</p></div>
+      <div class="panel">
+        <div class="toolbar">
+          <select id="audit-filter-mode"><option value="all">All audit events</option><option value="security">Security events only</option></select>
+          <input id="audit-filter-action" placeholder="filter by action, e.g. user.role_changed" />
+          <button class="btn btn-ghost" id="audit-refresh-btn">Refresh</button>
+        </div>
+        <table>
+          <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+          <tbody id="audit-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DATA QUALITY -->
+    <section class="view" id="view-dataquality">
+      <div class="view-header"><h2>Data Quality</h2><p>Real, computed issues — click through to the underlying record, don't just fix the report.</p></div>
+      <div class="grid" id="dq-cards"></div>
+      <div class="panel"><div id="dq-issues"></div></div>
+    </section>
+
+    <!-- POLICIES -->
+    <section class="view" id="view-policies">
+      <div class="view-header">
+        <div><h2>Placement Policy Center</h2><p>Every policy is versioned; changing one supersedes the last, never overwrites it.</p></div>
+        <button class="btn btn-primary" id="new-policy-btn">+ New policy version</button>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Key</th><th>Active version</th><th>Effective date</th><th>Config</th></tr></thead>
+          <tbody id="policies-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SESSIONS -->
+    <section class="view" id="view-sessions">
+      <div class="view-header"><h2>My Active Sessions</h2><p>Database-backed bearer tokens — revoking one here takes effect on its very next request.</p></div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Device</th><th>Created</th><th>Last active</th><th></th></tr></thead>
+          <tbody id="sessions-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SYSTEM -->
+    <section class="view" id="view-system">
+      <div class="view-header"><h2>System Health &amp; Integrations</h2><p>Real checks only — anything not wired up says so plainly.</p></div>
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><h3>Health</h3></div>
+          <div id="system-health"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Integrations</h3></div>
+          <div id="system-integrations"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Invite user modal -->
+<div class="modal-backdrop" id="invite-modal-backdrop">
+  <div class="modal">
+    <h3>Invite a user</h3>
+    <div class="field"><label>Name</label><input id="invite-name" /></div>
+    <div class="field"><label>Email</label><input id="invite-email" type="email" /></div>
+    <div class="field"><label>Role</label>
+      <select id="invite-role">
+        <option value="TPO_HEAD">TPO Head</option>
+        <option value="PLACEMENT_OFFICER">Placement Officer</option>
+        <option value="DEPARTMENT_COORDINATOR">Department Coordinator</option>
+        <option value="FACULTY">Faculty</option>
+        <option value="MANAGEMENT">Management</option>
+        <option value="STUDENT">Student</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="invite-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="invite-submit-btn">Send invite</button>
+    </div>
+  </div>
+</div>
+
+<!-- New policy modal -->
+<div class="modal-backdrop" id="policy-modal-backdrop">
+  <div class="modal">
+    <h3>New policy version</h3>
+    <div class="field"><label>Policy key</label><input id="policy-key" placeholder="e.g. multiple_offer_policy" /></div>
+    <div class="field"><label>Config (JSON)</label><input id="policy-config" placeholder='{"maxActiveOffers":1}' /></div>
+    <div class="field"><label>Reason</label><input id="policy-reason" placeholder="why is this changing?" /></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="policy-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="policy-submit-btn">Publish version</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

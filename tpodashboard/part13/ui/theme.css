@@ -1,0 +1,65 @@
+/* ui/theme.css — design tokens for the Proactive Intelligence UI.
+   Grounded in the spec's own name for this system (section 86):
+   "Continuous Placement Radar." Severity colour is load-bearing here,
+   not decorative, so the ramp below is kept visually distinct from the
+   ordinary interactive accent used for buttons/links. */
+
+:root {
+  --radar-bg: #0f1419;
+  --radar-surface: #171d24;
+  --radar-surface-raised: #1e252d;
+  --radar-border: #2a333d;
+  --radar-text: #edeff2;
+  --radar-text-muted: #8b96a5;
+  --radar-text-faint: #5b6572;
+
+  --radar-accent: #5b8def;
+  --radar-accent-soft: rgba(91, 141, 239, 0.14);
+
+  --sev-critical: #f0483e;
+  --sev-critical-soft: rgba(240, 72, 62, 0.12);
+  --sev-high: #f2914a;
+  --sev-high-soft: rgba(242, 145, 74, 0.12);
+  --sev-medium: #e8b93f;
+  --sev-medium-soft: rgba(232, 185, 63, 0.12);
+  --sev-low: #6b7a90;
+  --sev-low-soft: rgba(107, 122, 144, 0.12);
+  --sev-info: #4c5a6e;
+  --sev-info-soft: rgba(76, 90, 110, 0.12);
+  --sev-positive: #3fb68a;
+  --sev-positive-soft: rgba(63, 182, 138, 0.12);
+
+  --font-data: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.radar-root {
+  background: var(--radar-bg);
+  color: var(--radar-text);
+  font-family: var(--font-body);
+}
+
+.radar-numeral {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+@keyframes radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-sweep-indicator {
+  animation: radar-sweep 6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar-sweep-indicator {
+    animation: none;
+  }
+}

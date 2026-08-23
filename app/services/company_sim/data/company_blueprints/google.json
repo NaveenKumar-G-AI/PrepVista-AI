@@ -1,0 +1,181 @@
+{
+  "company_id": "google",
+  "display_name": "Google",
+  "aliases": ["Google India", "Alphabet", "Google LLC"],
+  "archetype": "premium_product",
+  "tier": "premium_product",
+  "tier_rank": "A",
+  "hiring_scale": "medium",
+  "logo_asset": "google.svg",
+  "brand_colors": { "primary": "#4285F4", "accent": "#34A853" },
+  "platform": {
+    "name": "Google Hiring Assessment (GHA) → Meet loop → Hiring Committee",
+    "emulation_profile": "proctored_meet",
+    "proctored": true,
+    "tab_switch_policy": "flag",
+    "navigation": "free_all",
+    "on_screen_calculator": false,
+    "rough_work": "shared_doc_or_whiteboard"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "l3", "label": "L3 — Software Engineer (entry)",  "ctc_lpa": [25.0, 40.0], "gate": "committee_hire" },
+    { "track": "l5", "label": "L5 — Software Engineer (senior)", "ctc_lpa": [50.0, 80.0], "gate": "committee_hire+system_design" }
+  ],
+  "eligibility": {
+    "degrees": ["BE", "BTech", "ME", "MTech", "MS", "MSc", "PhD"],
+    "note": "No published cutoff; extremely selective (~99.8% reject rate). L3 is the standard campus entry level."
+  },
+  "re_eligibility_gap_months": 6,
+  "format_confidence": 0.8,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "2026: AI assistance NOT permitted at any stage; in-person interviews reinstated to combat AI-assisted cheating.",
+    "2026: code-comprehension round pilot (read/analyze code rather than write it).",
+    "Team Matching now often happens before the Hiring Committee review."
+  ],
+  "culture_values": ["googleyness", "collaboration", "ambiguity_tolerance", "learning_mindset", "self_awareness"],
+  "what_they_value": "General Cognitive Ability, Role-Related Knowledge, Leadership, and Googleyness — the committee weighs all four; no single strong round guarantees a hire.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "google_gha",
+      "round_type": "coding_test",
+      "label": "Online Assessment (GHA) — some candidates",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 90,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "gha_1", "label": "Coding Problem 1 (medium)", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 45, "topics": ["arrays", "strings", "hashing", "two_pointers"], "languages_allowed": ["C++", "Java", "Python", "Go", "JavaScript"], "config": { "partial_scoring": true, "hidden_tests": true, "ai_assistance_allowed": false } },
+        { "section_id": "gha_2", "label": "Coding Problem 2 (medium)", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 45, "topics": ["graphs", "dp", "binary_search"], "languages_allowed": ["C++", "Java", "Python", "Go", "JavaScript"], "config": { "partial_scoring": true, "hidden_tests": true, "ai_assistance_allowed": false } }
+      ],
+      "gate_rule": { "type": "coding_count", "params": { "min_solved_by_track": { "l3": 1, "l5": 2 }, "partial_scoring": true } },
+      "notes": "GHA is administered to some candidates only (not every pipeline). Auto-graded with partial scoring on hidden tests. AI assistance is forbidden."
+    },
+    {
+      "order": 2,
+      "round_id": "google_phone_screen",
+      "round_type": "technical_interview",
+      "label": "Technical Phone Screen (via Meet)",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding", "label": "Live Medium Coding", "competency": "coding", "item_type": "interview_qa", "count": 2, "minutes": 45, "topics": ["arrays", "strings", "trees", "complexity_analysis"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "~45 min medium coding over Google Meet with a shared doc. Clarity of approach and complexity analysis matter as much as a working solution."
+    },
+    {
+      "order": 3,
+      "round_id": "google_onsite_dsa1",
+      "round_type": "technical_interview",
+      "label": "Onsite Loop — DSA / Algorithms (1)",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "dsa", "label": "Data Structures & Algorithms", "competency": "coding", "item_type": "interview_qa", "count": 2, "minutes": 45, "topics": ["graphs", "dp", "trees", "greedy", "trade_offs"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "Whiteboard or Chromebook. Interviewer files feedback on the 6-point scale into the committee packet."
+    },
+    {
+      "order": 4,
+      "round_id": "google_onsite_dsa2",
+      "round_type": "technical_interview",
+      "label": "Onsite Loop — DSA / Algorithms (2)",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "dsa", "label": "Data Structures & Algorithms", "competency": "coding", "item_type": "interview_qa", "count": 2, "minutes": 45, "topics": ["graphs", "dp", "backtracking", "strings", "optimization"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "Second algorithms round; 2-3 DSA/coding rounds is the typical onsite shape."
+    },
+    {
+      "order": 5,
+      "round_id": "google_code_comprehension",
+      "round_type": "technical_mcq",
+      "label": "Code Comprehension (2026 pilot)",
+      "is_elimination": false,
+      "difficulty_profile": "medium",
+      "total_minutes": 30,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "comprehension", "label": "Read & Analyze Code", "competency": "coding", "item_type": "mcq", "count": 8, "minutes": 30, "topics": ["trace_output", "identify_bug", "reason_about_complexity", "refactor_intent"] }
+      ],
+      "gate_rule": null,
+      "notes": "2026 pilot: read/analyze existing code rather than write it. Not yet a hard elimination gate; feedback still enters the packet. Lower confidence — verify presence per cycle."
+    },
+    {
+      "order": 6,
+      "round_id": "google_system_design",
+      "round_type": "system_design",
+      "label": "System Design (L5+ only)",
+      "is_elimination": true,
+      "applies_to_tracks": ["l5"],
+      "difficulty_profile": "hard",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "hld", "label": "High-Level / Low-Level Design", "competency": "system_design", "item_type": "interview_qa", "count": 1, "minutes": 45, "topics": ["requirements", "components", "data_flow", "scaling", "trade_offs", "reliability"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "System design appears at L5+; L3 (campus entry) candidates skip this round. Structured on requirements → components → data flow → scaling → trade-offs."
+    },
+    {
+      "order": 7,
+      "round_id": "google_googleyness",
+      "round_type": "hr_interview",
+      "label": "Googleyness & Leadership (every candidate)",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "googleyness", "label": "Collaboration, Ambiguity & Learning Mindset", "competency": "culture_fit", "item_type": "interview_qa", "count": 5, "minutes": 45, "topics": ["collaboration", "ambiguity_tolerance", "learning_mindset", "self_awareness", "leadership_without_authority"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.0 } },
+      "notes": "Behavioral round run for every candidate at every level: collaboration, comfort with ambiguity, learning mindset, and self-awareness."
+    },
+    {
+      "order": 8,
+      "round_id": "google_hiring_committee",
+      "round_type": "hiring_committee",
+      "label": "Hiring Committee Review (outcome step)",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 0,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "packet", "label": "Packet Review by Uninvolved Googlers", "competency": "behavioral", "item_type": "packet_review", "count": 1, "minutes": 0, "topics": ["general_cognitive_ability", "role_related_knowledge", "leadership", "googleyness"] }
+      ],
+      "gate_rule": { "type": "committee", "params": { "scale": ["strong_no_hire", "no_hire", "leaning_no_hire", "leaning_hire", "hire", "strong_hire"], "hire_threshold": "leaning_hire" } },
+      "notes": "Modeled as an OUTCOME step, not a live round: third-party Googlers not present in the interviews assemble a packet (per-round feedback + resume + phone screens) and reach a verdict on the 6-point scale. Not shown a live timer; time is 0."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "committee",
+    "attributes": ["general_cognitive_ability", "role_related_knowledge", "leadership", "googleyness"],
+    "tracks": [
+      { "track": "l3", "label": "L3 — Software Engineer (entry)",  "requires": { "committee_verdict_min": "leaning_hire" } },
+      { "track": "l5", "label": "L5 — Software Engineer (senior)", "requires": { "committee_verdict_min": "hire", "system_design_hire": true } }
+    ],
+    "params": {
+      "verdict_scale": ["strong_no_hire", "no_hire", "leaning_no_hire", "leaning_hire", "hire", "strong_hire"],
+      "committee_round": "google_hiring_committee",
+      "outcomes": ["hired", "team_match_needed", "more_interviews", "rejected"],
+      "order_high_to_low": ["l5", "l3"]
+    },
+    "gap_hints": {
+      "leaning_hire_to_hire": "Tighten complexity analysis and communicate trade-offs explicitly in the DSA rounds; add concrete Googleyness evidence (ambiguity + collaboration) so the packet reads consistently above the bar.",
+      "l3_to_l5": "Clear a full system-design round (requirements → scaling → trade-offs) and demonstrate leadership-without-authority impact."
+    }
+  }
+}

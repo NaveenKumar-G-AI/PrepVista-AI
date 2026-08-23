@@ -1,0 +1,12 @@
+{
+  "name": "prepvista-part8-readiness-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference implementation of the PrepVista Part 8 readiness/risk intelligence engine. Zero runtime dependencies — plug your real Part 1-7 data access into src/repositories/interfaces.js.",
+  "main": "src/ai/tools.js",
+  "scripts": {
+    "demo": "node demo/runDemo.js",
+    "demo:tpo": "node demo/runTpoAnalyticsDemo.js"
+  },
+  "dependencies": {}
+}

@@ -21,6 +21,13 @@ from app.middleware.error_handler import build_server_error_response, register_e
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.database.connection import DatabaseConnection, init_db_pool, close_db_pool
 from app.routers import account, admin, admin_grants, auth, interviews, reports, dashboard, billing, referrals, feedback, support, admin_support, events, org_admin, org_college, outcomes, stt_ws
+from app.routers.recruiter_companies import router as recruiter_companies_router, followup_router as recruiter_followups_router
+from app.routers.placement_drives import router as placement_drives_router
+from app.routers.placement_interviews import router as placement_interviews_router
+from app.routers.offers import router as offers_router
+from app.routers.training import router as training_router
+from app.routers.assessments import router as assessments_router
+from app.routers.ai_health import router as ai_health_router
 from app.services.user_activity import refresh_user_activity_stats
 
 
@@ -403,6 +410,20 @@ def create_app() -> FastAPI:
     app.include_router(org_admin.router, prefix="/org/admin", tags=["Org Admin"])
     app.include_router(org_college.router, prefix="/org/my", tags=["College Admin"])
     app.include_router(outcomes.router, prefix="/api/outcomes", tags=["Placement Outcomes"])
+    # Part 2 — Recruiter Companies & Follow-ups CRM (college-admin scoped)
+    app.include_router(recruiter_companies_router, prefix="/org/my", tags=["Recruiter Companies"])
+    app.include_router(recruiter_followups_router, prefix="/org/my", tags=["Recruiter Follow-ups"])
+    # Part 3 — Placement Drives & Eligibility Engine (college-admin scoped)
+    app.include_router(placement_drives_router, prefix="/org/my", tags=["Placement Drives"])
+    # Part 5 — Placement Interviews (college-admin scoped)
+    app.include_router(placement_interviews_router, prefix="/org/my", tags=["Placement Interviews"])
+    # Part 6 — Offers & Joining Outcomes
+    app.include_router(offers_router, prefix="/org/my/offers", tags=["Offers & Joining"])
+    # Part 7 — Training & Assessment Engine
+    app.include_router(training_router, prefix="/api/tpo/training", tags=["Training Engine"])
+    app.include_router(assessments_router, prefix="/api/tpo/assessments", tags=["Assessment Engine"])
+    # Part 4 — AI Provider Health (college-admin scoped)
+    app.include_router(ai_health_router, prefix="/org/my", tags=["AI Providers"])
     # STT WebSocket (/ws/stt/{session_id}) + REST fallback (/api/stt/transcribe).
     # Mounted at root so the paths match the Fix 1 spec exactly.
     app.include_router(stt_ws.router, tags=["Speech-to-Text"])

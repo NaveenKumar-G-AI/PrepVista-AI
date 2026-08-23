@@ -1,0 +1,195 @@
+{
+  "company_id": "capgemini",
+  "display_name": "Capgemini",
+  "aliases": ["Capgemini Technology Services", "CAP"],
+  "archetype": "mass_service",
+  "tier": "tier1_service",
+  "tier_rank": "A",
+  "hiring_scale": "very_high",
+  "logo_asset": "capgemini.svg",
+  "brand_colors": { "primary": "#0070AD", "accent": "#12ABDB" },
+  "platform": {
+    "name": "Superset (Exceller)",
+    "emulation_profile": "superset",
+    "proctored": true,
+    "tab_switch_policy": "warn",
+    "navigation": "free_within_section",
+    "on_screen_calculator": true,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "analyst",        "label": "Analyst",        "ctc_lpa": [4.0, 4.5], "gate": "sectional_pass" },
+    { "track": "senior_analyst", "label": "Senior Analyst", "ctc_lpa": [6.5, 7.5], "gate": "coding_performance" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 0,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"]
+  },
+  "re_eligibility_gap_months": null,
+  "format_confidence": 0.82,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "Hiring ~45,000 in 2025 with an explicit AI-ready-workforce focus.",
+    "The coding round's performance alone determines Analyst vs Senior Analyst tier."
+  ],
+  "culture_values": ["boldness", "trust", "team_spirit", "modesty", "fun"],
+  "what_they_value": "Pseudocode/output-prediction accuracy, reaching max game level, and clean C/C++/Java coding (Python is not allowed).",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "capgemini_pseudocode",
+      "round_type": "technical_mcq",
+      "label": "Pseudocode / Technical MCQ",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 25,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "pseudocode", "label": "Pseudocode & Output Prediction", "competency": "coding", "item_type": "pseudocode_mcq", "count": 40, "minutes": 25, "topics": ["programming_logic", "c", "cpp", "data_structures", "oops", "output_prediction", "db", "networking", "cloud"] }
+      ],
+      "gate_rule": { "type": "sectional", "params": { "min_percent": 70 } },
+      "notes": "~40 MCQs: programming logic, C/C++, DS, OOP, output prediction (+DB/networking/cloud for some streams). ~70% sectional gate."
+    },
+    {
+      "order": 2,
+      "round_id": "capgemini_essay",
+      "round_type": "written_communication",
+      "label": "Written English Test (Essay)",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "essay", "label": "Essay", "competency": "written_english", "item_type": "essay", "count": 1, "minutes": 20, "topics": ["grammar", "coherence", "vocabulary", "structure"], "config": { "min_words": 200 } }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.0 } },
+      "notes": "Written English essay component of the English Communication assessment."
+    },
+    {
+      "order": 3,
+      "round_id": "capgemini_spoken",
+      "round_type": "voice_assessment",
+      "label": "AI-Based Spoken English Test",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "spoken", "label": "Reading / Speaking / Listening", "competency": "spoken_english", "item_type": "voice_topic", "count": 4, "minutes": 20, "topics": ["reading", "speaking", "listening", "pronunciation"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "AI-based spoken English; elimination."
+    },
+    {
+      "order": 4,
+      "round_id": "capgemini_games",
+      "round_type": "game_based_aptitude",
+      "label": "Game-Based Aptitude (draw 4 of 24)",
+      "is_elimination": false,
+      "difficulty_profile": "medium",
+      "total_minutes": 24,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "game_1", "label": "Game 1 (drawn from pool)", "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 6, "topics": ["reasoning"], "config": { "leveling": true } },
+        { "section_id": "game_2", "label": "Game 2 (drawn from pool)", "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 6, "topics": ["reasoning"], "config": { "leveling": true } },
+        { "section_id": "game_3", "label": "Game 3 (drawn from pool)", "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 6, "topics": ["reasoning"], "config": { "leveling": true } },
+        { "section_id": "game_4", "label": "Game 4 (drawn from pool)", "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 6, "topics": ["reasoning"], "config": { "leveling": true } }
+      ],
+      "gate_rule": null,
+      "config": { "pool_size": 24, "draw_count": 4, "max_levels": 8, "pool": ["Deductive", "GeoSudo", "Inductive", "Grid", "Motion", "Digit", "Switch", "Numbers", "Shapes", "Path", "Balance", "Rotation", "Sequence", "Match", "Colour", "Trail", "Sorting", "Mirror", "Cluster", "Pattern", "Tally", "Route", "Stack", "Pairs"] },
+      "notes": "4 games randomly drawn from a pool of 24; each ~5-6 min; reach the max level (higher levels score more)."
+    },
+    {
+      "order": 5,
+      "round_id": "capgemini_quant",
+      "round_type": "aptitude_test",
+      "label": "Quantitative Aptitude",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "quant", "label": "Quantitative Aptitude", "competency": "aptitude_reasoning", "item_type": "mcq", "count": 20, "minutes": 20, "topics": ["profit_loss", "ratio", "mixtures_alligation", "averages", "percentages", "tsd"] }
+      ],
+      "gate_rule": { "type": "sectional", "params": { "min_percent": 60 } },
+      "notes": "Profit/loss, ratio, mixtures & alligation, averages, %, TSD."
+    },
+    {
+      "order": 6,
+      "round_id": "capgemini_behavioral",
+      "round_type": "behavioral_survey",
+      "label": "Behavioral Competency (Adept Essentials)",
+      "is_elimination": false,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "powerskills", "label": "PowerSkills / Adept Essentials", "competency": "behavioral", "item_type": "survey_most_least", "count": 30, "minutes": 20, "topics": ["adaptability", "problem_solving"] }
+      ],
+      "gate_rule": null,
+      "notes": "Untimed ~20 min; availability differs on/off campus."
+    },
+    {
+      "order": 7,
+      "round_id": "capgemini_coding",
+      "round_type": "coding_test",
+      "label": "Coding Round (Python BANNED)",
+      "is_elimination": true,
+      "applies_to_tracks": ["senior_analyst"],
+      "difficulty_profile": "medium",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding_1", "label": "Problem 1", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 22, "topics": ["arrays", "strings"], "languages_allowed": ["C", "C++", "Java"], "languages_banned": ["Python"] },
+        { "section_id": "coding_2", "label": "Problem 2", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 23, "topics": ["logic", "math"], "languages_allowed": ["C", "C++", "Java"], "languages_banned": ["Python"] }
+      ],
+      "gate_rule": { "type": "coding_count", "params": { "min_solved_by_track": { "senior_analyst": 1 }, "clean_solve_for": "senior_analyst" } },
+      "notes": "2 questions, 45 min, C / C++ / Java only — Python is BANNED (distinctive). Determines Analyst vs Senior Analyst tier."
+    },
+    {
+      "order": 8,
+      "round_id": "capgemini_interview",
+      "round_type": "technical_interview",
+      "label": "Technical Interview",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 35,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "tech_qa", "label": "Pseudocode Logic + Core Subjects + Projects", "competency": "technical_domain", "item_type": "interview_qa", "count": 6, "minutes": 35, "topics": ["pseudocode_logic", "cloud", "db", "networking", "projects"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.0 } },
+      "notes": "Pseudocode logic, core subjects, projects, cloud/DB/networking."
+    },
+    {
+      "order": 9,
+      "round_id": "capgemini_hr",
+      "round_type": "hr_interview",
+      "label": "HR Interview",
+      "is_elimination": true,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "hr_qa", "label": "HR", "competency": "hr_behavioral", "item_type": "interview_qa", "count": 5, "minutes": 20, "topics": ["motivation", "relocation", "candidate_questions"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "Standard HR."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "coding_count",
+    "attributes": ["pseudocode", "quant", "games", "coding"],
+    "tracks": [
+      { "track": "analyst",        "label": "Analyst",        "requires": { "sectional_pass": true } },
+      { "track": "senior_analyst", "label": "Senior Analyst", "requires": { "coding_solved": 2, "coding_clean": true } }
+    ],
+    "params": { "order_high_to_low": ["senior_analyst", "analyst"] },
+    "gap_hints": {
+      "analyst_to_senior_analyst": "Clean-solve both coding problems in C/C++/Java — the coding round alone sets the tier (Python is not allowed)."
+    }
+  }
+}

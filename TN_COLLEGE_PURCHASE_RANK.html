@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepVista AI — Tamil Nadu College Purchase-Priority Ranking</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a30; --panel2:#0f1729; --line:#22304f;
+    --txt:#e7ecf5; --muted:#9fb0cc; --accent:#4f8cff; --gold:#ffce54;
+    --hot:#ff5b6e; --warm:#ff9f43; --mid:#4fd1c5; --low:#7b8ba6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#080c18,#0b1020 240px);color:var(--txt);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  header{padding:34px 28px 22px;border-bottom:1px solid var(--line);
+    background:radial-gradient(1200px 300px at 20% -50%,rgba(79,140,255,.18),transparent)}
+  h1{margin:0 0 6px;font-size:26px;letter-spacing:.3px}
+  .sub{color:var(--muted);font-size:14px;max-width:900px}
+  .honest{margin:16px 0 0;padding:12px 16px;border:1px solid #7a5b1e;border-radius:10px;
+    background:rgba(255,206,84,.08);color:#ffe6a8;font-size:13px;max-width:960px}
+  .honest b{color:#ffce54}
+  .wrap{padding:22px 28px 60px;max-width:1180px;margin:0 auto}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
+  input,select{background:var(--panel);border:1px solid var(--line);color:var(--txt);
+    padding:9px 12px;border-radius:8px;font-size:14px}
+  input{min-width:260px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .stat{display:flex;gap:22px;flex-wrap:wrap;margin:6px 0 4px}
+  .stat div{font-size:13px;color:var(--muted)}
+  .stat b{color:var(--txt);font-size:18px;display:block}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:14px;padding:18px 20px;margin:0 0 16px;position:relative;overflow:hidden}
+  .card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+  .card.hot:before{background:var(--hot)} .card.warm:before{background:var(--warm)}
+  .card.mid:before{background:var(--mid)} .card.low:before{background:var(--low)}
+  .top{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .rank{font-size:30px;font-weight:800;min-width:56px;color:var(--gold);
+    text-shadow:0 0 18px rgba(255,206,84,.25)}
+  .meta{flex:1;min-width:260px}
+  .name{font-size:19px;font-weight:700;margin:0}
+  .loc{color:var(--muted);font-size:13px;margin-top:2px}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .b{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.4px;text-transform:uppercase}
+  .b.hot{background:rgba(255,91,110,.15);color:#ff8b98;border:1px solid #6d2530}
+  .b.warm{background:rgba(255,159,67,.15);color:#ffc078;border:1px solid #6d4a1e}
+  .b.mid{background:rgba(79,209,197,.15);color:#7de9df;border:1px solid #1e5d57}
+  .b.low{background:rgba(123,139,166,.15);color:#aab6c9;border:1px solid #3a4761}
+  .b.ghost{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--line)}
+  .score{text-align:right;min-width:120px}
+  .score .n{font-size:28px;font-weight:800}
+  .score.hot .n{color:var(--hot)} .score.warm .n{color:var(--warm)}
+  .score.mid .n{color:var(--mid)} .score.low .n{color:var(--low)}
+  .score .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .facts{display:flex;gap:20px;flex-wrap:wrap;margin:14px 0 12px;padding:12px 0;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .facts div{font-size:13px}
+  .facts .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .facts .v{color:var(--txt);font-weight:600}
+  .angle{background:rgba(79,140,255,.07);border-left:3px solid var(--accent);
+    padding:12px 16px;border-radius:0 8px 8px 0;margin-top:4px}
+  .angle .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent);font-weight:700;margin-bottom:4px}
+  .angle p{margin:0;font-size:14px}
+  .angle .pitch{margin-top:8px;font-style:italic;color:#cfe0ff;font-size:14px}
+  .cluster-h{margin:30px 0 6px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+  footer{color:var(--muted);font-size:12px;padding:24px 28px;border-top:1px solid var(--line);max-width:1180px;margin:0 auto}
+  a{color:var(--accent)}
+  mark{background:#3a5bbf;color:#fff;border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>PrepVista AI — Tamil Nadu College Purchase-Priority Ranking</h1>
+  <div class="sub">Every serious B2B target college in Tamil Nadu, ranked <b>high → low by likelihood &amp; value of a ₹1,00,000/yr deal</b>.
+  Ranking logic = cohort size (seats to justify the fee) × placement gap (the pain we fix) × TPO motivation × ability to pay × a benchmarkable elite rival nearby. Each card carries a ready-to-send, PSNA-style competitive angle.</div>
+  <div class="honest">
+    <b>Read this first — accuracy note.</b> Your repo has <b>zero confirmed purchases</b> (MARKET_ANALYSIS.md: "no evidence of paying customers"). So this is <b>not</b> a "confirmed-purchase" list — that data doesn't exist yet. This is a <b>purchase-<u>priority</u> / conversion-likelihood</b> ranking: who to pitch first and why.
+    Placement figures marked <b>(est.)</b> are analyst estimates (±); figures without the tag are from public 2024–26 sources (NIRF / college placement pages / Shiksha / Careers360 / Collegedunia). Cohort sizes are approximate. Treat scores as a sales-prioritisation index, not a guarantee.
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stat">
+    <div><b id="count">–</b>target colleges ranked</div>
+    <div><b id="hotc">–</b>HOT prospects (score ≥ 80)</div>
+    <div><b>₹1,00,000</b>list price / college / yr</div>
+    <div><b id="pipe">–</b>indicative pipeline if HOT tier closes</div>
+  </div>
+
+  <div class="controls">
+    <input id="q" type="text" placeholder="Search college, city, or rival (e.g. PSNA, Coimbatore, Panimalar)…">
+    <select id="tierf">
+      <option value="">All priority tiers</option>
+      <option value="hot">HOT — pitch this week</option>
+      <option value="warm">WARM — strong fit</option>
+      <option value="mid">MID — viable, longer cycle</option>
+      <option value="low">LOW — deprioritise / won't buy</option>
+    </select>
+    <select id="clusf"><option value="">All clusters</option></select>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--hot)"></span>HOT — perfect ICP: big cohort, visible gap, motivated TPO, can pay</span>
+    <span><span class="dot" style="background:var(--warm)"></span>WARM — good fit, moderate gap or size</span>
+    <span><span class="dot" style="background:var(--mid)"></span>MID — viable but slower / budget-tight</span>
+    <span><span class="dot" style="background:var(--low)"></span>LOW — elite (builds own / uses Superset) or too small to fund ₹1L</span>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<footer>
+  <b>Method &amp; honesty.</b> Ranking = weighted index of cohort size, placement-gap severity vs the nearest benchmarkable leader, TPO motivation signals, and paying ability — not observed purchases. Elite institutions (IIT-M, NIT-T, VIT, SSN, PSG, CEG, Anna Univ., SASTRA, Thiagarajar) are ranked <b>LOW priority</b> on purpose: they either build in-house, sit on free portals (Superset), or don't feel the pain — they are pitch-references, not buyers. The real money is the tier-2/3 middle. Verify each college's live placement % and TPO contact before outreach; figures here are directional.
+  Sources: NIRF 2025–26, Shiksha, Careers360, Collegedunia, CollegeDekho, college placement pages (2024–26).
+  <br><br>Generated for PrepVista AI (Naveenkumar G) · 2026-07-01 · sales-prioritisation artifact, not a customer record.
+</footer>
+
+<script>
+/* Purchase-priority dataset. score = conversion-likelihood index (0-100).
+   priority tier derived from score. Figures: plain = sourced; "(est.)" = estimate. */
+const D = [
+/* ---------- CHENNAI CLUSTER (benchmark leaders: SSN, CEG, Anna Univ) ---------- */
+{r:1,n:"Panimalar Engineering College",loc:"Poonamallee, Chennai",clus:"Chennai",tier:"hot",score:93,
+  cohort:"~1,600 / yr (one of TN's largest)",place:"1,381 placed / 1,621 · median ₹6L",gap:"~11–15 LPA behind SSN's median",rival:"SSN College of Engineering",
+  angle:"Panimalar graduates one of the biggest cohorts in the state, yet its median (₹6L) sits far below SSN barely 25 km away. Volume is its strength and its problem: 1,600 students, a stretched placement cell, and hundreds of mid-CTC offers that could be lifted a tier with structured, company-specific readiness. A ₹1L license spread over 1,600 seats is ~₹62/student — trivial against one extra ₹4L offer.",
+  pitch:"“You place more students than almost anyone in Chennai — but at SSN's median. Close that one-tier gap across 1,600 students this placement season and PrepVista pays for itself on a single upgraded offer.”"},
+
+{r:2,n:"Sri Sairam Engineering College",loc:"West Tambaram, Chennai",clus:"Chennai",tier:"hot",score:90,
+  cohort:"~1,200 / yr (est.)",place:"822 placed · 72.9% · ₹4.5–16 LPA",rival:"SSN College of Engineering",gap:"~5% placement + CTC gap vs SSN/CEG",
+  angle:"Sairam is ambitious, brand-conscious and already publishes placement stats — a TPO who tracks numbers is a TPO who will buy a number-mover. 72.9% is respectable but visibly under the 78–90% band of SSN/Velammal in the same city; the unplaced ~27% is the exact segment PrepVista's readiness score targets before the season.",
+  pitch:"“You're at 72.9% while SSN clears 78% and Velammal claims 95%. That gap is roughly 300 of your students every year. We move the unplaced quartile — measurably, before the drives start.”"},
+
+{r:3,n:"St. Joseph's College of Engineering / Institute of Technology",loc:"OMR, Chennai",clus:"Chennai",tier:"hot",score:88,
+  cohort:"~1,400 / yr across twin campuses (est.)",place:"~75–80% (est.) · median ₹4–5L (est.)",rival:"SSN College of Engineering",gap:"OMR IT-corridor CTC gap vs SSN",
+  angle:"Sitting on OMR — India's IT corridor — St. Joseph's students are literally next door to the recruiters SSN converts at higher CTC. Two campuses = ~1,400 seats, strong NAAC brand, and a placement office that would love a corridor-credibility story. Proximity to the employers is the whole pitch: same recruiters, half the outcome.",
+  pitch:"“Your students are on OMR, walking distance from the same employers SSN places into at ₹8L. Same recruiters, half the CTC. We close that corridor gap this year.”"},
+
+{r:4,n:"Velammal Engineering College",loc:"Ambattur, Chennai",clus:"Chennai",tier:"warm",score:83,
+  cohort:"~1,100 / yr (est.)",place:"Claims ~95% · avg ₹3L · high ₹11.5L",rival:"SSN College of Engineering",gap:"High volume, low avg CTC (₹3L)",
+  angle:"Velammal places nearly everyone — but at a ₹3L average, meaning quantity without quality of offer. Its pain isn't the placement % (already 95%); it's the CTC ceiling. PrepVista's angle here is upgrade, not rescue: convert mass ₹3L offers into ₹5–6L via company-specific prep for the better-paying recruiters.",
+  pitch:"“You already place 95% — the next win isn't more offers, it's better ones. At a ₹3L average you're leaving money on the table for 1,000 students. We shift the average, not the headcount.”"},
+
+{r:5,n:"Rajalakshmi Engineering College",loc:"Thandalam, Chennai",clus:"Chennai",tier:"warm",score:82,
+  cohort:"~1,300 / yr (est.)",place:"~80–85% (est.) · A++ NAAC",rival:"SSN College of Engineering",gap:"Autonomous but trailing SSN CTC band",
+  angle:"A++ NAAC, autonomous, large — Rajalakshmi has the money and the ambition to want the top-tier label. It's the classic 'good college that wants to be a great one' buyer. Benchmark it against SSN and CEG and the readiness-score narrative writes itself for the placement dean.",
+  pitch:"“You've got the A++ and the infrastructure — the one gap to SSN is placement CTC. A readiness standard your TPO can show the management is exactly how you close it this year.”"},
+
+{r:6,n:"Jeppiaar / R.M.K / R.M.D / Easwari / S.A. Engineering (Chennai belt)",loc:"Chennai peri-urban belt",clus:"Chennai",tier:"warm",score:78,
+  cohort:"~800–1,200 each (est.)",place:"~65–80% (est.) · median ₹3.5–4.5L (est.)",rival:"SSN / Rajalakshmi",gap:"Mid-tier CTC, crowded Chennai market",
+  angle:"A dense band of large-cohort Chennai privates that all compete for the same recruiters and all trail the SSN benchmark. Individually mid-priority; as a cluster they're a repeatable, copy-paste sales motion — win one, reference-sell the rest in the same recruiter pool.",
+  pitch:"“Every college in this belt fights for the same recruiters SSN gets first. Whoever gives their students a measurable readiness edge places first. Be that college this season.”"},
+
+/* ---------- COIMBATORE CLUSTER (benchmark leaders: PSG Tech, CIT, KCT) ---------- */
+{r:7,n:"Sri Krishna College of Engineering & Technology (SKCET)",loc:"Kuniyamuthur, Coimbatore",clus:"Coimbatore",tier:"hot",score:89,
+  cohort:"~1,000 / yr (est.)",place:"~85% (est.) · median ₹4.5–5L (est.)",rival:"PSG College of Technology / KCT",gap:"~2–2.5L median behind PSG (₹7L)",
+  angle:"SKCET is a strong tier-2 that lives in PSG and KCT's shadow in the same city. Its students clear the bar but land ₹2L below the PSG median at colleges 8 km away. That visible, local, apples-to-apples gap is the single most persuasive pitch a Coimbatore TPO will hear.",
+  pitch:"“Your students are 8 km from PSG and landing ₹2 lakh less for the same degree. We close that gap this academic year — measurably, before campus season.”"},
+
+{r:8,n:"SNS College of Technology / SNS College of Engineering",loc:"Saravanampatti, Coimbatore",clus:"Coimbatore",tier:"hot",score:87,
+  cohort:"~1,400 / yr across group (est.)",place:"~80–85% (est.)",rival:"KCT / PSG Tech",gap:"IT-hub location, sub-KCT CTC",
+  angle:"SNS sits in Saravanampatti — Coimbatore's IT hub, next to the recruiters — yet its outcomes trail KCT's 90–95%. Large group, marketing-forward management that loves a differentiator, and a location argument identical to the OMR one: the employers are next door; the readiness isn't.",
+  pitch:"“You're in Saravanampatti, surrounded by the same companies KCT places into at 90%+. Location isn't your gap — readiness is. We fix that this year.”"},
+
+{r:9,n:"Karpagam College / Karpagam Academy of Higher Education",loc:"Othakkalmandapam, Coimbatore",clus:"Coimbatore",tier:"warm",score:81,
+  cohort:"~1,200 / yr (est.)",place:"~78% (est.) · median ₹3.5–4.5L (est.)",rival:"PSG Tech / CIT",gap:"Large cohort, mid CTC",
+  angle:"Big, deemed-university ambition, budget to spend on rankings and outcomes. Karpagam wants the tier-1 optics and trails the PSG/CIT benchmark on CTC. A placement-readiness standard is a management-friendly, brochure-friendly purchase for a college chasing NAAC/NIRF optics.",
+  pitch:"“You've built the campus and the brand — the last gap to PSG and CIT is placement CTC. Give your TPO a readiness number to show management, and close it this year.”"},
+
+{r:10,n:"Sri Ramakrishna Engineering College (SREC) / KPRIET",loc:"Coimbatore",clus:"Coimbatore",tier:"warm",score:79,
+  cohort:"~900–1,100 each (est.)",place:"~80–88% (est.)",rival:"PSG Tech / KCT",gap:"Solid tier-1.5, CTC ceiling vs PSG",
+  angle:"Both are strong, autonomous, well-run — near the top of tier-2. The pain is thinner (they already place well), so the pitch shifts to CTC upgrade + a differentiator vs each other. Higher-effort sell but higher paying-ability; good second-wave targets after the clearer-gap colleges.",
+  pitch:"“You're a whisker behind PSG on outcomes — the difference now is CTC, not placement rate. A company-specific readiness edge is how you take that last step this season.”"},
+
+{r:11,n:"Hindusthan / Info Institute / Nehru / Dr. Mahalingam / Kathir (Coimbatore tier-3)",loc:"Coimbatore periphery",clus:"Coimbatore",tier:"mid",score:68,
+  cohort:"~500–900 each (est.)",place:"~60–75% (est.) · median ₹3–3.5L (est.)",rival:"SKCET / Karpagam",gap:"Real placement gap, tighter budgets",
+  angle:"Genuine pain (60–75% placement) but tighter budgets and less procurement maturity — longer cycles, more price sensitivity. Best approached with a free single-department pilot, then convert on demonstrated lift. High pain, medium ability-to-pay.",
+  pitch:"“Your placement gap is real and your students deserve the same shot as the ones 10 km away at SKCET. Start with one department free this season — pay only when you see the lift.”"},
+
+/* ---------- DINDIGUL / MADURAI SOUTH (benchmark leader: PSNA, Thiagarajar) ---------- */
+{r:12,n:"NPR College of Engineering / GTEC / Christian College of Engineering (Dindigul–Natham belt)",loc:"Dindigul / Natham",clus:"Madurai–Dindigul",tier:"hot",score:86,
+  cohort:"~400–700 each (est.)",place:"~55–70% (est.) · median ₹3–3.5L (est.)",rival:"PSNA College of Engineering",gap:"Half of PSNA's placement, same district",
+  angle:"This is the literal PSNA example. These colleges sit within a few km of PSNA (90% placement, ₹6L median, A++ NAAC) and place at roughly half the rate for the same district's students. The rival is local, famous and unarguable — the strongest possible benchmark pitch in the region.",
+  pitch:"“Your students are 5 km from PSNA and getting half the placements — we can close that gap this academic year.”"},
+
+{r:13,n:"Velammal College of Engineering & Technology, Madurai",loc:"Madurai",clus:"Madurai–Dindigul",tier:"hot",score:85,
+  cohort:"~1,000 / yr (est.)",place:"~80% (est.) · median ₹4L (est.)",rival:"Thiagarajar College of Engineering (TCE)",gap:"~3L median behind TCE (highest ₹29L)",
+  angle:"Velammal Madurai is the biggest ambitious private in a city dominated by the government-aided TCE. It has the volume and the brand but trails TCE's CTC ceiling badly. A private college that must justify fees against a cheaper, better-placed government rival is highly motivated to buy an outcome-differentiator.",
+  pitch:"“TCE is government-aided, cheaper, and out-places you on CTC in your own city. Your fees demand a better placement story — we give your TPO one this year.”"},
+
+{r:14,n:"Kamaraj College of Engineering / K.L.N. College / Latha Mathavan (Madurai belt)",loc:"Madurai / Virudhunagar",clus:"Madurai–Dindigul",tier:"warm",score:76,
+  cohort:"~500–800 each (est.)",place:"~65–75% (est.)",rival:"Thiagarajar / Velammal Madurai",gap:"Mid-tier, regional recruiter dependence",
+  angle:"Solid regional privates that depend on a narrower recruiter pool (mass IT + local firms). Their students under-perform in the exact HR/aptitude rounds PrepVista drills. Motivated but budget-conscious — pilot-led entry works best.",
+  pitch:"“Your students lose the same TCS/Infosys aptitude and HR rounds every year. That's the most fixable gap in placements — and it's exactly what we drill before the season.”"},
+
+{r:15,n:"Mepco Schlenk Engineering College",loc:"Sivakasi",clus:"Madurai–Dindigul",tier:"mid",score:64,
+  cohort:"~900 / yr (est.)",place:"~85%+ (est.) · autonomous, strong",rival:"Thiagarajar / NEC Kovilpatti",gap:"Already strong — upgrade pitch only",
+  angle:"Mepco is genuinely strong (autonomous, well-regarded) so the rescue narrative doesn't land — this is a CTC-upgrade / differentiation sell to a confident TPO. Lower priority because the pain is low, but paying ability is high; keep as a warm reference-builder for the southern belt.",
+  pitch:"“You already place well — so the question is CTC, not count. A readiness standard your students carry into interviews is how a strong college becomes a top-CTC one.”"},
+
+/* ---------- SALEM / NAMAKKAL / ERODE (leaders: Kongu, Bannari Amman, Sona) ---------- */
+{r:16,n:"K.S.R. College of Engineering / K.S.R. Institutions",loc:"Tiruchengode, Namakkal",clus:"Salem–Erode",tier:"hot",score:84,
+  cohort:"~1,500 / yr across group (est.)",place:"~70–78% (est.) · median ₹3.5L (est.)",rival:"Kongu Engineering College",gap:"Behind Kongu's autonomous CTC band",
+  angle:"KSR is a massive multi-institution group in Kongu's backyard. Enormous seat count makes the per-student cost of PrepVista negligible, and management runs it like a business that responds to competitive, measurable pitches. Kongu is the local benchmark everyone respects.",
+  pitch:"“Kongu, down the road, is autonomous and out-places you on CTC. With your student numbers, a readiness edge is the cheapest lever you have — and it moves thousands of students at once.”"},
+
+{r:17,n:"Sona College of Technology",loc:"Salem",clus:"Salem–Erode",tier:"warm",score:77,
+  cohort:"~1,000 / yr (est.)",place:"~85% (est.) · autonomous",rival:"Kongu / Bannari Amman",gap:"Strong, but CTC ceiling vs Kongu",
+  angle:"Sona is the strongest private in Salem itself — confident TPO, good outcomes, so lead with upgrade + differentiation vs Kongu/Bannari, not rescue. Good paying ability; medium urgency.",
+  pitch:"“You own Salem — the next benchmark is Kongu and Bannari on CTC. A company-specific readiness layer is how Sona students out-interview theirs this season.”"},
+
+{r:18,n:"Mahendra / Muthayammal / Paavai / Vivekanandha / Gnanamani (Namakkal–Salem tier-3 belt)",loc:"Namakkal / Salem periphery",clus:"Salem–Erode",tier:"mid",score:66,
+  cohort:"~600–1,200 each (est.)",place:"~55–70% (est.) · median ₹3L (est.)",rival:"Kongu / KSR / Sona",gap:"Clear placement gap, price-sensitive",
+  angle:"High-volume tier-3 groups with real placement gaps but thin budgets and long decision chains. The winning motion is a free department pilot during placement season, converting on demonstrated readiness lift. Large aggregate seat count makes the belt worth farming.",
+  pitch:"“Your students are as capable as Kongu's — they just walk in less prepared for the aptitude and HR rounds. One free pilot department this season proves we close that gap.”"},
+
+/* ---------- TRICHY / THANJAVUR (leaders: NIT-T, SASTRA, Saranathan) ---------- */
+{r:19,n:"Dhanalakshmi Srinivasan group (Perambalur / Trichy / Samayapuram)",loc:"Trichy–Perambalur",clus:"Trichy–Thanjavur",tier:"hot",score:83,
+  cohort:"~1,500 / yr across group (est.)",place:"~60–72% (est.) · median ₹3–3.5L (est.)",rival:"SASTRA / Saranathan / K Ramakrishnan",gap:"Large cohort, big gap vs SASTRA",
+  angle:"One of the largest private education groups in central TN — many campuses, huge seat count, business-minded management. Their students trail SASTRA and even Saranathan badly on CTC. Scale + gap + commercial decision-makers = a high-priority, high-volume deal.",
+  pitch:"“You educate thousands across central Tamil Nadu but place them a full tier below SASTRA. At your scale, a readiness standard is the single cheapest way to lift outcomes for every campus at once.”"},
+
+{r:20,n:"Saranathan / K Ramakrishnan / M.A.M / SRM Trichy (Trichy belt)",loc:"Trichy",clus:"Trichy–Thanjavur",tier:"warm",score:74,
+  cohort:"~700–1,000 each (est.)",place:"~70–80% (est.)",rival:"NIT Trichy / SASTRA",gap:"Solid tier-2, NIT-T CTC shadow",
+  angle:"Respectable Trichy privates living in NIT-Trichy's enormous shadow — they can't match NIT but compete hard with each other. The pitch is differentiation within the Trichy pool plus CTC upgrade. Decent budgets, moderate urgency.",
+  pitch:"“You'll never be NIT — but you can be the Trichy private whose students interview best. A readiness edge is how you win the recruiters that visit all of you.”"},
+
+/* ---------- TIRUNELVELI / SOUTH (leaders: Govt CET Tirunelveli, NEC, Francis Xavier) ---------- */
+{r:21,n:"Francis Xavier Engineering College / PSN College / Einstein (Tirunelveli belt)",loc:"Tirunelveli",clus:"Tirunelveli–South",tier:"warm",score:75,
+  cohort:"~600–900 each (est.)",place:"~65–75% (est.)",rival:"Govt CET Tirunelveli / NEC Kovilpatti",gap:"Southern belt, recruiter access gap",
+  angle:"Far-south colleges fight a structural disadvantage: fewer recruiters travel down, so readiness-per-visit matters more than anywhere. A student who converts the few companies that do visit is worth double. That scarcity is the pitch — maximise a thin recruiter pipeline.",
+  pitch:"“Fewer companies make the trip to Tirunelveli — so every drive counts double. We make sure your students convert the recruiters who do come, instead of losing them to a metro college's better-prepped candidates.”"},
+
+{r:22,n:"National Engineering College (NEC) / Dr. Sivanthi Aditanar / Unnamalai (Kovilpatti–Thoothukudi)",loc:"Kovilpatti / Thoothukudi",clus:"Tirunelveli–South",tier:"mid",score:63,
+  cohort:"~400–700 each (est.)",place:"~70% (est.) · NEC autonomous/strong",rival:"Govt CET Tirunelveli",gap:"Decent but recruiter-starved region",
+  angle:"NEC is autonomous and respected; the belt's real constraint is geography, not quality. Medium priority — solid paying ability, real recruiter-scarcity pain, but small cohorts and remote logistics slow the sale. Good regional flagship to land first.",
+  pitch:"“Your students are strong — the region just doesn't get the recruiter footfall Chennai does. We turn every scarce drive into more offers by sending students in interview-ready.”"},
+
+/* ---------- KANYAKUMARI DEEP SOUTH ---------- */
+{r:23,n:"Ponjesly / Rohini / Stella Mary's / Arunachala / Cape (Kanyakumari belt)",loc:"Nagercoil / Kanyakumari",clus:"Kanyakumari",tier:"mid",score:60,
+  cohort:"~300–600 each (est.)",place:"~55–70% (est.) · median ₹2.8–3.2L (est.)",rival:"NEC / Tirunelveli govt colleges",gap:"Deep-south recruiter scarcity, low CTC",
+  angle:"The most recruiter-starved corner of TN — huge outbound-migration of talent, low local CTC. Pain is high but budgets and cohort sizes are small, so the ₹1L must be justified over fewer seats. Pilot-led, price-flexible entry; strong social-impact angle for management.",
+  pitch:"“Your students leave the district to find jobs — because the interviews come to them unprepared. A readiness programme keeps more of them placed from campus, this year, without leaving home.”"},
+
+/* ---------- VELLORE / NORTH ---------- */
+{r:24,n:"C. Abdul Hakeem / Ganadipathy Tulsi's Jain / Kingston / Priyadarshini (Vellore belt)",loc:"Vellore / Ranipet",clus:"Vellore–North",tier:"warm",score:72,
+  cohort:"~500–800 each (est.)",place:"~60–72% (est.)",rival:"VIT Vellore",gap:"Placing at a fraction of VIT next door",
+  angle:"Living beside VIT (₹9.5L CSE average, 900+ recruiters) is brutal — the contrast is stark and the local student/parent comparison is constant. That very contrast is a razor-sharp pitch: same city as India's #11, a fraction of the outcome, one fixable reason (readiness).",
+  pitch:"“You share a city with VIT and a fraction of its placements. Parents make that comparison every admission season. Give them a placement story worth choosing you for — starting this year.”"},
+
+/* ---------- ARTS & SCIENCE / OTHER DEGREE COLLEGES ---------- */
+{r:25,n:"Large Arts &amp; Science colleges statewide (BCA/B.Com/BBA/MCA cohorts)",loc:"Statewide (Chennai, Coimbatore, Madurai, Trichy…)",clus:"Arts &amp; Science",tier:"warm",score:70,
+  cohort:"~800–3,000 / yr each (huge)",place:"~30–55% relevant placement (est.)",rival:"Engineering colleges in same city",gap:"Weakest placement cells, biggest headcount",
+  angle:"Arts & Science colleges have the largest cohorts and the weakest placement infrastructure — often no structured interview prep at all. Lower fees/budgets, but immense seat counts make even a discounted per-student deal add up, and the greenfield (no incumbent tool) means no competitive displacement needed. An underserved, high-volume flank.",
+  pitch:"“Your BCA and B.Com students compete for the same entry jobs as engineers — with none of the interview prep. You have the numbers; give them the readiness, and your placement cell finally has a story to tell.”"},
+
+/* ---------- LOW PRIORITY — ELITE / WON'T BUY ---------- */
+{r:26,n:"IIT Madras · NIT Trichy · Anna Univ (CEG/MIT) · VIT · SSN · PSG Tech · SASTRA · Thiagarajar · CIT · KCT",loc:"Statewide flagships",clus:"Elite (reference-only)",tier:"low",score:22,
+  cohort:"varies (large)",place:"78–99% · high CTC — no pain",rival:"—",gap:"No placement pain → no purchase motive",
+  angle:"Deliberately ranked LOW. These are your pitch REFERENCES, not your customers. They place well (78–99%), build tooling in-house, sit on free portals (Superset serves 600+ premium colleges free), and won't feel a problem worth ₹1L. Chasing them burns founder time. Use their names as the benchmark in every card above — do not sell to them.",
+  pitch:"“(Do not pitch — reference only.) These are the names you invoke to sell everyone else: ‘close the gap to PSG / SSN / VIT.’”"},
+];
+
+/* ---- render ---- */
+const listEl = document.getElementById('list');
+const clusF = document.getElementById('clusf');
+const clusters = [...new Set(D.map(d=>d.clus))];
+clusters.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;clusF.appendChild(o)});
+
+function tierLabel(t){return {hot:'HOT — pitch this week',warm:'WARM — strong fit',mid:'MID — viable / longer cycle',low:'LOW — deprioritise'}[t]}
+function esc(s){return s.replace(/&(?!amp;|lt;|gt;)/g,'&amp;')}
+
+function render(){
+  const q=document.getElementById('q').value.toLowerCase();
+  const tf=document.getElementById('tierf').value;
+  const cf=clusF.value;
+  listEl.innerHTML='';
+  let shown=0, curClus=null;
+  D.filter(d=>{
+    const hay=(d.n+d.loc+d.clus+d.rival).toLowerCase();
+    return (!q||hay.includes(q)) && (!tf||d.tier===tf) && (!cf||d.clus===cf);
+  }).forEach(d=>{
+    if(d.clus!==curClus && !cf){curClus=d.clus;const h=document.createElement('div');h.className='cluster-h';h.textContent='▸ '+d.clus.replace('&amp;','&')+' cluster';listEl.appendChild(h);}
+    shown++;
+    const el=document.createElement('div');
+    el.className='card '+d.tier;
+    el.innerHTML=`
+      <div class="top">
+        <div class="rank">#${d.r}</div>
+        <div class="meta">
+          <p class="name">${d.n}</p>
+          <div class="loc">📍 ${d.loc}</div>
+          <div class="badges">
+            <span class="b ${d.tier}">${tierLabel(d.tier)}</span>
+            <span class="b ghost">${d.clus.replace('&amp;','&')}</span>
+            <span class="b ghost">Benchmark: ${d.rival}</span>
+          </div>
+        </div>
+        <div class="score ${d.tier}"><div class="n">${d.score}</div><div class="l">Priority index</div></div>
+      </div>
+      <div class="facts">
+        <div><div class="k">Cohort / yr</div><div class="v">${d.cohort}</div></div>
+        <div><div class="k">Placement reality</div><div class="v">${d.place}</div></div>
+        <div><div class="k">Gap vs leader</div><div class="v">${d.gap}</div></div>
+      </div>
+      <div class="angle">
+        <div class="lbl">Why this rank / how to sell</div>
+        <p>${d.angle}</p>
+        <p class="pitch">${d.pitch}</p>
+      </div>`;
+    listEl.appendChild(el);
+  });
+  document.getElementById('count').textContent=D.length;
+  document.getElementById('hotc').textContent=D.filter(d=>d.score>=80).length;
+  document.getElementById('pipe').textContent='₹'+(D.filter(d=>d.score>=80).length)+'L+';
+}
+['q','tierf'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+clusF.addEventListener('change',render);
+render();
+</script>
+</body>
+</html>

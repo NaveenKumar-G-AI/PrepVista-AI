@@ -1,0 +1,133 @@
+.pv-insights {
+  --pv-ink: #14213d;
+  --pv-paper: #f6f7f5;
+  --pv-seal: #1f6f54;
+  --pv-amber: #c17817;
+  --pv-rose: #b3261e;
+  --pv-line: #d8dce1;
+  --pv-muted: #5b6472;
+
+  display: grid;
+  gap: 22px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--pv-ink);
+}
+
+.pv-insights__block {
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
+  border-radius: 10px;
+  padding: 20px 24px;
+}
+
+.pv-insights__heading {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pv-muted);
+  margin: 0 0 16px;
+}
+
+/* Funnel */
+.pv-insights__funnel-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.pv-insights__funnel-label {
+  font-size: 13px;
+  color: var(--pv-muted);
+}
+
+.pv-insights__funnel-track {
+  height: 8px;
+  background: rgba(20, 33, 61, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pv-insights__funnel-bar {
+  height: 100%;
+  background: var(--pv-ink);
+  border-radius: 4px;
+}
+
+.pv-insights__funnel-count {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  font-size: 13px;
+  text-align: right;
+}
+
+/* Company table */
+.pv-insights__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pv-insights__table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pv-muted);
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--pv-line);
+}
+
+.pv-insights__table td {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--pv-line);
+}
+
+.pv-insights__table tr:last-child td {
+  border-bottom: none;
+}
+
+.pv-insights__num {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  text-align: right;
+}
+
+/* Today strip */
+.pv-insights__today {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.pv-insights__today-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 88px;
+}
+
+.pv-insights__today-item--zero {
+  opacity: 0.45;
+}
+
+.pv-insights__today-value {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.pv-insights__today-value--amber { color: var(--pv-amber); }
+.pv-insights__today-value--rose { color: var(--pv-rose); }
+.pv-insights__today-value--seal { color: var(--pv-seal); }
+
+.pv-insights__today-label {
+  font-size: 12px;
+  color: var(--pv-muted);
+}
+
+@media (max-width: 480px) {
+  .pv-insights__funnel-row { grid-template-columns: 100px 1fr 36px; }
+  .pv-insights__table { font-size: 12px; }
+}

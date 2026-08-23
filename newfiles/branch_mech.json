@@ -1,0 +1,216 @@
+{
+  "branch": "mech",
+  "label": "Mechanical Engineering",
+  "schema_version": 1,
+  "notes": "Seed questions for the mech branch.",
+  "topics": [
+    {
+      "topic": "Thermodynamics",
+      "subtopics": [
+        "laws",
+        "cycles",
+        "entropy",
+        "heat & work"
+      ],
+      "questions": {
+        "easy": [
+          "What does the first law of thermodynamics state?",
+          "What's the difference between heat and work?",
+          "What is a thermodynamic system?"
+        ],
+        "medium": [
+          "Explain the second law of thermodynamics in simple terms.",
+          "What is entropy, intuitively?",
+          "What's the difference between a reversible and an irreversible process?"
+        ],
+        "hard": [
+          "Walk through the Carnot cycle and why it sets an efficiency limit.",
+          "Compare the Otto and Diesel cycles.",
+          "How would you compute the efficiency of a Rankine cycle?"
+        ]
+      }
+    },
+    {
+      "topic": "Fluid Mechanics",
+      "subtopics": [
+        "Bernoulli",
+        "flow",
+        "viscosity",
+        "pumps"
+      ],
+      "questions": {
+        "easy": [
+          "What is viscosity?",
+          "What's the difference between laminar and turbulent flow?",
+          "What does a pump do?"
+        ],
+        "medium": [
+          "Explain Bernoulli's principle and a real application.",
+          "What is the Reynolds number, and what does it tell you?",
+          "What's the difference between a positive-displacement and a centrifugal pump?"
+        ],
+        "hard": [
+          "Derive or explain the continuity equation for incompressible flow.",
+          "How would you estimate head loss in a pipe?",
+          "Explain boundary-layer separation and why it matters."
+        ]
+      }
+    },
+    {
+      "topic": "Strength of Materials",
+      "subtopics": [
+        "stress/strain",
+        "bending",
+        "torsion",
+        "factor of safety"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between stress and strain?",
+          "What is the factor of safety?",
+          "What is elasticity?"
+        ],
+        "medium": [
+          "Explain the stress-strain curve for mild steel.",
+          "What is bending moment, and how does it relate to shear force?",
+          "What happens to a shaft under torsion?"
+        ],
+        "hard": [
+          "How would you find the deflection of a cantilever beam under a load?",
+          "Explain the concept of principal stresses.",
+          "How would you analyse a column for buckling?"
+        ]
+      }
+    },
+    {
+      "topic": "Manufacturing Processes",
+      "subtopics": [
+        "casting",
+        "welding",
+        "machining",
+        "forming"
+      ],
+      "questions": {
+        "easy": [
+          "What is casting?",
+          "What is welding used for?",
+          "What's the difference between turning and milling?"
+        ],
+        "medium": [
+          "What's the difference between hot working and cold working?",
+          "What are the main defects in casting, and what causes them?",
+          "What's the difference between additive and subtractive manufacturing?"
+        ],
+        "hard": [
+          "How would you select a manufacturing process for a given part and volume?",
+          "Explain the factors affecting tool life in machining.",
+          "How does the heat-affected zone form in welding, and why does it matter?"
+        ]
+      }
+    },
+    {
+      "topic": "Machine Design",
+      "subtopics": [
+        "gears",
+        "bearings",
+        "fatigue",
+        "shafts"
+      ],
+      "questions": {
+        "easy": [
+          "What is a gear used for?",
+          "What is a bearing?",
+          "What is fatigue failure?"
+        ],
+        "medium": [
+          "What's the difference between spur and helical gears?",
+          "How does a factor of safety affect a design?",
+          "What's the difference between a ball bearing and a journal bearing?"
+        ],
+        "hard": [
+          "How would you design a shaft for combined bending and torsion?",
+          "Explain the S-N curve and its role in fatigue design.",
+          "How would you select a gear train for a required speed ratio?"
+        ]
+      }
+    },
+    {
+      "topic": "Heat Transfer",
+      "subtopics": [
+        "conduction",
+        "convection",
+        "radiation",
+        "exchangers"
+      ],
+      "questions": {
+        "easy": [
+          "What are the three modes of heat transfer?",
+          "What is thermal conductivity?",
+          "What is a heat exchanger?"
+        ],
+        "medium": [
+          "What's the difference between conduction and convection?",
+          "What is the role of a fin in heat transfer?",
+          "What's the difference between natural and forced convection?"
+        ],
+        "hard": [
+          "How would you analyse steady-state conduction through a composite wall?",
+          "Explain the LMTD method for a heat exchanger.",
+          "How does radiation heat transfer depend on temperature?"
+        ]
+      }
+    },
+    {
+      "topic": "Engineering Mechanics",
+      "subtopics": [
+        "statics",
+        "dynamics",
+        "friction",
+        "equilibrium"
+      ],
+      "questions": {
+        "easy": [
+          "What is meant by static equilibrium?",
+          "What is friction?",
+          "What is a free-body diagram?"
+        ],
+        "medium": [
+          "How would you find the reactions on a simply supported beam?",
+          "What's the difference between kinematics and kinetics?",
+          "What is the coefficient of friction?"
+        ],
+        "hard": [
+          "Analyse the forces in a truss using the method of joints.",
+          "Explain the work-energy principle with an example.",
+          "How would you analyse motion on an inclined plane with friction?"
+        ]
+      }
+    },
+    {
+      "topic": "IC Engines",
+      "subtopics": [
+        "4-stroke",
+        "efficiency",
+        "combustion",
+        "SI/CI"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between a petrol and a diesel engine?",
+          "What are the four strokes of a 4-stroke engine?",
+          "What is compression ratio?"
+        ],
+        "medium": [
+          "What's the difference between SI and CI engines?",
+          "Why does a diesel engine have higher efficiency than a petrol engine?",
+          "What is knocking in an engine?"
+        ],
+        "hard": [
+          "Explain the factors affecting the thermal efficiency of an IC engine.",
+          "How would you reduce emissions from an IC engine?",
+          "Explain the difference between brake power and indicated power."
+        ]
+      }
+    }
+  ]
+}

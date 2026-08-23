@@ -1,0 +1,57 @@
+{
+  "module": "interviews",
+  "version": "1.0.0",
+  "owner_paths": [
+    "modules/interviews/**",
+    "services/interviews/**",
+    "api/interviews/**",
+    "schemas/interviews/**",
+    "tests/interviews/**"
+  ],
+  "routes_example_adapter": [
+    "GET /api/interviews/today",
+    "GET /api/interviews",
+    "GET /api/interviews/:id",
+    "POST /api/interviews/:id/attendance",
+    "POST /api/interviews/:id/confirm",
+    "POST /api/interviews/:id/issue",
+    "POST /api/interviews/:id/result",
+    "POST /api/results/review",
+    "POST /api/results/publish",
+    "POST /api/results/import/preview",
+    "GET /api/results/pending",
+    "GET /api/students/:studentId/dashboard",
+    "GET /api/analytics",
+    "GET /api/command-centre"
+  ],
+  "database_tables_owned": [
+    "interviews", "interview_results", "round_executions",
+    "interview_issues", "reschedule_requests", "audit_log", "event_log"
+  ],
+  "database_tables_read_only_stub_in_this_build": [
+    "institutions", "students", "drives", "source_rounds", "applications",
+    "readiness_scores_stub"
+  ],
+  "events_published": [
+    "INTERVIEW_CREATED", "INTERVIEW_SCHEDULED", "INTERVIEW_UPDATED",
+    "INTERVIEW_RESCHEDULED", "INTERVIEW_CANCELLED",
+    "INTERVIEW_ATTENDANCE_RECORDED", "INTERVIEW_NO_SHOW", "INTERVIEW_COMPLETED",
+    "INTERVIEW_RESULT_CREATED", "INTERVIEW_RESULT_UPDATED", "INTERVIEW_RESULT_REVIEWED",
+    "INTERVIEW_RESULT_PUBLISHED", "INTERVIEW_RESULT_CORRECTED",
+    "STUDENT_ADVANCED_TO_NEXT_ROUND", "STUDENT_REJECTED_FROM_ROUND", "STUDENT_PLACEMENT_HOLD",
+    "INTERVIEW_ISSUE_REPORTED", "INTERVIEW_ISSUE_RESOLVED"
+  ],
+  "events_consumed": [],
+  "services_exposed": [
+    "getTodayInterviews", "getUpcomingInterviews", "getInterviewStatus", "getAttendance",
+    "getPendingResults", "getResult", "getRoundResults", "getRoundProgression",
+    "getInterviewIssues", "getInterviewAnalytics", "getStudentInterviewHistory",
+    "getReadinessVsInterviewOutcome",
+    "part6_contract.get_final_selected_candidates",
+    "part6_contract.get_approved_final_results",
+    "part6_contract.get_student_final_interview_outcome"
+  ],
+  "dependencies": ["institution", "season", "students", "companies", "drives", "applications"],
+  "recruiter_access": "NONE — not implemented, out of scope by design",
+  "note": "database_tables_read_only_stub_in_this_build exist ONLY so this module runs standalone in this environment; in the real PrepVista repo these become foreign keys / service calls into Parts 1-4, never tables this module owns or writes to (except seed_demo.py, which is fixture-only)."
+}

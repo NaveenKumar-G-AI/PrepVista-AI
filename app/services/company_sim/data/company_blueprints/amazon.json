@@ -1,0 +1,167 @@
+{
+  "company_id": "amazon",
+  "display_name": "Amazon",
+  "aliases": ["Amazon India", "AWS", "Amazon Development Centre"],
+  "archetype": "premium_product",
+  "tier": "premium_product",
+  "tier_rank": "A",
+  "hiring_scale": "high",
+  "logo_asset": "amazon.svg",
+  "brand_colors": { "primary": "#FF9900", "accent": "#146EB4" },
+  "platform": {
+    "name": "Amazon OA (HackerRank/Codility-style) → Virtual Loop",
+    "emulation_profile": "hackerrank_style",
+    "proctored": true,
+    "tab_switch_policy": "flag",
+    "navigation": "free_all",
+    "on_screen_calculator": false,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": true,
+  "packages": [
+    { "track": "sde1", "label": "SDE-1", "ctc_lpa": [28.0, 40.0], "gate": "coding+lp_hire" },
+    { "track": "sde2", "label": "SDE-2", "ctc_lpa": [45.0, 60.0], "gate": "coding+system_design+deep_lp" }
+  ],
+  "eligibility": {
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc", "BSc"]
+  },
+  "re_eligibility_gap_months": 6,
+  "format_confidence": 0.85,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "Binary-search-on-answer and graph (DSU/BFS/DFS) problems trending in 2025-26.",
+    "Growing reports of AI-assisted coding sections.",
+    "Signing bonus ~₹6L with a 12-month clawback (retention)."
+  ],
+  "culture_values": ["customer_obsession", "ownership", "dive_deep", "bias_for_action", "deliver_results", "earn_trust"],
+  "what_they_value": "Both technical bar AND the 16 Leadership Principles (≈50% of evaluation). You can fail with perfect code and weak LPs.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "amazon_oa_coding",
+      "round_type": "coding_test",
+      "label": "Online Assessment — 2 DSA Problems",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 105,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "dsa_1", "label": "DSA Problem 1 (easy-medium)", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 50, "topics": ["graphs", "dsu", "bfs", "dfs"], "languages_allowed": ["Python", "Java", "C++", "JavaScript"], "config": { "partial_scoring": true, "hidden_tests": true } },
+        { "section_id": "dsa_2", "label": "DSA Problem 2 (medium)",      "competency": "coding", "item_type": "coding", "count": 1, "minutes": 55, "topics": ["dp", "binary_search_on_answer"], "languages_allowed": ["Python", "Java", "C++", "JavaScript"], "config": { "partial_scoring": true, "hidden_tests": true } }
+      ],
+      "gate_rule": { "type": "coding_count", "params": { "min_solved_by_track": { "sde1": 1, "sde2": 2 }, "partial_scoring": true } },
+      "notes": "2 DSA problems, auto-graded with partial scoring on hidden tests."
+    },
+    {
+      "order": 2,
+      "round_id": "amazon_work_sim",
+      "round_type": "work_simulation",
+      "label": "Work Simulation",
+      "is_elimination": false,
+      "difficulty_profile": "medium",
+      "total_minutes": 40,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "scenarios", "label": "Virtual-Office Scenarios", "competency": "work_judgment", "item_type": "scenario", "count": 8, "minutes": 40, "topics": ["email_response", "prioritization", "minor_debugging", "lp_alignment"] }
+      ],
+      "gate_rule": null,
+      "notes": "Virtual-office scenarios (respond to emails, prioritize, minor debugging); graded on judgment + LP alignment."
+    },
+    {
+      "order": 3,
+      "round_id": "amazon_lp_survey",
+      "round_type": "behavioral_survey",
+      "label": "Work-Style Survey (Leadership Principles)",
+      "is_elimination": false,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "lp_most_least", "label": "LP Most/Least Multiple-Choice", "competency": "leadership_principles", "item_type": "survey_most_least", "count": 30, "minutes": 20, "topics": ["16_leadership_principles", "consistency"] }
+      ],
+      "gate_rule": null,
+      "notes": "Leadership-Principles most/least items; scored for consistency + LP alignment."
+    },
+    {
+      "order": 4,
+      "round_id": "amazon_dsa1",
+      "round_type": "technical_interview",
+      "label": "Interview Loop — DSA (LC-medium) + LP probes",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 60,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding", "label": "Live DSA (LC-medium)", "competency": "coding",                "item_type": "interview_qa", "count": 2, "minutes": 40, "topics": ["arrays", "trees", "graphs"] },
+        { "section_id": "lp",     "label": "LP Probes (1-2)",       "competency": "leadership_principles", "item_type": "interview_qa", "count": 2, "minutes": 20, "topics": ["star", "measurable_impact"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5, "dimensions": ["technical", "lp"] } },
+      "notes": "Every interviewer scores BOTH technical AND LP. Prepare 6 STAR stories mapped to LPs."
+    },
+    {
+      "order": 5,
+      "round_id": "amazon_dsa2",
+      "round_type": "technical_interview",
+      "label": "Interview Loop — DSA (LC-hard) / Machine Coding (LLD) + LP probes",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 60,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding", "label": "Live DSA (LC-hard) or LLD", "competency": "coding",                "item_type": "interview_qa", "count": 2, "minutes": 40, "topics": ["dp", "graphs", "lld_parking_lot", "lld_bookstore"] },
+        { "section_id": "lp",     "label": "LP Probes",               "competency": "leadership_principles", "item_type": "interview_qa", "count": 2, "minutes": 20, "topics": ["star", "measurable_impact"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5, "dimensions": ["technical", "lp"] } },
+      "notes": "1 LC-hard typical; sometimes machine coding / LLD (design chess / parking lot / bookstore)."
+    },
+    {
+      "order": 6,
+      "round_id": "amazon_system_design",
+      "round_type": "system_design",
+      "label": "System Design (SDE-2)",
+      "is_elimination": true,
+      "applies_to_tracks": ["sde2"],
+      "difficulty_profile": "hard",
+      "total_minutes": 60,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "hld", "label": "High-Level Design", "competency": "system_design", "item_type": "interview_qa", "count": 1, "minutes": 60, "topics": ["requirements", "components", "data_flow", "scaling", "trade_offs"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "SDE-2 adds full system design + deeper LP."
+    },
+    {
+      "order": 7,
+      "round_id": "amazon_bar_raiser",
+      "round_type": "bar_raiser",
+      "label": "Bar Raiser (veto)",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 60,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "bar_raiser_lp", "label": "Different-Team Senior — Deep LP/Behavior", "competency": "leadership_principles", "item_type": "interview_qa", "count": 5, "minutes": 60, "topics": ["dive_deep", "ownership", "escalating_followups", "measurable_impact"] }
+      ],
+      "gate_rule": { "type": "veto", "params": { "min_score_0_10": 5.5, "caps_outcome": true } },
+      "notes": "A specially-trained senior from a DIFFERENT team; behavior-heavy; holds a no-fly veto; you are not told who it is. The single hardest round; debrief led by the Bar Raiser."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "rubric_verdict",
+    "attributes": ["coding", "leadership_principles", "system_design", "work_judgment"],
+    "tracks": [
+      { "track": "sde1", "label": "SDE-1", "requires": { "coding_hire": true, "lp_hire": true, "bar_raiser_pass": true } },
+      { "track": "sde2", "label": "SDE-2", "requires": { "coding_hire": true, "system_design_hire": true, "deep_lp": true, "bar_raiser_pass": true } }
+    ],
+    "params": {
+      "verdict_scale": ["strong_no_hire", "no_hire", "hire", "strong_hire"],
+      "veto_round": "amazon_bar_raiser",
+      "lp_weight": 0.5,
+      "order_high_to_low": ["sde2", "sde1"]
+    },
+    "gap_hints": {
+      "leaning_hire_to_hire": "Add measurable impact to 2 LP stories and tighten Dive-Deep evidence for the Bar Raiser.",
+      "sde1_to_sde2": "Clear a full system-design round and show deeper, multi-LP behavioral depth."
+    }
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "description": "Conservative cheat-detection configuration for PrepVista (integrity_monitor.py). Each behavioural signal carries a weight, severity, and trigger. The integrity score starts at 100 and subtracts the weighted penalties of triggered signals. Crucially, the system is conservative: it NEVER auto-penalises a student — every flag is for human/TPO review — and a single signal can never push a session past 'needs review'. 'High risk' requires multiple corroborating signals.",
+  "philosophy": "Protect the credibility of scores without falsely accusing students. When unsure, flag softly for human review rather than penalise.",
+  "signals": [
+    {
+      "key": "paste_burst",
+      "label": "Large paste burst",
+      "description": "A large block of text appears at once with almost no keystrokes — likely pasted, not typed.",
+      "weight": 0.18,
+      "severity": "high",
+      "trigger": {
+        "min_chars": 200,
+        "max_keystrokes": 5
+      }
+    },
+    {
+      "key": "superhuman_typing",
+      "label": "Superhuman typing speed",
+      "description": "Sustained typing speed implausibly high for a person.",
+      "weight": 0.15,
+      "severity": "high",
+      "trigger": {
+        "min_wpm": 140,
+        "min_duration_seconds": 5
+      }
+    },
+    {
+      "key": "verbatim_external_match",
+      "label": "Verbatim external match",
+      "description": "Answer matches a known external/canned source near-verbatim.",
+      "weight": 0.15,
+      "severity": "high",
+      "trigger": {
+        "similarity_threshold": 0.92
+      }
+    },
+    {
+      "key": "repeated_focus_loss",
+      "label": "Repeated focus loss",
+      "description": "The window loses focus multiple times during answering — consistent with looking things up.",
+      "weight": 0.14,
+      "severity": "high",
+      "trigger": {
+        "min_blur_events": 3,
+        "during": "answer_window"
+      }
+    },
+    {
+      "key": "ai_generated_signature",
+      "label": "AI-generated signature",
+      "description": "Answer shows strong statistical markers of AI-generated text (over-polished, generic structure).",
+      "weight": 0.12,
+      "severity": "medium",
+      "trigger": {
+        "detector_confidence": 0.85
+      }
+    },
+    {
+      "key": "clipboard_question",
+      "label": "Question copied to clipboard",
+      "description": "The question text was copied — often a precursor to an external search.",
+      "weight": 0.12,
+      "severity": "medium",
+      "trigger": {
+        "event": "copy_of_question"
+      }
+    },
+    {
+      "key": "rapid_response",
+      "label": "Implausibly rapid response",
+      "description": "A complete, complex answer arrives faster than a person could compose it.",
+      "weight": 0.11,
+      "severity": "medium",
+      "trigger": {
+        "min_expected_seconds_ratio": 0.25
+      }
+    },
+    {
+      "key": "idle_then_instant",
+      "label": "Idle then instant complete answer",
+      "description": "A long idle gap followed by an instant, complete answer.",
+      "weight": 0.1,
+      "severity": "medium",
+      "trigger": {
+        "min_idle_seconds": 30,
+        "then_paste": true
+      }
+    },
+    {
+      "key": "single_focus_loss",
+      "label": "Single focus loss",
+      "description": "The window loses focus once during answering.",
+      "weight": 0.07,
+      "severity": "low",
+      "trigger": {
+        "min_blur_events": 1,
+        "during": "answer_window"
+      }
+    },
+    {
+      "key": "copy_event",
+      "label": "Copy event",
+      "description": "A copy action was detected during the session.",
+      "weight": 0.06,
+      "severity": "low",
+      "trigger": {
+        "event": "copy"
+      }
+    },
+    {
+      "key": "answer_inconsistency",
+      "label": "Answer-quality inconsistency",
+      "description": "Answer quality swings far beyond the candidate's established level across the session.",
+      "weight": 0.1,
+      "severity": "medium",
+      "trigger": {
+        "zscore_threshold": 2.5
+      }
+    },
+    {
+      "key": "proctoring_anomaly",
+      "label": "Proctoring anomaly (if enabled)",
+      "description": "Camera-based proctoring detects no face or multiple faces (only if proctoring is enabled).",
+      "weight": 0.1,
+      "severity": "medium",
+      "trigger": {
+        "condition": "no_face_or_multiple_faces",
+        "requires_proctoring": true
+      }
+    }
+  ],
+  "integrity_score": {
+    "scale": [
+      0,
+      100
+    ],
+    "start": 100,
+    "formula": "integrity = 100 * (1 - min(1.0, sum(weight of each triggered signal))).",
+    "interpretation": "Higher is cleaner. The score never goes below 0.",
+    "max_single_signal_penalty": 0.18,
+    "note": "Weights are capped so no lone signal dominates; corroboration is what matters."
+  },
+  "risk_bands": [
+    {
+      "key": "clean",
+      "label": "Clean",
+      "integrity_min": 80,
+      "action": "none",
+      "color": "#2ECC71",
+      "meaning": "No meaningful integrity concerns."
+    },
+    {
+      "key": "review",
+      "label": "Needs review",
+      "integrity_min": 50,
+      "action": "flag for TPO/human review",
+      "color": "#F39C12",
+      "meaning": "Some signals present; a human should glance at the session before trusting the score."
+    },
+    {
+      "key": "high_risk",
+      "label": "High risk",
+      "integrity_min": 0,
+      "action": "flag prominently; recommend a proctored re-test",
+      "color": "#E74C3C",
+      "meaning": "Multiple corroborating signals; treat the score with caution."
+    }
+  ],
+  "false_positive_guards": {
+    "never_auto_penalize": true,
+    "all_flags_are_for_human_review": true,
+    "min_corroborating_signals_for_high_risk": 2,
+    "single_signal_max_band": "review",
+    "require_high_severity_for_high_risk": true,
+    "grace": {
+      "slow_connection_grace_seconds": 5,
+      "allow_one_focus_loss": true,
+      "note": "Don't punish a single tab-switch or a laggy connection."
+    },
+    "appealable": true,
+    "note": "A student can be wrongly flagged for innocent reasons; these guards keep the system fair."
+  },
+  "proctoring": {
+    "optional": true,
+    "default_enabled": false,
+    "note": "Camera proctoring is opt-in per college; proctoring signals only apply when enabled."
+  },
+  "data_handling": {
+    "store_raw_keystrokes": false,
+    "store_signal_summaries": true,
+    "retention_days": 180,
+    "note": "Store derived signals, not raw keystroke streams, for privacy."
+  }
+}

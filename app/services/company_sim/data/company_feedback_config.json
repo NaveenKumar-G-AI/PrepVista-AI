@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "description": "Company-mode report sections (Feature #01, M6). These sit ON TOP of the existing 10 general-report sections in interview/data/feedback_config.json when a session was run in company mode. Same schema (order/key/label/description/data_source/audience) so the existing report pipeline renders them unchanged. Student-vs-TPO visibility follows feedback_config.student_vs_tpo: the student sees every section except full integrity/proctoring detail (surfaced to them only as a soft 'flagged for review' note); the TPO sees everything.",
+  "extends": "interview/data/feedback_config.json",
+  "mode": "company",
+  "sections": [
+    {
+      "order": 11,
+      "key": "company_headline",
+      "label": "Company Result",
+      "description": "Top-line company outcome: the company + target track, the predicted track/verdict, confidence, and the terminal state (completed / eliminated at round X / terminated). Carries the blueprint's format_confidence + last_verified stamp so the student knows how current the format is.",
+      "data_source": "company_session_record",
+      "audience": "all"
+    },
+    {
+      "order": 12,
+      "key": "round_timeline",
+      "label": "Round-by-Round Timeline",
+      "description": "Each round in order with its score, pass/borderline/fail badge, the deciding metric (percentile / problems solved / verdict), and any negative-marking note. 'Cleared Foundation -> cleared Advanced -> Bar Raiser: borderline' at a glance. Proctor actions on a round are TPO-only detail.",
+      "data_source": "company_session_record.rounds",
+      "audience": "all"
+    },
+    {
+      "order": 13,
+      "key": "track_prediction",
+      "label": "Predicted Track & Gap to Next",
+      "description": "The predicted track with confidence, the cutoffs cleared vs missed for each track, and the concrete gap-to-next-track actions ('Solve 1 more coding problem to reach Elite'). This is the 'before the actual day' payoff.",
+      "data_source": "outcome_resolver",
+      "audience": "all"
+    },
+    {
+      "order": 14,
+      "key": "attribute_breakdown",
+      "label": "Attribute Breakdown",
+      "description": "Score (0-100) on each attribute the company actually evaluates on (TCS: verbal/reasoning/numerical/advanced-logic/coding; Google: general cognitive ability / role-related knowledge / leadership / Googleyness), weakest highlighted.",
+      "data_source": "outcome_resolver.attribute_breakdown",
+      "audience": "all"
+    },
+    {
+      "order": 15,
+      "key": "company_coaching",
+      "label": "Company-Specific Coaching",
+      "description": "Coaching tuned to this company's real rules and rounds: Wipro voice (filler-word rate + WPM), Amazon (measurable impact in LP stories), Cognizant (reach the max game level), Capgemini (Python is banned - practice C/C++/Java), TCS (clean-solve advanced coding for Prime), plus the weakest-attribute action. Always concrete, never 'do better'.",
+      "data_source": "derived",
+      "audience": "all"
+    },
+    {
+      "order": 16,
+      "key": "proctoring_detail",
+      "label": "Integrity & Proctoring (TPO)",
+      "description": "Full proctoring detail: tab-switch policy, events, review flags, and any termination. Conservative - flags for review, never auto-penalizes. TPO-only; the student sees only a soft 'session flagged for review' note when applicable.",
+      "data_source": "company_session_record.proctoring",
+      "audience": "tpo"
+    }
+  ],
+  "badges": {
+    "cleared": {"label": "Cleared", "tone": "pass"},
+    "downgraded": {"label": "Cleared (below target)", "tone": "borderline"},
+    "eliminated": {"label": "Eliminated", "tone": "fail"},
+    "terminated": {"label": "Terminated", "tone": "fail"}
+  },
+  "student_vs_tpo": {
+    "student_sees": "company_headline, round_timeline (no proctor detail), track_prediction, attribute_breakdown, company_coaching; proctoring surfaces only as a soft 'session flagged for review' note.",
+    "tpo_sees": "Everything, including proctoring_detail and per-round proctor actions."
+  },
+  "export": {
+    "formats": ["in_app", "pdf"],
+    "downloadable_by_student": true,
+    "shareable_with_tpo": true
+  }
+}

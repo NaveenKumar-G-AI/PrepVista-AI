@@ -1,0 +1,31 @@
+# Core framework
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+starlette==1.6.0
+
+# Database
+sqlalchemy==2.0.52
+alembic==1.19.1
+psycopg[binary]==3.3.4
+
+# Validation / settings
+pydantic==2.13.4
+pydantic-settings==2.15.0
+email-validator==2.3.0
+
+# Auth
+bcrypt==5.0.0
+python-jose[cryptography]==3.5.0
+
+# File upload / import workflow
+python-multipart==0.0.32
+openpyxl==3.1.5
+pandas==3.0.2
+
+# Testing
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx==0.28.1
+
+# Lint (dev only)
+ruff==0.16.2

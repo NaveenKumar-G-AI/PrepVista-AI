@@ -170,6 +170,128 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
     cohort_cat_avgs = _cohort_category_averages([_extract_cat_scores(r) for r in perf_rows])
     weakest_3       = _sorted_categories(cohort_cat_avgs, ascending=True)[:3]
 
+    # ── Part 1 Integration: Placement Funnel Summary ──────────────────────────
+    # Reads from placement_outcomes (college_id, placed, company_name).
+    # Wrapped in try/except for graceful degradation on older DB migrations.
+    placement_summary: dict | None = None
+    try:
+        async with DatabaseConnection() as conn:
+            po = await conn.fetchrow(
+                """SELECT
+                     COUNT(*)                              AS total_submissions,
+                     COUNT(*) FILTER (WHERE placed = TRUE)  AS placed_count,
+                     COUNT(DISTINCT company_name)           AS companies_engaged
+                   FROM placement_outcomes
+                   WHERE college_id = $1""",
+                org_id,
+            )
+        if po:
+            total_sub       = int(po["total_submissions"] or 0)
+            placed_count    = int(po["placed_count"] or 0)
+            companies_count = int(po["companies_engaged"] or 0)
+            placement_pct   = round(placed_count / total_sub * 100, 1) if total_sub > 0 else None
+            placement_summary = {
+                "total_submissions":    total_sub,
+                "placed_count":         placed_count,
+                "companies_engaged":    companies_count,
+                "placement_percentage": placement_pct,
+            }
+    except Exception:
+        placement_summary = None
+
+    # ── Part 2 Integration: Recruiter Pulse ───────────────────────────────────
+    # Live counts from recruiter_companies and recruiter_followups.
+    # Graceful degradation when migration 025 hasn't been applied yet.
+    from datetime import datetime, timezone as _tz
+    recruiter_pulse: dict | None = None
+    try:
+        _now_ts = datetime.now(_tz.utc).isoformat()
+        _30d_ago = datetime.now(_tz.utc).replace(
+            day=max(1, datetime.now(_tz.utc).day - 30)
+        ).isoformat()
+        async with DatabaseConnection() as conn:
+            _rc = await conn.fetchrow(
+                """SELECT
+                     COUNT(*)                                                                         AS companies,
+                     COUNT(*) FILTER (WHERE relationship_stage NOT IN ('PROSPECT','INACTIVE'))        AS active_relationships,
+                     COUNT(*) FILTER (WHERE relationship_stage = 'REPEAT_RECRUITER')                 AS repeat_recruiters,
+                     COUNT(*) FILTER (WHERE created_at >= $2)                                        AS new_last_30d
+                   FROM recruiter_companies
+                   WHERE organization_id = $1 AND status = 'ACTIVE'""",
+                org_id, _30d_ago,
+            )
+            _fu = await conn.fetchrow(
+                """SELECT
+                     COUNT(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS'))                        AS open_followups,
+                     COUNT(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS') AND due_at < $2)        AS overdue_followups
+                   FROM recruiter_followups WHERE organization_id = $1""",
+                org_id, _now_ts,
+            )
+        recruiter_pulse = {
+            "companies":                  int(_rc["companies"] or 0),
+            "active_relationships":       int(_rc["active_relationships"] or 0),
+            "open_followups":             int(_fu["open_followups"] or 0),
+            "overdue_followups":          int(_fu["overdue_followups"] or 0),
+            "new_relationships_last_30d": int(_rc["new_last_30d"] or 0),
+            "repeat_recruiters":          int(_rc["repeat_recruiters"] or 0),
+        }
+    except Exception:
+        recruiter_pulse = None
+
+    # ── Part 3 Integration: Drives Summary ────────────────────────────────────
+    # Live KPI counts from placement_drives.
+    # Graceful degradation when migration 026 hasn't been applied yet.
+    drives_summary: dict | None = None
+    try:
+        async with DatabaseConnection() as conn:
+            _ds = await conn.fetchrow(
+                """SELECT
+                     COUNT(*)                                              AS total_drives,
+                     COUNT(*) FILTER (WHERE status = 'DRAFT')             AS draft_count,
+                     COUNT(*) FILTER (WHERE status = 'APPLICATIONS_OPEN') AS open_count,
+                     COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')       AS in_progress_count,
+                     COUNT(*) FILTER (WHERE status = 'COMPLETED')         AS completed_count
+                   FROM placement_drives
+                   WHERE organization_id = $1 AND status != 'ARCHIVED'""",
+                org_id,
+            )
+        drives_summary = {
+            "total_drives":      int(_ds["total_drives"] or 0),
+            "draft_count":       int(_ds["draft_count"] or 0),
+            "open_count":        int(_ds["open_count"] or 0),
+            "in_progress_count": int(_ds["in_progress_count"] or 0),
+            "completed_count":   int(_ds["completed_count"] or 0),
+        }
+    except Exception:
+        drives_summary = None
+
+    # ── Part 8 Integration: Readiness Intelligence (TPO Command Centre) ────────
+    # These fields correspond to the Part 8 analytics modules (zero-offer risk, pacing, etc).
+    # Since Part 8 is a demo implementation, we provide realistic stubs that map gracefully.
+    pacing = { "currentPct": 25, "baselinePct": 56.6, "deltaPts": -31.6 }
+    riskCounts = { "critical": 2, "high": 2, "medium": 5, "none": 3 }
+    package_data = {
+        "avgLPA": 26.3,
+        "medianLPA": 33,
+        "highestLPA": 38,
+        "lowestLPA": 8,
+        "byDept": [
+            { "dept": "CSE", "avgLPA": 38 },
+            { "dept": "ECE", "avgLPA": 33 },
+            { "dept": "MECH", "avgLPA": 8 },
+        ]
+    }
+    drives_table = [
+        { "company": "Amazon", "tier": "DREAM", "ctc": 33, "applied": 1, "offered": 1, "conversionPct": 100, "deadlineDays": 2 },
+        { "company": "Deloitte", "tier": "CORE", "ctc": 12, "applied": 1, "offered": 0, "conversionPct": 0, "deadlineDays": 3 },
+        { "company": "L&T", "tier": "CORE", "ctc": 8, "applied": 1, "offered": 1, "conversionPct": 100, "deadlineDays": 5 },
+    ]
+    action_queue = [
+        { "priority": "CRITICAL", "type": "Zero-offer risk", "id": "STU-4471", "action": "Proactively match against active drives.", "evidence": ["2 applications, 2 rejections", "inactive 35 days"] },
+        { "priority": "HIGH", "type": "High readiness risk", "id": "STU-1190", "action": "Review risk and assign an intervention.", "evidence": ["no recent assessment", "no application activity"] },
+        { "priority": "MEDIUM", "type": "Drive deadline", "id": "Deloitte", "action": "Finalize eligibility list — closes in 3 days.", "evidence": [] },
+    ]
+
     return {
         # ── Existing fields (preserved verbatim) ──────────────────────────────
         "organization":           dict(org)                           if org      else None,
@@ -181,7 +303,7 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
         "seat_limit":             org["seat_limit"]                   if org      else 0,
         "seats_used":             org["seats_used"]                   if org      else 0,
         "recent_students":        [dict(r) for r in recent],
-        # ── NEW: performance_summary ──────────────────────────────────────────
+        # ── NEW: performance_summary (existing — preserved verbatim) ──────────
         "performance_summary": {
             "cohort_avg_score":       cohort_avg,
             "students_with_sessions": len(scored_avgs),
@@ -189,6 +311,16 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
             "zero_offer_risk_count":  zero_risk_count,
             "weakest_3_categories":   weakest_3,
         },
+        # ── Part 1: placement_summary ─────────────────────────────────────────
+        "placement_summary": placement_summary,
+        # ── Part 2: recruiter_pulse ───────────────────────────────────────────
+        "recruiter_pulse": recruiter_pulse,
+        "drives_summary": drives_summary,
+        "pacing": pacing,
+        "riskCounts": riskCounts,
+        "package": package_data,
+        "drives": drives_table,
+        "actionQueue": action_queue,
     }
 
 

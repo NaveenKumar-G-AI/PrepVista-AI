@@ -1,0 +1,133 @@
+{
+  "company_id": "hcltech",
+  "display_name": "HCLTech",
+  "aliases": ["HCL", "HCL Technologies"],
+  "archetype": "mass_service",
+  "tier": "tier1_service",
+  "tier_rank": "A",
+  "hiring_scale": "very_high",
+  "logo_asset": "hcltech.svg",
+  "brand_colors": { "primary": "#0F5EF7", "accent": "#00C4B3" },
+  "platform": {
+    "name": "HCLTech National Test (Mettl-style)",
+    "emulation_profile": "custom",
+    "proctored": true,
+    "tab_switch_policy": "flag",
+    "navigation": "free_within_section",
+    "on_screen_calculator": true,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "base",    "label": "HCLTech Engineering (base)", "ctc_lpa": [3.5, 4.5], "gate": "aptitude+technical" },
+    { "track": "digital", "label": "HCLTech Digital",            "ctc_lpa": [5.5, 6.5], "gate": "aptitude+technical+coding" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 1,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"]
+  },
+  "re_eligibility_gap_months": null,
+  "format_confidence": 0.45,
+  "last_verified": "2026-03",
+  "recent_changes": [
+    "VERIFY BEFORE SEASON: HCLTech has the thinnest public 2026 format detail of the Tier-A set. TechBee (12th-pass Early Career Programme) is a separate, non-degree track — keep as a distinct blueprint if targeted."
+  ],
+  "culture_values": ["ideapreneurship", "employee_first", "trust", "transparency"],
+  "what_they_value": "Solid aptitude, CS fundamentals, and a working coding component (standard service shape).",
+  "notes": "Modeled on the mass_service template pending current-cycle verification (low format_confidence + verify banner).",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "hcltech_aptitude",
+      "round_type": "aptitude_test",
+      "label": "Online Aptitude",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "quant",   "label": "Quantitative", "competency": "aptitude_reasoning", "item_type": "mcq", "count": 15, "minutes": 15, "topics": ["percentages", "ratio", "tsd"] },
+        { "section_id": "logical", "label": "Logical",      "competency": "aptitude_reasoning", "item_type": "mcq", "count": 15, "minutes": 15, "topics": ["series", "coding_decoding", "syllogism"] },
+        { "section_id": "english", "label": "English",      "competency": "communication",      "item_type": "mcq", "count": 15, "minutes": 15, "topics": ["grammar", "reading_comprehension"] }
+      ],
+      "gate_rule": { "type": "overall", "params": { "min_percentile_by_track": { "base": { "overall": 60 } } } },
+      "notes": "Standard aptitude (quant + logical + English). Numbers are template estimates — verify."
+    },
+    {
+      "order": 2,
+      "round_id": "hcltech_technical",
+      "round_type": "technical_mcq",
+      "label": "Technical MCQ",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "cs_mcq", "label": "CS Fundamentals + Programming", "competency": "technical_domain", "item_type": "mcq", "count": 15, "minutes": 20, "topics": ["oops", "dbms", "os", "cn", "programming"] }
+      ],
+      "gate_rule": { "type": "sectional", "params": { "min_percent": 55 } },
+      "notes": "CS fundamentals + programming MCQ."
+    },
+    {
+      "order": 3,
+      "round_id": "hcltech_coding",
+      "round_type": "coding_test",
+      "label": "Coding",
+      "is_elimination": true,
+      "applies_to_tracks": ["digital"],
+      "difficulty_profile": "medium",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding_1", "label": "Problem 1", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 22, "topics": ["arrays", "strings"], "languages_allowed": ["C", "C++", "Java", "Python"] },
+        { "section_id": "coding_2", "label": "Problem 2", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 23, "topics": ["logic", "math"], "languages_allowed": ["C", "C++", "Java", "Python"] }
+      ],
+      "gate_rule": { "type": "coding_count", "params": { "min_solved_by_track": { "digital": 1 } } },
+      "notes": "Coding component gates the higher digital track. Verify current-cycle counts."
+    },
+    {
+      "order": 4,
+      "round_id": "hcltech_interview",
+      "round_type": "technical_interview",
+      "label": "Technical Interview",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 35,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "tech_qa", "label": "DSA + CS Fundamentals + Project", "competency": "technical_domain", "item_type": "interview_qa", "count": 6, "minutes": 35, "topics": ["dsa", "cs_fundamentals", "project"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.0 } },
+      "notes": "DSA, CS fundamentals, project."
+    },
+    {
+      "order": 5,
+      "round_id": "hcltech_hr",
+      "round_type": "hr_interview",
+      "label": "HR Interview",
+      "is_elimination": true,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "hr_qa", "label": "HR", "competency": "hr_behavioral", "item_type": "interview_qa", "count": 5, "minutes": 20, "topics": ["motivation", "relocation", "candidate_questions"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "Standard HR."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "multi_signal_tracks",
+    "attributes": ["aptitude", "technical", "coding"],
+    "tracks": [
+      { "track": "base",    "label": "HCLTech Engineering (base)", "requires": { "aptitude_cleared": true, "technical_cleared": true } },
+      { "track": "digital", "label": "HCLTech Digital",            "requires": { "coding_solved": 1 } }
+    ],
+    "params": { "order_high_to_low": ["digital", "base"] },
+    "gap_hints": {
+      "base_to_digital": "Clear the coding component to unlock the higher digital track."
+    }
+  }
+}

@@ -1,0 +1,846 @@
+{
+  "schema_version": 2,
+  "description": "RAPID mock-interview session templates for PrepVista. Full mocks deliberately run 10-15 minutes and cover ALL 14 question categories with at least one question each (one question per category, 14 total), so a student gets a complete, low-fatigue readiness check in one short sitting. Company types differ by difficulty, not length. Focused drills are even shorter, single-purpose sessions. Difficulty modes (auto/normal/medium/difficult) are requests; each module clamps them to its category's allowed band.",
+  "format_note": "Brisk pacing (~1 minute per question). Per-question maximums still come from each module's time_limit_s; the round minutes set the session budget.",
+  "categories": [
+    "hr_behavioral",
+    "resume_based",
+    "technical_domain",
+    "aptitude_reasoning",
+    "situational_star",
+    "stress_curveball",
+    "puzzles_brainteasers",
+    "creative_estimation",
+    "case_study",
+    "culture_fit",
+    "career_motivation",
+    "salary_expectation",
+    "group_discussion",
+    "candidate_questions"
+  ],
+  "company_types": [
+    "service",
+    "product",
+    "analytics",
+    "core",
+    "general"
+  ],
+  "difficulty_modes": [
+    "auto",
+    "normal",
+    "medium",
+    "difficult"
+  ],
+  "blueprints": [
+    {
+      "key": "service_full",
+      "label": "IT Services — Rapid Full Mock (10–15 min)",
+      "description": "A fast, complete mock for IT-services hiring: all 14 question types in one brisk session, tuned to the breadth-and-communication style of service companies.",
+      "company_types": [
+        "service"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 14,
+      "default_difficulty_mode": "normal",
+      "covers_all_categories": true,
+      "rounds": [
+        {
+          "round": "Technical & Aptitude Screen",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "aptitude_reasoning",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "technical_domain",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "resume_based",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "puzzles_brainteasers",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Problem Solving",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "case_study",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "creative_estimation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "stress_curveball",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Behavioral & Situational",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "hr_behavioral",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "situational_star",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Fit & Closing",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "culture_fit",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "group_discussion",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "salary_expectation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "candidate_questions",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 14
+    },
+    {
+      "key": "product_full",
+      "label": "Product Company — Rapid Full Mock (10–15 min)",
+      "description": "A fast, complete mock for product companies: all 14 question types, with the technical and problem-solving items dialled up to the depth product companies expect.",
+      "company_types": [
+        "product"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 15,
+      "default_difficulty_mode": "medium",
+      "covers_all_categories": true,
+      "rounds": [
+        {
+          "round": "Technical & Aptitude Screen",
+          "minutes": 5,
+          "sections": [
+            {
+              "category": "aptitude_reasoning",
+              "questions": 1,
+              "difficulty_mode": "medium"
+            },
+            {
+              "category": "technical_domain",
+              "questions": 1,
+              "difficulty_mode": "difficult"
+            },
+            {
+              "category": "resume_based",
+              "questions": 1,
+              "difficulty_mode": "medium"
+            },
+            {
+              "category": "puzzles_brainteasers",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Problem Solving",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "case_study",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "creative_estimation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "stress_curveball",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Behavioral & Situational",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "hr_behavioral",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "situational_star",
+              "questions": 1,
+              "difficulty_mode": "medium"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Fit & Closing",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "culture_fit",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "group_discussion",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "salary_expectation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "candidate_questions",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 14
+    },
+    {
+      "key": "analytics_full",
+      "label": "Analytics / Data Science — Rapid Full Mock (10–15 min)",
+      "description": "A fast, complete mock for analytics roles: all 14 question types, weighted toward quantitative rigour and structured case/guesstimate reasoning.",
+      "company_types": [
+        "analytics"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 14,
+      "default_difficulty_mode": "medium",
+      "covers_all_categories": true,
+      "rounds": [
+        {
+          "round": "Technical & Aptitude Screen",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "aptitude_reasoning",
+              "questions": 1,
+              "difficulty_mode": "medium"
+            },
+            {
+              "category": "technical_domain",
+              "questions": 1,
+              "difficulty_mode": "medium"
+            },
+            {
+              "category": "resume_based",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "puzzles_brainteasers",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Problem Solving",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "case_study",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "creative_estimation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "stress_curveball",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Behavioral & Situational",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "hr_behavioral",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "situational_star",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Fit & Closing",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "culture_fit",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "group_discussion",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "salary_expectation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "candidate_questions",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 14
+    },
+    {
+      "key": "core_full",
+      "label": "Core Engineering — Rapid Full Mock (10–15 min)",
+      "description": "A fast, complete mock for core-engineering roles: all 14 question types, weighted toward domain fundamentals and realism.",
+      "company_types": [
+        "core"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 14,
+      "default_difficulty_mode": "normal",
+      "covers_all_categories": true,
+      "rounds": [
+        {
+          "round": "Technical & Aptitude Screen",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "aptitude_reasoning",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "technical_domain",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "resume_based",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "puzzles_brainteasers",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Problem Solving",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "case_study",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "creative_estimation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "stress_curveball",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Behavioral & Situational",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "hr_behavioral",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "situational_star",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Fit & Closing",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "culture_fit",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "group_discussion",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "salary_expectation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "candidate_questions",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 14
+    },
+    {
+      "key": "general_full",
+      "label": "General / Mixed — Rapid Full Mock (10–15 min)",
+      "description": "A fast, complete, balanced mock for any company or when the type is unknown: all 14 question types at adaptive difficulty.",
+      "company_types": [
+        "general"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 13,
+      "default_difficulty_mode": "auto",
+      "covers_all_categories": true,
+      "rounds": [
+        {
+          "round": "Technical & Aptitude Screen",
+          "minutes": 4,
+          "sections": [
+            {
+              "category": "aptitude_reasoning",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "technical_domain",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "resume_based",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "puzzles_brainteasers",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Problem Solving",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "case_study",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "creative_estimation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "stress_curveball",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Behavioral & Situational",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "hr_behavioral",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "situational_star",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        },
+        {
+          "round": "Fit & Closing",
+          "minutes": 3,
+          "sections": [
+            {
+              "category": "culture_fit",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "group_discussion",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "salary_expectation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "candidate_questions",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 14
+    },
+    {
+      "key": "quick_warmup",
+      "label": "Quick Warm-up (5 min)",
+      "description": "A 5-minute mixed warm-up to shake off nerves right before a real interview.",
+      "company_types": [
+        "service",
+        "product",
+        "analytics",
+        "core",
+        "general"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 5,
+      "default_difficulty_mode": "auto",
+      "covers_all_categories": false,
+      "rounds": [
+        {
+          "round": "Warm-up",
+          "minutes": 5,
+          "sections": [
+            {
+              "category": "hr_behavioral",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "technical_domain",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "aptitude_reasoning",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 4
+    },
+    {
+      "key": "hr_round_only",
+      "label": "HR & Behavioral Drill (10 min)",
+      "description": "Focused 10-minute practice on the HR round — intro, behavioral stories, motivation, fit, and your questions.",
+      "company_types": [
+        "service",
+        "product",
+        "analytics",
+        "core",
+        "general"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 10,
+      "default_difficulty_mode": "auto",
+      "covers_all_categories": false,
+      "rounds": [
+        {
+          "round": "HR Round",
+          "minutes": 10,
+          "sections": [
+            {
+              "category": "hr_behavioral",
+              "questions": 2,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "situational_star",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "culture_fit",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "candidate_questions",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 6
+    },
+    {
+      "key": "technical_round_only",
+      "label": "Technical Drill (10 min)",
+      "description": "Focused 10-minute technical practice — domain depth, a resume drill-down, and a brain-teaser.",
+      "company_types": [
+        "service",
+        "product",
+        "analytics",
+        "core",
+        "general"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 10,
+      "default_difficulty_mode": "medium",
+      "covers_all_categories": false,
+      "rounds": [
+        {
+          "round": "Technical Round",
+          "minutes": 10,
+          "sections": [
+            {
+              "category": "technical_domain",
+              "questions": 4,
+              "difficulty_mode": "medium"
+            },
+            {
+              "category": "resume_based",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "puzzles_brainteasers",
+              "questions": 1,
+              "difficulty_mode": "medium"
+            }
+          ]
+        }
+      ],
+      "total_questions": 6
+    },
+    {
+      "key": "gd_practice",
+      "label": "Group Discussion Drill (10 min)",
+      "description": "Focused 10-minute GD practice across varied topics.",
+      "company_types": [
+        "service",
+        "analytics",
+        "core",
+        "general"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 10,
+      "default_difficulty_mode": "medium",
+      "covers_all_categories": false,
+      "rounds": [
+        {
+          "round": "Group Discussion",
+          "minutes": 10,
+          "sections": [
+            {
+              "category": "group_discussion",
+              "questions": 3,
+              "difficulty_mode": "medium"
+            }
+          ]
+        }
+      ],
+      "total_questions": 3
+    },
+    {
+      "key": "final_round",
+      "label": "Final / Offer-Stage Drill (8 min)",
+      "description": "An 8-minute final-round drill — culture fit, the salary conversation, motivation, and the questions you ask them.",
+      "company_types": [
+        "service",
+        "product",
+        "analytics",
+        "core",
+        "general"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 8,
+      "default_difficulty_mode": "auto",
+      "covers_all_categories": false,
+      "rounds": [
+        {
+          "round": "Final Round",
+          "minutes": 8,
+          "sections": [
+            {
+              "category": "culture_fit",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "salary_expectation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "career_motivation",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            },
+            {
+              "category": "candidate_questions",
+              "questions": 1,
+              "difficulty_mode": "auto"
+            }
+          ]
+        }
+      ],
+      "total_questions": 4
+    },
+    {
+      "key": "aptitude_drill",
+      "label": "Aptitude & Reasoning Drill (10 min)",
+      "description": "A focused 10-minute aptitude and reasoning drill — the first screen most companies use.",
+      "company_types": [
+        "service",
+        "analytics",
+        "core",
+        "general"
+      ],
+      "roles": [
+        "any"
+      ],
+      "total_minutes": 10,
+      "default_difficulty_mode": "normal",
+      "covers_all_categories": false,
+      "rounds": [
+        {
+          "round": "Aptitude Drill",
+          "minutes": 10,
+          "sections": [
+            {
+              "category": "aptitude_reasoning",
+              "questions": 6,
+              "difficulty_mode": "normal"
+            },
+            {
+              "category": "puzzles_brainteasers",
+              "questions": 1,
+              "difficulty_mode": "normal"
+            }
+          ]
+        }
+      ],
+      "total_questions": 7
+    }
+  ]
+}

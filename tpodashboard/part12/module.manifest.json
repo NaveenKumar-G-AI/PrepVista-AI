@@ -1,0 +1,61 @@
+{
+  "module": "ai-placement-officer",
+  "version": "1.0.0",
+  "part": 12,
+  "owner_paths": [
+    "modules/ai/**",
+    "services/ai/**",
+    "services/ai-tools/**",
+    "api/ai/**",
+    "schemas/ai/**",
+    "tests/ai/**"
+  ],
+  "routes": [
+    "POST /api/ai/session",
+    "POST /api/ai/message",
+    "GET  /api/ai/briefing",
+    "POST /api/ai/action/propose",
+    "POST /api/ai/action/confirm"
+  ],
+  "api": [
+    "AIPlacementOfficer.handleMessage",
+    "AIPlacementOfficer.generateBriefing",
+    "AIPlacementOfficer.proposeAction",
+    "AIPlacementOfficer.confirmAction"
+  ],
+  "database_tables": [
+    "ai_session (reference shape only — see src/session.js; production build swaps the in-memory store for a real table)",
+    "ai_message (reference shape only — see src/session.js)"
+  ],
+  "tools": "see src/tools/index.js for the full registered tool catalog (43 tools across 12 categories)",
+  "events_published": [
+    "AI_SESSION_CREATED",
+    "AI_TOOL_CALLED",
+    "AI_TOOL_FAILED",
+    "AI_RESPONSE_GENERATED",
+    "AI_ACTION_PROPOSED",
+    "AI_ACTION_CONFIRMED",
+    "AI_ACTION_EXECUTED",
+    "AI_ACTION_FAILED",
+    "AI_PERMISSION_DENIED"
+  ],
+  "events_consumed": [],
+  "services_exposed": [
+    "AIPlacementOfficer (src/orchestrator.js)",
+    "ToolRegistry (src/tools/registry.js)"
+  ],
+  "dependencies": [
+    "students",
+    "companies",
+    "drives",
+    "applications",
+    "interviews",
+    "offers",
+    "training",
+    "readiness",
+    "communication",
+    "reports",
+    "admin"
+  ],
+  "integration_note": "This build was produced in a session with no access to the real Part 1-11 codebases. Every dependency above is fronted by a documented service contract in src/services/mockServices.js with an in-memory mock implementation standing in for the real service. Swapping to production means implementing the same contract against the real Part 1-11 services — the tool layer, permission guard, and orchestrator do not change."
+}

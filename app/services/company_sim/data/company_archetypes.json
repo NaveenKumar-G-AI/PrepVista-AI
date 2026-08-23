@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "description": "The 6 archetype templates a company inherits until it is hand-verified (Dossier Part 8 / Roster). Tier-B/C companies map to one of these and are usable day one; Tier-A companies override with a full blueprint. 'default_rounds' is the ordered round-type spine; 'default_skin' picks a platform_skins profile; 'package_band_lpa' is the typical CTC range; 'exotic_rounds' lists which net-new simulators the archetype expects.",
+  "archetypes": {
+    "mass_service": {
+      "label": "Mass-service (IT services)",
+      "default_rounds": [
+        { "round_type": "aptitude_test", "label": "Aptitude (verbal + reasoning + numerical)" },
+        { "round_type": "technical_mcq", "label": "Technical / Pseudocode MCQ" },
+        { "round_type": "coding_test", "label": "Coding (1-2 problems)" },
+        { "round_type": "technical_interview", "label": "Technical Interview" },
+        { "round_type": "hr_interview", "label": "HR Interview" }
+      ],
+      "default_skin": "superset",
+      "package_band_lpa": [3.5, 7.5],
+      "has_tracks": true,
+      "exotic_rounds": [],
+      "notes": "OA (aptitude + technical/pseudocode MCQ + 1-2 coding) → Technical Interview → HR."
+    },
+    "product": {
+      "label": "Product / internet company",
+      "default_rounds": [
+        { "round_type": "coding_test", "label": "OA (2 DSA + optional debugging)" },
+        { "round_type": "technical_interview", "label": "Technical / DSA Interview 1" },
+        { "round_type": "technical_interview", "label": "Technical / DSA Interview 2" },
+        { "round_type": "hr_interview", "label": "HR Interview" }
+      ],
+      "default_skin": "hackerrank_style",
+      "package_band_lpa": [8.0, 20.0],
+      "has_tracks": false,
+      "exotic_rounds": ["system_design"],
+      "notes": "OA (2 DSA + optional debugging) → 2-3 technical/DSA interviews → HR; optional LLD."
+    },
+    "premium_product": {
+      "label": "Premium product (FAANG-tier)",
+      "default_rounds": [
+        { "round_type": "coding_test", "label": "OA / Phone Screen (DSA)" },
+        { "round_type": "technical_interview", "label": "DSA Loop 1" },
+        { "round_type": "technical_interview", "label": "DSA Loop 2" },
+        { "round_type": "system_design", "label": "System Design (senior)" },
+        { "round_type": "bar_raiser", "label": "Behavioral / Bar-Raiser" }
+      ],
+      "default_skin": "hackerrank_style",
+      "package_band_lpa": [20.0, 50.0],
+      "has_tracks": true,
+      "exotic_rounds": ["system_design", "bar_raiser", "hiring_committee", "behavioral_survey", "work_simulation"],
+      "notes": "OA/phone screen → DSA loop + system design → behavioral/committee/bar-raiser."
+    },
+    "analytics": {
+      "label": "Analytics / consulting / finance-tech",
+      "default_rounds": [
+        { "round_type": "aptitude_test", "label": "Aptitude + Stats" },
+        { "round_type": "case_study_round", "label": "Case / Guesstimate", "round_type_fallback": "managerial_interview" },
+        { "round_type": "technical_interview", "label": "SQL / ML Technical" },
+        { "round_type": "hr_interview", "label": "HR Interview" }
+      ],
+      "default_skin": "custom",
+      "package_band_lpa": [6.0, 14.0],
+      "has_tracks": true,
+      "exotic_rounds": [],
+      "notes": "aptitude + stats → case/guesstimate → SQL/ML technical → HR. Case-heavy. (Case round reuses managerial_interview + q_case_study skin.)"
+    },
+    "core": {
+      "label": "Core engineering (mech / eee / ece / civil / chemical)",
+      "default_rounds": [
+        { "round_type": "aptitude_test", "label": "Aptitude" },
+        { "round_type": "technical_mcq", "label": "Domain MCQ" },
+        { "round_type": "technical_interview", "label": "Domain Technical Interview" },
+        { "round_type": "hr_interview", "label": "HR Interview" }
+      ],
+      "default_skin": "custom",
+      "package_band_lpa": [3.5, 8.0],
+      "has_tracks": true,
+      "exotic_rounds": [],
+      "notes": "aptitude + domain MCQ → domain technical → HR."
+    },
+    "unique": {
+      "label": "Unique (bespoke, e.g. Zoho)",
+      "default_rounds": [],
+      "default_skin": "proctored_meet",
+      "package_band_lpa": [6.0, 10.0],
+      "has_tracks": false,
+      "exotic_rounds": ["advanced_coding"],
+      "notes": "Bespoke selection process; always Tier A (no meaningful template default)."
+    }
+  }
+}

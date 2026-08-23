@@ -32,9 +32,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { BuildingIcon, ChartIcon, KeyIcon, SparklesIcon, UsersIcon } from '@/components/icons';
-import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api';
+import { BuildingIcon, ChartIcon, KeyIcon, SparklesIcon, UsersIcon } from '@/components/icons';
+
+import { CommandCentreHeader } from './components/CommandCentreHeader';
+import { CommandCentreHero } from './components/CommandCentreHero';
+import { PulseStrip } from './components/PulseStrip';
 
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -64,6 +68,15 @@ interface PerformanceSummary {
   weakest_3_categories: WeakCategory[];
 }
 
+/** Part 1 integration — placement funnel stats from placement_outcomes table.
+ *  Optional: returns null from backend when table is absent or has no data. */
+interface PlacementSummary {
+  total_submissions: number;
+  placed_count: number;
+  companies_engaged: number;
+  placement_percentage: number | null;
+}
+
 interface RecentStudent {
   id: string;
   student_code: string | null;
@@ -85,6 +98,37 @@ interface DashboardData {
   recent_students: RecentStudent[];
   /** Extended by MBP-1 backend work. Optional: page degrades safely without it. */
   performance_summary?: PerformanceSummary;
+  /** Part 1 integration. Optional: null when placement_outcomes has no data. */
+  placement_summary?: PlacementSummary | null;
+  /** Part 2 integration. Optional: null when migration 025 not yet applied. */
+  recruiter_pulse?: RecruiterPulse | null;
+  /** Part 3 integration. Optional: null when migration 026 not yet applied. */
+  drives_summary?: DrivesSummary | null;
+  /** Part 8 integration. */
+  pacing?: { currentPct: number; baselinePct: number; deltaPts: number };
+  riskCounts?: { critical: number; high: number; medium: number; none: number };
+  package?: { avgLPA: number; medianLPA: number; highestLPA: number; lowestLPA: number; byDept: any[] };
+  drives?: any[];
+  actionQueue?: any[];
+}
+
+/** Part 2 — live recruiter CRM counts from recruiter_companies & recruiter_followups. */
+interface RecruiterPulse {
+  companies: number;
+  active_relationships: number;
+  open_followups: number;
+  overdue_followups: number;
+  new_relationships_last_30d: number;
+  repeat_recruiters: number;
+}
+
+/** Part 3 — live placement drive KPI counts from placement_drives. */
+interface DrivesSummary {
+  total_drives: number;
+  draft_count: number;
+  open_count: number;
+  in_progress_count: number;
+  completed_count: number;
 }
 
 
@@ -217,6 +261,30 @@ const QUICK_ACTIONS = [
     Icon: SparklesIcon,
     iconBg: 'bg-rose-500/15',
     iconText: 'text-rose-400',
+  },
+  {
+    href: '/org-admin/companies',
+    label: 'Recruiter CRM',
+    desc: 'Companies & follow-ups',
+    Icon: BuildingIcon,
+    iconBg: 'bg-emerald-500/15',
+    iconText: 'text-emerald-400',
+  },
+  {
+    href: '/org-admin/interviews',
+    label: 'Placement Interviews',
+    desc: 'Real drives & results',
+    Icon: UsersIcon,
+    iconBg: 'bg-blue-500/15',
+    iconText: 'text-blue-400',
+  },
+  {
+    href: '/org-admin/offers',
+    label: 'Offers & Joining',
+    desc: 'Verify placements & outcomes',
+    Icon: SparklesIcon,
+    iconBg: 'bg-emerald-500/15',
+    iconText: 'text-emerald-400',
   },
 ] as const;
 
@@ -394,6 +462,270 @@ function WeakestCategoriesWidget({ categories }: { categories: WeakCategory[] })
 }
 
 /**
+ * Part 1 Integration — Placement Funnel Summary Widget.
+ * Shows placed_count, total_submissions, companies_engaged, and placement_percentage.
+ * Returns null gracefully when placement_summary is absent (no data yet).
+ * Uses the original Tailwind theme — no raw color variables from the HTML prototypes.
+ */
+function PlacementFunnelWidget({ summary }: { summary: PlacementSummary | null | undefined }) {
+  if (!summary) return null;
+
+  const { total_submissions, placed_count, companies_engaged, placement_percentage } = summary;
+  const notPlaced = total_submissions - placed_count;
+  const placedPct = placement_percentage ?? 0;
+
+  const funnelItems = [
+    {
+      label: 'Total Submissions',
+      value: total_submissions,
+      helper: 'Outcome records logged',
+      accent: 'blue' as const,
+    },
+    {
+      label: 'Placed',
+      value: placed_count,
+      helper: `${placedPct}% placement rate`,
+      accent: 'emerald' as const,
+    },
+    {
+      label: 'Not Placed',
+      value: notPlaced,
+      helper: 'Need further coaching',
+      accent: 'rose' as const,
+    },
+    {
+      label: 'Companies',
+      value: companies_engaged,
+      helper: 'Unique recruiters engaged',
+      accent: 'violet' as const,
+    },
+  ] as const;
+
+  return (
+    <div className="card !p-6 slide-up">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Placement Funnel</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Outcomes recorded via /api/outcomes — real hiring data
+          </p>
+        </div>
+        {placement_percentage !== null && (
+          <div className="shrink-0 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-center">
+            <div className="text-lg font-bold tabular-nums text-emerald-400">{placedPct}%</div>
+            <div className="text-[9px] font-semibold uppercase tracking-widest text-slate-400">Placement Rate</div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {funnelItems.map(({ label, value, helper, accent }) => {
+          const s = STAT_ACCENT_STYLES[accent];
+          return (
+            <div
+              key={label}
+              className={`rounded-2xl bg-gradient-to-br ${s.ring} p-4 ring-1`}
+            >
+              <div className={`text-2xl font-bold tabular-nums ${s.text}`}>{value}</div>
+              <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+              <div className="mt-1 text-[10px] text-slate-500">{helper}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Placed / Not-placed bar */}
+      {total_submissions > 0 && (
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-center justify-between text-[10px] text-slate-500">
+            <span>Placed {placed_count}</span>
+            <span>Not placed {notPlaced}</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+              style={{ width: `${placedPct}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Part 2 Integration — Recruiter Pulse Widget.
+ * Shows live CRM KPIs: companies, active relationships, open/overdue follow-ups,
+ * new relationships last 30 days, and repeat recruiters.
+ * Returns null gracefully when recruiter_pulse is absent (migration 025 pending).
+ * Uses the project's STAT_ACCENT_STYLES theme — no prototype colours.
+ */
+function RecruiterPulseWidget({ pulse }: { pulse: RecruiterPulse | null | undefined }) {
+  if (!pulse) return null;
+
+  const tiles = [
+    { label: 'Companies', value: pulse.companies, helper: 'Active in CRM', accent: 'blue' as const },
+    { label: 'Active Relations', value: pulse.active_relationships, helper: 'Past prospect stage', accent: 'emerald' as const },
+    { label: 'Open Follow-ups', value: pulse.open_followups, helper: 'Pending action', accent: 'violet' as const },
+    { label: 'Overdue', value: pulse.overdue_followups, helper: 'Past due date', accent: pulse.overdue_followups > 0 ? 'rose' as const : 'emerald' as const },
+    { label: 'New Last 30d', value: pulse.new_relationships_last_30d, helper: 'Recently added', accent: 'blue' as const },
+    { label: 'Repeat Recruiters', value: pulse.repeat_recruiters, helper: 'Returning partners', accent: 'emerald' as const },
+  ] as const;
+
+  return (
+    <div className="card !p-6 slide-up">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Recruiter Pulse</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Live CRM snapshot — companies &amp; follow-ups</p>
+        </div>
+        <Link
+          href="/org-admin/companies"
+          className="text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+        >
+          Manage companies →
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {tiles.map(({ label, value, helper, accent }) => {
+          const s = STAT_ACCENT_STYLES[accent];
+          return (
+            <div key={label} className={`rounded-2xl bg-gradient-to-br ${s.ring} p-3 ring-1`}>
+              <div className={`text-2xl font-bold tabular-nums ${s.text}`}>{value}</div>
+              <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+              <div className="mt-0.5 text-[9px] text-slate-500">{helper}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {pulse.overdue_followups > 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/8 px-3 py-2">
+          <span className="text-rose-400 text-sm">⚠</span>
+          <span className="text-xs text-rose-300">
+            {pulse.overdue_followups} overdue follow-up{pulse.overdue_followups !== 1 ? 's' : ''} need attention.
+          </span>
+          <Link href="/org-admin/companies" className="ml-auto text-xs text-rose-400 hover:underline">
+            View →
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Part 3 Integration — Placement Drives Summary Widget.
+ * Shows live drive pipeline KPIs from placement_drives table.
+ * Returns null gracefully when drives_summary is absent (migration 026 pending).
+ */
+function DrivesSummaryWidget({ summary }: { summary: DrivesSummary | null | undefined }) {
+  if (!summary) return null;
+
+  const tiles = [
+    { label: 'Total Drives',  value: summary.total_drives,      accent: 'blue' as const },
+    { label: 'Draft',         value: summary.draft_count,        accent: 'violet' as const },
+    { label: 'Applications Open', value: summary.open_count,    accent: 'emerald' as const },
+    { label: 'In Progress',   value: summary.in_progress_count,  accent: 'amber' as const },
+    { label: 'Completed',     value: summary.completed_count,    accent: 'emerald' as const },
+  ] as const;
+
+  return (
+    <div className="card !p-6 slide-up">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Placement Drives</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Drive pipeline — eligibility engine powered</p>
+        </div>
+        <Link
+          href="/org-admin/drives"
+          className="text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+        >
+          Manage drives →
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {tiles.map(({ label, value, accent }) => {
+          const s = STAT_ACCENT_STYLES[accent];
+          return (
+            <div key={label} className={`rounded-2xl bg-gradient-to-br ${s.ring} p-3 ring-1`}>
+              <div className={`text-2xl font-bold tabular-nums ${s.text}`}>{value}</div>
+              <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Part 4 Integration — AI Provider Status Widget.
+ * Self-fetching component: calls /org/my/ai/health independently so it never
+ * blocks or delays the main dashboard. Shows a traffic-light status dot per
+ * registered provider (available=green, unknown=amber, misconfigured=red).
+ * Gracefully collapses if the endpoint is unreachable.
+ */
+function AIProviderStatusWidget() {
+  const [health, setHealth] = useState<{ providers: { provider: string; status: string; detail: string | null }[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getAIProviderHealth<{ providers: { provider: string; status: string; detail: string | null }[] }>()
+      .then(d => setHealth(d))
+      .catch(() => setHealth(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return null;
+  if (!health) return null;
+
+  const DOT: Record<string, string> = {
+    available:     'bg-emerald-400',
+    unknown:       'bg-amber-400',
+    misconfigured: 'bg-rose-500',
+    unavailable:   'bg-rose-500',
+  };
+  const LABEL: Record<string, string> = {
+    available:     'Available',
+    unknown:       'Unknown',
+    misconfigured: 'Not configured',
+    unavailable:   'Unavailable',
+  };
+
+  const availableCount = health.providers.filter(p => p.status === 'available').length;
+
+  return (
+    <div className="card !p-5 slide-up">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-white">AI Provider Status</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {availableCount}/{health.providers.length} provider{health.providers.length !== 1 ? 's' : ''} available
+          </p>
+        </div>
+        <span className="text-lg" aria-hidden>&#x1F9E0;</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {health.providers.map(p => (
+          <div
+            key={p.provider}
+            className="flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-1.5"
+            title={p.detail ?? undefined}
+          >
+            <span className={`h-2 w-2 rounded-full ${DOT[p.status] ?? 'bg-slate-500'}`} />
+            <span className="text-xs font-medium text-white capitalize">{p.provider}</span>
+            <span className="text-[10px] text-slate-500">{LABEL[p.status] ?? p.status}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Dismissible rose alert for zero-offer risk students.
  * Returns null when count === 0 — never renders for healthy cohorts.
  * Dismiss is per-render (component state) so TPO sees it on each visit until they act.
@@ -481,6 +813,155 @@ function DashboardSkeleton() {
   );
 }
 
+/**
+ * Part 8 Integration — Season Pacing Widget.
+ */
+function SeasonPacingWidget({ pacing, seasonLabel }: { pacing: DashboardData['pacing']; seasonLabel: string }) {
+  if (!pacing) return null;
+  const behindSchedule = pacing.deltaPts < 0;
+  return (
+    <div className="flex items-center gap-2 mb-6 slide-up">
+      <span className="text-sm font-medium" style={{ color: behindSchedule ? '#f43f5e' : '#10b981' }}>
+        {behindSchedule ? '▼' : '▲'} {Math.abs(pacing.deltaPts)} pts {behindSchedule ? "behind" : "ahead of"} last season at this point ({pacing.currentPct}% through) for {seasonLabel}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Part 8 Integration — Action Queue Row.
+ */
+function ActionRow({ item }: { item: any }) {
+  const [open, setOpen] = useState(false);
+  const style = {
+    CRITICAL: { cls: "bg-rose-500/10 text-rose-400 border border-rose-500/20", label: "CRITICAL" },
+    HIGH: { cls: "bg-amber-500/10 text-amber-400 border border-amber-500/20", label: "HIGH" },
+    MEDIUM: { cls: "bg-blue-500/10 text-blue-400 border border-blue-500/20", label: "MEDIUM" },
+  }[item.priority as string] || { cls: "bg-slate-500/10 text-slate-400 border border-slate-500/20", label: item.priority };
+  
+  const hasEvidence = item.evidence && item.evidence.length > 0;
+  return (
+    <div className="p-4 border-b border-white/10 hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => hasEvidence && setOpen(!open)}>
+      <div className="flex items-center gap-3">
+        <span className={`text-[10px] font-bold tracking-widest px-2 py-1 rounded-md ${style.cls}`}>{style.label}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-sm font-bold text-white">{item.id}</span>
+            <span className="text-xs text-slate-400">{item.type}</span>
+          </div>
+          <p className="text-sm text-slate-300 mt-1">{item.action}</p>
+        </div>
+        {hasEvidence && <span className="text-slate-500 text-xs">{open ? '▼' : '▶'}</span>}
+      </div>
+      {open && hasEvidence && (
+        <ul className="mt-3 ml-4 list-disc text-xs text-slate-400 space-y-1 pl-4">
+          {item.evidence.map((e: string, i: number) => <li key={i}>{e}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Part 8 Integration — Action Queue Widget.
+ */
+function ActionQueueWidget({ queue }: { queue: DashboardData['actionQueue'] }) {
+  if (!queue || !queue.length) return null;
+  return (
+    <div className="card !p-0 slide-up overflow-hidden">
+      <div className="p-4 border-b border-white/10 bg-white/[0.02]">
+        <h3 className="text-sm font-semibold text-white">Today's Action Queue</h3>
+        <p className="text-xs text-slate-500 mt-0.5">{queue.length} priority items needing attention</p>
+      </div>
+      <div>
+        {queue.map((item, i) => <ActionRow key={i} item={item} />)}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Part 8 Integration — Zero Offer Risk & Package Snapshot
+ */
+function Part8Widgets({ riskCounts, pkg }: { riskCounts: DashboardData['riskCounts'], pkg: DashboardData['package'] }) {
+  if (!riskCounts || !pkg) return null;
+  return (
+    <div className="grid grid-cols-2 gap-4 slide-up">
+      <div className="card !p-5">
+        <h3 className="text-sm font-semibold text-white mb-2">Zero-Offer Risk</h3>
+        <div className="flex items-baseline gap-3 mb-2">
+          <span className="text-3xl font-bold text-rose-400">{riskCounts.critical + riskCounts.high}</span>
+          <span className="text-xs text-slate-400">need attention now</span>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          {riskCounts.critical} critical · {riskCounts.high} high · {riskCounts.medium} medium
+        </p>
+      </div>
+      <div className="card !p-5">
+        <h3 className="text-sm font-semibold text-white mb-2">Package Snapshot</h3>
+        <div className="flex items-baseline gap-3 mb-2">
+          <span className="text-3xl font-bold text-emerald-400">₹{pkg.avgLPA}L</span>
+          <span className="text-xs text-slate-400">average</span>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          highest ₹{pkg.highestLPA}L · median ₹{pkg.medianLPA}L
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Part 8 Integration — Active & Recent Drives Table.
+ */
+function DrivesTableWidget({ drives }: { drives: DashboardData['drives'] }) {
+  if (!drives || !drives.length) return null;
+  return (
+    <div className="card !p-0 slide-up overflow-hidden">
+      <div className="p-4 border-b border-white/10 bg-white/[0.02]">
+        <h3 className="text-sm font-semibold text-white">Active &amp; Recent Drives</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm text-slate-300">
+          <thead className="text-[10px] uppercase tracking-wider text-slate-500 bg-white/[0.02]">
+            <tr>
+              <th className="p-4 font-medium">Company</th>
+              <th className="p-4 font-medium">Tier</th>
+              <th className="p-4 font-medium">CTC</th>
+              <th className="p-4 font-medium">Applied</th>
+              <th className="p-4 font-medium">Offered</th>
+              <th className="p-4 font-medium">Conv.</th>
+              <th className="p-4 font-medium">Deadline</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {drives.map(d => (
+              <tr key={d.company} className="hover:bg-white/[0.02] transition-colors">
+                <td className="p-4 font-medium text-white">{d.company}</td>
+                <td className="p-4">
+                  <span className={`text-[9px] font-bold tracking-widest px-2 py-1 rounded-md ${
+                    d.tier === 'DREAM' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' :
+                    d.tier === 'CORE' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  }`}>
+                    {d.tier}
+                  </span>
+                </td>
+                <td className="p-4 font-mono">₹{d.ctc}L</td>
+                <td className="p-4">{d.applied}</td>
+                <td className="p-4">{d.offered}</td>
+                <td className="p-4">{d.conversionPct === null ? '—' : `${d.conversionPct}%`}</td>
+                <td className={`p-4 ${d.deadlineDays !== null && d.deadlineDays <= 3 ? 'text-rose-400' : 'text-slate-500'}`}>
+                  {d.deadlineDays === null ? 'closed' : `${d.deadlineDays}d`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE COMPONENT
@@ -533,17 +1014,26 @@ export default function OrgAdminDashboard() {
   const lowEngagement = total > 0 && studentsWithSess / total < 0.3;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col -mt-6 -mx-4 lg:-mx-6 lg:-mt-6">
+      <CommandCentreHeader />
+      
+      <div className="p-4 lg:p-6 space-y-6 lg:space-y-8">
+        
+        {/* ── Error banner ────────────────────────────────────────────────────── */}
+        {error && (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-400"
+          >
+            {error}
+          </div>
+        )}
 
-      {/* ── Error banner ────────────────────────────────────────────────────── */}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-400"
-        >
-          {error}
+        {/* ── Command Centre (Part 0) Integration ────────────────────────────── */}
+        <div>
+          <CommandCentreHero />
+          <PulseStrip />
         </div>
-      )}
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_15%_10%,rgba(56,189,248,0.18),transparent_25%),radial-gradient(circle_at_85%_18%,rgba(99,102,241,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0c1830_48%,#0f1b31_100%)] px-7 py-8 text-white shadow-[0_30px_80px_rgba(2,8,23,0.34)] fade-in">
@@ -701,6 +1191,24 @@ export default function OrgAdminDashboard() {
         </div>
       )}
 
+      {/* ── Part 1: Placement Funnel Summary ──────────────────────────────────── */}
+      <PlacementFunnelWidget summary={data?.placement_summary} />
+
+      {/* ── Part 8 Integration: Readiness Intelligence (TPO Command Centre) ───── */}
+      <SeasonPacingWidget pacing={data?.pacing} seasonLabel="2026" />
+      <Part8Widgets riskCounts={data?.riskCounts} pkg={data?.package} />
+      <ActionQueueWidget queue={data?.actionQueue} />
+      <DrivesTableWidget drives={data?.drives} />
+
+      {/* ── Part 2: Recruiter Pulse ────────────────────────────────────────────── */}
+      <RecruiterPulseWidget pulse={data?.recruiter_pulse} />
+
+      {/* ── Part 3: Placement Drives Summary ──────────────────────────────────── */}
+      <DrivesSummaryWidget summary={data?.drives_summary} />
+
+      {/* ── Part 4: AI Provider Status ─────────────────────────────────────────── */}
+      <AIProviderStatusWidget />
+
       {/* ── Quick Actions — 6 total (extended from 4) ────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 slide-up">
         {QUICK_ACTIONS.map(({ href, label, desc, Icon, iconBg, iconText }) => (
@@ -771,6 +1279,7 @@ export default function OrgAdminDashboard() {
         )}
       </section>
 
+      </div>
     </div>
   );
 }

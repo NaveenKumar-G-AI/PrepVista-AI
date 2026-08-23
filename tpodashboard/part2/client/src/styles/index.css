@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-line;
+  }
+  :focus-visible {
+    outline: 2px solid theme("colors.harbor.DEFAULT");
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: theme("colors.gold");
+    color: white;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Tabular numbers everywhere numbers appear in tables/metrics, so columns of digits align. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

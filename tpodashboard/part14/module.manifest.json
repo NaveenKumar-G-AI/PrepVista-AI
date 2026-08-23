@@ -1,0 +1,70 @@
+{
+  "module": "ai-actions",
+  "version": "1.0.0",
+  "part": 14,
+  "routes": [
+    "POST /actions",
+    "GET /actions/:id",
+    "POST /actions/:id/preview",
+    "POST /actions/:id/confirm",
+    "POST /actions/:id/execute",
+    "POST /actions/:id/cancel"
+  ],
+  "api": [
+    "actionEngine.proposeAction(actionType, input, actorContext)",
+    "actionEngine.validateAction(actionId, actorContext)",
+    "actionEngine.previewAction(actionId, actorContext)",
+    "actionEngine.confirmAction(actionId, actorContext)",
+    "actionEngine.executeAction(actionId, actorContext)",
+    "actionEngine.getActionStatus(actionId, actorContext)",
+    "actionEngine.cancelAction(actionId, actorContext)",
+    "automationRuleEngine.register(rule)",
+    "automationRuleEngine.handleEvent(domainEvent)",
+    "getAuditTrail(actionId)"
+  ],
+  "database_tables": [
+    "ai_action",
+    "ai_action_audit",
+    "ai_action_idempotency",
+    "automation_rule"
+  ],
+  "actions": [
+    { "actionType": "list_unapplied_students", "category": "APPLICATION", "riskLevel": "READ" },
+    { "actionType": "prepare_application_reminder", "category": "COMMUNICATION", "riskLevel": "PREPARE" },
+    { "actionType": "create_tpo_task", "category": "TASK", "riskLevel": "LOW_RISK_WRITE" },
+    { "actionType": "send_application_reminder", "category": "COMMUNICATION", "riskLevel": "SENSITIVE_WRITE" },
+    { "actionType": "assign_training_to_cohort", "category": "TRAINING", "riskLevel": "SENSITIVE_WRITE (escalates to HIGH_RISK above 200 records)" },
+    { "actionType": "publish_interview_results", "category": "INTERVIEW", "riskLevel": "HIGH_RISK" },
+    { "actionType": "accept_offer", "category": "OFFER", "riskLevel": "HIGH_RISK" },
+    { "actionType": "notify_student_result_published", "category": "COMMUNICATION", "riskLevel": "LOW_RISK_WRITE" }
+  ],
+  "events_published": [
+    "ai_action.proposed",
+    "ai_action.status_changed",
+    "ai_action.executed",
+    "automation_rule.fired"
+  ],
+  "events_consumed": [
+    "interview_result.published",
+    "drive.deadline_approaching",
+    "readiness.signal_detected"
+  ],
+  "services_exposed": [
+    "ActionEngine",
+    "AutomationRuleEngine",
+    "ActionRegistry"
+  ],
+  "dependencies": [
+    "ai",
+    "admin",
+    "communication",
+    "students",
+    "drives",
+    "applications",
+    "interviews",
+    "offers",
+    "training",
+    "readiness",
+    "reports"
+  ]
+}

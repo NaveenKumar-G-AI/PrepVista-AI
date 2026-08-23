@@ -1,0 +1,282 @@
+{
+  "branch": "cse",
+  "label": "Computer Science & Engineering",
+  "schema_version": 1,
+  "notes": "Seed technical questions for q_technical_domain.py (cse branch). Grouped by topic; each topic carries easy/medium/hard seeds. These steer the live LLM and serve as graceful-degradation fallbacks; they are not a fixed paper.",
+  "topics": [
+    {
+      "topic": "Data Structures",
+      "subtopics": [
+        "Arrays",
+        "Linked Lists",
+        "Stacks & Queues",
+        "Trees",
+        "Hashing",
+        "Heaps",
+        "Graphs"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between an array and a linked list, and when would you use each?",
+          "Explain how a stack works and give a real use case.",
+          "What is a hash table, and why are lookups typically O(1)?",
+          "What's the difference between a queue and a stack?"
+        ],
+        "medium": [
+          "How would you detect a cycle in a linked list?",
+          "Explain how a hash collision is handled — chaining vs open addressing.",
+          "When would you choose a balanced BST over a hash table?",
+          "How does a min-heap support an efficient priority queue?"
+        ],
+        "hard": [
+          "Design a data structure that supports insert, delete, and getRandom in O(1).",
+          "How would you implement an LRU cache, and what structures make it O(1)?",
+          "Explain how a trie works and where it beats a hash map.",
+          "How would you represent and traverse a large sparse graph efficiently?"
+        ]
+      }
+    },
+    {
+      "topic": "Algorithms",
+      "subtopics": [
+        "Sorting",
+        "Searching",
+        "Recursion",
+        "Dynamic Programming",
+        "Greedy",
+        "Complexity"
+      ],
+      "questions": {
+        "easy": [
+          "Explain Big-O notation and why it matters.",
+          "What's the difference between linear and binary search, and what does binary search need?",
+          "Describe how bubble sort works and its time complexity.",
+          "What does it mean for an algorithm to be O(n log n)?"
+        ],
+        "medium": [
+          "Compare quicksort and mergesort — time, space, and stability.",
+          "Explain the idea behind dynamic programming with an example.",
+          "How would you find the kth largest element in an array efficiently?",
+          "What's the difference between a greedy approach and dynamic programming?"
+        ],
+        "hard": [
+          "Solve the longest common subsequence problem and state its complexity.",
+          "How would you detect the shortest path in a weighted graph, and which algorithm fits when?",
+          "Explain how you'd approach the 0/1 knapsack problem.",
+          "Given a stream of numbers, how would you maintain a running median?"
+        ]
+      }
+    },
+    {
+      "topic": "Object-Oriented Programming",
+      "subtopics": [
+        "Encapsulation",
+        "Inheritance",
+        "Polymorphism",
+        "Abstraction",
+        "SOLID"
+      ],
+      "questions": {
+        "easy": [
+          "Explain the four pillars of OOP in your own words.",
+          "What's the difference between a class and an object?",
+          "What is encapsulation, and why is it useful?",
+          "What's the difference between overloading and overriding?"
+        ],
+        "medium": [
+          "What's the difference between an abstract class and an interface?",
+          "Explain polymorphism with a concrete example.",
+          "What is composition, and when would you prefer it over inheritance?",
+          "What problem does the single-responsibility principle solve?"
+        ],
+        "hard": [
+          "Walk me through the SOLID principles and why each matters.",
+          "How would you design a class hierarchy for a payment system, and where might inheritance hurt?",
+          "Explain the difference between tight and loose coupling, with an example.",
+          "When does inheritance break encapsulation, and how would you avoid it?"
+        ]
+      }
+    },
+    {
+      "topic": "Databases (DBMS & SQL)",
+      "subtopics": [
+        "Normalization",
+        "Joins",
+        "Indexes",
+        "Transactions",
+        "ACID",
+        "SQL vs NoSQL"
+      ],
+      "questions": {
+        "easy": [
+          "What is a primary key, and how is it different from a foreign key?",
+          "What does normalization mean, and why do we do it?",
+          "What's the difference between an INNER JOIN and a LEFT JOIN?",
+          "What is an index, and why does it speed up queries?"
+        ],
+        "medium": [
+          "Explain the ACID properties of a transaction.",
+          "When would you denormalize a database, and what's the trade-off?",
+          "What's the difference between WHERE and HAVING in SQL?",
+          "When would you choose a NoSQL database over a relational one?"
+        ],
+        "hard": [
+          "How does a database index work under the hood (e.g. a B-tree)?",
+          "Explain isolation levels and the anomalies they prevent.",
+          "How would you design the schema for an e-commerce order system?",
+          "What causes a deadlock in a database, and how is it resolved?"
+        ]
+      }
+    },
+    {
+      "topic": "Operating Systems",
+      "subtopics": [
+        "Processes & Threads",
+        "Scheduling",
+        "Memory",
+        "Deadlock",
+        "Concurrency"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between a process and a thread?",
+          "What is a deadlock, in simple terms?",
+          "What does an operating system actually do?",
+          "What's the difference between concurrency and parallelism?"
+        ],
+        "medium": [
+          "Explain how virtual memory and paging work.",
+          "What are the four conditions necessary for a deadlock?",
+          "What's the difference between a mutex and a semaphore?",
+          "How does a context switch work, and what does it cost?"
+        ],
+        "hard": [
+          "Explain the producer-consumer problem and how you'd solve it.",
+          "How does the OS decide which page to evict (page-replacement algorithms)?",
+          "What is a race condition, and how would you prevent one?",
+          "Compare scheduling algorithms and when each is appropriate."
+        ]
+      }
+    },
+    {
+      "topic": "Computer Networks",
+      "subtopics": [
+        "OSI/TCP-IP",
+        "TCP vs UDP",
+        "HTTP",
+        "DNS",
+        "Routing"
+      ],
+      "questions": {
+        "easy": [
+          "What happens when you type a URL into a browser and press enter?",
+          "What's the difference between TCP and UDP?",
+          "What is an IP address, and what's the difference between IPv4 and IPv6?",
+          "What does DNS do?"
+        ],
+        "medium": [
+          "Explain the TCP three-way handshake.",
+          "What's the difference between HTTP and HTTPS?",
+          "What are the layers of the OSI model, briefly?",
+          "What's the difference between a switch and a router?"
+        ],
+        "hard": [
+          "How does TCP ensure reliable, in-order delivery?",
+          "Explain how HTTPS establishes a secure connection.",
+          "How would you debug a slow web request end to end?",
+          "What is congestion control, and how does TCP handle it?"
+        ]
+      }
+    },
+    {
+      "topic": "Programming Fundamentals",
+      "subtopics": [
+        "Memory",
+        "Pointers",
+        "Recursion",
+        "Error handling",
+        "Value vs reference"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between pass-by-value and pass-by-reference?",
+          "What is recursion, and what does every recursive function need?",
+          "What's the difference between compile-time and run-time errors?",
+          "What is the difference between the stack and the heap in memory?"
+        ],
+        "medium": [
+          "What is a memory leak, and how can it happen?",
+          "Explain the difference between deep copy and shallow copy.",
+          "What are exceptions, and how should they be handled well?",
+          "What's the difference between mutable and immutable types?"
+        ],
+        "hard": [
+          "How does garbage collection work, at a high level?",
+          "What is a dangling pointer, and how do you avoid one?",
+          "Explain how recursion uses the call stack and when it overflows.",
+          "What's the difference between concurrency bugs and logic bugs, with an example?"
+        ]
+      }
+    },
+    {
+      "topic": "System Design (basics)",
+      "subtopics": [
+        "Scalability",
+        "Caching",
+        "Load balancing",
+        "Databases at scale",
+        "APIs"
+      ],
+      "questions": {
+        "easy": [
+          "What is caching, and why does it help performance?",
+          "What does a load balancer do?",
+          "What's the difference between horizontal and vertical scaling?",
+          "What is an API, in simple terms?"
+        ],
+        "medium": [
+          "How would you design a URL shortener at a high level?",
+          "What's the difference between SQL and NoSQL for a high-traffic app?",
+          "Where would you add caching in a typical web app, and what would you cache?",
+          "What is a CDN, and when is it useful?"
+        ],
+        "hard": [
+          "How would you design a system to handle millions of users?",
+          "Explain how you'd keep data consistent across replicas.",
+          "How would you design a rate limiter?",
+          "What trade-offs does the CAP theorem describe?"
+        ]
+      }
+    },
+    {
+      "topic": "Software Engineering & Web",
+      "subtopics": [
+        "Version control",
+        "Testing",
+        "REST",
+        "Frontend/Backend",
+        "Deployment"
+      ],
+      "questions": {
+        "easy": [
+          "What is version control, and why do teams use Git?",
+          "What's the difference between frontend and backend?",
+          "What is a REST API?",
+          "Why do we write tests for code?"
+        ],
+        "medium": [
+          "What's the difference between unit, integration, and end-to-end tests?",
+          "What do the main HTTP methods (GET, POST, PUT, DELETE) do?",
+          "What is the difference between authentication and authorization?",
+          "What happens during a typical CI/CD pipeline?"
+        ],
+        "hard": [
+          "How would you design a RESTful API for a blogging platform?",
+          "How do you keep a web application secure against common attacks?",
+          "Explain how you'd handle versioning of a public API.",
+          "How would you debug an intermittent production bug you can't reproduce locally?"
+        ]
+      }
+    }
+  ]
+}

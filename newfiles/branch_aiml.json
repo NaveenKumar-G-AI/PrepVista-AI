@@ -1,0 +1,216 @@
+{
+  "branch": "aiml",
+  "label": "Artificial Intelligence & Machine Learning",
+  "schema_version": 1,
+  "notes": "Seed questions for the aiml branch.",
+  "topics": [
+    {
+      "topic": "ML Algorithms",
+      "subtopics": [
+        "regression",
+        "trees",
+        "SVM",
+        "clustering"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between classification and regression?",
+          "Explain linear regression in simple terms.",
+          "What is k-means clustering?"
+        ],
+        "medium": [
+          "How does a decision tree decide where to split?",
+          "What's the difference between bagging and boosting?",
+          "When would you use logistic regression over a tree-based model?"
+        ],
+        "hard": [
+          "Explain how a random forest reduces overfitting compared to a single tree.",
+          "How does gradient boosting work at a high level?",
+          "How would you choose between SVM, tree ensembles, and a neural net for a problem?"
+        ]
+      }
+    },
+    {
+      "topic": "Neural Networks",
+      "subtopics": [
+        "perceptron",
+        "activation",
+        "backprop",
+        "layers"
+      ],
+      "questions": {
+        "easy": [
+          "What is a neuron in a neural network?",
+          "Why do neural networks need activation functions?",
+          "What is a hidden layer?"
+        ],
+        "medium": [
+          "Explain backpropagation in your own words.",
+          "What's the difference between sigmoid, ReLU, and softmax, and where is each used?",
+          "What is the vanishing gradient problem?"
+        ],
+        "hard": [
+          "How would you design a network architecture for a tabular vs an image problem?",
+          "Explain how weight initialisation affects training.",
+          "How do batch normalisation and dropout help training?"
+        ]
+      }
+    },
+    {
+      "topic": "Deep Learning",
+      "subtopics": [
+        "CNN",
+        "RNN",
+        "transformers",
+        "transfer learning"
+      ],
+      "questions": {
+        "easy": [
+          "What is deep learning, and how is it different from classical ML?",
+          "What is a CNN typically used for?",
+          "What is transfer learning?"
+        ],
+        "medium": [
+          "Why are CNNs effective for images?",
+          "What problem do RNNs and LSTMs address?",
+          "At a high level, what is a transformer and why is attention useful?"
+        ],
+        "hard": [
+          "How would you fine-tune a pretrained model on a small dataset?",
+          "Explain how self-attention works at a high level.",
+          "How would you reduce the size or latency of a large deep model for deployment?"
+        ]
+      }
+    },
+    {
+      "topic": "Model Training & Optimization",
+      "subtopics": [
+        "loss",
+        "gradient descent",
+        "learning rate",
+        "epochs"
+      ],
+      "questions": {
+        "easy": [
+          "What is a loss function?",
+          "What does gradient descent do?",
+          "What is a learning rate?"
+        ],
+        "medium": [
+          "What happens if the learning rate is too high or too low?",
+          "What's the difference between batch, mini-batch, and stochastic gradient descent?",
+          "What is early stopping, and why use it?"
+        ],
+        "hard": [
+          "How would you debug a model whose loss isn't decreasing?",
+          "Explain how optimisers like Adam differ from plain SGD.",
+          "How would you tune hyperparameters efficiently?"
+        ]
+      }
+    },
+    {
+      "topic": "Overfitting & Generalization",
+      "subtopics": [
+        "regularization",
+        "validation",
+        "augmentation",
+        "dropout"
+      ],
+      "questions": {
+        "easy": [
+          "What is overfitting, and how would you spot it?",
+          "Why do we use a validation set?",
+          "What is data augmentation?"
+        ],
+        "medium": [
+          "How do L1/L2 regularisation reduce overfitting?",
+          "How does dropout help generalisation?",
+          "What is the bias-variance trade-off?"
+        ],
+        "hard": [
+          "How would you diagnose whether a model is underfitting or overfitting?",
+          "How would you improve a model that does well on training but poorly in production?",
+          "How would you detect and handle distribution shift?"
+        ]
+      }
+    },
+    {
+      "topic": "NLP Basics",
+      "subtopics": [
+        "tokenization",
+        "embeddings",
+        "language models",
+        "sentiment"
+      ],
+      "questions": {
+        "easy": [
+          "What is tokenization in NLP?",
+          "What are word embeddings?",
+          "What is sentiment analysis?"
+        ],
+        "medium": [
+          "What's the difference between bag-of-words and embeddings?",
+          "Why are pretrained language models so useful?",
+          "How would you handle out-of-vocabulary words?"
+        ],
+        "hard": [
+          "How would you build a text-classification pipeline end to end?",
+          "Explain how a transformer-based language model represents context.",
+          "How would you evaluate the quality of a text-generation model?"
+        ]
+      }
+    },
+    {
+      "topic": "Computer Vision Basics",
+      "subtopics": [
+        "pixels",
+        "convolution",
+        "detection",
+        "segmentation"
+      ],
+      "questions": {
+        "easy": [
+          "How is an image represented to a computer?",
+          "What does a convolution do in image processing?",
+          "What's the difference between classification and object detection?"
+        ],
+        "medium": [
+          "Why does a CNN use pooling layers?",
+          "What's the difference between object detection and segmentation?",
+          "How would you handle a small image dataset?"
+        ],
+        "hard": [
+          "How would you approach detecting defects in manufacturing images?",
+          "Explain how data augmentation helps a vision model generalise.",
+          "How would you deploy a vision model on a low-power edge device?"
+        ]
+      }
+    },
+    {
+      "topic": "ML Deployment & MLOps",
+      "subtopics": [
+        "serving",
+        "monitoring",
+        "pipelines",
+        "versioning"
+      ],
+      "questions": {
+        "easy": [
+          "What does it mean to deploy a machine-learning model?",
+          "Why does a deployed model need monitoring?",
+          "What is model versioning, and why does it matter?"
+        ],
+        "medium": [
+          "What's the difference between batch and real-time inference?",
+          "How would you detect that a deployed model is degrading?",
+          "Why is reproducibility important in ML pipelines?"
+        ],
+        "hard": [
+          "How would you design a system to retrain and redeploy a model automatically?",
+          "How would you roll out a new model version safely?",
+          "How would you serve a model at low latency under high load?"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "module": "admin-governance",
+  "version": "1.0.0",
+  "description": "PrepVista AI — Part 11: Administration, Security, Governance, RBAC, Audit & Data Quality Control Center",
+  "routes": [
+    "POST /api/auth/login",
+    "POST /api/auth/logout",
+    "POST /api/auth/logout-all-others",
+    "POST /api/auth/password/change",
+    "POST /api/auth/password/reset/request",
+    "POST /api/auth/password/reset/confirm",
+    "POST /api/auth/invitations/accept",
+    "GET /api/auth/dev/outbox",
+    "GET /api/sessions",
+    "DELETE /api/sessions/:id",
+    "GET /api/admin/audit",
+    "GET /api/admin/audit/security-events",
+    "GET /api/admin/users",
+    "POST /api/admin/users/invite",
+    "PATCH /api/admin/users/:id/role",
+    "PATCH /api/admin/users/:id/status",
+    "DELETE /api/admin/users/:id/sessions",
+    "GET /api/admin/roles",
+    "POST /api/admin/roles",
+    "GET /api/admin/departments",
+    "POST /api/admin/departments",
+    "PATCH /api/admin/departments/:id/active",
+    "GET /api/admin/policies",
+    "GET /api/admin/policies/:key/history",
+    "POST /api/admin/policies/:key",
+    "GET /api/admin/data-quality",
+    "GET /api/admin/system/health",
+    "GET /api/admin/system/integrations",
+    "GET /api/admin/ai-governance/:userId",
+    "GET /api/me",
+    "GET /api/me/sessions",
+    "POST /api/me/password/change"
+  ],
+  "database_tables": [
+    "institutions", "departments", "roles", "permissions", "role_permissions",
+    "users", "sessions", "security_tokens", "policies", "audit_events", "dev_outbox_messages"
+  ],
+  "events_published": [],
+  "events_consumed": [],
+  "services_exposed": {
+    "part10_reporting_bridge": [
+      "getDataQuality(institutionId)",
+      "getAuditEvidence(institutionId, filters)",
+      "getPolicyConfiguration(institutionId, key)",
+      "getMetricConfiguration(institutionId)",
+      "getReportReadiness(institutionId)"
+    ],
+    "ai_governance_for_parts_12_and_14": [
+      "getAllowedAITools(user)",
+      "getAIContextScope(user)",
+      "getAIActionPolicy(user)",
+      "recordAIAction(user, action)"
+    ]
+  },
+  "dependencies": [
+    "auth", "users", "students", "drives", "applications", "interviews",
+    "offers", "training", "readiness", "communication", "reports"
+  ],
+  "notes": "Built with no pre-existing repository to integrate into — see docs/PART11_RECONNAISSANCE.md. The 'dependencies' list is aspirational: these are the modules this layer is designed to be consumed by/consume once they exist, not modules actually present or called in this build. See docs/PART11_BUILD_STATUS.md for exactly what is and isn't real."
+}

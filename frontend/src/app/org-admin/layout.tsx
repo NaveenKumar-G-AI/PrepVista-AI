@@ -125,10 +125,16 @@ export function useOrgContext() {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/org-admin', label: 'Dashboard', icon: SparklesIcon, exact: true },
+  { href: '/org-admin/ai-officer', label: 'AI Officer', icon: SparklesIcon },
+  { href: '/org-admin/placement-radar', label: 'Placement Radar', icon: ChartIcon },
+  { href: '/org-admin/action-engine', label: 'Action Engine', icon: ChartIcon },
+  { href: '/org-admin/forecast-strategy', label: 'Forecast & Strategy', icon: ChartIcon },
+  { href: '/org-admin/system-hardening', label: 'System Hardening', icon: KeyIcon },
   { href: '/org-admin/students', label: 'Students', icon: UsersIcon },
   { href: '/org-admin/departments', label: 'Departments', icon: BuildingIcon },
   { href: '/org-admin/years-batches', label: 'Years & Batches', icon: LayersIcon },
   { href: '/org-admin/analytics', label: 'Analytics', icon: ChartIcon },
+  { href: '/org-admin/communications', label: 'Communications', icon: TargetIcon },
   { href: '/org-admin/leaderboard', label: 'Leaderboard', icon: CrownIcon },
   { href: '/org-admin/placement-config', label: 'Placement Config', icon: TargetIcon },
   { href: '/org-admin/access-control', label: 'Access Control', icon: KeyIcon },
@@ -340,15 +346,12 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
         <div className="mx-auto max-w-[1440px] px-4 py-6 lg:px-6">
           <div className="flex gap-6">
 
-            {/* ── Desktop Sidebar ──────────────────────────────────────────── */}
+            {/* ── Desktop Sidebar (Maps to .pv-rail) ────────────────────── */}
             <aside
-              className="hidden lg:block w-64 shrink-0"
+              className="hidden lg:flex flex-col w-[220px] shrink-0 border-r border-border h-[calc(100vh-80px)] sticky top-20 overflow-y-auto pr-4 py-2"
               aria-label="Org admin sidebar navigation"
             >
-              <div
-                className="sticky top-24 rounded-[28px] border p-4 shadow-[0_24px_54px_rgba(2,8,23,0.12)] backdrop-blur-2xl"
-                style={{ borderColor: 'var(--border-color)', background: 'var(--card-bg)' }}
-              >
+              <div className="flex flex-col gap-1 h-full">
 
                 {/* ── Org Header ── */}
                 <div
@@ -438,17 +441,19 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
                           <Link
                             href={item.href}
                             aria-current={active ? 'page' : undefined}
-                            className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all ${active
-                                ? 'bg-blue-500/16 text-primary font-semibold shadow-[0_8px_20px_rgba(37,99,235,0.12)]'
+                            className={`relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-[12.5px] font-medium transition-all ${active
+                                ? 'bg-secondary text-primary'
                                 : 'text-secondary hover:bg-hover hover:text-primary'
                               }`}
                           >
+                            {/* Active left indicator (Maps to .pv-rail-item.active::before) */}
+                            {active && (
+                              <div className="absolute -left-3 top-2 bottom-2 w-0.5 rounded-full bg-blue-500" />
+                            )}
                             <span
-                              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-blue-500 text-white' : 'text-secondary'
-                                }`}
-                              style={active ? undefined : { background: 'var(--bg-hover)' }}
+                              className={`inline-flex w-4 items-center justify-center ${active ? 'text-blue-500' : 'text-tertiary'}`}
                             >
-                              <Icon size={15} />
+                              <Icon size={14} />
                             </span>
 
                             {item.label}
@@ -499,11 +504,11 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
                   </ul>
                 </nav>
 
+                {/* Spacer to push "Back to Main" to bottom */}
+                <div className="flex-1" />
+
                 {/* Back to main */}
-                <div
-                  className="mt-4 border-t pt-4"
-                  style={{ borderColor: 'var(--border-color)' }}
-                >
+                <div className="mt-4 border-t pt-3 border-border">
                   <Link
                     href="/dashboard"
                     className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-secondary hover:bg-hover hover:text-primary transition-all"

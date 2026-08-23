@@ -1,0 +1,88 @@
+
+=== 1. Tenant isolation (§8) ===
+[PASS] Institution A cannot read B's student (stu-b-001)
+[PASS] Institution A cannot read B's drive (drv-crestline-b)
+[PASS] Institution A cannot read B's application (app-b-001)
+[PASS] Institution B cannot read A's student (stu-001)
+[PASS] Institution B cannot read A's drive (drv-zenith-sde)
+[PASS] Institution B cannot read A's application (app-001)
+[PASS] Institution B cannot read A's offer (off-001)
+[PASS] Institution B cannot read A's joining (join-001)
+[PASS] Institution A can read its own student
+[PASS] Institution B can read its own student
+
+=== 2. RBAC (§10, §38) ===
+[PASS] assertNotRecruiterRole blocks "recruiter"
+[PASS] tpo_head can update any student
+[PASS] department_coordinator can view own-department student
+[PASS] department_coordinator CANNOT view another department's student
+[PASS] management CANNOT update an application (view-only)
+[PASS] student can view their own application
+[PASS] student CANNOT view another student's application
+
+=== 3. Status transitions (§34) ===
+[PASS] drive: draft → published is legal
+[PASS] drive: draft → closed is illegal (must publish first)
+[PASS] offer: published → accepted is legal
+[PASS] ai_action: prepared → executing is illegal (must confirm first)
+
+=== 4. Event idempotency & ordering (§26–27) ===
+[PASS] duplicate event id only processed once
+[PASS] JOINING_CONFIRMED before OFFER_ACCEPTED is rejected
+[PASS] JOINING_CONFIRMED accepted once OFFER_ACCEPTED is logged first
+
+=== 5. Data integrity scan (§33) ===
+[PASS] applications without a drive: found 1
+[PASS] interviews without an application: found 1
+[PASS] offers without a selection: found 1
+[PASS] joinings without an offer: found 1
+[PASS] placement outcomes without a verified joining: found 1
+[PASS] training enrollments without a student: found 1
+[PASS] readiness records without a student: found 1
+[PASS] communications without a valid recipient: found 1
+[PASS] signals without a source entity: found 1
+[PASS] confirmed AI actions with no confirming user: found 1
+[PASS] forecasts without a cutoff/model version: found 1
+
+=== 6. Fake/demo code sweep (§35–36) ===
+[PASS] scanner flags the seeded fake markers in legacy-code-sample/
+  7 marker(s) found across 2 file(s).
+
+=== 7. The "wow flow" (§72/§91) — Institution A, live ===
+TPO: "What needs my attention?"
+AI:  "I found 4 thing(s) requiring attention."
+     - Zenith Systems — SDE closes in 4 day(s)
+     - 11 data-quality issue(s) found
+     - 3 eligible students haven't applied to Zenith Systems — SDE
+     - 8 eligible students haven't applied to Orbit Analytics — Data Analyst
+[PASS] top signal is a real ELIGIBLE_NOT_APPLIED signal with students attached
+
+TPO: "Show high-readiness students."
+AI:  "5 of those 8 have readiness 85+: Aditi Rao, Karthik Subramaniam, Priya Iyer, Yash Malhotra, Rohit Sharma."
+[PASS] narrowing by readiness actually reduced the count
+
+TPO: "Prepare a reminder."
+[PASS] action created in "prepared" state, not yet executed
+AI:  "Reminder drafted for 5 students about Orbit Analytics — Data Analyst. Confirm to send?"
+TPO: "Confirm."
+[PASS] action moved to "confirmed" with a human confirmer attached
+[PASS] action executed and communications actually sent
+AI:  "Sent to 5. 3 applied within the window."
+
+[Command Centre recomputes...]
+Same signal now: 5 eligible-not-applied (was 8).
+
+TPO: "Did it help?"
+AI:  "Yes — 3 of the 8 moved to applied."
+[PASS] outcome check shows real, non-fabricated movement
+
+[Management view]
+Verified joinings: 1 | Reports show: 1 | Reconciled: true
+[PASS] dashboard, report, and verified outcome reconcile (§44)
+
+
+=== TRUTH TABLE ===
+43 passed, 0 failed, across 7 sections.
+
+---
+Captured 2026-08-14T18:24:32Z by actually running: node run-part16-demo.mjs

@@ -1,0 +1,94 @@
+{
+  "module": "proactive-intelligence",
+  "part": 13,
+  "version": "0.1.0",
+  "codename": "Continuous Placement Radar",
+  "routes": [
+    "/api/proactive/tpo/attention-center",
+    "/api/proactive/student/attention-center",
+    "/api/proactive/management/intelligence",
+    "/api/proactive/signals/[id]/actions"
+  ],
+  "api": [
+    "GET /api/proactive/tpo/attention-center",
+    "GET /api/proactive/student/attention-center",
+    "GET /api/proactive/management/intelligence",
+    "POST /api/proactive/signals/{id}/actions"
+  ],
+  "database_tables": ["proactive_signals", "proactive_signal_feedback"],
+  "signal_categories": [
+    "APPLICATION", "INTERVIEW", "OFFER", "JOINING", "TRAINING", "ASSESSMENT",
+    "READINESS", "INTERVENTION", "DRIVE", "COMPANY_RELATIONSHIP", "COMMUNICATION",
+    "DATA_QUALITY", "PLACEMENT", "MANAGEMENT", "SYSTEM"
+  ],
+  "signals_registered_total": 26,
+  "signals_implemented": [
+    "APPLICATION_ELIGIBLE_NOT_APPLIED",
+    "APPLICATION_RATE_IMPROVED",
+    "INTERVIEW_RESULT_PENDING",
+    "OFFER_DEADLINE_APPROACHING",
+    "JOINING_CONFIRMATION_MISSING",
+    "TRAINING_LOW_ATTENDANCE",
+    "TRAINING_COMPLETION_IMPROVED",
+    "READINESS_SIGNIFICANT_DECLINE",
+    "READINESS_MILESTONE_REACHED",
+    "COMPANY_RELATIONSHIP_STALE",
+    "DATA_QUALITY_UNVERIFIED_OUTCOME",
+    "MANAGEMENT_PLACEMENT_TARGET_GAP",
+    "SYSTEM_EVIDENCE_STALE"
+  ],
+  "signals_registered_not_implemented": [
+    "APPLICATION_LOW_RATE",
+    "INTERVIEW_NO_SHOW",
+    "OFFER_VERIFICATION_MISSING",
+    "JOINING_DID_NOT_JOIN",
+    "ASSESSMENT_OVERDUE",
+    "ASSESSMENT_REPEATED_FAILURE",
+    "INTERVENTION_OVERDUE",
+    "INTERVENTION_INEFFECTIVE_AFTER_WINDOW",
+    "DRIVE_DEADLINE_APPROACHING",
+    "COMMUNICATION_CRITICAL_DELIVERY_FAILURE",
+    "DATA_QUALITY_ORPHAN_RECORD",
+    "PLACEMENT_RATE_BEHIND_LAST_SEASON",
+    "MANAGEMENT_RECRUITER_CONCENTRATION"
+  ],
+  "events_published": [
+    "(none — this module is a signal/event CONSUMER; Part 9 owns actual delivery via NotificationIntent, see jobs/scheduledJobs.ts:publishNotificationIntent)"
+  ],
+  "events_consumed": [
+    "APPLICATION_SUBMITTED", "APPLICATION_DEADLINE_APPROACHING", "DRIVE_PUBLISHED",
+    "DRIVE_DEADLINE_APPROACHING", "INTERVIEW_COMPLETED", "RESULT_PUBLISHED",
+    "OFFER_PUBLISHED", "OFFER_DEADLINE_APPROACHING", "OFFER_ACCEPTED",
+    "JOINING_DATE_APPROACHING", "JOINING_CONFIRMATION_SUBMITTED", "TRAINING_ASSIGNED",
+    "TRAINING_ATTENDANCE_RECORDED", "TRAINING_COMPLETED", "READINESS_UPDATED",
+    "READINESS_DECLINED", "INTERVENTION_ASSIGNED", "INTERVENTION_OVERDUE",
+    "DATA_QUALITY_ISSUE_CREATED", "PLACEMENT_TARGET_UPDATED"
+  ],
+  "services_exposed": [
+    "priorityEngine.calculatePriority",
+    "anomalyEngine.checkSampleSufficiency / compareToBaseline / zScore / detectTrend",
+    "deduplicationEngine.upsertSignal / buildDedupKey",
+    "escalationEngine.runEscalationSweep / nextEscalatedSeverity",
+    "signalClustering.clusterSignals",
+    "briefingGenerator.generateDailyBriefing / generateEndOfDayBriefing / generateWeeklyIntelligence / generateManagementBriefing",
+    "audience.renderForAudience / filterSignalsForAudience"
+  ],
+  "dependencies": [
+    "students", "drives", "applications", "interviews", "offers",
+    "joining", "training", "readiness", "communication", "reports",
+    "admin", "ai"
+  ],
+  "integration_points_requiring_your_repo": [
+    "modules/proactive/detectorFramework.ts: DataSourcePort — implement against real Parts 1-12 queries",
+    "api/proactive/_shared.ts: requireRole — wire to real auth/session",
+    "api/proactive/_shared.ts: getRepository — swap InMemorySignalRepository for a Prisma-backed adapter",
+    "jobs/scheduledJobs.ts: publishNotificationIntent — wire to Part 9",
+    "jobs/scheduledJobs.ts: the three job functions — register with your real job scheduler",
+    "prisma/part13_proactive_signals.prisma — merge into your schema and migrate"
+  ],
+  "verified_in_this_delivery": {
+    "typecheck": "tsc --noEmit clean across all of services/, modules/, jobs/, tests/ (TypeScript 6.0.3)",
+    "tests": "23/23 passing via `tsx --test tests/proactive/*.test.ts` (Node built-in test runner), including the spec's own two priority worked examples from section 12",
+    "not_verified_here": "api/ and ui/ could not be fully typechecked (no Next.js or @types/react available offline in this sandbox); no live database, no real event bus, no load testing — see PART13_INTEGRATION.md's truth table"
+  }
+}

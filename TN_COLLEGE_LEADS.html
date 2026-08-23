@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepVista AI — Tamil Nadu College Leads (Rank · Contacts · Cold-Email)</title>
+<style>
+  :root{--bg:#0b1020;--panel:#121a30;--panel2:#0f1729;--line:#22304f;--txt:#e7ecf5;--muted:#9fb0cc;
+    --accent:#4f8cff;--gold:#ffce54;--hot:#ff5b6e;--warm:#ff9f43;--mid:#4fd1c5;--ok:#4fd17a;--verify:#ffb454}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#080c18,#0b1020 240px);color:var(--txt);
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}
+  header{padding:26px 26px 18px;border-bottom:1px solid var(--line);
+    background:radial-gradient(1200px 300px at 20% -50%,rgba(79,140,255,.18),transparent)}
+  h1{margin:0 0 6px;font-size:23px}
+  .sub{color:var(--muted);font-size:13.5px;max-width:980px}
+  .honest{margin:12px 0 0;padding:11px 15px;border:1px solid #7a5b1e;border-radius:10px;
+    background:rgba(255,206,84,.08);color:#ffe6a8;font-size:12.5px;max-width:1020px}
+  .honest b{color:#ffce54}
+  .cfg{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0;align-items:center}
+  .cfg label{font-size:11px;color:var(--muted)}
+  .wrap{padding:18px 26px 60px;max-width:1560px;margin:0 auto}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 14px;align-items:center}
+  input,select,button{background:var(--panel);border:1px solid var(--line);color:var(--txt);
+    padding:8px 11px;border-radius:8px;font-size:13.5px}
+  input{min-width:180px} button{cursor:pointer}
+  button.exp{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .b{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
+  .b.hot{background:rgba(255,91,110,.15);color:#ff8b98;border:1px solid #6d2530}
+  .b.warm{background:rgba(255,159,67,.15);color:#ffc078;border:1px solid #6d4a1e}
+  .b.mid{background:rgba(79,209,197,.15);color:#7de9df;border:1px solid #1e5d57}
+  .b.ok{background:rgba(79,209,122,.15);color:#8fe6ac;border:1px solid #2a5d3a}
+  .b.verify{background:rgba(255,180,84,.15);color:#ffd08a;border:1px solid #6d5320}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:10px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{position:sticky;top:0;background:#0e1526;color:var(--muted);font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.5px;cursor:pointer;user-select:none;z-index:2}
+  tr:hover td{background:rgba(79,140,255,.04)}
+  .rk{font-weight:800;color:var(--gold);font-size:15px}
+  .nm{font-weight:700;font-size:13.5px}
+  .loc{color:var(--muted);font-size:11.5px}
+  .c-line{margin:1px 0}.c-k{color:var(--muted);font-size:10.5px}
+  a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+  .who{font-weight:600}
+  .act{display:flex;flex-direction:column;gap:5px}
+  .act button{font-size:11px;padding:5px 9px;white-space:nowrap}
+  .mail{background:rgba(79,140,255,.12);border-color:#2c4a86;color:#bcd4ff}
+  .copy{background:rgba(255,255,255,.04)}
+  footer{color:var(--muted);font-size:12px;padding:20px 26px;border-top:1px solid var(--line);max-width:1560px;margin:0 auto}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#173b1f;color:#8fe6ac;
+    border:1px solid #2a5d3a;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>PrepVista AI — Tamil Nadu College Leads &nbsp;<span style="font-size:12.5px;color:var(--muted)">rank · verified contacts · one-click cold email</span></h1>
+  <div class="sub">Click a column to sort. <b>✉ Email</b> opens your mail client with a subject + full pitch pre-written for that exact college. <b>📋 Copy</b> puts the email on your clipboard. Green <b>PUBLIC</b> = from the college's own official site; amber <b>VERIFY</b> = confirm before dialling.</div>
+  <div class="honest">
+    <b>Nothing here is invented.</b> Every phone/email is from a public official source (college placement pages / listed recruiter lines — the contacts colleges publish <b>for recruiters</b>). Named-TPO mobiles change; treat as leads and verify on first contact. This is legitimate B2B outreach data.
+  </div>
+  <div class="cfg">
+    <label>Your name <input id="fName" value="Naveenkumar G"></label>
+    <label>Your email <input id="fMail" value="you@prepvista.ai" placeholder="you@prepvista.ai"></label>
+    <label>Your phone <input id="fPhone" value="+91 " placeholder="+91 …"></label>
+    <span style="font-size:11px;color:var(--muted)">↑ fills every email signature</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <input id="q" type="text" placeholder="Search college, city, contact…">
+    <select id="tf"><option value="">All priority</option><option value="hot">HOT</option><option value="warm">WARM</option><option value="mid">MID</option></select>
+    <button class="exp" onclick="exportCSV()">⬇ Export CSV</button>
+    <span style="font-size:12px;color:var(--muted)"><span id="cnt"></span></span>
+  </div>
+  <table id="tbl">
+    <thead><tr>
+      <th data-k="r">#</th><th data-k="score">Score</th><th data-k="n">College</th>
+      <th>Address</th><th>Phone</th><th>Email &amp; contact</th><th data-k="conf">Src</th>
+      <th>Pitch angle</th><th>Outreach</th>
+    </tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+</div>
+
+<div id="toast"></div>
+
+<footer>
+  <b>Sources (official/public):</b> panimalar.ac.in · sairam.edu.in · stjosephs.ac.in · rajalakshmi.org · velammal.edu.in · skcet.ac.in · snsct.org · kce.ac.in · vcet.ac.in · ksrce.ac.in · sonatech.ac.in · dsengg.ac.in · nprcet.org · christianengineering.in · rmkec.ac.in · rmd.ac.in · jeppiaarcollege.org · srmeaswari.ac.in · saec.ac.in · hindusthan.net · mcet.in — plus Careers360/Collegedunia/CollegeBatch (2024–26). Verify each contact on first outreach; institutional lines change yearly.
+  <br>For PrepVista AI (Naveenkumar G) · 2026-07-01 · legitimate recruiter-outreach contacts only.
+</footer>
+
+<script>
+const D=[
+{r:1,score:93,tier:"hot",n:"Panimalar Engineering College",loc:"Poonamallee, Chennai",
+ addr:"Bangalore Trunk Rd, Varadharajapuram, Poonamallee, Chennai – 600123",
+ phones:[["Placement","044-26274665"],["Main","044-26490404 / 0505"]],
+ email:"placement@panimalar.ac.in",who:"Prof. Viswanathan (TPO, 20+ yrs)",web:"panimalar.ac.in",conf:"ok",
+ pitch:"You place more students than almost anyone in Chennai — but at SSN's median. Close that one-tier gap across 1,600 students this season."},
+{r:2,score:90,tier:"hot",n:"Sri Sairam Engineering College",loc:"West Tambaram, Chennai",
+ addr:"Sai Leo Nagar, West Tambaram, Chennai – 600044",
+ phones:[["Placement Officer","96770 65552"],["Main","044-22512222"]],
+ email:"sairamplacement@sairam.edu.in",who:"Mr. R. Vedamoorthy (Placement Officer)",web:"sairam.edu.in",conf:"ok",
+ pitch:"You're at 72.9% while SSN clears 78%. That gap is ~300 students a year — we move the unplaced quartile before the drives start."},
+{r:3,score:88,tier:"hot",n:"St. Joseph's College of Engineering",loc:"OMR, Chennai",
+ addr:"OMR, Old Mahabalipuram Rd, Chennai – 600119",
+ phones:[["Placement direct","044-24500595"],["Mobile","99449 87560"]],
+ email:"placement@stjosephs.ac.in",who:"Centre for Training & Placement",web:"stjosephs.ac.in",conf:"ok",
+ pitch:"Your students are on OMR, walking distance from the employers SSN places at ₹8L. Same recruiters, half the CTC. We close that corridor gap this year."},
+{r:4,score:83,tier:"warm",n:"Velammal Engineering College",loc:"Ambattur, Chennai",
+ addr:"Velammal Nagar, Ambattur–Red Hills Rd, Chennai – 600066",
+ phones:[["Main","044-39666005"],["Alt","044-26591841"]],
+ email:"info@velammaltrust.com",who:"Placement Cell (confirm current id)",web:"velammal.edu.in",conf:"verify",
+ pitch:"You already place 95% — the next win is better offers, not more. At a ₹3L average you're leaving money on the table for 1,000 students."},
+{r:5,score:82,tier:"warm",n:"Rajalakshmi Engineering College",loc:"Thandalam, Chennai",
+ addr:"Rajalakshmi Nagar, Thandalam, Chennai – 602105",
+ phones:[["Training/Placement","93819 81015"],["Main","044-67181111"]],
+ email:"placement@rajalakshmi.edu.in",who:"Prof. I. Philip Praveen (Director, T&P)",web:"rajalakshmi.org",conf:"ok",
+ pitch:"You've got the A++ and the infrastructure — the one gap to SSN is placement CTC. A readiness standard your TPO shows management is how you close it."},
+{r:6,score:80,tier:"warm",n:"RMD Engineering College",loc:"Kavaraipettai, Tiruvallur",
+ addr:"RSM Nagar, Kavaraipettai, Gummidipoondi Taluk, Tiruvallur – 601206",
+ phones:[["Placement direct","044-67919115"],["Board","044-67919191"]],
+ email:"tnp@rmd.ac.in",who:"Ms. Maria Antony Swapna (Placement Officer)",web:"rmd.ac.in",conf:"ok",
+ pitch:"You're autonomous and ambitious, but your students fight the same Chennai recruiters as SSN with less prep. A readiness edge is how they win those drives first."},
+{r:7,score:79,tier:"warm",n:"RMK Engineering College",loc:"Kavaraipettai, Tiruvallur",
+ addr:"RSM Nagar, Kavaraipettai, Gummidipoondi Taluk, Tiruvallur – 601206",
+ phones:[["Placement (ext 617)","044-67900679"],["Board","044-67906790"]],
+ email:"placement@rmkcet.ac.in",who:"Training & Placement Cell",web:"rmkec.ac.in",conf:"ok",
+ pitch:"A strong autonomous brand that still trails the SSN CTC band. Give students company-specific readiness and you lift the offer quality, not just the count."},
+{r:8,score:78,tier:"warm",n:"Jeppiaar Engineering College",loc:"Semmenchery, Chennai (OMR)",
+ addr:"Old Mamallapuram Rd, Rajiv Gandhi Salai, Semmenchery, Chennai – 600119",
+ phones:[["General","044-24502818"],["Admission","99403 99911"]],
+ email:"dean@jeppiaarcollege.org",who:"Dean / Placement Cell",web:"jeppiaarcollege.org",conf:"ok",
+ pitch:"You're on OMR beside the recruiters SSN and St. Joseph's convert at higher CTC. Location's covered — readiness is the gap we close this season."},
+{r:9,score:77,tier:"warm",n:"Easwari Engineering College (SRM)",loc:"Ramapuram, Chennai",
+ addr:"Bharathi Salai, Ramapuram, Chennai – 600089",
+ phones:[["Office","044-43923041"],["Mobile","89396 28204"]],
+ email:"principal@eec.srmrmp.edu.in",who:"Placement Cell (SRM group)",web:"srmeaswari.ac.in",conf:"ok",
+ pitch:"Big cohort, SRM brand, but mid CTC vs SSN. A readiness score your TPO reports to management is how Easwari trades up its offer band this year."},
+{r:10,score:76,tier:"warm",n:"S.A. Engineering College",loc:"Thiruverkadu, Chennai",
+ addr:"Poonamallee–Avadi Rd, Veeraraghavapuram, Thiruverkadu, Chennai – 600077",
+ phones:[["Main","044-26801999"]],
+ email:"saec@saec.ac.in",who:"Placement Cell (autonomous)",web:"saec.ac.in",conf:"ok",
+ pitch:"Autonomous and steady, but your students lose the same aptitude/HR rounds every year. That's the most fixable gap in placements — we drill it before season."},
+/* ---------- COIMBATORE ---------- */
+{r:11,score:89,tier:"hot",n:"Sri Krishna College of Engg & Tech (SKCET)",loc:"Kuniamuthur, Coimbatore",
+ addr:"Kuniamuthur, Coimbatore – 641008",
+ phones:[["Main","0422-2678003 to 007"]],
+ email:"(skcet.ac.in → Placement Team)",who:"Placement Team (confirm officer)",web:"skcet.ac.in",conf:"verify",
+ pitch:"Your students are 8 km from PSG and landing ₹2 lakh less for the same degree. We close that gap this academic year, before campus season."},
+{r:12,score:87,tier:"hot",n:"SNS College of Technology",loc:"Saravanampatti, Coimbatore",
+ addr:"SNS Kalvi Nagar, Sathy Main Rd (NH-209), Saravanampatti, Coimbatore – 641035",
+ phones:[["Office","75503 16701 / 16702"]],
+ email:"office@snsct.org",who:"IIPC Placement Cell (iipc.snsgroups.com)",web:"snsct.org",conf:"ok",
+ pitch:"You're in Saravanampatti, surrounded by the same companies KCT places at 90%+. Location isn't your gap — readiness is. We fix that this year."},
+{r:13,score:81,tier:"warm",n:"Karpagam College of Engineering",loc:"Othakkalmandapam, Coimbatore",
+ addr:"Myleripalayam Village, Othakkalmandapam, Coimbatore – 641032",
+ phones:[["Main","82203 33750"]],
+ email:"info@kce.ac.in",who:"Placement Cell (confirm officer)",web:"kce.ac.in",conf:"verify",
+ pitch:"You've built the campus and the brand — the last gap to PSG and CIT is placement CTC. Give your TPO a readiness number to show management."},
+{r:14,score:69,tier:"mid",n:"Hindusthan College of Engg & Tech (HICET)",loc:"Coimbatore",
+ addr:"Valley Campus, Pollachi Highway, Coimbatore – 641032",
+ phones:[["Main","0422-4440555"],["Mobile","80983 33333"]],
+ email:"info@hindusthan.net",who:"Placement Cell",web:"hicet.ac.in",conf:"ok",
+ pitch:"Your placement gap to SKCET is real, and your students deserve the same shot. Start with one department free this season — pay only when you see the lift."},
+{r:15,score:67,tier:"mid",n:"Dr. Mahalingam College of Engg & Tech (MCET)",loc:"Pollachi, Coimbatore",
+ addr:"Udumalai Rd, Pollachi – 642003",
+ phones:[["Main","04259-236030 / 40 / 50"]],
+ email:"(mcet.in → Placement)",who:"Placement Cell (confirm officer)",web:"mcet.in",conf:"verify",
+ pitch:"Pollachi students travel for the few good drives that visit. A readiness programme makes each one count — more offers from the recruiters who do come."},
+/* ---------- DINDIGUL / MADURAI — THE PSNA BELT ---------- */
+{r:16,score:86,tier:"hot",n:"NPR College of Engineering & Technology",loc:"Natham, Dindigul",
+ addr:"NPR Nagar, Natham–Dindigul, Dindigul – 624401",
+ phones:[["Office","04544-246500 / 501 / 502"],["Mobile","93444 44466"]],
+ email:"nprcetprincipal@nprcolleges.org",who:"Principal's Office / Placement Cell",web:"nprcet.org",conf:"ok",
+ pitch:"Your students are a short drive from PSNA and getting a fraction of the placements — we can close that gap this academic year."},
+{r:17,score:85,tier:"hot",n:"Christian College of Engineering & Technology (CCET)",loc:"Oddanchatram, Dindigul",
+ addr:"Palani–Dindigul Main Rd, Oddanchatram, Dindigul – 624619",
+ phones:[["Placement (Mr. Francis)","94431 88243"],["General","95241 24125"]],
+ email:"ccetplacement@gmail.com",who:"Mr. Francis Xavier Rajan (Placement, Mech Dept)",web:"christianengineering.in",conf:"ok",
+ pitch:"Your students are 5 km from PSNA and getting half the placements — we can close that gap this academic year."},
+{r:18,score:85,tier:"hot",n:"Velammal College of Engg & Tech (VCET)",loc:"Madurai",
+ addr:"Velammal Nagar, Viraganoor, Madurai – 625009",
+ phones:[["Placement cell","99401 27839 / 94440 08233"],["General","99949 94991"]],
+ email:"(vcet.ac.in → Placement — verify id)",who:"Placement Cell (confirm name)",web:"vcet.ac.in",conf:"verify",
+ pitch:"TCE is government-aided, cheaper, and out-places you on CTC in your own city. Your fees demand a better placement story — we give your TPO one."},
+/* ---------- SALEM / NAMAKKAL ---------- */
+{r:19,score:84,tier:"hot",n:"K.S.R. College of Engineering",loc:"Tiruchengode, Namakkal",
+ addr:"KSR Kalvi Nagar, Tiruchengode, Namakkal – 637215",
+ phones:[["Placements","92808 08083"],["General","04288-274741"]],
+ email:"(ksrce.ac.in → Placement)",who:"Placement Cell",web:"ksrce.ac.in",conf:"ok",
+ pitch:"Kongu, down the road, is autonomous and out-places you on CTC. With your student numbers, a readiness edge moves thousands of students at once."},
+{r:20,score:77,tier:"warm",n:"Sona College of Technology",loc:"Salem",
+ addr:"Junction Main Rd, Suramangalam, Salem – 636005",
+ phones:[["Placement direct","0427-4099979"],["Incharge","86674 66363"]],
+ email:"sonaplacement@sonatech.ac.in",who:"Senthil Kumar V.S (Placement Incharge)",web:"sonatech.ac.in",conf:"ok",
+ pitch:"You own Salem — the next benchmark is Kongu and Bannari on CTC. A company-specific readiness layer is how Sona students out-interview theirs."},
+/* ---------- TRICHY ---------- */
+{r:21,score:83,tier:"hot",n:"Dhanalakshmi Srinivasan Engg College",loc:"Perambalur (Trichy belt)",
+ addr:"Thuraiyur Rd, Perambalur – 621212",
+ phones:[["Placement","70944 66477 / 98405 98360"],["Main","04328-220444"]],
+ email:"placement@dsgroupmail.com",who:"Placement Cell (largest central-TN group)",web:"dsengg.ac.in",conf:"ok",
+ pitch:"You educate thousands across central TN but place them a tier below SASTRA. At your scale, a readiness standard is the cheapest way to lift every campus at once."},
+];
+
+const tb=document.getElementById('tb');
+const g=id=>document.getElementById(id).value.trim();
+function badge(t){return {hot:'HOT',warm:'WARM',mid:'MID'}[t]||t}
+function phoneHtml(p){return p.map(x=>`<div class="c-line"><span class="c-k">${x[0]}:</span> ${x[1]}</div>`).join('')}
+function firstEmail(d){const m=(d.email.match(/[\w.+-]+@[\w.-]+\.\w+/));return m?m[0]:''}
+
+function emailText(d){
+  const nm=g('fName')||'Naveenkumar G', mail=g('fMail'), ph=g('fPhone');
+  const addressee = d.who && !/confirm|cell$/i.test(d.who) && /[A-Z][a-z]+/.test(d.who)
+    ? d.who.replace(/\s*\(.*\)/,'') : 'Training & Placement Officer';
+  const subject=`Lifting ${d.n.replace(/\(.*\)/,'').trim()}'s placements this season — a quick idea`;
+  const body=
+`Dear ${addressee},
+
+I'm ${nm}, founder of PrepVista AI — an AI placement-readiness platform built for Tamil Nadu colleges.
+
+${d.pitch}
+
+PrepVista gives every student resume-based mock interviews, company-specific practice (TCS / Infosys / Wipro / Accenture patterns), server-side speech evaluation, and a 0–100 Placement Readiness Score your cell can track before the drives — plus a TPO dashboard and per-company hiring-probability report.
+
+Could I run a free pilot for one department (50–100 students) this placement season, at no cost, and show you the measurable readiness lift? A 10-minute call this week would be enough to set it up.
+
+Warm regards,
+${nm}
+PrepVista AI${mail?`\n${mail}`:''}${ph&&ph!=='+91'?`\n${ph}`:''}`;
+  return {subject,body};
+}
+function mailto(d){const e=firstEmail(d),{subject,body}=emailText(d);
+  return `mailto:${e}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
+function copyEmail(i){const d=D[i],{subject,body}=emailText(d);
+  navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`).then(()=>toast('📋 Email copied — paste into your mail client'));}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
+
+let sortK='r',sortAsc=true;
+function render(){
+  const q=g('q').toLowerCase(),tf=document.getElementById('tf').value;
+  let rows=D.map((d,i)=>({d,i})).filter(({d})=>{
+    const hay=(d.n+d.loc+d.who+d.addr).toLowerCase();
+    return (!q||hay.includes(q))&&(!tf||d.tier===tf);});
+  rows.sort((a,b)=>{let x=a.d[sortK],y=b.d[sortK];if(typeof x==='string'){x=x.toLowerCase();y=y.toLowerCase();}
+    return (x<y?-1:x>y?1:0)*(sortAsc?1:-1)});
+  tb.innerHTML=rows.map(({d,i})=>{
+    const e=firstEmail(d);
+    return `<tr>
+    <td><span class="rk">#${d.r}</span></td>
+    <td><span class="b ${d.tier}">${badge(d.tier)}</span><div style="margin-top:4px;font-weight:700">${d.score}</div></td>
+    <td><div class="nm">${d.n}</div><div class="loc">${d.loc}${d.web!=='—'?` · <a href="https://${d.web}" target="_blank">site</a>`:''}</div></td>
+    <td style="max-width:180px">${d.addr}</td>
+    <td>${phoneHtml(d.phones)}</td>
+    <td style="max-width:210px"><div class="c-line">${d.email}</div><div class="who c-line" style="margin-top:3px">${d.who}</div></td>
+    <td><span class="b ${d.conf}">${d.conf==='ok'?'PUBLIC':'VERIFY'}</span></td>
+    <td><div style="max-width:300px;font-style:italic;color:#cfe0ff">${d.pitch}</div></td>
+    <td><div class="act">
+      ${e?`<a class="b" href="${mailto(d)}" style="text-decoration:none"><button class="mail">✉ Email</button></a>`:`<button class="mail" onclick="toast('No public email — call instead')">✉ n/a</button>`}
+      <button class="copy" onclick="copyEmail(${i})">📋 Copy</button>
+    </div></td>
+  </tr>`}).join('');
+  document.getElementById('cnt').textContent=`${rows.length} of ${D.length} colleges`;
+}
+document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{
+  const k=th.dataset.k;if(sortK===k)sortAsc=!sortAsc;else{sortK=k;sortAsc=true}render();}));
+['q','tf','fName','fMail','fPhone'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+function exportCSV(){
+  const head=['Rank','Score','Priority','College','City','Address','Phones','Email','Contact person','Source','Website','Pitch'];
+  const rows=D.map(d=>[d.r,d.score,badge(d.tier),d.n,d.loc,d.addr,
+    d.phones.map(p=>p[0]+': '+p[1]).join(' | '),d.email,d.who,d.conf==='ok'?'PUBLIC':'VERIFY',d.web,d.pitch]);
+  const csv=[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='TN_college_leads_prepvista.csv';a.click();
+}
+render();
+</script>
+</body>
+</html>

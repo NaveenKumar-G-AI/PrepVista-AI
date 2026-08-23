@@ -1,0 +1,18 @@
+{
+  "name": "@prepvista/offers-joining",
+  "version": "0.1.0",
+  "description": "PrepVista Part 6: Offer -> Acceptance -> Joining -> Verified Placement Outcome",
+  "main": "services/offers/offerService.js",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "_comment": "The tested core (services/, events/, schemas/) has ZERO runtime dependencies - it only uses Node built-ins. The packages below are only needed if you wire up api/*/routes.js as-is; swap for whatever your host app already uses.",
+    "express": "^4.19.0"
+  },
+  "peerDependenciesComment": "A real integration also needs: a Postgres client/ORM for migrations/001_offers_joining_placement.sql, and your existing CSV/XLSX parser feeding services/offers/bulkImport.js.",
+  "devDependencies": {}
+}

@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "description": "Adaptive-difficulty configuration for PrepVista (the DifficultyController in base.py). Defines difficulty levels and their scoring weights, what each DifficultyMode resolves to, how a requested level is clamped to a category's allowed band (see categories.json), and the AUTO controller's adaptive logic. Weights are cross-checked against scoring_config.json.",
+  "score_scale": [
+    0,
+    10
+  ],
+  "difficulty_levels": [
+    {
+      "key": "easy",
+      "label": "Easy",
+      "weight": 0.8,
+      "order": 0,
+      "description": "Fundamentals and warm-up questions; builds confidence."
+    },
+    {
+      "key": "medium",
+      "label": "Medium",
+      "weight": 1.0,
+      "order": 1,
+      "description": "The standard bar most interviews set."
+    },
+    {
+      "key": "hard",
+      "label": "Hard",
+      "weight": 1.28,
+      "order": 2,
+      "description": "Stretch questions that separate strong candidates."
+    }
+  ],
+  "difficulty_modes": [
+    {
+      "key": "auto",
+      "label": "Adaptive",
+      "maps_to": "adaptive",
+      "description": "The controller raises or lowers difficulty within the category's band based on recent performance."
+    },
+    {
+      "key": "normal",
+      "label": "Normal",
+      "maps_to": "easy",
+      "description": "Starts at the easy end of the category's band."
+    },
+    {
+      "key": "medium",
+      "label": "Medium",
+      "maps_to": "medium",
+      "description": "Holds at medium (clamped into the band)."
+    },
+    {
+      "key": "difficult",
+      "label": "Difficult",
+      "maps_to": "hard",
+      "description": "Starts at the hard end of the category's band."
+    }
+  ],
+  "band_clamping": {
+    "rule": "A requested level is clamped to the category's allowed [low, high] band.",
+    "examples": [
+      "'difficult' on an easy-medium category (e.g. culture_fit) -> medium.",
+      "'normal' on a medium-hard category (e.g. group_discussion) -> medium.",
+      "'medium' is valid for every category and is the universal safe default."
+    ],
+    "source_of_bands": "categories.json -> categories[].difficulty_band"
+  },
+  "auto_controller": {
+    "starting_level": "medium",
+    "cold_start": {
+      "questions": 2,
+      "hold_level": "medium",
+      "note": "Hold at medium for the first 2 answered questions until there's enough signal to adapt."
+    },
+    "rolling_window": 3,
+    "step_up": {
+      "score_threshold": 7.5,
+      "consecutive_required": 2,
+      "max_step": 1,
+      "note": "Raise difficulty by one level after 2 consecutive answers at or above 7.5/10."
+    },
+    "step_down": {
+      "score_threshold": 4.0,
+      "consecutive_required": 1,
+      "max_step": 1,
+      "note": "Lower difficulty by one level after a single answer below 4.0/10, to rebuild confidence."
+    },
+    "hysteresis": {
+      "dead_zone": [
+        4.0,
+        7.5
+      ],
+      "note": "Scores between the step-down and step-up thresholds hold the current level, preventing oscillation."
+    },
+    "stay_within_band": true,
+    "max_step_per_question": 1,
+    "note": "The controller never jumps more than one level at a time and never leaves the category's band."
+  },
+  "per_mode_resolution": {
+    "auto": "Use the cold-start hold, then adapt via step_up/step_down within the band.",
+    "normal": "Resolve to the band's lowest level (>= easy).",
+    "medium": "Resolve to medium (clamped into the band).",
+    "difficult": "Resolve to the band's highest level (<= hard)."
+  }
+}

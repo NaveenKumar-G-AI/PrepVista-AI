@@ -1,0 +1,132 @@
+{
+  "company_id": "zoho",
+  "display_name": "Zoho",
+  "aliases": ["Zoho Corporation", "AdventNet"],
+  "archetype": "unique",
+  "tier": "product_selective",
+  "tier_rank": "A",
+  "hiring_scale": "medium",
+  "logo_asset": "zoho.svg",
+  "brand_colors": { "primary": "#E42527", "accent": "#F9B21D" },
+  "platform": {
+    "name": "Zoho Meet (proctored) / in-person",
+    "emulation_profile": "proctored_meet",
+    "proctored": true,
+    "tab_switch_policy": "flag",
+    "navigation": "free_all",
+    "on_screen_calculator": false,
+    "rough_work": "physical_or_scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "merit", "label": "Member Technical Staff", "ctc_lpa": [6.0, 8.0], "gate": "merit_all_rounds" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 0,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc", "BSc"]
+  },
+  "re_eligibility_gap_months": 6,
+  "format_confidence": 0.82,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "Famously selective (e.g., ~700 attempt → ~2 offers reported). Logic over CGPA.",
+    "Alternate path: Zoho School of Technology."
+  ],
+  "culture_values": ["frugality", "long_term_thinking", "engineering_depth", "ownership"],
+  "what_they_value": "Raw programming logic and the ability to build something real, not CGPA.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "zoho_written",
+      "round_type": "aptitude_test",
+      "label": "Written Test — Aptitude + C Programming",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 90,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "general_aptitude", "label": "General Aptitude", "competency": "aptitude_reasoning", "item_type": "mcq", "count": 20, "minutes": 40, "topics": ["time_work", "profit_loss", "speed_distance", "percentages", "ratio", "averages"] },
+        { "section_id": "c_programming",    "label": "C-Programming Aptitude (Output Prediction)", "competency": "coding", "item_type": "pseudocode_mcq", "count": 20, "minutes": 50, "topics": ["nested_loops", "recursion", "flowcharts", "pointers", "output_prediction"] }
+      ],
+      "gate_rule": {
+        "type": "sectional_and_overall",
+        "params": { "sections_required": ["general_aptitude", "c_programming"], "min_percent": 70, "near_perfect_campuses": true },
+        "note": "Some campuses demand near-perfect (a reported '10/10 to pass'). Harder papers → fewer (~20) questions."
+      },
+      "notes": "~90 min: general aptitude + C-programming aptitude (pseudocode output; nested loops, recursion, flowcharts, pointers)."
+    },
+    {
+      "order": 2,
+      "round_id": "zoho_basic_programming",
+      "round_type": "coding_test",
+      "label": "Basic Programming Round",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 120,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "programs", "label": "5-8 Programming Problems", "competency": "coding", "item_type": "coding", "count": 6, "minutes": 120, "topics": ["loops", "recursion", "2d_arrays", "strings", "pattern_printing", "basic_ds"], "languages_allowed": ["C", "C++", "Java"] }
+      ],
+      "gate_rule": { "type": "coding_count", "params": { "min_solved_by_track": { "merit": 5 } } },
+      "notes": "One-on-one (laptop or screen-share proctored); 5-8 problems. Signature styles: reverse a number, palindrome, dial-pad word sequence, merge sorted arrays, star patterns, Armstrong/lucky numbers."
+    },
+    {
+      "order": 3,
+      "round_id": "zoho_advanced",
+      "round_type": "advanced_coding",
+      "label": "Advanced Programming — Hard Problem OR Build-an-Application",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 90,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "build_app", "label": "Build an Application / Product-Design Task", "competency": "coding", "item_type": "build_app", "count": 1, "minutes": 90, "topics": ["application_design", "correctness", "structure", "design_reasoning"], "languages_allowed": ["C", "C++", "Java"], "config": { "mode": "hard_problem_or_build_app", "rubric": ["correctness", "structure", "design_reasoning"] } }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 6.0 } },
+      "notes": "One hard problem in ~90 min, OR build an application / do a product-design task. Zoho's signature 'build something real' round."
+    },
+    {
+      "order": 4,
+      "round_id": "zoho_technical_hr",
+      "round_type": "technical_interview",
+      "label": "Technical HR",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "tech_qa", "label": "Fundamentals + DBMS + OS + CN + Resume (sometimes LLD/HLD)", "competency": "technical_domain", "item_type": "interview_qa", "count": 6, "minutes": 45, "topics": ["programming_fundamentals", "dbms", "os", "cn", "resume", "system_design"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "Programming fundamentals, DBMS, OS, CN, resume depth; sometimes system design (LLD/HLD)."
+    },
+    {
+      "order": 5,
+      "round_id": "zoho_hr",
+      "round_type": "hr_interview",
+      "label": "General HR",
+      "is_elimination": true,
+      "difficulty_profile": "easy",
+      "total_minutes": 25,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "hr_qa", "label": "HR", "competency": "hr_behavioral", "item_type": "interview_qa", "count": 5, "minutes": 25, "topics": ["family_background", "hobbies", "why_zoho", "location", "situational", "cultural_fit"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "Family background, hobbies, why Zoho, location, situational/decision-making, cultural fit."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "single_merit",
+    "attributes": ["written", "basic_programming", "advanced", "technical_hr"],
+    "tracks": [
+      { "track": "merit", "label": "Member Technical Staff", "requires": { "all_rounds_cleared": true } }
+    ],
+    "params": { "escalating_gauntlet": true },
+    "gap_hints": {
+      "to_offer": "Every round eliminates — the Advanced 'build-an-application' round is where most strong coders are separated; ship a working, well-structured app with clear design reasoning."
+    }
+  }
+}

@@ -1,0 +1,216 @@
+{
+  "branch": "ece",
+  "label": "Electronics & Communication Engineering",
+  "schema_version": 1,
+  "notes": "Seed questions for the ece branch.",
+  "topics": [
+    {
+      "topic": "Digital Electronics",
+      "subtopics": [
+        "logic gates",
+        "flip-flops",
+        "counters",
+        "Boolean algebra"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between combinational and sequential logic?",
+          "What does a flip-flop do?",
+          "What is the difference between a latch and a flip-flop?"
+        ],
+        "medium": [
+          "How would you simplify a Boolean expression using a K-map?",
+          "Explain the difference between a multiplexer and a decoder.",
+          "How does a ripple counter work, and what's its drawback?"
+        ],
+        "hard": [
+          "Design a synchronous counter for a given sequence.",
+          "Explain setup and hold time and why timing violations matter.",
+          "How would you build a finite state machine for a traffic-light controller?"
+        ]
+      }
+    },
+    {
+      "topic": "Analog Electronics",
+      "subtopics": [
+        "diodes",
+        "transistors",
+        "op-amps",
+        "amplifiers"
+      ],
+      "questions": {
+        "easy": [
+          "What is a diode, and what is it commonly used for?",
+          "What does a transistor do, in simple terms?",
+          "What is an operational amplifier?"
+        ],
+        "medium": [
+          "Explain how a transistor works as a switch versus an amplifier.",
+          "What is the role of feedback in an op-amp circuit?",
+          "How does a half-wave rectifier differ from a full-wave rectifier?"
+        ],
+        "hard": [
+          "Design a non-inverting amplifier with a given gain.",
+          "Explain the concept of an op-amp's virtual short.",
+          "How would you analyse the biasing of a BJT amplifier?"
+        ]
+      }
+    },
+    {
+      "topic": "Signals & Systems",
+      "subtopics": [
+        "signals",
+        "Fourier",
+        "LTI",
+        "sampling"
+      ],
+      "questions": {
+        "easy": [
+          "What's the difference between a continuous and a discrete signal?",
+          "What does it mean for a system to be linear?",
+          "What is sampling?"
+        ],
+        "medium": [
+          "What does the Fourier transform tell you about a signal?",
+          "What is the Nyquist sampling theorem?",
+          "What's the difference between time-domain and frequency-domain analysis?"
+        ],
+        "hard": [
+          "Explain convolution and its role in LTI systems.",
+          "What is aliasing, and how do you prevent it?",
+          "How would you analyse the stability of an LTI system?"
+        ]
+      }
+    },
+    {
+      "topic": "Communication Systems",
+      "subtopics": [
+        "modulation",
+        "AM/FM",
+        "digital comm",
+        "noise"
+      ],
+      "questions": {
+        "easy": [
+          "What is modulation, and why do we need it?",
+          "What's the difference between AM and FM?",
+          "What is bandwidth in communication?"
+        ],
+        "medium": [
+          "Why is FM more noise-resistant than AM?",
+          "What's the difference between analog and digital communication?",
+          "What is the role of a carrier signal?"
+        ],
+        "hard": [
+          "Explain how digital modulation (e.g. QAM) packs more data into a channel.",
+          "How does the signal-to-noise ratio affect channel capacity (Shannon)?",
+          "How would you design a link budget for a wireless system?"
+        ]
+      }
+    },
+    {
+      "topic": "Microcontrollers & Embedded",
+      "subtopics": [
+        "architecture",
+        "interrupts",
+        "GPIO",
+        "timers"
+      ],
+      "questions": {
+        "easy": [
+          "What is a microcontroller?",
+          "What is the difference between a microprocessor and a microcontroller?",
+          "What is GPIO?"
+        ],
+        "medium": [
+          "What is an interrupt, and why is it useful?",
+          "How does a timer/counter peripheral work?",
+          "What's the difference between polling and interrupts?"
+        ],
+        "hard": [
+          "How would you debounce a mechanical switch in firmware?",
+          "Explain how you'd handle multiple interrupts with priorities.",
+          "How would you design a low-power embedded system?"
+        ]
+      }
+    },
+    {
+      "topic": "Network Theory",
+      "subtopics": [
+        "KVL/KCL",
+        "theorems",
+        "AC analysis",
+        "transients"
+      ],
+      "questions": {
+        "easy": [
+          "State Kirchhoff's voltage and current laws.",
+          "What is Ohm's law?",
+          "What's the difference between series and parallel resistance?"
+        ],
+        "medium": [
+          "Explain Thevenin's theorem and where it helps.",
+          "What is resonance in an RLC circuit?",
+          "What's the difference between impedance and resistance?"
+        ],
+        "hard": [
+          "Analyse the transient response of an RC circuit.",
+          "Explain superposition theorem with an example.",
+          "How would you find the maximum power transfer condition?"
+        ]
+      }
+    },
+    {
+      "topic": "Electromagnetics",
+      "subtopics": [
+        "fields",
+        "waves",
+        "transmission lines",
+        "antennas"
+      ],
+      "questions": {
+        "easy": [
+          "What is an electric field?",
+          "What is the difference between an electric and a magnetic field?",
+          "What is an antenna used for?"
+        ],
+        "medium": [
+          "What does a transmission line do at high frequencies?",
+          "What is impedance matching, and why does it matter?",
+          "What is a standing wave?"
+        ],
+        "hard": [
+          "Explain how an electromagnetic wave propagates (Maxwell's equations, qualitatively).",
+          "What is the reflection coefficient on a transmission line?",
+          "How would you design a basic dipole antenna for a given frequency?"
+        ]
+      }
+    },
+    {
+      "topic": "VLSI Basics",
+      "subtopics": [
+        "MOSFET",
+        "CMOS",
+        "fabrication",
+        "logic design"
+      ],
+      "questions": {
+        "easy": [
+          "What is a MOSFET?",
+          "What does CMOS stand for, and why is it widely used?",
+          "What is an integrated circuit?"
+        ],
+        "medium": [
+          "Why does CMOS consume little static power?",
+          "What's the difference between NMOS and PMOS?",
+          "What is propagation delay in a logic gate?"
+        ],
+        "hard": [
+          "Design a CMOS inverter and explain its operation.",
+          "Explain the sources of power dissipation in CMOS.",
+          "How does transistor scaling affect performance and power?"
+        ]
+      }
+    }
+  ]
+}

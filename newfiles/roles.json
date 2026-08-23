@@ -1,0 +1,3040 @@
+{
+  "schema_version": 1,
+  "description": "Fresher target-role catalogue for PrepVista. Each role maps to the branches that can apply, the company types that hire for it, its key competencies (canonical set), the question categories it emphasises, and a comprehensive set of 20+ relevant skills (technical, tools, concepts, soft). Used by the orchestrator to tailor interviews and by the resume matcher to score skill coverage.",
+  "competencies": [
+    "introduction",
+    "technical_depth",
+    "project_ownership",
+    "communication",
+    "problem_solving",
+    "behavioral",
+    "situational_judgment",
+    "creative_thinking",
+    "ai_tool_fluency"
+  ],
+  "categories": [
+    "hr_behavioral",
+    "resume_based",
+    "technical_domain",
+    "aptitude_reasoning",
+    "situational_star",
+    "stress_curveball",
+    "puzzles_brainteasers",
+    "creative_estimation",
+    "case_study",
+    "culture_fit",
+    "career_motivation",
+    "salary_expectation",
+    "group_discussion",
+    "candidate_questions"
+  ],
+  "branches": [
+    "cse",
+    "aids",
+    "aiml",
+    "ece",
+    "eee",
+    "mech",
+    "civil",
+    "cyber"
+  ],
+  "company_types": [
+    "service",
+    "product",
+    "analytics",
+    "core",
+    "general"
+  ],
+  "roles": [
+    {
+      "key": "software_engineer",
+      "label": "Software Engineer / SDE",
+      "description": "Builds and maintains software; the core fresher tech role.",
+      "branches": [
+        "cse",
+        "aids",
+        "aiml",
+        "ece",
+        "cyber"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Data structures",
+        "Algorithms",
+        "Object-oriented programming",
+        "Time & space complexity (Big-O)",
+        "Recursion",
+        "Problem solving",
+        "Debugging",
+        "Git & version control",
+        "Clean code practices",
+        "Unit testing basics",
+        "Operating systems",
+        "Computer networks",
+        "Database management systems",
+        "SQL",
+        "Computer architecture",
+        "A primary language (Java/C++/Python)",
+        "Multithreading basics",
+        "Agile/Scrum basics",
+        "Code reviews",
+        "Design patterns",
+        "System design basics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 27,
+      "seniority": "fresher"
+    },
+    {
+      "key": "backend_developer",
+      "label": "Backend Developer",
+      "description": "Builds server-side logic, APIs, and data layers.",
+      "branches": [
+        "cse",
+        "aids",
+        "aiml",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Data structures",
+        "Algorithms",
+        "Object-oriented programming",
+        "Time & space complexity (Big-O)",
+        "Recursion",
+        "Problem solving",
+        "Debugging",
+        "Git & version control",
+        "Clean code practices",
+        "Unit testing basics",
+        "A backend language (Java/Python/Node/Go)",
+        "REST APIs",
+        "HTTP/HTTPS",
+        "JSON",
+        "API integration",
+        "Authentication basics",
+        "Relational databases",
+        "Database design & normalization",
+        "Indexing",
+        "NoSQL basics",
+        "Query optimization",
+        "Stored procedures",
+        "Caching basics",
+        "Microservices basics",
+        "Operating systems",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 31,
+      "seniority": "fresher"
+    },
+    {
+      "key": "frontend_developer",
+      "label": "Frontend Developer",
+      "description": "Builds user interfaces and client-side experiences.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "communication",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "HTML5",
+        "CSS3",
+        "JavaScript (ES6+)",
+        "Responsive design",
+        "DOM manipulation",
+        "Browser dev tools",
+        "A frontend framework (React/Angular/Vue)",
+        "State management",
+        "UI/UX fundamentals",
+        "Web accessibility basics",
+        "Webpack/build tools",
+        "Cross-browser compatibility",
+        "REST APIs",
+        "HTTP/HTTPS",
+        "JSON",
+        "API integration",
+        "Authentication basics",
+        "Git & version control",
+        "Problem solving",
+        "Debugging",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 26,
+      "seniority": "fresher"
+    },
+    {
+      "key": "full_stack_developer",
+      "label": "Full-Stack Developer",
+      "description": "Works across frontend, backend, and databases.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "HTML5",
+        "CSS3",
+        "JavaScript (ES6+)",
+        "Responsive design",
+        "DOM manipulation",
+        "Browser dev tools",
+        "A frontend framework",
+        "A backend language",
+        "REST APIs",
+        "HTTP/HTTPS",
+        "JSON",
+        "API integration",
+        "Authentication basics",
+        "Relational databases",
+        "Database design & normalization",
+        "Indexing",
+        "NoSQL basics",
+        "Query optimization",
+        "Stored procedures",
+        "Git & version control",
+        "Deployment basics",
+        "Problem solving",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 28,
+      "seniority": "fresher"
+    },
+    {
+      "key": "mobile_app_developer",
+      "label": "Mobile App Developer",
+      "description": "Builds Android/iOS or cross-platform apps.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Android (Kotlin/Java) or iOS (Swift)",
+        "Flutter or React Native",
+        "Object-oriented programming",
+        "Mobile app lifecycle",
+        "UI design for mobile",
+        "Local storage (SQLite)",
+        "REST APIs",
+        "HTTP/HTTPS",
+        "JSON",
+        "API integration",
+        "Authentication basics",
+        "Push notifications",
+        "Performance optimization",
+        "Git & version control",
+        "Debugging",
+        "Problem solving",
+        "Data structures",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 23,
+      "seniority": "fresher"
+    },
+    {
+      "key": "qa_test_engineer",
+      "label": "QA / Test Engineer",
+      "description": "Designs tests and ensures software quality.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "communication",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Manual testing",
+        "Test case design",
+        "Test automation basics",
+        "Selenium basics",
+        "API testing (Postman)",
+        "Bug tracking (JIRA)",
+        "SDLC & STLC",
+        "Regression testing",
+        "SQL basics",
+        "Defect lifecycle",
+        "Black-box & white-box testing",
+        "Performance testing basics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn",
+        "Critical thinking",
+        "Ownership",
+        "Work ethic",
+        "Curiosity"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "devops_engineer",
+      "label": "DevOps Engineer",
+      "description": "Automates build, deployment, and infrastructure.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece",
+        "cyber"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Cloud fundamentals (AWS/Azure/GCP)",
+        "Linux/Unix",
+        "Shell scripting",
+        "Docker basics",
+        "CI/CD basics",
+        "Networking basics",
+        "Kubernetes basics",
+        "Infrastructure as Code (Terraform)",
+        "Configuration management (Ansible)",
+        "Monitoring (Prometheus/Grafana)",
+        "Git & version control",
+        "Build tools",
+        "Scripting (Python/Bash)",
+        "Logging",
+        "Networking",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 21,
+      "seniority": "fresher"
+    },
+    {
+      "key": "cloud_engineer",
+      "label": "Cloud Engineer",
+      "description": "Builds and manages cloud infrastructure.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece",
+        "cyber"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Cloud fundamentals (AWS/Azure/GCP)",
+        "Linux/Unix",
+        "Shell scripting",
+        "Docker basics",
+        "CI/CD basics",
+        "Networking basics",
+        "Compute & storage services",
+        "Virtual networking (VPC)",
+        "Identity & access management (IAM)",
+        "Load balancing",
+        "Auto-scaling",
+        "Cloud security basics",
+        "Cost optimization basics",
+        "Infrastructure as Code",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "site_reliability_engineer",
+      "label": "Site Reliability Engineer (SRE)",
+      "description": "Keeps systems reliable and scalable.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Operating systems",
+        "Computer networks",
+        "Linux/Unix",
+        "Scripting (Python/Bash)",
+        "Monitoring & alerting",
+        "Incident response",
+        "Distributed systems basics",
+        "Containers & orchestration",
+        "CI/CD",
+        "Reliability & SLAs",
+        "Capacity planning basics",
+        "Debugging",
+        "Data structures",
+        "Problem solving",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "systems_engineer",
+      "label": "Systems Engineer",
+      "description": "Configures and supports systems and infrastructure.",
+      "branches": [
+        "cse",
+        "ece",
+        "eee"
+      ],
+      "company_types": [
+        "service",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "communication",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Operating systems",
+        "Computer networks",
+        "Linux/Windows administration",
+        "Hardware fundamentals",
+        "Scripting",
+        "Virtualization basics",
+        "Troubleshooting",
+        "Active Directory basics",
+        "Networking protocols",
+        "Storage basics",
+        "ITIL basics",
+        "Documentation",
+        "Problem solving",
+        "Data structures",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "database_administrator",
+      "label": "Database Administrator",
+      "description": "Designs, tunes, and maintains databases.",
+      "branches": [
+        "cse",
+        "aids"
+      ],
+      "company_types": [
+        "service",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "SQL",
+        "Relational databases",
+        "Database design & normalization",
+        "Indexing",
+        "Query optimization",
+        "Backup & recovery",
+        "Stored procedures",
+        "Transactions & ACID",
+        "Performance tuning",
+        "Replication basics",
+        "NoSQL basics",
+        "Data modelling",
+        "Security & access control",
+        "Operating systems",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "network_engineer",
+      "label": "Network Engineer",
+      "description": "Designs and maintains computer networks.",
+      "branches": [
+        "cse",
+        "ece",
+        "cyber"
+      ],
+      "company_types": [
+        "service",
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Networking (OSI & TCP/IP)",
+        "Routing & switching",
+        "Subnetting",
+        "IP addressing",
+        "Network protocols (DNS/DHCP/HTTP)",
+        "Firewalls",
+        "VPN basics",
+        "Network security basics",
+        "Troubleshooting",
+        "Cisco basics (CCNA)",
+        "Wireless basics",
+        "Load balancing",
+        "Operating systems",
+        "Linux basics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "embedded_engineer",
+      "label": "Embedded Systems Engineer",
+      "description": "Develops software for embedded/IoT devices.",
+      "branches": [
+        "ece",
+        "eee",
+        "cse"
+      ],
+      "company_types": [
+        "product",
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Embedded C",
+        "C++",
+        "Microcontrollers (ARM/AVR/PIC)",
+        "RTOS basics",
+        "Digital electronics",
+        "Analog electronics",
+        "Hardware interfacing (I2C/SPI/UART)",
+        "Sensors & actuators",
+        "Memory management",
+        "Debugging (oscilloscope/JTAG)",
+        "Firmware development",
+        "Data structures",
+        "Problem solving",
+        "IoT basics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "firmware_engineer",
+      "label": "Firmware Engineer",
+      "description": "Writes low-level firmware for hardware.",
+      "branches": [
+        "ece",
+        "eee",
+        "cse"
+      ],
+      "company_types": [
+        "product",
+        "core"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Embedded C",
+        "Assembly basics",
+        "Microcontrollers",
+        "Hardware interfacing (I2C/SPI/UART)",
+        "Memory management",
+        "RTOS basics",
+        "Bootloaders",
+        "Device drivers",
+        "Debugging tools",
+        "Digital electronics",
+        "Bit manipulation",
+        "Data structures",
+        "Problem solving",
+        "Low-power design",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "application_support_engineer",
+      "label": "Application Support Engineer",
+      "description": "Supports and troubleshoots applications.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "communication",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "SQL basics",
+        "Troubleshooting",
+        "Log analysis",
+        "Ticketing tools (JIRA/ServiceNow)",
+        "Operating systems",
+        "Networking basics",
+        "Scripting basics",
+        "Incident management",
+        "ITIL basics",
+        "Application monitoring",
+        "Root-cause analysis",
+        "Customer communication",
+        "Documentation",
+        "Problem solving",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "technical_support_engineer",
+      "label": "Technical Support Engineer",
+      "description": "Resolves customer technical issues.",
+      "branches": [
+        "cse",
+        "ece",
+        "eee"
+      ],
+      "company_types": [
+        "service",
+        "general"
+      ],
+      "key_competencies": [
+        "communication",
+        "situational_judgment",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "hr_behavioral",
+        "situational_star",
+        "technical_domain",
+        "aptitude_reasoning",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Troubleshooting",
+        "Customer communication",
+        "Product knowledge",
+        "Ticketing systems",
+        "Operating systems basics",
+        "Networking basics",
+        "SQL basics",
+        "Remote support tools",
+        "Incident management",
+        "Patience under pressure",
+        "Documentation",
+        "Active listening",
+        "Root-cause analysis",
+        "Escalation handling",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "data_scientist",
+      "label": "Data Scientist",
+      "description": "Builds models and extracts insight from data.",
+      "branches": [
+        "aids",
+        "aiml",
+        "cse"
+      ],
+      "company_types": [
+        "analytics",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Python",
+        "Statistics",
+        "Probability",
+        "Data wrangling",
+        "Pandas & NumPy",
+        "Data visualization",
+        "SQL",
+        "Exploratory data analysis",
+        "Machine learning fundamentals",
+        "Supervised learning",
+        "Unsupervised learning",
+        "Model evaluation",
+        "Feature engineering",
+        "Regularization & overfitting",
+        "Scikit-learn",
+        "Hypothesis testing",
+        "A/B testing",
+        "Feature selection",
+        "Data storytelling",
+        "Jupyter notebooks",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 26,
+      "seniority": "fresher"
+    },
+    {
+      "key": "data_analyst",
+      "label": "Data Analyst",
+      "description": "Analyses data and builds reports/dashboards.",
+      "branches": [
+        "aids",
+        "cse",
+        "ece"
+      ],
+      "company_types": [
+        "analytics",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "SQL",
+        "Advanced Excel",
+        "Data visualization",
+        "Tableau or Power BI",
+        "Statistics basics",
+        "Pandas & NumPy",
+        "Python or R",
+        "Data cleaning",
+        "Dashboard design",
+        "Storytelling with data",
+        "Business sense",
+        "KPIs & metrics",
+        "Hypothesis testing basics",
+        "Reporting",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "data_engineer",
+      "label": "Data Engineer",
+      "description": "Builds data pipelines and infrastructure.",
+      "branches": [
+        "aids",
+        "aiml",
+        "cse"
+      ],
+      "company_types": [
+        "analytics",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "SQL",
+        "Python",
+        "ETL/ELT",
+        "Data warehousing",
+        "Apache Spark basics",
+        "Big data concepts",
+        "Data modelling",
+        "Pipeline orchestration (Airflow)",
+        "Cloud data services",
+        "NoSQL",
+        "Data quality",
+        "Streaming basics (Kafka)",
+        "Linux",
+        "Git & version control",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "machine_learning_engineer",
+      "label": "Machine Learning Engineer",
+      "description": "Builds and deploys ML systems.",
+      "branches": [
+        "aiml",
+        "aids",
+        "cse"
+      ],
+      "company_types": [
+        "analytics",
+        "product"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Python",
+        "Statistics",
+        "Probability",
+        "Data wrangling",
+        "Pandas & NumPy",
+        "Data visualization",
+        "SQL",
+        "Exploratory data analysis",
+        "Machine learning fundamentals",
+        "Supervised learning",
+        "Unsupervised learning",
+        "Model evaluation",
+        "Feature engineering",
+        "Regularization & overfitting",
+        "Scikit-learn",
+        "Deep learning basics",
+        "Neural networks",
+        "Backpropagation",
+        "TensorFlow or PyTorch",
+        "CNNs",
+        "Hyperparameter tuning",
+        "Model deployment",
+        "MLOps basics",
+        "Software engineering",
+        "APIs",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 31,
+      "seniority": "fresher"
+    },
+    {
+      "key": "ai_engineer",
+      "label": "AI Engineer",
+      "description": "Develops AI-powered features and applications.",
+      "branches": [
+        "aiml",
+        "aids",
+        "cse"
+      ],
+      "company_types": [
+        "product",
+        "analytics"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "ai_tool_fluency"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Python",
+        "Machine learning basics",
+        "Deep learning basics",
+        "LLMs & prompting",
+        "NLP basics",
+        "APIs (OpenAI/HF)",
+        "Vector databases",
+        "RAG basics",
+        "Model integration",
+        "Software engineering",
+        "Data structures",
+        "Git & version control",
+        "Cloud basics",
+        "Problem solving",
+        "Statistics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 21,
+      "seniority": "fresher"
+    },
+    {
+      "key": "business_intelligence_analyst",
+      "label": "BI Analyst",
+      "description": "Builds BI dashboards and analytics.",
+      "branches": [
+        "aids",
+        "cse"
+      ],
+      "company_types": [
+        "analytics",
+        "general"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "SQL",
+        "Power BI or Tableau",
+        "Data modelling",
+        "DAX basics",
+        "ETL basics",
+        "Advanced Excel",
+        "Data warehousing basics",
+        "Dashboard design",
+        "KPIs & metrics",
+        "Storytelling with data",
+        "Business sense",
+        "Reporting",
+        "Data cleaning",
+        "Stakeholder communication",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "analytics_consultant",
+      "label": "Analytics Consultant",
+      "description": "Solves business problems with analytics.",
+      "branches": [
+        "aids",
+        "aiml",
+        "cse"
+      ],
+      "company_types": [
+        "analytics"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "creative_estimation",
+        "technical_domain",
+        "group_discussion",
+        "hr_behavioral"
+      ],
+      "typical_skills": [
+        "Structured problem solving",
+        "Business acumen",
+        "Stakeholder management",
+        "Requirement gathering",
+        "MS Excel",
+        "Presentation skills",
+        "Analytical thinking",
+        "Documentation",
+        "SQL",
+        "Statistics",
+        "Python or R",
+        "Data visualization",
+        "Guesstimates",
+        "Hypothesis-driven thinking",
+        "Client communication",
+        "Storytelling with data",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "decision_scientist",
+      "label": "Decision Scientist",
+      "description": "Drives decisions through quantitative analysis.",
+      "branches": [
+        "aids",
+        "aiml"
+      ],
+      "company_types": [
+        "analytics"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "creative_thinking",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "creative_estimation",
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Statistics",
+        "Probability",
+        "Optimization basics",
+        "Python or R",
+        "SQL",
+        "Experiment design",
+        "A/B testing",
+        "Hypothesis testing",
+        "Business framing",
+        "Data visualization",
+        "Causal inference basics",
+        "Storytelling with data",
+        "Problem solving",
+        "Analytical thinking",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "research_analyst",
+      "label": "Research Analyst",
+      "description": "Conducts research and synthesises findings.",
+      "branches": [
+        "aids",
+        "cse",
+        "eee"
+      ],
+      "company_types": [
+        "analytics",
+        "general"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "creative_estimation",
+        "group_discussion",
+        "hr_behavioral",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Research methodology",
+        "Data analysis",
+        "Statistics basics",
+        "Excel",
+        "Report writing",
+        "Secondary research",
+        "Critical thinking",
+        "Domain reading",
+        "Survey design basics",
+        "Data visualization",
+        "SQL basics",
+        "Presentation skills",
+        "Synthesis",
+        "Analytical thinking",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "nlp_engineer",
+      "label": "NLP Engineer",
+      "description": "Builds language-understanding systems.",
+      "branches": [
+        "aiml",
+        "aids",
+        "cse"
+      ],
+      "company_types": [
+        "product",
+        "analytics"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Python",
+        "NLP fundamentals",
+        "Tokenization",
+        "Word embeddings",
+        "Transformers & attention",
+        "LLMs",
+        "Text classification",
+        "Named entity recognition",
+        "Deep learning",
+        "PyTorch or TensorFlow",
+        "Hugging Face",
+        "Data preprocessing",
+        "Model evaluation",
+        "Software engineering",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "computer_vision_engineer",
+      "label": "Computer Vision Engineer",
+      "description": "Builds image/video understanding systems.",
+      "branches": [
+        "aiml",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "product",
+        "core"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Python",
+        "Image processing",
+        "OpenCV",
+        "CNNs",
+        "Object detection",
+        "Image segmentation",
+        "Deep learning",
+        "PyTorch or TensorFlow",
+        "Data augmentation",
+        "Transfer learning",
+        "Model evaluation",
+        "Linear algebra",
+        "Software engineering",
+        "Camera/optics basics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "mlops_engineer",
+      "label": "MLOps Engineer",
+      "description": "Operationalises and monitors ML in production.",
+      "branches": [
+        "aiml",
+        "aids",
+        "cse"
+      ],
+      "company_types": [
+        "product",
+        "analytics"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "case_study",
+        "creative_estimation",
+        "aptitude_reasoning",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "Python",
+        "Machine learning basics",
+        "CI/CD for ML",
+        "Docker & Kubernetes",
+        "Model serving",
+        "Model monitoring",
+        "MLflow / pipelines",
+        "Cloud (AWS/Azure/GCP)",
+        "Data versioning",
+        "Feature stores basics",
+        "Linux",
+        "Git & version control",
+        "Software engineering",
+        "Logging",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "cybersecurity_analyst",
+      "label": "Cybersecurity Analyst",
+      "description": "Monitors and defends systems against threats.",
+      "branches": [
+        "cyber",
+        "cse",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "situational_judgment",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "situational_star",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral"
+      ],
+      "typical_skills": [
+        "Security fundamentals (CIA triad)",
+        "Network security",
+        "Cryptography basics",
+        "Threat analysis",
+        "Vulnerability assessment",
+        "Linux security",
+        "Secure coding basics",
+        "Risk assessment",
+        "SIEM tools",
+        "Incident response",
+        "Networking",
+        "Log analysis",
+        "Malware basics",
+        "Firewalls & IDS/IPS",
+        "Security policies",
+        "Operating systems",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "security_engineer",
+      "label": "Security Engineer",
+      "description": "Builds secure systems and defences.",
+      "branches": [
+        "cyber",
+        "cse"
+      ],
+      "company_types": [
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "puzzles_brainteasers",
+        "aptitude_reasoning",
+        "resume_based",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Security fundamentals (CIA triad)",
+        "Network security",
+        "Cryptography basics",
+        "Threat analysis",
+        "Vulnerability assessment",
+        "Linux security",
+        "Secure coding basics",
+        "Risk assessment",
+        "Secure coding",
+        "Application security (OWASP)",
+        "Networking",
+        "Penetration testing basics",
+        "Cloud security",
+        "Identity & access management",
+        "Scripting (Python)",
+        "Threat modelling",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "soc_analyst",
+      "label": "SOC Analyst",
+      "description": "Operates a security operations centre, triaging alerts.",
+      "branches": [
+        "cyber",
+        "cse",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "general"
+      ],
+      "key_competencies": [
+        "situational_judgment",
+        "communication",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "situational_star",
+        "technical_domain",
+        "aptitude_reasoning",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "SIEM tools",
+        "Log analysis",
+        "Incident response",
+        "Network security",
+        "Threat detection",
+        "Malware basics",
+        "Operating systems",
+        "Firewalls & IDS/IPS",
+        "Security fundamentals (CIA triad)",
+        "Alert triage",
+        "Documentation",
+        "Cryptography basics",
+        "Vulnerability basics",
+        "Communication under pressure",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "penetration_tester",
+      "label": "Penetration Tester",
+      "description": "Tests systems by ethically attacking them.",
+      "branches": [
+        "cyber",
+        "cse"
+      ],
+      "company_types": [
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "puzzles_brainteasers",
+        "case_study",
+        "resume_based",
+        "aptitude_reasoning"
+      ],
+      "typical_skills": [
+        "Web application security (OWASP)",
+        "Networking",
+        "Linux",
+        "Scripting (Python/Bash)",
+        "Exploitation basics",
+        "Vulnerability assessment",
+        "Burp Suite",
+        "Nmap",
+        "Metasploit basics",
+        "Cryptography basics",
+        "Reporting",
+        "Security fundamentals",
+        "Operating systems",
+        "Reconnaissance",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "business_analyst",
+      "label": "Business Analyst",
+      "description": "Bridges business needs and technical solutions.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece",
+        "mech"
+      ],
+      "company_types": [
+        "service",
+        "analytics",
+        "general"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "creative_estimation",
+        "group_discussion",
+        "hr_behavioral",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Structured problem solving",
+        "Business acumen",
+        "Stakeholder management",
+        "Requirement gathering",
+        "MS Excel",
+        "Presentation skills",
+        "Analytical thinking",
+        "Documentation",
+        "SQL basics",
+        "Process mapping",
+        "Use cases & user stories",
+        "Wireframing basics",
+        "Agile basics",
+        "Gap analysis",
+        "Data analysis",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 21,
+      "seniority": "fresher"
+    },
+    {
+      "key": "consultant",
+      "label": "Consultant",
+      "description": "Solves client problems across domains.",
+      "branches": [
+        "cse",
+        "aids",
+        "mech",
+        "ece",
+        "eee",
+        "civil"
+      ],
+      "company_types": [
+        "service",
+        "analytics",
+        "general"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "creative_estimation",
+        "group_discussion",
+        "hr_behavioral",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Structured problem solving",
+        "Business acumen",
+        "Stakeholder management",
+        "Requirement gathering",
+        "MS Excel",
+        "Presentation skills",
+        "Analytical thinking",
+        "Documentation",
+        "Case-solving frameworks",
+        "Guesstimates",
+        "Market sizing",
+        "Hypothesis-driven thinking",
+        "Client management",
+        "Storytelling",
+        "Adaptability across domains",
+        "Research",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "product_analyst",
+      "label": "Product Analyst",
+      "description": "Uses data to inform product decisions.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "product",
+        "analytics",
+        "general"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "creative_thinking"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "creative_estimation",
+        "technical_domain",
+        "hr_behavioral",
+        "resume_based"
+      ],
+      "typical_skills": [
+        "SQL",
+        "Product analytics",
+        "A/B testing",
+        "Metrics & KPIs",
+        "Excel",
+        "Data visualization",
+        "Product sense",
+        "User behaviour analysis",
+        "Statistics basics",
+        "Experimentation",
+        "Funnel analysis",
+        "Storytelling with data",
+        "Roadmap basics",
+        "Cohort analysis",
+        "Retention metrics",
+        "SQL querying",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "operations_analyst",
+      "label": "Operations Analyst",
+      "description": "Improves processes and operational efficiency.",
+      "branches": [
+        "cse",
+        "mech",
+        "civil",
+        "ece"
+      ],
+      "company_types": [
+        "general",
+        "service"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "situational_star",
+        "aptitude_reasoning",
+        "hr_behavioral",
+        "group_discussion"
+      ],
+      "typical_skills": [
+        "Process analysis",
+        "Excel",
+        "SQL basics",
+        "Data analysis",
+        "Lean/Six Sigma basics",
+        "KPIs & metrics",
+        "Reporting",
+        "Root-cause analysis",
+        "Coordination",
+        "Problem solving",
+        "Workflow optimization",
+        "Stakeholder management",
+        "Documentation",
+        "Analytical thinking",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "management_trainee",
+      "label": "Management Trainee",
+      "description": "Rotational programme grooming future managers.",
+      "branches": [
+        "cse",
+        "aids",
+        "mech",
+        "ece",
+        "eee",
+        "civil"
+      ],
+      "company_types": [
+        "general",
+        "core",
+        "service"
+      ],
+      "key_competencies": [
+        "communication",
+        "behavioral",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "hr_behavioral",
+        "group_discussion",
+        "situational_star",
+        "career_motivation",
+        "case_study"
+      ],
+      "typical_skills": [
+        "Leadership basics",
+        "Communication",
+        "Business acumen",
+        "Teamwork",
+        "Adaptability",
+        "Problem solving",
+        "Presentation skills",
+        "Stakeholder management",
+        "Decision-making",
+        "Time management",
+        "People skills",
+        "Conflict resolution basics",
+        "Analytical thinking",
+        "MS Office",
+        "Project basics",
+        "Negotiation basics",
+        "Ownership",
+        "Critical thinking",
+        "Work ethic",
+        "Initiative"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "mechanical_design_engineer",
+      "label": "Mechanical Design Engineer",
+      "description": "Designs mechanical components and systems.",
+      "branches": [
+        "mech"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Engineering drawing",
+        "CAD (AutoCAD/SolidWorks)",
+        "Strength of materials",
+        "Thermodynamics",
+        "Fluid mechanics",
+        "Manufacturing processes",
+        "Machine design",
+        "GD&T",
+        "SolidWorks/CATIA",
+        "Finite element analysis (FEA) basics",
+        "Material science",
+        "Tolerance analysis",
+        "Design for manufacturing",
+        "Heat transfer",
+        "Product design process",
+        "Problem solving",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "production_engineer",
+      "label": "Production Engineer",
+      "description": "Manages manufacturing and production lines.",
+      "branches": [
+        "mech",
+        "eee"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "situational_judgment",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Manufacturing processes",
+        "Lean manufacturing",
+        "Six Sigma basics",
+        "Production planning",
+        "Quality control",
+        "Process improvement",
+        "Machine operations",
+        "Industrial engineering",
+        "Material handling",
+        "Safety standards",
+        "Inventory basics",
+        "MS Excel",
+        "Problem solving",
+        "Coordination",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "quality_engineer",
+      "label": "Quality Engineer",
+      "description": "Ensures product and process quality.",
+      "branches": [
+        "mech",
+        "ece",
+        "eee"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "behavioral",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Quality tools (7 QC tools)",
+        "Metrology",
+        "Statistical process control (SPC)",
+        "Root-cause analysis (5-Why/Fishbone)",
+        "ISO standards",
+        "Six Sigma basics",
+        "Inspection methods",
+        "GD&T",
+        "FMEA",
+        "Calibration",
+        "Documentation",
+        "Problem solving",
+        "Audit basics",
+        "Control charts",
+        "PPAP basics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 21,
+      "seniority": "fresher"
+    },
+    {
+      "key": "maintenance_engineer",
+      "label": "Maintenance Engineer",
+      "description": "Keeps plant and equipment running.",
+      "branches": [
+        "mech",
+        "eee",
+        "ece"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "situational_judgment",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Preventive maintenance",
+        "Predictive maintenance",
+        "Troubleshooting",
+        "Mechanical systems",
+        "Electrical systems basics",
+        "Hydraulics & pneumatics",
+        "Root-cause analysis",
+        "Safety standards",
+        "Equipment reliability",
+        "Spare-parts management",
+        "CMMS basics",
+        "Problem solving",
+        "Coordination",
+        "Documentation",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "manufacturing_engineer",
+      "label": "Manufacturing Engineer",
+      "description": "Optimises manufacturing methods.",
+      "branches": [
+        "mech",
+        "eee"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Manufacturing processes",
+        "Process optimization",
+        "CAD/CAM",
+        "Lean manufacturing",
+        "Tooling & fixtures",
+        "Industrial engineering",
+        "Time & motion study",
+        "Quality control",
+        "Automation basics",
+        "Cost analysis",
+        "Material science",
+        "Problem solving",
+        "Six Sigma basics",
+        "MS Excel",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "graduate_engineer_trainee",
+      "label": "Graduate Engineer Trainee (GET)",
+      "description": "Entry rotational engineering programme.",
+      "branches": [
+        "mech",
+        "eee",
+        "ece",
+        "civil"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "behavioral",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Domain fundamentals",
+        "Engineering drawing",
+        "MS Office",
+        "Problem solving",
+        "Adaptability",
+        "Communication",
+        "Teamwork",
+        "Willingness to learn",
+        "Safety awareness",
+        "Basic project management",
+        "Analytical thinking",
+        "Time management",
+        "Coordination",
+        "Report writing",
+        "Quality basics",
+        "Hands-on aptitude",
+        "Attention to detail",
+        "Initiative",
+        "Work ethic",
+        "Curiosity"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "electrical_engineer",
+      "label": "Electrical Engineer",
+      "description": "Designs and maintains electrical systems.",
+      "branches": [
+        "eee",
+        "ece"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Circuit theory",
+        "Analog electronics",
+        "Digital electronics",
+        "Electrical machines",
+        "Power systems basics",
+        "Control systems basics",
+        "Measurements & instrumentation",
+        "Electrical design",
+        "Wiring & distribution",
+        "Transformers",
+        "Motors & drives",
+        "Electrical safety",
+        "AutoCAD Electrical",
+        "Load calculations",
+        "Power electronics basics",
+        "Problem solving",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "electronics_engineer",
+      "label": "Electronics Engineer",
+      "description": "Designs electronic circuits and systems.",
+      "branches": [
+        "ece",
+        "eee"
+      ],
+      "company_types": [
+        "core",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Digital electronics",
+        "Analog electronics",
+        "Signals & systems",
+        "Communication systems",
+        "Microcontrollers & embedded",
+        "Network theory",
+        "VLSI basics",
+        "Circuit design",
+        "PCB design",
+        "Embedded systems basics",
+        "Testing & debugging",
+        "Sensors",
+        "Power supply design",
+        "Soldering",
+        "Microcontrollers",
+        "Problem solving",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "vlsi_engineer",
+      "label": "VLSI Design Engineer",
+      "description": "Designs integrated circuits and chips.",
+      "branches": [
+        "ece",
+        "eee"
+      ],
+      "company_types": [
+        "product",
+        "core"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Digital design",
+        "Verilog/VHDL",
+        "CMOS design",
+        "Static timing analysis (STA)",
+        "RTL design",
+        "Logic synthesis",
+        "Physical design basics",
+        "Semiconductor fundamentals",
+        "Circuit theory",
+        "EDA tools",
+        "Verification basics",
+        "Low-power design",
+        "Problem solving",
+        "Digital electronics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "power_systems_engineer",
+      "label": "Power Systems Engineer",
+      "description": "Works on generation, transmission, distribution.",
+      "branches": [
+        "eee"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Power systems analysis",
+        "Power generation",
+        "Transmission & distribution",
+        "Protection & switchgear",
+        "Load flow analysis",
+        "Fault analysis",
+        "Electrical machines",
+        "Power electronics",
+        "Renewable energy basics",
+        "Grid stability basics",
+        "Electrical safety",
+        "SCADA basics",
+        "Problem solving",
+        "Circuit theory",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "control_systems_engineer",
+      "label": "Control Systems Engineer",
+      "description": "Designs control and automation systems.",
+      "branches": [
+        "eee",
+        "ece",
+        "mech"
+      ],
+      "company_types": [
+        "core",
+        "product"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Control theory",
+        "Transfer functions",
+        "PID control",
+        "PLC programming",
+        "SCADA",
+        "Instrumentation",
+        "Sensors & actuators",
+        "Stability analysis",
+        "System modelling",
+        "MATLAB/Simulink",
+        "Automation basics",
+        "Signal processing basics",
+        "Problem solving",
+        "Circuit theory",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "instrumentation_engineer",
+      "label": "Instrumentation Engineer",
+      "description": "Designs measurement and control instrumentation.",
+      "branches": [
+        "ece",
+        "eee"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Sensors & transducers",
+        "Process control",
+        "Calibration",
+        "Instrumentation systems",
+        "PLC & SCADA basics",
+        "Measurement techniques",
+        "Control valves",
+        "P&ID reading",
+        "Signal conditioning",
+        "Electronics basics",
+        "Safety standards",
+        "Troubleshooting",
+        "Problem solving",
+        "Documentation",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "civil_engineer",
+      "label": "Civil Engineer",
+      "description": "Designs and builds infrastructure.",
+      "branches": [
+        "civil"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Structural analysis",
+        "Concrete technology",
+        "Geotechnical engineering",
+        "Surveying",
+        "AutoCAD",
+        "Estimation & costing",
+        "Construction materials",
+        "IS codes / standards",
+        "Building planning",
+        "Quantity surveying",
+        "Project management basics",
+        "Soil mechanics",
+        "Hydraulics",
+        "Transportation engineering",
+        "Environmental engineering basics",
+        "Problem solving",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 22,
+      "seniority": "fresher"
+    },
+    {
+      "key": "structural_engineer",
+      "label": "Structural Engineer",
+      "description": "Designs safe load-bearing structures.",
+      "branches": [
+        "civil"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "problem_solving",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Structural analysis",
+        "RCC design",
+        "Steel design",
+        "STAAD.Pro",
+        "ETABS",
+        "Load calculations",
+        "Foundation design",
+        "Earthquake-resistant design basics",
+        "Concrete technology",
+        "IS codes",
+        "AutoCAD",
+        "Strength of materials",
+        "Problem solving",
+        "Estimation",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "site_engineer",
+      "label": "Site Engineer",
+      "description": "Executes and supervises construction on site.",
+      "branches": [
+        "civil"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "situational_judgment",
+        "communication"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Construction methods",
+        "Site supervision",
+        "Quality control",
+        "Safety management",
+        "Surveying",
+        "Estimation & billing",
+        "Reading drawings",
+        "Material management",
+        "Labour coordination",
+        "Concrete technology",
+        "Project scheduling",
+        "Problem solving",
+        "Documentation",
+        "AutoCAD",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "project_engineer",
+      "label": "Project Engineer",
+      "description": "Plans and runs engineering projects.",
+      "branches": [
+        "civil",
+        "mech",
+        "eee"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "project_ownership",
+        "communication",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "resume_based",
+        "hr_behavioral",
+        "aptitude_reasoning",
+        "situational_star"
+      ],
+      "typical_skills": [
+        "Project planning",
+        "Scheduling (MS Project/Primavera)",
+        "Cost estimation",
+        "Resource management",
+        "Risk management basics",
+        "Coordination",
+        "Procurement basics",
+        "Quality & safety",
+        "Stakeholder management",
+        "Reporting",
+        "Contract basics",
+        "Problem solving",
+        "Documentation",
+        "Domain fundamentals",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "construction_manager_trainee",
+      "label": "Construction Management Trainee",
+      "description": "Trains in managing construction projects.",
+      "branches": [
+        "civil"
+      ],
+      "company_types": [
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "project_ownership",
+        "communication",
+        "behavioral"
+      ],
+      "emphasized_categories": [
+        "situational_star",
+        "hr_behavioral",
+        "case_study",
+        "group_discussion",
+        "career_motivation"
+      ],
+      "typical_skills": [
+        "Project management basics",
+        "Scheduling",
+        "Estimation & costing",
+        "Construction methods",
+        "Quality control",
+        "Safety management",
+        "Resource planning",
+        "Coordination",
+        "Contract basics",
+        "Site management",
+        "Communication",
+        "Reading drawings",
+        "Problem solving",
+        "Documentation",
+        "Leadership basics",
+        "Stakeholder management",
+        "Time management",
+        "Teamwork",
+        "Adaptability",
+        "Ownership"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "technical_writer",
+      "label": "Technical Writer",
+      "description": "Creates technical documentation.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "communication",
+        "behavioral",
+        "technical_depth"
+      ],
+      "emphasized_categories": [
+        "hr_behavioral",
+        "resume_based",
+        "situational_star",
+        "career_motivation",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Technical writing",
+        "Documentation tools",
+        "Markdown",
+        "API documentation",
+        "Editing & proofreading",
+        "Information architecture",
+        "Clarity & concision",
+        "Audience analysis",
+        "Basic HTML",
+        "Version control basics",
+        "Diagramming",
+        "Style guides",
+        "Research",
+        "Technical understanding",
+        "Attention to detail",
+        "Communication",
+        "Time management",
+        "Adaptability",
+        "Collaboration",
+        "Eagerness to learn"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "sales_engineer",
+      "label": "Sales / Solution Engineer",
+      "description": "Bridges technical products and customers.",
+      "branches": [
+        "cse",
+        "ece",
+        "eee",
+        "mech"
+      ],
+      "company_types": [
+        "product",
+        "core",
+        "general"
+      ],
+      "key_competencies": [
+        "communication",
+        "situational_judgment",
+        "technical_depth"
+      ],
+      "emphasized_categories": [
+        "hr_behavioral",
+        "situational_star",
+        "case_study",
+        "group_discussion",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Product knowledge",
+        "Technical fundamentals",
+        "Communication",
+        "Presentation skills",
+        "Customer handling",
+        "Solution selling basics",
+        "Negotiation basics",
+        "Demos & POCs",
+        "Requirement understanding",
+        "CRM basics",
+        "Objection handling",
+        "Relationship building",
+        "Domain awareness",
+        "Problem solving",
+        "Business acumen",
+        "Active listening",
+        "Adaptability",
+        "Teamwork",
+        "Time management",
+        "Ownership"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    },
+    {
+      "key": "implementation_engineer",
+      "label": "Implementation Engineer",
+      "description": "Deploys and configures solutions for clients.",
+      "branches": [
+        "cse",
+        "ece",
+        "eee"
+      ],
+      "company_types": [
+        "service",
+        "product",
+        "general"
+      ],
+      "key_competencies": [
+        "technical_depth",
+        "communication",
+        "project_ownership"
+      ],
+      "emphasized_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "resume_based",
+        "hr_behavioral",
+        "candidate_questions"
+      ],
+      "typical_skills": [
+        "Product configuration",
+        "SQL basics",
+        "Troubleshooting",
+        "Operating systems",
+        "Networking basics",
+        "Scripting basics",
+        "Client communication",
+        "Requirement gathering",
+        "Deployment",
+        "Integration basics",
+        "Documentation",
+        "Testing",
+        "Project coordination",
+        "Problem solving",
+        "Data migration basics",
+        "Communication",
+        "Teamwork & collaboration",
+        "Time management",
+        "Adaptability",
+        "Attention to detail",
+        "Eagerness to learn"
+      ],
+      "skill_count": 21,
+      "seniority": "fresher"
+    },
+    {
+      "key": "it_consultant",
+      "label": "IT Consultant",
+      "description": "Advises clients on technology solutions.",
+      "branches": [
+        "cse",
+        "aids",
+        "ece"
+      ],
+      "company_types": [
+        "service",
+        "analytics",
+        "general"
+      ],
+      "key_competencies": [
+        "problem_solving",
+        "communication",
+        "situational_judgment"
+      ],
+      "emphasized_categories": [
+        "case_study",
+        "hr_behavioral",
+        "situational_star",
+        "group_discussion",
+        "technical_domain"
+      ],
+      "typical_skills": [
+        "Technical breadth",
+        "Business acumen",
+        "Requirement analysis",
+        "Solution design",
+        "Communication",
+        "Presentation skills",
+        "Stakeholder management",
+        "Project basics",
+        "Cloud basics",
+        "SQL basics",
+        "Process mapping",
+        "Problem solving",
+        "Documentation",
+        "Client management",
+        "Adaptability",
+        "Analytical thinking",
+        "Teamwork",
+        "Time management",
+        "Ownership",
+        "Critical thinking"
+      ],
+      "skill_count": 20,
+      "seniority": "fresher"
+    }
+  ]
+}

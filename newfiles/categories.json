@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "description": "Master registry of PrepVista's 14 question categories. Each entry binds a category to its module/class, default per-question time limit, allowed difficulty band, grading style, the competencies it develops, and the readiness pillar it feeds. Metadata is introspected from the live modules where possible. Every category supports an adaptive follow-up question.",
+  "competencies": [
+    "introduction",
+    "technical_depth",
+    "project_ownership",
+    "communication",
+    "problem_solving",
+    "behavioral",
+    "situational_judgment",
+    "creative_thinking",
+    "ai_tool_fluency"
+  ],
+  "pillars": [
+    "technical_competence",
+    "aptitude_logic",
+    "problem_solving",
+    "communication",
+    "behavioral",
+    "composure",
+    "professional_maturity"
+  ],
+  "grading_types": [
+    "objective",
+    "objective_reference",
+    "subjective",
+    "subjective_star",
+    "subjective_reference",
+    "subjective_composure",
+    "non_strict",
+    "no_factual_key",
+    "no_single_answer"
+  ],
+  "difficulty_levels": [
+    "easy",
+    "medium",
+    "hard"
+  ],
+  "categories": [
+    {
+      "key": "hr_behavioral",
+      "label": "HR & Behavioral",
+      "description": "Classic HR and behavioral questions probing past behaviour and self-presentation, evaluated STAR-aware.",
+      "module_file": "q_hr_behavioral.py",
+      "class": "HRBehaviouralModule",
+      "default_time_limit_s": 150,
+      "difficulty_band": [
+        "easy",
+        "medium"
+      ],
+      "grading": "subjective_star",
+      "competencies": [
+        "behavioral",
+        "communication"
+      ],
+      "pillar": "behavioral",
+      "has_followup": true,
+      "archetypes": 16,
+      "content_bank_size": 0
+    },
+    {
+      "key": "resume_based",
+      "label": "Resume-Based",
+      "description": "Drill-down into the candidate's own resume — projects, ownership, and claims, with inflation tells vs ownership markers.",
+      "module_file": "q_resume_based.py",
+      "class": "ResumeBasedModule",
+      "default_time_limit_s": 180,
+      "difficulty_band": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "grading": "subjective",
+      "competencies": [
+        "project_ownership",
+        "technical_depth",
+        "communication"
+      ],
+      "pillar": "technical_competence",
+      "has_followup": true,
+      "archetypes": 14,
+      "content_bank_size": 0
+    },
+    {
+      "key": "technical_domain",
+      "label": "Technical (Domain)",
+      "description": "Branch-routed domain technical questions across 8 engineering disciplines.",
+      "module_file": "q_technical_domain.py",
+      "class": "TechnicalDomainModule",
+      "default_time_limit_s": 300,
+      "difficulty_band": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "grading": "subjective_reference",
+      "competencies": [
+        "technical_depth",
+        "problem_solving"
+      ],
+      "pillar": "technical_competence",
+      "has_followup": true,
+      "archetypes": 7,
+      "content_bank_size": 0
+    },
+    {
+      "key": "aptitude_reasoning",
+      "label": "Aptitude & Reasoning",
+      "description": "Quantitative and logical reasoning with a fully-worked item bank and objective grading.",
+      "module_file": "q_aptitude_reasoning.py",
+      "class": "AptitudeReasoningModule",
+      "default_time_limit_s": 90,
+      "difficulty_band": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "grading": "objective",
+      "competencies": [
+        "problem_solving"
+      ],
+      "pillar": "aptitude_logic",
+      "has_followup": true,
+      "archetypes": 6,
+      "content_bank_size": 81
+    },
+    {
+      "key": "situational_star",
+      "label": "Situational (STAR)",
+      "description": "Situational judgement scenarios evaluated against a STAR rubric.",
+      "module_file": "q_situational_star.py",
+      "class": "SituationalStarModule",
+      "default_time_limit_s": 240,
+      "difficulty_band": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "grading": "subjective_star",
+      "competencies": [
+        "situational_judgment",
+        "behavioral"
+      ],
+      "pillar": "behavioral",
+      "has_followup": true,
+      "archetypes": 14,
+      "content_bank_size": 0
+    },
+    {
+      "key": "stress_curveball",
+      "label": "Stress & Curveball",
+      "description": "Banded stress and curveball questions scored on composure under pressure.",
+      "module_file": "q_stress_curveball.py",
+      "class": "StressCurveballModule",
+      "default_time_limit_s": 120,
+      "difficulty_band": [
+        "medium",
+        "hard"
+      ],
+      "grading": "subjective_composure",
+      "competencies": [
+        "situational_judgment",
+        "communication"
+      ],
+      "pillar": "composure",
+      "has_followup": true,
+      "archetypes": 14,
+      "content_bank_size": 0
+    },
+    {
+      "key": "puzzles_brainteasers",
+      "label": "Puzzles & Brainteasers",
+      "description": "Worked logic puzzles and brainteasers with adaptive hints.",
+      "module_file": "q_puzzles_brainteasers.py",
+      "class": "PuzzlesBrainteasersModule",
+      "default_time_limit_s": 180,
+      "difficulty_band": [
+        "medium",
+        "hard"
+      ],
+      "grading": "objective_reference",
+      "competencies": [
+        "problem_solving",
+        "creative_thinking"
+      ],
+      "pillar": "aptitude_logic",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 0
+    },
+    {
+      "key": "creative_estimation",
+      "label": "Creative Estimation",
+      "description": "Guesstimate / market-sizing problems with anchor facts and non-strict reference grading.",
+      "module_file": "q_creative_estimation.py",
+      "class": "CreativeEstimationModule",
+      "default_time_limit_s": 240,
+      "difficulty_band": [
+        "medium",
+        "hard"
+      ],
+      "grading": "non_strict",
+      "competencies": [
+        "creative_thinking",
+        "problem_solving"
+      ],
+      "pillar": "problem_solving",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 0
+    },
+    {
+      "key": "case_study",
+      "label": "Case Study",
+      "description": "Business/technical cases with data-reveal follow-ups and non-strict reference grading.",
+      "module_file": "q_case_study.py",
+      "class": "CaseStudyModule",
+      "default_time_limit_s": 360,
+      "difficulty_band": [
+        "medium",
+        "hard"
+      ],
+      "grading": "non_strict",
+      "competencies": [
+        "problem_solving",
+        "technical_depth"
+      ],
+      "pillar": "problem_solving",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 0
+    },
+    {
+      "key": "culture_fit",
+      "label": "Culture Fit",
+      "description": "Researched, authentic alignment with company values; no-factual-key grading that penalises flattery.",
+      "module_file": "q_culture_fit.py",
+      "class": "CultureFitModule",
+      "default_time_limit_s": 120,
+      "difficulty_band": [
+        "easy",
+        "medium"
+      ],
+      "grading": "no_factual_key",
+      "competencies": [
+        "behavioral",
+        "communication"
+      ],
+      "pillar": "professional_maturity",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 248
+    },
+    {
+      "key": "career_motivation",
+      "label": "Career & Motivation",
+      "description": "Self-awareness, goals, strengths/weaknesses, and genuine motivation; no-factual-key grading.",
+      "module_file": "q_career_motivation.py",
+      "class": "CareerMotivationModule",
+      "default_time_limit_s": 120,
+      "difficulty_band": [
+        "easy",
+        "medium"
+      ],
+      "grading": "no_factual_key",
+      "competencies": [
+        "introduction",
+        "behavioral"
+      ],
+      "pillar": "professional_maturity",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 241
+    },
+    {
+      "key": "salary_expectation",
+      "label": "Salary & Expectations",
+      "description": "Professional, researched, flexible handling of the compensation conversation; no-factual-key grading.",
+      "module_file": "q_salary_expectation.py",
+      "class": "SalaryExpectationModule",
+      "default_time_limit_s": 100,
+      "difficulty_band": [
+        "easy",
+        "medium"
+      ],
+      "grading": "no_factual_key",
+      "competencies": [
+        "communication",
+        "situational_judgment",
+        "behavioral"
+      ],
+      "pillar": "professional_maturity",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 229
+    },
+    {
+      "key": "group_discussion",
+      "label": "Group Discussion",
+      "description": "Simulated GD: a topic paired with a move, scored on content + assertiveness-without-aggression + collaboration.",
+      "module_file": "q_group_discussion.py",
+      "class": "GroupDiscussionModule",
+      "default_time_limit_s": 150,
+      "difficulty_band": [
+        "medium",
+        "hard"
+      ],
+      "grading": "no_single_answer",
+      "competencies": [
+        "communication",
+        "situational_judgment",
+        "behavioral",
+        "problem_solving"
+      ],
+      "pillar": "communication",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 175
+    },
+    {
+      "key": "candidate_questions",
+      "label": "Candidate's Questions",
+      "description": "Quality of the questions the candidate asks the interviewer; no-factual-key grading.",
+      "module_file": "q_candidate_questions.py",
+      "class": "CandidateQuestionsModule",
+      "default_time_limit_s": 120,
+      "difficulty_band": [
+        "easy",
+        "medium"
+      ],
+      "grading": "no_factual_key",
+      "competencies": [
+        "communication",
+        "behavioral"
+      ],
+      "pillar": "communication",
+      "has_followup": true,
+      "archetypes": 12,
+      "content_bank_size": 159
+    }
+  ]
+}

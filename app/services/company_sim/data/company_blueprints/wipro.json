@@ -1,0 +1,168 @@
+{
+  "company_id": "wipro",
+  "display_name": "Wipro",
+  "aliases": ["Wipro Ltd", "Wipro Technologies"],
+  "archetype": "mass_service",
+  "tier": "tier1_service",
+  "tier_rank": "A",
+  "hiring_scale": "very_high",
+  "logo_asset": "wipro.svg",
+  "brand_colors": { "primary": "#341F65", "accent": "#00B5B0" },
+  "platform": {
+    "name": "Superset",
+    "emulation_profile": "superset",
+    "proctored": true,
+    "tab_switch_policy": "warn",
+    "navigation": "free_within_section",
+    "on_screen_calculator": true,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "elite",            "label": "Wipro Elite",            "ctc_lpa": [6.5, 6.5], "gate": "coding+higher_cutoff" },
+    { "track": "turbo",            "label": "Wipro Turbo",            "ctc_lpa": [5.0, 5.0], "gate": "coding" },
+    { "track": "velocity",         "label": "Wipro Velocity",         "ctc_lpa": [4.0, 4.5], "gate": "aptitude+comms" },
+    { "track": "project_engineer", "label": "Wipro Project Engineer", "ctc_lpa": [3.5, 3.5], "gate": "aptitude" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 1,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"]
+  },
+  "re_eligibility_gap_months": 6,
+  "format_confidence": 0.85,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "Turbo variant reported ~128 min total: Quants 16Q/16min, Logical 14Q/14min, Verbal 18Q/18min, Coding 2/60min, Essay 20min."
+  ],
+  "culture_values": ["spirit_of_wipro", "integrity", "customer_centricity", "adaptability"],
+  "what_they_value": "Clear spoken and written English, plus coding for the higher tracks.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "wipro_aptitude",
+      "round_type": "aptitude_test",
+      "label": "Online Assessment — Aptitude",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 48,
+      "negative_marking": { "enabled": false, "model": "none", "note": "1 mark each; no negative marking on aptitude." },
+      "sections": [
+        { "section_id": "quants",  "label": "Quantitative Ability", "competency": "aptitude_reasoning", "item_type": "mcq", "count": 16, "minutes": 16, "topics": ["percentages", "ratio", "tsd", "profit_loss", "averages"] },
+        { "section_id": "logical", "label": "Logical Ability",      "competency": "aptitude_reasoning", "item_type": "mcq", "count": 14, "minutes": 14, "topics": ["series", "coding_decoding", "seating", "syllogism"] },
+        { "section_id": "verbal",  "label": "Verbal Ability",       "competency": "communication",      "item_type": "mcq", "count": 18, "minutes": 18, "topics": ["reading_comprehension", "grammar", "vocabulary"] }
+      ],
+      "gate_rule": {
+        "type": "sectional_and_overall",
+        "params": {
+          "sections_required": ["quants", "logical", "verbal"],
+          "min_percentile_by_track": {
+            "project_engineer": { "overall": 60 },
+            "velocity": { "overall": 65 },
+            "turbo": { "overall": 70 },
+            "elite": { "overall": 80 }
+          }
+        }
+      },
+      "notes": "Quants + Logical + Verbal, ~48 min combined; 1 mark each; no negative marking."
+    },
+    {
+      "order": 2,
+      "round_id": "wipro_essay",
+      "round_type": "written_communication",
+      "label": "Written Communication Test (Essay)",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 20,
+      "negative_marking": {
+        "enabled": true,
+        "model": "threshold",
+        "threshold": 5,
+        "note": "Distinctive Wipro rule: free up to ~5 mistakes; exceeding the threshold triggers negative marking. AI-evaluated for grammar/clarity/coherence/vocabulary/structure."
+      },
+      "sections": [
+        {
+          "section_id": "essay",
+          "label": "Essay",
+          "competency": "written_english",
+          "item_type": "essay",
+          "count": 1,
+          "minutes": 20,
+          "topics": ["grammar", "clarity", "coherence", "vocabulary", "structure"],
+          "config": { "mistake_threshold": 5, "min_words": 200 }
+        }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.0 } },
+      "notes": "20-minute essay; the ~5-mistake threshold is the signature rule."
+    },
+    {
+      "order": 3,
+      "round_id": "wipro_coding",
+      "round_type": "coding_test",
+      "label": "Coding — 2 Problems",
+      "is_elimination": true,
+      "applies_to_tracks": ["elite", "turbo"],
+      "difficulty_profile": "medium",
+      "total_minutes": 60,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding_1", "label": "Problem 1", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 30, "topics": ["arrays", "strings", "math"], "languages_allowed": ["C", "C++", "Java", "Python"] },
+        { "section_id": "coding_2", "label": "Problem 2", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 30, "topics": ["greedy", "sorting", "logic"], "languages_allowed": ["C", "C++", "Java", "Python"] }
+      ],
+      "gate_rule": {
+        "type": "coding_count",
+        "params": { "min_solved_by_track": { "turbo": 1, "elite": 2 } }
+      },
+      "notes": "2 problems, 60 min, visible + hidden test cases; gates the higher tracks (Turbo/Elite)."
+    },
+    {
+      "order": 4,
+      "round_id": "wipro_voice",
+      "round_type": "voice_assessment",
+      "label": "Voice / Communication Assessment",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "read_aloud",     "label": "Read a Passage Aloud",  "competency": "spoken_english", "item_type": "voice_read_aloud",     "count": 1, "minutes": 4, "topics": ["pronunciation", "fluency", "pace"] },
+        { "section_id": "describe_image", "label": "Describe an Image",      "competency": "spoken_english", "item_type": "voice_describe_image", "count": 1, "minutes": 4, "topics": ["structure", "content_coverage"], "config": { "structure": ["what", "where", "who", "whats_happening", "opinion"] } },
+        { "section_id": "speak_topic",    "label": "Speak on a Topic (~90s)","competency": "spoken_english", "item_type": "voice_topic",         "count": 1, "minutes": 4, "topics": ["fluency", "relevance", "grammar"] },
+        { "section_id": "dictation",      "label": "Listen-and-Type Dictation","competency": "spoken_english","item_type": "voice_dictation",    "count": 1, "minutes": 8, "topics": ["listening", "typing_accuracy"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "Automated spoken-English: pronunciation/fluency/pace/content. A signature Wipro differentiator."
+    },
+    {
+      "order": 5,
+      "round_id": "wipro_hr",
+      "round_type": "hr_interview",
+      "label": "Business Discussion / HR",
+      "is_elimination": true,
+      "difficulty_profile": "easy",
+      "total_minutes": 25,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "hr_qa", "label": "Confidence, leadership, teamwork, motivation", "competency": "hr_behavioral", "item_type": "interview_qa", "count": 5, "minutes": 25, "topics": ["leadership", "teamwork", "motivation", "puzzles", "gd"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "Confidence, leadership, teamwork, motivation; sometimes puzzles or a GD."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "multi_signal_tracks",
+    "attributes": ["aptitude", "essay", "coding", "voice"],
+    "tracks": [
+      { "track": "project_engineer", "label": "Wipro Project Engineer", "requires": { "aptitude_cleared": true } },
+      { "track": "velocity",         "label": "Wipro Velocity",         "requires": { "aptitude_pct": 65, "voice_cleared": true } },
+      { "track": "turbo",            "label": "Wipro Turbo",            "requires": { "aptitude_pct": 70, "coding_solved": 1, "voice_cleared": true } },
+      { "track": "elite",            "label": "Wipro Elite",            "requires": { "aptitude_pct": 80, "coding_solved": 2, "voice_cleared": true, "essay_cleared": true } }
+    ],
+    "params": { "order_high_to_low": ["elite", "turbo", "velocity", "project_engineer"] },
+    "gap_hints": {
+      "turbo_to_elite": "Clear both coding problems and keep the essay under the mistake threshold.",
+      "velocity_to_turbo": "Solve at least one coding problem cleanly and lift aptitude toward the 70th percentile."
+    }
+  }
+}

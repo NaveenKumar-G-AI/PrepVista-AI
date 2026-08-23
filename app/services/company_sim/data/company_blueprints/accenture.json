@@ -1,0 +1,173 @@
+{
+  "company_id": "accenture",
+  "display_name": "Accenture",
+  "aliases": ["Accenture Solutions", "ACN"],
+  "archetype": "mass_service",
+  "tier": "tier1_service",
+  "tier_rank": "A",
+  "hiring_scale": "very_high",
+  "logo_asset": "accenture.svg",
+  "brand_colors": { "primary": "#A100FF", "accent": "#460073" },
+  "platform": {
+    "name": "CoCubes",
+    "emulation_profile": "cocubes",
+    "proctored": true,
+    "tab_switch_policy": "warn",
+    "navigation": "free_within_section",
+    "on_screen_calculator": true,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "ase",      "label": "Associate Software Engineer (ASE)", "ctc_lpa": [4.5, 5.0],  "gate": "cognitive+technical" },
+    { "track": "advanced", "label": "Advanced App Engineering",          "ctc_lpa": [8.0, 10.0], "gate": "cognitive+technical+coding" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 0,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"],
+    "min_cgpa": 6.0
+  },
+  "re_eligibility_gap_months": null,
+  "format_confidence": 0.78,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "Coding is now an elimination round and its score carries into the interview.",
+    "Game-based questions have replaced some classic aptitude items."
+  ],
+  "culture_values": ["client_value", "one_global_network", "respect_for_the_individual", "integrity"],
+  "what_they_value": "Adaptive cognitive ability, MS-Office/common-applications literacy, and clean coding.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "accenture_behavioral",
+      "round_type": "behavioral_survey",
+      "label": "Behavioral Assessment",
+      "is_elimination": false,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "workstyle", "label": "Personality / Work-Style", "competency": "behavioral", "item_type": "survey_most_least", "count": 40, "minutes": 20, "topics": ["work_style", "adaptability", "collaboration"] }
+      ],
+      "gate_rule": null,
+      "notes": "Personality/work-style; no technical; not an elimination gate."
+    },
+    {
+      "order": 2,
+      "round_id": "accenture_cognitive",
+      "round_type": "aptitude_test",
+      "label": "Cognitive Assessment (adaptive)",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 50,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "english",    "label": "English Ability",              "competency": "communication",      "item_type": "mcq", "count": 12, "minutes": 12, "topics": ["grammar", "vocabulary", "reading_comprehension"] },
+        { "section_id": "abstract",   "label": "Abstract Reasoning",           "competency": "aptitude_reasoning", "item_type": "mcq", "count": 12, "minutes": 12, "topics": ["patterns", "figures", "analogies"] },
+        { "section_id": "critical",   "label": "Critical Thinking & Problem Solving", "competency": "problem_solving", "item_type": "mcq", "count": 12, "minutes": 16, "topics": ["deduction", "data_interpretation"] },
+        { "section_id": "ms_office",  "label": "Common Applications & MS Office", "competency": "domain_core",     "item_type": "mcq", "count": 10, "minutes": 10, "topics": ["ms_word", "ms_excel", "ms_powerpoint", "common_apps"] }
+      ],
+      "gate_rule": {
+        "type": "sectional_and_overall",
+        "params": {
+          "sections_required": ["english", "abstract", "critical", "ms_office"],
+          "min_percentile_by_track": { "ase": { "overall": 65 }, "advanced": { "overall": 75 } },
+          "adaptive": true
+        }
+      },
+      "notes": "Adaptive cognitive; distinctive MS-Office / Common-Applications section."
+    },
+    {
+      "order": 3,
+      "round_id": "accenture_technical",
+      "round_type": "technical_mcq",
+      "label": "Technical Assessment",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 30,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "pseudocode",  "label": "Pseudo Code",                       "competency": "coding",       "item_type": "pseudocode_mcq", "count": 12, "minutes": 15, "topics": ["arrays", "loops", "functions", "complexity"] },
+        { "section_id": "networking",  "label": "Fundamentals of Networking, Security & Cloud", "competency": "domain_core", "item_type": "mcq", "count": 10, "minutes": 10, "topics": ["networking", "security", "cloud"] },
+        { "section_id": "prog_mcq",    "label": "Programming MCQs",                   "competency": "technical_domain","item_type": "mcq",           "count": 6,  "minutes": 5,  "topics": ["oops", "dbms", "programming"] }
+      ],
+      "gate_rule": { "type": "sectional", "params": { "min_percentile_by_track": { "ase": { "overall": 60 } } } },
+      "notes": "Distinctive Networking/Security/Cloud fundamentals + pseudocode focus."
+    },
+    {
+      "order": 4,
+      "round_id": "accenture_coding",
+      "round_type": "coding_test",
+      "label": "Coding (elimination)",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding_1", "label": "Problem 1", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 22, "topics": ["arrays", "strings"], "languages_allowed": ["C", "C++", "Java", "Python"] },
+        { "section_id": "coding_2", "label": "Problem 2", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 23, "topics": ["logic", "math"], "languages_allowed": ["C", "C++", "Java", "Python"] }
+      ],
+      "gate_rule": { "type": "coding_count", "params": { "min_solved_by_track": { "ase": 1, "advanced": 2 } } },
+      "notes": "2 questions, 45 min; now an elimination round whose score carries into the interview."
+    },
+    {
+      "order": 5,
+      "round_id": "accenture_communication",
+      "round_type": "voice_assessment",
+      "label": "Communication Assessment",
+      "is_elimination": false,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "spoken", "label": "Spoken English", "competency": "spoken_english", "item_type": "voice_topic", "count": 4, "minutes": 20, "topics": ["sentence_mastery", "vocabulary", "fluency", "pronunciation"] }
+      ],
+      "gate_rule": null,
+      "notes": "Spoken English (sentence mastery, vocabulary, fluency, pronunciation); typically NOT an elimination gate."
+    },
+    {
+      "order": 6,
+      "round_id": "accenture_interview",
+      "round_type": "technical_interview",
+      "label": "Technical Interview",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 40,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "tech_qa", "label": "Core Subjects + Coding + Projects", "competency": "technical_domain", "item_type": "interview_qa", "count": 6, "minutes": 40, "topics": ["core_cs", "coding", "projects"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.0 } },
+      "notes": "Core subjects, coding, projects; the coding-round score carries in."
+    },
+    {
+      "order": 7,
+      "round_id": "accenture_hr",
+      "round_type": "hr_interview",
+      "label": "HR Interview",
+      "is_elimination": true,
+      "difficulty_profile": "easy",
+      "total_minutes": 25,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "hr_qa", "label": "HR", "competency": "hr_behavioral", "item_type": "interview_qa", "count": 5, "minutes": 25, "topics": ["motivation", "relocation", "candidate_questions"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "Standard HR, ~20-30 min."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "multi_signal_tracks",
+    "attributes": ["cognitive", "technical", "coding", "communication"],
+    "tracks": [
+      { "track": "ase",      "label": "Associate Software Engineer", "requires": { "cognitive_cleared": true, "coding_solved": 1 } },
+      { "track": "advanced", "label": "Advanced App Engineering",    "requires": { "cognitive_pct": 75, "coding_solved": 2 } }
+    ],
+    "params": { "order_high_to_low": ["advanced", "ase"] },
+    "gap_hints": {
+      "ase_to_advanced": "Clear both coding problems cleanly and lift the adaptive cognitive score toward the 75th percentile."
+    }
+  }
+}

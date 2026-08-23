@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "description": "Scoring configuration for PrepVista. Defines how the 14 question categories roll up into 7 placement-readiness pillars, the weight each pillar carries in the 0-100 Placement Readiness Index (PRI), the score tiers and their thresholds, the per-category 'ready' cutoffs, and the difficulty weights. scoring.py and the growth/TPO dashboards read this so the readiness model is configurable, not hardcoded.",
+  "categories": [
+    "hr_behavioral",
+    "resume_based",
+    "technical_domain",
+    "aptitude_reasoning",
+    "situational_star",
+    "stress_curveball",
+    "puzzles_brainteasers",
+    "creative_estimation",
+    "case_study",
+    "culture_fit",
+    "career_motivation",
+    "salary_expectation",
+    "group_discussion",
+    "candidate_questions"
+  ],
+  "pillars": [
+    {
+      "key": "technical_competence",
+      "label": "Technical Competence",
+      "description": "Depth in the candidate's domain and the ability to talk credibly about their own work.",
+      "categories": [
+        "technical_domain",
+        "resume_based"
+      ],
+      "pri_weight": 0.22
+    },
+    {
+      "key": "aptitude_logic",
+      "label": "Aptitude & Logic",
+      "description": "Quantitative, logical, and lateral reasoning under time pressure.",
+      "categories": [
+        "aptitude_reasoning",
+        "puzzles_brainteasers"
+      ],
+      "pri_weight": 0.15
+    },
+    {
+      "key": "problem_solving",
+      "label": "Problem Solving & Analysis",
+      "description": "Structured thinking on open-ended business, case, and estimation problems.",
+      "categories": [
+        "case_study",
+        "creative_estimation"
+      ],
+      "pri_weight": 0.13
+    },
+    {
+      "key": "communication",
+      "label": "Communication & Articulation",
+      "description": "Getting heard, engaging in discussion, and asking sharp questions.",
+      "categories": [
+        "group_discussion",
+        "candidate_questions"
+      ],
+      "pri_weight": 0.15
+    },
+    {
+      "key": "behavioral",
+      "label": "Behavioral & Interpersonal",
+      "description": "Past-behaviour stories and situational judgement, well-structured and honest.",
+      "categories": [
+        "hr_behavioral",
+        "situational_star"
+      ],
+      "pri_weight": 0.15
+    },
+    {
+      "key": "composure",
+      "label": "Composure & Adaptability",
+      "description": "Staying calm and thinking clearly under stress and curveballs.",
+      "categories": [
+        "stress_curveball"
+      ],
+      "pri_weight": 0.07
+    },
+    {
+      "key": "professional_maturity",
+      "label": "Professional Maturity",
+      "description": "Genuine motivation, cultural fit, and a mature approach to the offer conversation.",
+      "categories": [
+        "culture_fit",
+        "career_motivation",
+        "salary_expectation"
+      ],
+      "pri_weight": 0.13
+    }
+  ],
+  "pri": {
+    "scale": [
+      0,
+      100
+    ],
+    "pillar_score": "Mean of the category mean-scores (each 0-10) within the pillar, multiplied by 10 to a 0-100 scale.",
+    "formula": "PRI = sum(pillar_score_0_100 * pri_weight) across all pillars.",
+    "note": "Category scores are difficulty-weighted means of question scores; recent sessions are weighted more (see overall_score.recency_half_life_days)."
+  },
+  "score_tiers": [
+    {
+      "key": "platinum",
+      "label": "Platinum",
+      "pri_min": 85,
+      "overall_min": 8.5,
+      "color": "#6C5CE7",
+      "meaning": "Placement-ready across the board; among the strongest candidates."
+    },
+    {
+      "key": "gold",
+      "label": "Gold",
+      "pri_min": 70,
+      "overall_min": 7.0,
+      "color": "#F1C40F",
+      "meaning": "Strong and interview-ready, with only minor gaps to polish."
+    },
+    {
+      "key": "silver",
+      "label": "Silver",
+      "pri_min": 55,
+      "overall_min": 5.5,
+      "color": "#95A5A6",
+      "meaning": "Competitive, but a few areas need focused work before peak season."
+    },
+    {
+      "key": "bronze",
+      "label": "Bronze",
+      "pri_min": 40,
+      "overall_min": 4.0,
+      "color": "#CD7F32",
+      "meaning": "Foundations are forming; needs consistent practice across categories."
+    },
+    {
+      "key": "developing",
+      "label": "Developing",
+      "pri_min": 0,
+      "overall_min": 0.0,
+      "color": "#E74C3C",
+      "meaning": "Early stage; prioritise fundamentals and regular mock practice."
+    }
+  ],
+  "category_thresholds": {
+    "technical_domain": 6.0,
+    "aptitude_reasoning": 6.0,
+    "resume_based": 5.5,
+    "situational_star": 5.5,
+    "hr_behavioral": 5.5,
+    "case_study": 5.5,
+    "group_discussion": 5.5,
+    "creative_estimation": 5.0,
+    "puzzles_brainteasers": 5.0,
+    "stress_curveball": 5.0,
+    "candidate_questions": 5.0,
+    "culture_fit": 5.0,
+    "career_motivation": 5.0,
+    "salary_expectation": 5.0
+  },
+  "difficulty_weights": {
+    "easy": 0.8,
+    "medium": 1.0,
+    "hard": 1.28
+  },
+  "overall_score": {
+    "scale": [
+      0,
+      10
+    ],
+    "method": "Difficulty-weighted mean of individual question scores (0-10).",
+    "recency_half_life_days": 30,
+    "note": "A question's contribution is weighted by difficulty_weights[difficulty]; older sessions decay with a 30-day half-life so the score reflects current readiness."
+  }
+}

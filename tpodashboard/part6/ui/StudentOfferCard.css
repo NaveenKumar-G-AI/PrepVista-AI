@@ -1,0 +1,241 @@
+/*
+ * Design direction: "letterhead and seal", not "startup confetti".
+ * A placement office issuing something consequential to one student -
+ * calm, legible, quietly official. Signature element: a folded top-right
+ * corner (like a sealed envelope/certificate) plus a small check-seal
+ * badge for verified offers - not a badge shelf or gradient hero.
+ *
+ * Tokens (see also ../ui/TpoOffersSummary.css, which shares this palette):
+ *   --pv-ink    #14213D  primary text / structure (deep navy-charcoal)
+ *   --pv-paper  #F6F7F5  card background (cool off-white, not cream)
+ *   --pv-seal   #1F6F54  verified / positive (certificate green)
+ *   --pv-amber  #C17817  attention / deadline soon
+ *   --pv-rose   #B3261E  urgent / closed - used sparingly
+ *   --pv-line   #D8DCE1  hairline borders
+ *   --pv-muted  #5B6472  secondary text
+ *
+ * Type: a serif display face for the company name and CTC figure (the
+ * two things that matter most), a grotesk for everything operational,
+ * a monospace for the money figure itself (ledger feel). Load
+ * "Source Serif 4", "Inter" and "IBM Plex Mono" via your existing font
+ * pipeline - these rules fall back gracefully to system fonts if absent.
+ */
+
+.pv-offer-card {
+  --pv-ink: #14213d;
+  --pv-paper: #f6f7f5;
+  --pv-seal: #1f6f54;
+  --pv-amber: #c17817;
+  --pv-rose: #b3261e;
+  --pv-line: #d8dce1;
+  --pv-muted: #5b6472;
+
+  position: relative;
+  max-width: 400px;
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
+  border-radius: 10px;
+  padding: 28px 28px 24px;
+  color: var(--pv-ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+}
+
+/* Signature element: a folded corner, like a sealed envelope flap. */
+.pv-offer-card__fold {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, transparent 50%, var(--pv-line) 50%);
+}
+
+.pv-offer-card__eyebrow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.pv-offer-card__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pv-muted);
+}
+
+.pv-offer-card__seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pv-seal);
+  border: 1px solid var(--pv-seal);
+  border-radius: 999px;
+  padding: 3px 9px 3px 7px;
+}
+
+.pv-offer-card__company {
+  font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 2px;
+}
+
+.pv-offer-card__role {
+  margin: 0 0 20px;
+  color: var(--pv-muted);
+  font-size: 15px;
+}
+
+.pv-offer-card__figures {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--pv-line);
+  border-bottom: 1px solid var(--pv-line);
+  padding: 16px 0;
+  margin-bottom: 16px;
+}
+
+.pv-offer-card__ctc {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pv-offer-card__location {
+  font-size: 14px;
+  color: var(--pv-muted);
+}
+
+.pv-offer-card__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.pv-offer-card__meta dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pv-muted);
+  margin-bottom: 2px;
+}
+
+.pv-offer-card__meta dd {
+  margin: 0;
+  font-size: 14px;
+}
+
+.pv-offer-card__deadline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  background: rgba(20, 33, 61, 0.04);
+}
+
+.pv-offer-card__deadline-label {
+  color: var(--pv-muted);
+}
+
+.pv-offer-card__deadline-value {
+  font-weight: 600;
+}
+
+.pv-offer-card__deadline--soon .pv-offer-card__deadline-value {
+  color: var(--pv-amber);
+}
+
+.pv-offer-card__deadline--urgent {
+  background: rgba(193, 120, 23, 0.12);
+}
+.pv-offer-card__deadline--urgent .pv-offer-card__deadline-value {
+  color: var(--pv-amber);
+}
+
+.pv-offer-card__deadline--closed {
+  background: rgba(179, 38, 30, 0.08);
+}
+.pv-offer-card__deadline--closed .pv-offer-card__deadline-value {
+  color: var(--pv-rose);
+}
+
+.pv-offer-card__status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--pv-muted);
+  margin-bottom: 22px;
+}
+
+.pv-offer-card__status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pv-muted);
+}
+.pv-offer-card__status-dot--accepted { background: var(--pv-seal); }
+.pv-offer-card__status-dot--declined,
+.pv-offer-card__status-dot--expired { background: var(--pv-rose); }
+.pv-offer-card__status-dot--acceptance_pending { background: var(--pv-amber); }
+
+.pv-offer-card__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.pv-offer-card__btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.pv-offer-card__btn:focus-visible {
+  outline: 2px solid var(--pv-ink);
+  outline-offset: 2px;
+}
+
+.pv-offer-card__btn--primary {
+  background: var(--pv-ink);
+  color: var(--pv-paper);
+  margin-left: auto;
+}
+.pv-offer-card__btn--primary:hover { background: #0d1729; }
+
+.pv-offer-card__btn--ghost {
+  background: transparent;
+  border-color: var(--pv-line);
+  color: var(--pv-ink);
+}
+.pv-offer-card__btn--ghost:hover { background: rgba(20, 33, 61, 0.04); }
+
+.pv-offer-card__btn--quiet {
+  background: transparent;
+  color: var(--pv-muted);
+}
+.pv-offer-card__btn--quiet:hover { color: var(--pv-rose); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pv-offer-card__btn { transition: background-color 120ms ease, color 120ms ease; }
+}
+
+@media (max-width: 420px) {
+  .pv-offer-card { max-width: 100%; padding: 22px 18px 18px; }
+  .pv-offer-card__actions { flex-wrap: wrap; }
+  .pv-offer-card__btn--primary { margin-left: 0; width: 100%; }
+}

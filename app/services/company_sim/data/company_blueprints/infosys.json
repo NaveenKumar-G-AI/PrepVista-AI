@@ -1,0 +1,210 @@
+{
+  "company_id": "infosys",
+  "display_name": "Infosys",
+  "aliases": ["Infosys Ltd", "INFY"],
+  "archetype": "mass_service",
+  "tier": "tier1_service",
+  "tier_rank": "A",
+  "hiring_scale": "very_high",
+  "logo_asset": "infosys.svg",
+  "brand_colors": { "primary": "#007CC3", "accent": "#5E259A" },
+  "platform": {
+    "name": "Infosys Online Test (HackerRank-style)",
+    "emulation_profile": "hackerrank_style",
+    "proctored": true,
+    "tab_switch_policy": "flag",
+    "navigation": "free_within_section",
+    "on_screen_calculator": false,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "se",  "label": "System Engineer (SE)",            "ctc_lpa": [3.6, 3.6], "gate": "aptitude" },
+    { "track": "dse", "label": "Digital Specialist Engineer (DSE)", "ctc_lpa": [6.5, 6.5], "gate": "coding_2of3" },
+    { "track": "sp",  "label": "Specialist Programmer (SP)",       "ctc_lpa": [9.0, 9.0], "gate": "coding_3of3" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 0,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"]
+  },
+  "re_eligibility_gap_months": 9,
+  "format_confidence": 0.8,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "HackWithInfy elite coding contest continues to funnel top coders directly to SP."
+  ],
+  "culture_values": ["learnability", "excellence", "client_value", "integrity"],
+  "what_they_value": "Logical reasoning, pseudocode fluency (SE) or algorithmic depth across E/M/H problems (SP/DSE).",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "infosys_aptitude",
+      "round_type": "aptitude_test",
+      "label": "Online Test — Aptitude + Pseudocode (System Engineer)",
+      "is_elimination": true,
+      "applies_to_tracks": ["se"],
+      "difficulty_profile": "medium",
+      "total_minutes": 100,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "reasoning",
+          "label": "Reasoning Ability",
+          "competency": "aptitude_reasoning",
+          "item_type": "mcq",
+          "count": 15,
+          "minutes": 25,
+          "topics": ["series", "coding_decoding", "blood_relations", "directions", "cryptarithmetic", "seating"]
+        },
+        {
+          "section_id": "math_logical",
+          "label": "Mathematical / Logical Ability",
+          "competency": "aptitude_reasoning",
+          "item_type": "mcq",
+          "count": 10,
+          "minutes": 35,
+          "topics": ["ratio", "percentages", "si_ci", "profit_loss", "time_work", "tsd", "pnc", "probability"]
+        },
+        {
+          "section_id": "verbal",
+          "label": "Verbal Ability",
+          "competency": "communication",
+          "item_type": "mcq",
+          "count": 20,
+          "minutes": 20,
+          "topics": ["sentence_completion", "error_correction", "reading_comprehension", "critical_reasoning"]
+        },
+        {
+          "section_id": "pseudocode",
+          "label": "Pseudocode",
+          "competency": "coding",
+          "item_type": "pseudocode_mcq",
+          "count": 15,
+          "minutes": 20,
+          "topics": ["arrays", "loops", "conditionals", "functions", "oops", "complexity"]
+        }
+      ],
+      "gate_rule": {
+        "type": "sectional_and_overall",
+        "params": {
+          "sections_required": ["reasoning", "math_logical", "verbal", "pseudocode"],
+          "min_percentile_by_track": { "se": { "overall": 60 } }
+        }
+      },
+      "notes": "SE entry: sectional + overall cutoffs across reasoning, math/logical, verbal and pseudocode."
+    },
+    {
+      "order": 2,
+      "round_id": "infosys_coding_gauntlet",
+      "round_type": "coding_test",
+      "label": "Online Test — 3 Coding Problems (Specialist / Digital Specialist)",
+      "is_elimination": true,
+      "applies_to_tracks": ["sp", "dse"],
+      "difficulty_profile": "hard",
+      "total_minutes": 180,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "problem_easy",
+          "label": "Problem 1 — Easy (basic DS/algo)",
+          "competency": "coding",
+          "item_type": "coding",
+          "count": 1,
+          "minutes": 40,
+          "topics": ["arrays", "strings", "hashing"],
+          "languages_allowed": ["Java", "Python", "C++", "C"]
+        },
+        {
+          "section_id": "problem_medium",
+          "label": "Problem 2 — Medium (greedy)",
+          "competency": "coding",
+          "item_type": "coding",
+          "count": 1,
+          "minutes": 60,
+          "topics": ["greedy", "sorting", "two_pointers"],
+          "languages_allowed": ["Java", "Python", "C++", "C"]
+        },
+        {
+          "section_id": "problem_hard",
+          "label": "Problem 3 — Hard (usually DP)",
+          "competency": "coding",
+          "item_type": "coding",
+          "count": 1,
+          "minutes": 80,
+          "topics": ["dynamic_programming", "graphs"],
+          "languages_allowed": ["Java", "Python", "C++", "C"]
+        }
+      ],
+      "gate_rule": {
+        "type": "coding_count",
+        "params": {
+          "min_solved_by_track": { "dse": 2, "sp": 3 },
+          "sectional_and_overall_cutoffs": true
+        }
+      },
+      "notes": "3 problems in 3 hours; sectional + overall cutoffs; performance decides SP vs DSE."
+    },
+    {
+      "order": 3,
+      "round_id": "infosys_technical",
+      "round_type": "technical_interview",
+      "label": "Technical Interview",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 40,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "tech_qa",
+          "label": "Logic behind solutions, DSA, puzzles, branch subjects, project",
+          "competency": "technical_domain",
+          "item_type": "interview_qa",
+          "count": 6,
+          "minutes": 40,
+          "topics": ["dsa", "solution_reasoning", "puzzles", "branch_subjects", "project"]
+        }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.0 } },
+      "notes": "Probes the logic behind your test solutions plus DSA, puzzles and project depth."
+    },
+    {
+      "order": 4,
+      "round_id": "infosys_hr",
+      "round_type": "hr_interview",
+      "label": "HR Interview",
+      "is_elimination": true,
+      "difficulty_profile": "easy",
+      "total_minutes": 20,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        {
+          "section_id": "hr_qa",
+          "label": "Behavioral + motivation + relocation",
+          "competency": "hr_behavioral",
+          "item_type": "interview_qa",
+          "count": 5,
+          "minutes": 20,
+          "topics": ["motivation", "relocation", "strengths_weaknesses", "candidate_questions"]
+        }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "Standard HR; relocation and bond awareness matter."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "coding_gauntlet",
+    "attributes": ["reasoning", "math_logical", "verbal", "pseudocode", "problem_easy", "problem_medium", "problem_hard"],
+    "tracks": [
+      { "track": "se",  "label": "System Engineer (SE)",             "requires": { "aptitude_cleared": true } },
+      { "track": "dse", "label": "Digital Specialist Engineer (DSE)", "requires": { "coding_solved": 2 } },
+      { "track": "sp",  "label": "Specialist Programmer (SP)",        "requires": { "coding_solved": 3 } }
+    ],
+    "params": { "order_high_to_low": ["sp", "dse", "se"] },
+    "gap_hints": {
+      "dse_to_sp": "Solve the hard (DP) problem cleanly — SP requires all 3 problems passing.",
+      "se_to_dse": "Enter via the Specialist coding track and clear at least 2 of 3 problems."
+    }
+  }
+}

@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "description": "Session feedback-report structure for PrepVista. Defines the ordered report sections shown after each mock interview, each bound to its data source and a visibility level (student / tpo / both). The report renderer reads this to build a student's feedback and the TPO's session view. Sources are cross-checked against scoring_config, categories, competencies, and interview_blueprints.",
+  "sections": [
+    {
+      "order": 1,
+      "key": "headline",
+      "label": "Overall Result",
+      "description": "The top-line outcome: overall score (0-10), readiness tier, and the 0-100 Placement Readiness Index.",
+      "data_source": "scoring.py",
+      "visible_to": "both",
+      "fields": [
+        "overall_score",
+        "tier",
+        "tier_label",
+        "pri",
+        "pri_band"
+      ]
+    },
+    {
+      "order": 2,
+      "key": "readiness_pillars",
+      "label": "Readiness Pillars",
+      "description": "Score on each of the 7 placement-readiness pillars, with the weakest highlighted.",
+      "data_source": "scoring_config.pillars",
+      "visible_to": "both",
+      "fields": [
+        "pillar_scores_0_100",
+        "weakest_pillar",
+        "strongest_pillar"
+      ]
+    },
+    {
+      "order": 3,
+      "key": "category_breakdown",
+      "label": "Category Breakdown",
+      "description": "Per-category score versus the 'ready' threshold, so the student sees exactly which of the 14 areas clear the bar.",
+      "data_source": "categories + scoring_config.category_thresholds",
+      "visible_to": "both",
+      "fields": [
+        "per_category_score",
+        "threshold",
+        "is_ready",
+        "attempted"
+      ]
+    },
+    {
+      "order": 4,
+      "key": "competency_profile",
+      "label": "Competency Profile",
+      "description": "Score across the 9 canonical competencies, with notable sub-competency strengths and gaps.",
+      "data_source": "competencies",
+      "visible_to": "both",
+      "fields": [
+        "competency_scores",
+        "top_sub_competencies",
+        "gap_sub_competencies"
+      ]
+    },
+    {
+      "order": 5,
+      "key": "strengths",
+      "label": "What You Did Well",
+      "description": "The top strengths from this session — the categories and competencies the candidate handled best.",
+      "data_source": "derived",
+      "visible_to": "both",
+      "fields": [
+        "top_categories",
+        "highlight_quotes"
+      ]
+    },
+    {
+      "order": 6,
+      "key": "focus_areas",
+      "label": "Where to Focus Next",
+      "description": "The two or three weakest areas, each with concrete, actionable coaching tips from the module.",
+      "data_source": "derived + module.coaching_for",
+      "visible_to": "both",
+      "fields": [
+        "weak_categories",
+        "coaching_tips",
+        "common_mistakes"
+      ]
+    },
+    {
+      "order": 7,
+      "key": "question_review",
+      "label": "Question-by-Question Review",
+      "description": "For each question: the score, what was strong, what to improve, a model better-answer, and the follow-up asked.",
+      "data_source": "EvaluationResult",
+      "visible_to": "both",
+      "fields": [
+        "question_text",
+        "score",
+        "strengths",
+        "improvements",
+        "better_answer",
+        "followup_text",
+        "difficulty"
+      ]
+    },
+    {
+      "order": 8,
+      "key": "integrity_summary",
+      "label": "Integrity Summary",
+      "description": "Integrity risk band and any flags. The TPO sees the detail; the student sees only a soft note if review is suggested.",
+      "data_source": "integrity_config",
+      "visible_to": "tpo",
+      "fields": [
+        "integrity_score",
+        "risk_band",
+        "triggered_signals",
+        "review_required"
+      ]
+    },
+    {
+      "order": 9,
+      "key": "recommended_next",
+      "label": "Recommended Next Steps",
+      "description": "Suggested drills or blueprints to run next, chosen to target this session's weakest areas.",
+      "data_source": "interview_blueprints",
+      "visible_to": "student",
+      "fields": [
+        "recommended_blueprints",
+        "recommended_categories",
+        "rationale"
+      ]
+    },
+    {
+      "order": 10,
+      "key": "progress_trend",
+      "label": "Your Progress",
+      "description": "How this session compares with previous ones — trend in overall score, PRI, and per-pillar movement.",
+      "data_source": "growth_tracker.py",
+      "visible_to": "both",
+      "fields": [
+        "pri_trend",
+        "overall_trend",
+        "pillar_deltas",
+        "sessions_count"
+      ]
+    }
+  ],
+  "score_display": {
+    "overall_scale": [
+      0,
+      10
+    ],
+    "pri_scale": [
+      0,
+      100
+    ],
+    "show_tier_badge": true,
+    "show_pri_ring": true,
+    "decimal_places": 1,
+    "color_by_tier": true,
+    "source_of_colors": "scoring_config.score_tiers[].color"
+  },
+  "coaching": {
+    "max_tips_per_area": 3,
+    "max_focus_areas": 3,
+    "max_strengths": 3,
+    "tone": "constructive, specific, and encouraging — never harsh",
+    "always_actionable": true,
+    "note": "Tips come from each module's coaching_for(); never just 'do better' — always a concrete next action."
+  },
+  "benchmarking": {
+    "enabled": true,
+    "compare_against": [
+      "role_cohort",
+      "department_cohort",
+      "college_cohort"
+    ],
+    "show_percentile": true,
+    "privacy": "aggregate only — never names other students",
+    "note": "Helps a student see where they stand without exposing anyone else's data."
+  },
+  "student_vs_tpo": {
+    "student_sees": "All sections except integrity detail; integrity surfaces only as a soft 'session flagged for review' note if applicable.",
+    "tpo_sees": "Everything, including full integrity signals and cohort analytics.",
+    "rationale": "Protect students from false-accusation framing while giving TPOs what they need."
+  },
+  "tone_guidelines": [
+    "Lead with what went well before what to improve.",
+    "Be specific: cite the question and the exact gap.",
+    "Frame weaknesses as 'next focus', not failure.",
+    "Keep it concise — a student should act on it, not drown in it.",
+    "Never compare a student to a named peer."
+  ],
+  "export": {
+    "formats": [
+      "in_app",
+      "pdf"
+    ],
+    "shareable_with_tpo": true,
+    "downloadable_by_student": true
+  }
+}

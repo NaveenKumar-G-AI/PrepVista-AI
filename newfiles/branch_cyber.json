@@ -1,0 +1,216 @@
+{
+  "branch": "cyber",
+  "label": "Cyber Security",
+  "schema_version": 1,
+  "notes": "Seed questions for the cyber branch.",
+  "topics": [
+    {
+      "topic": "Security Fundamentals",
+      "subtopics": [
+        "CIA triad",
+        "risk",
+        "threats",
+        "defence in depth"
+      ],
+      "questions": {
+        "easy": [
+          "What does the CIA triad stand for in security?",
+          "What's the difference between a threat and a vulnerability?",
+          "What is authentication?"
+        ],
+        "medium": [
+          "What's the difference between authentication and authorization?",
+          "What is defence in depth?",
+          "What's the difference between a risk, a threat, and a vulnerability?"
+        ],
+        "hard": [
+          "How would you perform a basic risk assessment for an application?",
+          "Explain the principle of least privilege and why it matters.",
+          "How would you design a layered security strategy for a small company?"
+        ]
+      }
+    },
+    {
+      "topic": "Cryptography",
+      "subtopics": [
+        "symmetric",
+        "asymmetric",
+        "hashing",
+        "keys"
+      ],
+      "questions": {
+        "easy": [
+          "What is encryption?",
+          "What's the difference between encryption and hashing?",
+          "What is a digital signature?"
+        ],
+        "medium": [
+          "What's the difference between symmetric and asymmetric encryption?",
+          "Why are passwords stored as hashes, not plaintext?",
+          "What is a public key and a private key used for?"
+        ],
+        "hard": [
+          "Explain how TLS uses both symmetric and asymmetric cryptography.",
+          "What is a salt, and why does it strengthen password hashing?",
+          "How would you design secure key exchange between two parties?"
+        ]
+      }
+    },
+    {
+      "topic": "Network Security",
+      "subtopics": [
+        "firewalls",
+        "VPN",
+        "IDS/IPS",
+        "protocols"
+      ],
+      "questions": {
+        "easy": [
+          "What does a firewall do?",
+          "What is a VPN used for?",
+          "What is the difference between HTTP and HTTPS?"
+        ],
+        "medium": [
+          "What's the difference between an IDS and an IPS?",
+          "How does a firewall decide what traffic to allow?",
+          "What is a man-in-the-middle attack?"
+        ],
+        "hard": [
+          "How would you segment a network to limit an attacker's movement?",
+          "Explain how a DDoS attack works and how you'd mitigate it.",
+          "How would you detect lateral movement inside a network?"
+        ]
+      }
+    },
+    {
+      "topic": "Web Security",
+      "subtopics": [
+        "OWASP",
+        "XSS",
+        "SQL injection",
+        "CSRF"
+      ],
+      "questions": {
+        "easy": [
+          "What is SQL injection?",
+          "What is cross-site scripting (XSS)?",
+          "Why should user input never be trusted?"
+        ],
+        "medium": [
+          "How would you prevent SQL injection in an application?",
+          "What's the difference between stored and reflected XSS?",
+          "What is CSRF, and how is it prevented?"
+        ],
+        "hard": [
+          "How would you secure a web application against the OWASP Top 10?",
+          "Explain how a content security policy mitigates XSS.",
+          "How would you design secure session management for a web app?"
+        ]
+      }
+    },
+    {
+      "topic": "System & OS Security",
+      "subtopics": [
+        "access control",
+        "privilege",
+        "hardening",
+        "logging"
+      ],
+      "questions": {
+        "easy": [
+          "What is access control?",
+          "What does it mean to harden a system?",
+          "Why is logging important for security?"
+        ],
+        "medium": [
+          "What's the difference between discretionary and role-based access control?",
+          "What is privilege escalation?",
+          "Why should services run with minimal privileges?"
+        ],
+        "hard": [
+          "How would you harden a Linux server exposed to the internet?",
+          "Explain how privilege escalation attacks work and how to prevent them.",
+          "How would you design audit logging that's useful in an investigation?"
+        ]
+      }
+    },
+    {
+      "topic": "Threats & Malware",
+      "subtopics": [
+        "malware types",
+        "phishing",
+        "social engineering",
+        "vectors"
+      ],
+      "questions": {
+        "easy": [
+          "What is malware?",
+          "What is phishing?",
+          "What is ransomware?"
+        ],
+        "medium": [
+          "What's the difference between a virus, a worm, and a trojan?",
+          "What is social engineering, and why is it effective?",
+          "What is a zero-day vulnerability?"
+        ],
+        "hard": [
+          "How would you respond to a suspected ransomware infection?",
+          "Explain how an attacker might chain a phishing email into full compromise.",
+          "How would you defend an organisation against social-engineering attacks?"
+        ]
+      }
+    },
+    {
+      "topic": "Incident Response",
+      "subtopics": [
+        "detection",
+        "forensics",
+        "containment",
+        "recovery"
+      ],
+      "questions": {
+        "easy": [
+          "What is incident response?",
+          "What does it mean to contain an incident?",
+          "Why is having backups important?"
+        ],
+        "medium": [
+          "What are the main phases of incident response?",
+          "What's the difference between containment and eradication?",
+          "Why is preserving evidence important during an incident?"
+        ],
+        "hard": [
+          "How would you investigate a suspected data breach?",
+          "Explain the chain of custody in digital forensics.",
+          "How would you build an incident-response plan for a company?"
+        ]
+      }
+    },
+    {
+      "topic": "Secure Coding & AppSec",
+      "subtopics": [
+        "input validation",
+        "auth",
+        "secrets",
+        "dependencies"
+      ],
+      "questions": {
+        "easy": [
+          "Why is input validation important?",
+          "Why shouldn't secrets be hard-coded in source code?",
+          "What is authentication versus authorization in an app?"
+        ],
+        "medium": [
+          "How would you store user passwords securely?",
+          "What's the risk of using outdated third-party libraries?",
+          "What is the principle of least privilege in application design?"
+        ],
+        "hard": [
+          "How would you design secure secrets management for a deployed service?",
+          "Explain how you'd threat-model a new feature.",
+          "How would you prevent insecure deserialization vulnerabilities?"
+        ]
+      }
+    }
+  ]
+}

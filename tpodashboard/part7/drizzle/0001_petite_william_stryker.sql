@@ -1,0 +1,1 @@
+ALTER TABLE "intervention_assignment" ADD COLUMN "linked_enrollment_id" text;

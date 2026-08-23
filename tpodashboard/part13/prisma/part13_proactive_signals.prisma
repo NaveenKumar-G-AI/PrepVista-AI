@@ -1,0 +1,142 @@
+// prisma/part13_proactive_signals.prisma
+//
+// Reference schema — section 9's "conceptual" model, made concrete. Field
+// names are camelCase to match services/signals/types.ts 1:1. Not run
+// against a live database in this sandbox (no DB, no network) — merge
+// these models into your real schema.prisma, add @map(...) per field (or
+// @@map at the model level) if your Postgres convention is snake_case,
+// and run your own `prisma migrate dev`.
+
+enum SignalCategory {
+  APPLICATION
+  INTERVIEW
+  OFFER
+  JOINING
+  TRAINING
+  ASSESSMENT
+  READINESS
+  INTERVENTION
+  DRIVE
+  COMPANY_RELATIONSHIP
+  COMMUNICATION
+  DATA_QUALITY
+  PLACEMENT
+  MANAGEMENT
+  SYSTEM
+}
+
+enum SignalSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum SignalStatus {
+  NEW
+  ACKNOWLEDGED
+  IN_PROGRESS
+  SNOOZED
+  RESOLVED
+  EXPIRED
+  DISMISSED
+}
+
+enum SignalConfidence {
+  HIGH_CONFIDENCE
+  MEDIUM_CONFIDENCE
+  LOW_CONFIDENCE
+}
+
+enum SignalActionability {
+  INFORMATIONAL
+  MONITOR
+  REVIEW
+  ACTION_RECOMMENDED
+  ACTION_REQUIRED
+}
+
+enum SignalPolarity {
+  RISK
+  POSITIVE
+  NEUTRAL
+}
+
+enum SignalAudience {
+  TPO
+  STUDENT
+  MANAGEMENT
+}
+
+model ProactiveSignal {
+  id             String               @id @default(cuid())
+  institutionId  String
+  seasonId       String
+  signalType     String
+  category       SignalCategory
+  polarity       SignalPolarity
+  severity       SignalSeverity
+  priorityScore  Int
+  priorityBucket SignalSeverity
+  status         SignalStatus         @default(NEW)
+  confidence     SignalConfidence
+  actionability  SignalActionability
+
+  title   String
+  summary String @db.Text
+
+  entityType    String
+  entityId      String
+  departmentTag String?
+
+  evidence          Json
+  evidenceMeta      Json
+  recommendedAction Json?
+
+  audiences SignalAudience[]
+  clusterId String?
+
+  dedupKey         String
+  studentsAffected Int?
+
+  detectedAt         DateTime
+  lastUpdatedAt      DateTime
+  expiresAt          DateTime?
+  acknowledgedAt     DateTime?
+  acknowledgedBy     String?
+  resolvedAt         DateTime?
+  resolvedBy         String?
+  resolutionEvidence String?
+  snoozedUntil       DateTime?
+  dismissedAt        DateTime?
+
+  // Stored as JSON arrays of {at, from, to, reason} / {at, note} — see
+  // services/signals/types.ts EscalationHistoryEntry / UpdateHistoryEntry.
+  escalationHistory Json @default("[]")
+  updateHistory     Json @default("[]")
+
+  createdAt DateTime @default(now())
+
+  // Section 66's own performance requirement, as indexes:
+  //  - fast "open signals for this institution" (attention centers)
+  //  - fast dedup lookup on every detection cycle
+  //  - fast per-entity lookup (student personal view)
+  //  - fast severity-scoped queries (critical/high buckets)
+  @@index([institutionId, status])
+  @@index([institutionId, dedupKey])
+  @@index([entityType, entityId])
+  @@index([institutionId, severity, status])
+  @@map("proactive_signals")
+}
+
+model SignalFeedback {
+  id        String   @id @default(cuid())
+  signalId  String
+  userId    String
+  feedback  String // 'false_positive' | 'useful' | 'acted_upon' | 'dismissed'
+  createdAt DateTime @default(now())
+
+  @@index([signalId])
+  @@map("proactive_signal_feedback")
+}

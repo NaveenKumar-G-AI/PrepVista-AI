@@ -1,0 +1,145 @@
+{
+  "company_id": "cognizant",
+  "display_name": "Cognizant",
+  "aliases": ["CTS", "Cognizant Technology Solutions"],
+  "archetype": "mass_service",
+  "tier": "tier1_service",
+  "tier_rank": "A",
+  "hiring_scale": "very_high",
+  "logo_asset": "cognizant.svg",
+  "brand_colors": { "primary": "#1A3A6B", "accent": "#00A3E0" },
+  "platform": {
+    "name": "Superset",
+    "emulation_profile": "superset",
+    "proctored": true,
+    "tab_switch_policy": "warn",
+    "navigation": "free_within_section",
+    "on_screen_calculator": true,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": false,
+  "packages": [
+    { "track": "genc",      "label": "GenC",      "ctc_lpa": [4.0, 4.0], "gate": "coding_3of5" },
+    { "track": "genc_pro",  "label": "GenC Pro",  "ctc_lpa": [6.0, 6.0], "gate": "coding_cluster+cert" },
+    { "track": "genc_next", "label": "GenC Next", "ctc_lpa": [9.0, 9.0], "gate": "coding_5of5" }
+  ],
+  "eligibility": {
+    "min_percentage_throughout": 60,
+    "max_active_backlogs": 0,
+    "max_academic_gap_years": 2,
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"]
+  },
+  "re_eligibility_gap_months": null,
+  "format_confidence": 0.82,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "Certifications (Salesforce / CyberSecurity / ServiceNow) can lift a candidate from GenC to GenC Pro.",
+    "Round 1/2 order may swap by zone."
+  ],
+  "culture_values": ["client_first", "integrity", "collaboration", "continuous_learning"],
+  "what_they_value": "Communication, reaching the maximum game level, and how many coding problems you solve.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "cognizant_communication",
+      "round_type": "voice_assessment",
+      "label": "Communication Assessment",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 60,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "listening_speaking", "label": "Listening & Speaking", "competency": "spoken_english", "item_type": "voice_topic",  "count": 3, "minutes": 30, "topics": ["fluency", "grammar", "pronunciation"] },
+        { "section_id": "repeat_audio",       "label": "Repeat After the Audio (played once)", "competency": "spoken_english", "item_type": "voice_repeat", "count": 5, "minutes": 30, "topics": ["listening", "recall", "pronunciation"], "config": { "audio_plays": 1 } }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 4.5 } },
+      "notes": "~60 min: listening & speaking, grammar, fluency; the 'repeat after the audio' section plays only once."
+    },
+    {
+      "order": 2,
+      "round_id": "cognizant_aptitude",
+      "round_type": "aptitude_test",
+      "label": "Aptitude + Reasoning",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 40,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "aptitude", "label": "Aptitude / Quant", "competency": "aptitude_reasoning", "item_type": "mcq", "count": 20, "minutes": 25, "topics": ["percentages", "ratio", "tsd", "profit_loss"] },
+        { "section_id": "logical",  "label": "Logical Reasoning", "competency": "aptitude_reasoning", "item_type": "mcq", "count": 10, "minutes": 15, "topics": ["series", "coding_decoding", "syllogism"] }
+      ],
+      "gate_rule": { "type": "overall", "params": { "min_percentile_by_track": { "genc": { "overall": 60 } } } },
+      "notes": "~30 aptitude/quant + logical-reasoning questions."
+    },
+    {
+      "order": 3,
+      "round_id": "cognizant_games",
+      "round_type": "game_based_aptitude",
+      "label": "Game-Based Reasoning",
+      "is_elimination": false,
+      "difficulty_profile": "medium",
+      "total_minutes": 40,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "deductive", "label": "Deductive Challenge", "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 10, "topics": ["deductive_reasoning"], "config": { "leveling": true } },
+        { "section_id": "switch",    "label": "Switch Challenge",    "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 10, "topics": ["code_switching", "multitasking"], "config": { "leveling": true } },
+        { "section_id": "grid",      "label": "Grid Challenge",      "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 10, "topics": ["visual_reasoning"], "config": { "leveling": true } },
+        { "section_id": "motion",    "label": "Motion Challenge",    "competency": "cognitive_games", "item_type": "game", "count": 1, "minutes": 10, "topics": ["attention", "tracking"], "config": { "leveling": true } }
+      ],
+      "gate_rule": null,
+      "notes": "4 gamified sections; reach the maximum level for a higher score (level x per-level weight). Fixed set (Cognizant)."
+    },
+    {
+      "order": 4,
+      "round_id": "cognizant_coding",
+      "round_type": "coding_test",
+      "label": "Technical Assessment (Coding)",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 90,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "sql_1",   "label": "SQL Query 1",        "competency": "coding", "item_type": "sql",    "count": 1, "minutes": 15, "topics": ["joins", "aggregation"], "languages_allowed": ["SQL"] },
+        { "section_id": "sql_2",   "label": "SQL Query 2",        "competency": "coding", "item_type": "sql",    "count": 1, "minutes": 15, "topics": ["subqueries", "indexing"], "languages_allowed": ["SQL"] },
+        { "section_id": "coding_1","label": "Coding Problem 1",   "competency": "coding", "item_type": "coding", "count": 1, "minutes": 25, "topics": ["arrays", "strings"], "languages_allowed": ["C", "C++", "Java", "Python", "C#"] },
+        { "section_id": "coding_2","label": "Coding Problem 2",   "competency": "coding", "item_type": "coding", "count": 1, "minutes": 25, "topics": ["logic", "math"], "languages_allowed": ["C", "C++", "Java", "Python", "C#"] },
+        { "section_id": "web_ui",  "label": "Web-UI (HTML/CSS/JS)","competency": "coding","item_type": "web_ui", "count": 1, "minutes": 10, "topics": ["html", "css", "javascript"], "languages_allowed": ["HTML", "CSS", "JavaScript"] }
+      ],
+      "gate_rule": {
+        "type": "coding_count",
+        "params": { "min_solved_by_track": { "genc": 3, "genc_pro": 4, "genc_next": 5 } }
+      },
+      "notes": "GenC = 5 questions (2 SQL, 2 coding, 1 Web-UI); solve >=3 for GenC. GenC Pro uses language clusters (24 coding in 120 min)."
+    },
+    {
+      "order": 5,
+      "round_id": "cognizant_interview",
+      "round_type": "technical_interview",
+      "label": "Technical + HR Interview",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 30,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "tech_qa", "label": "CS Fundamentals + SQL Depth + Project", "competency": "technical_domain", "item_type": "interview_qa", "count": 5, "minutes": 20, "topics": ["oops", "dbms", "cn", "os", "sql_indexing", "project_deep_dive", "ai_bigdata_trends"] },
+        { "section_id": "hr_qa",   "label": "HR",                                    "competency": "hr_behavioral",   "item_type": "interview_qa", "count": 3, "minutes": 10, "topics": ["motivation", "relocation", "candidate_questions"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.0 } },
+      "notes": "~30 min: CS fundamentals (OOP/DBMS/CN/OS), SQL depth (index hunting, fill factor), project deep-dive, plus standard HR."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "coding_count",
+    "attributes": ["communication", "aptitude", "games", "coding"],
+    "tracks": [
+      { "track": "genc",      "label": "GenC",      "requires": { "coding_solved": 3 } },
+      { "track": "genc_pro",  "label": "GenC Pro",  "requires": { "coding_solved": 4, "certification": true } },
+      { "track": "genc_next", "label": "GenC Next", "requires": { "coding_solved": 5 } }
+    ],
+    "params": { "order_high_to_low": ["genc_next", "genc_pro", "genc"] },
+    "gap_hints": {
+      "genc_to_genc_pro": "Solve a 4th problem and add a ServiceNow / Salesforce / CyberSecurity certification.",
+      "genc_pro_to_genc_next": "Solve all 5 coding problems (2 SQL + 2 coding + 1 Web-UI)."
+    }
+  }
+}

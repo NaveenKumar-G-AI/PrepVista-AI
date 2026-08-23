@@ -1,0 +1,695 @@
+{
+  "schema_version": 2,
+  "description": "Registry of the 9 canonical competencies PrepVista measures, each broken into observable sub-competencies / behavioral indicators (100+ total) for granular feedback and rubric scoring. The 9 top-level competencies are the fixed canonical set the engine enforces; sub-competencies add descriptive depth. Each competency also lists the categories that develop it (reverse-mapped from categories.json).",
+  "total_sub_competencies": 108,
+  "competencies": [
+    {
+      "key": "introduction",
+      "label": "Self-Presentation",
+      "description": "Presenting who you are, your story, and where you're headed — concisely and relevantly.",
+      "developed_by_categories": [
+        "career_motivation"
+      ],
+      "category_coverage": 1,
+      "what_strong_looks_like": "Concise, structured (present-past-future), and tailored to the role.",
+      "what_weak_looks_like": "Rambling, generic, or a memorised life story.",
+      "sub_competencies": [
+        {
+          "key": "elevator_pitch",
+          "label": "Elevator pitch",
+          "indicator": "Gives a crisp, memorable self-summary."
+        },
+        {
+          "key": "present_past_future",
+          "label": "Present-past-future structure",
+          "indicator": "Frames the intro across now, the path here, and goals."
+        },
+        {
+          "key": "relevance_to_role",
+          "label": "Relevance to role",
+          "indicator": "Tailors the introduction to the specific role."
+        },
+        {
+          "key": "conciseness",
+          "label": "Conciseness",
+          "indicator": "Keeps it to roughly 60-90 seconds."
+        },
+        {
+          "key": "confidence",
+          "label": "Confidence",
+          "indicator": "Comes across self-assured, not arrogant."
+        },
+        {
+          "key": "authenticity",
+          "label": "Authenticity",
+          "indicator": "Sounds genuine rather than scripted."
+        },
+        {
+          "key": "narrative_thread",
+          "label": "Narrative thread",
+          "indicator": "Maintains a coherent through-line."
+        },
+        {
+          "key": "highlight_selection",
+          "label": "Highlight selection",
+          "indicator": "Chooses the most relevant highlights."
+        },
+        {
+          "key": "strong_opening",
+          "label": "Strong opening",
+          "indicator": "Opens with a confident first impression."
+        },
+        {
+          "key": "enthusiasm",
+          "label": "Enthusiasm",
+          "indicator": "Conveys genuine interest in the role."
+        },
+        {
+          "key": "forward_close",
+          "label": "Forward-looking close",
+          "indicator": "Ends on a note that sets up why they're here."
+        }
+      ],
+      "sub_competency_count": 11
+    },
+    {
+      "key": "technical_depth",
+      "label": "Technical Depth",
+      "description": "Depth of knowledge in the candidate's domain and the ability to reason about it.",
+      "developed_by_categories": [
+        "resume_based",
+        "technical_domain",
+        "case_study"
+      ],
+      "category_coverage": 3,
+      "what_strong_looks_like": "Accurate, goes a level deeper, explains trade-offs and the 'why'.",
+      "what_weak_looks_like": "Surface-level, memorised, or unable to handle a follow-up.",
+      "sub_competencies": [
+        {
+          "key": "fundamentals",
+          "label": "Fundamentals",
+          "indicator": "Shows a solid grasp of core concepts."
+        },
+        {
+          "key": "depth_beyond_surface",
+          "label": "Depth beyond surface",
+          "indicator": "Goes a level deeper than the textbook answer."
+        },
+        {
+          "key": "trade_off_reasoning",
+          "label": "Trade-off reasoning",
+          "indicator": "Explains the trade-offs behind a choice."
+        },
+        {
+          "key": "correctness",
+          "label": "Correctness",
+          "indicator": "Gives accurate, reliable answers."
+        },
+        {
+          "key": "follow_up_resilience",
+          "label": "Follow-up resilience",
+          "indicator": "Handles probing follow-ups without crumbling."
+        },
+        {
+          "key": "complexity_analysis",
+          "label": "Complexity analysis",
+          "indicator": "Reasons about time and space complexity."
+        },
+        {
+          "key": "system_thinking",
+          "label": "System thinking",
+          "indicator": "Connects the answer to the larger system."
+        },
+        {
+          "key": "debugging_mindset",
+          "label": "Debugging mindset",
+          "indicator": "Approaches problems methodically."
+        },
+        {
+          "key": "best_practices",
+          "label": "Best practices",
+          "indicator": "Knows and applies established best practices."
+        },
+        {
+          "key": "breadth",
+          "label": "Breadth",
+          "indicator": "Covers across the domain, not just one corner."
+        },
+        {
+          "key": "applied_knowledge",
+          "label": "Applied knowledge",
+          "indicator": "Connects theory to real practice."
+        },
+        {
+          "key": "tooling_familiarity",
+          "label": "Tooling familiarity",
+          "indicator": "Knows the relevant tools and ecosystem."
+        },
+        {
+          "key": "precision_of_terms",
+          "label": "Precision of terms",
+          "indicator": "Uses terminology correctly."
+        }
+      ],
+      "sub_competency_count": 13
+    },
+    {
+      "key": "project_ownership",
+      "label": "Project Ownership",
+      "description": "Genuine ownership of one's own work, decisions, and outcomes.",
+      "developed_by_categories": [
+        "resume_based"
+      ],
+      "category_coverage": 1,
+      "what_strong_looks_like": "Clear personal role, drove the outcome, and reflects on what was learned.",
+      "what_weak_looks_like": "Vague, inflated, or hides behind 'we' with no individual contribution.",
+      "sub_competencies": [
+        {
+          "key": "individual_contribution",
+          "label": "Individual contribution",
+          "indicator": "Makes their personal role clear."
+        },
+        {
+          "key": "outcome_driving",
+          "label": "Outcome driving",
+          "indicator": "Drove the result, not just participated."
+        },
+        {
+          "key": "decision_making",
+          "label": "Decision making",
+          "indicator": "Made real decisions during the work."
+        },
+        {
+          "key": "accountability",
+          "label": "Accountability",
+          "indicator": "Owns both successes and failures."
+        },
+        {
+          "key": "impact_articulation",
+          "label": "Impact articulation",
+          "indicator": "Quantifies the impact achieved."
+        },
+        {
+          "key": "learning_extraction",
+          "label": "Learning extraction",
+          "indicator": "Reflects on what was learned."
+        },
+        {
+          "key": "initiative",
+          "label": "Initiative",
+          "indicator": "Went beyond what was asked."
+        },
+        {
+          "key": "end_to_end_involvement",
+          "label": "End-to-end involvement",
+          "indicator": "Saw the work through to completion."
+        },
+        {
+          "key": "challenge_handling",
+          "label": "Challenge handling",
+          "indicator": "Navigated real obstacles."
+        },
+        {
+          "key": "collaboration_in_ownership",
+          "label": "Collaboration within ownership",
+          "indicator": "Worked with others while still owning the outcome."
+        },
+        {
+          "key": "depth_of_involvement",
+          "label": "Depth of involvement",
+          "indicator": "Was genuinely hands-on."
+        },
+        {
+          "key": "honest_role",
+          "label": "Honesty about role",
+          "indicator": "Doesn't inflate their contribution."
+        }
+      ],
+      "sub_competency_count": 12
+    },
+    {
+      "key": "communication",
+      "label": "Communication",
+      "description": "Clarity, structure, and getting the point across to the listener.",
+      "developed_by_categories": [
+        "hr_behavioral",
+        "resume_based",
+        "stress_curveball",
+        "culture_fit",
+        "salary_expectation",
+        "group_discussion",
+        "candidate_questions"
+      ],
+      "category_coverage": 7,
+      "what_strong_looks_like": "Clear, organised, audience-aware, and concise.",
+      "what_weak_looks_like": "Unclear, disorganised, or buries the point.",
+      "sub_competencies": [
+        {
+          "key": "clarity",
+          "label": "Clarity",
+          "indicator": "Expresses ideas plainly and clearly."
+        },
+        {
+          "key": "structure",
+          "label": "Structured delivery",
+          "indicator": "Organises an answer logically."
+        },
+        {
+          "key": "conciseness",
+          "label": "Conciseness",
+          "indicator": "Is economical with words."
+        },
+        {
+          "key": "audience_awareness",
+          "label": "Audience awareness",
+          "indicator": "Adapts to the listener."
+        },
+        {
+          "key": "active_listening",
+          "label": "Active listening",
+          "indicator": "Answers the actual question asked."
+        },
+        {
+          "key": "articulation",
+          "label": "Articulation",
+          "indicator": "Speaks fluently and coherently."
+        },
+        {
+          "key": "persuasiveness",
+          "label": "Persuasiveness",
+          "indicator": "Makes a convincing case."
+        },
+        {
+          "key": "storytelling",
+          "label": "Storytelling",
+          "indicator": "Frames points in an engaging narrative."
+        },
+        {
+          "key": "question_handling",
+          "label": "Question handling",
+          "indicator": "Addresses questions directly."
+        },
+        {
+          "key": "summarising",
+          "label": "Summarising",
+          "indicator": "Wraps up points clearly."
+        },
+        {
+          "key": "delivery_confidence",
+          "label": "Confidence in delivery",
+          "indicator": "Delivers in a composed way."
+        },
+        {
+          "key": "jargon_management",
+          "label": "Jargon management",
+          "indicator": "Avoids unnecessary jargon."
+        },
+        {
+          "key": "tone_modulation",
+          "label": "Tone and pacing",
+          "indicator": "Modulates tone and pace appropriately."
+        }
+      ],
+      "sub_competency_count": 13
+    },
+    {
+      "key": "problem_solving",
+      "label": "Problem Solving",
+      "description": "A structured, logical approach to working through problems.",
+      "developed_by_categories": [
+        "technical_domain",
+        "aptitude_reasoning",
+        "puzzles_brainteasers",
+        "creative_estimation",
+        "case_study",
+        "group_discussion"
+      ],
+      "category_coverage": 6,
+      "what_strong_looks_like": "Breaks the problem down, reasons step by step, and sanity-checks.",
+      "what_weak_looks_like": "Jumps to an answer, guesses, or gets stuck without a method.",
+      "sub_competencies": [
+        {
+          "key": "decomposition",
+          "label": "Decomposition",
+          "indicator": "Breaks a problem into parts."
+        },
+        {
+          "key": "structured_approach",
+          "label": "Structured approach",
+          "indicator": "Uses a clear method or framework."
+        },
+        {
+          "key": "logical_reasoning",
+          "label": "Logical reasoning",
+          "indicator": "Reasons soundly from premises."
+        },
+        {
+          "key": "assumption_handling",
+          "label": "Assumption handling",
+          "indicator": "States and validates assumptions."
+        },
+        {
+          "key": "edge_case_thinking",
+          "label": "Edge-case thinking",
+          "indicator": "Considers edge and corner cases."
+        },
+        {
+          "key": "prioritisation",
+          "label": "Prioritisation",
+          "indicator": "Focuses on what matters most."
+        },
+        {
+          "key": "sanity_checking",
+          "label": "Sanity checking",
+          "indicator": "Verifies the answer makes sense."
+        },
+        {
+          "key": "creative_solutions",
+          "label": "Creative solutions",
+          "indicator": "Finds non-obvious solutions."
+        },
+        {
+          "key": "quantitative_reasoning",
+          "label": "Quantitative reasoning",
+          "indicator": "Works confidently with numbers."
+        },
+        {
+          "key": "pattern_recognition",
+          "label": "Pattern recognition",
+          "indicator": "Spots underlying patterns."
+        },
+        {
+          "key": "handling_ambiguity",
+          "label": "Handling ambiguity",
+          "indicator": "Copes with incomplete information."
+        },
+        {
+          "key": "iteration",
+          "label": "Iteration",
+          "indicator": "Refines the approach as needed."
+        },
+        {
+          "key": "clarifying_questions",
+          "label": "Clarifying questions",
+          "indicator": "Asks before assuming."
+        }
+      ],
+      "sub_competency_count": 13
+    },
+    {
+      "key": "behavioral",
+      "label": "Behavioral",
+      "description": "How the candidate has actually behaved and acts in real situations.",
+      "developed_by_categories": [
+        "hr_behavioral",
+        "situational_star",
+        "culture_fit",
+        "career_motivation",
+        "salary_expectation",
+        "group_discussion",
+        "candidate_questions"
+      ],
+      "category_coverage": 7,
+      "what_strong_looks_like": "Specific real stories, honest, accountable, and reflective.",
+      "what_weak_looks_like": "Generic, evasive, or shifts blame without accountability.",
+      "sub_competencies": [
+        {
+          "key": "specificity",
+          "label": "Specificity",
+          "indicator": "Gives concrete, real examples."
+        },
+        {
+          "key": "star_structure",
+          "label": "STAR structure",
+          "indicator": "Uses Situation-Task-Action-Result."
+        },
+        {
+          "key": "honesty",
+          "label": "Honesty",
+          "indicator": "Is truthful and candid."
+        },
+        {
+          "key": "accountability",
+          "label": "Accountability",
+          "indicator": "Owns mistakes without blame-shifting."
+        },
+        {
+          "key": "self_reflection",
+          "label": "Self-reflection",
+          "indicator": "Learns from past experience."
+        },
+        {
+          "key": "conflict_handling",
+          "label": "Conflict handling",
+          "indicator": "Navigates interpersonal friction maturely."
+        },
+        {
+          "key": "teamwork",
+          "label": "Teamwork",
+          "indicator": "Works well within a team."
+        },
+        {
+          "key": "adaptability",
+          "label": "Adaptability",
+          "indicator": "Handles change and the unexpected."
+        },
+        {
+          "key": "story_consistency",
+          "label": "Story consistency",
+          "indicator": "Keeps stories coherent across answers."
+        },
+        {
+          "key": "emotional_intelligence",
+          "label": "Emotional intelligence",
+          "indicator": "Reads people and situations."
+        },
+        {
+          "key": "resilience",
+          "label": "Resilience",
+          "indicator": "Bounces back from setbacks."
+        },
+        {
+          "key": "integrity",
+          "label": "Integrity",
+          "indicator": "Acts ethically under pressure."
+        }
+      ],
+      "sub_competency_count": 12
+    },
+    {
+      "key": "situational_judgment",
+      "label": "Situational Judgement",
+      "description": "Sound judgement in tricky, ambiguous, or high-pressure situations.",
+      "developed_by_categories": [
+        "situational_star",
+        "stress_curveball",
+        "salary_expectation",
+        "group_discussion"
+      ],
+      "category_coverage": 4,
+      "what_strong_looks_like": "Weighs options, stays composed, and reasons from sensible principles.",
+      "what_weak_looks_like": "Rash, one-dimensional, or panics under pressure.",
+      "sub_competencies": [
+        {
+          "key": "option_weighing",
+          "label": "Option weighing",
+          "indicator": "Considers alternatives before deciding."
+        },
+        {
+          "key": "pressure_prioritisation",
+          "label": "Prioritisation under pressure",
+          "indicator": "Triages well when stakes are high."
+        },
+        {
+          "key": "ethical_reasoning",
+          "label": "Ethical reasoning",
+          "indicator": "Reasons with integrity."
+        },
+        {
+          "key": "stakeholder_awareness",
+          "label": "Stakeholder awareness",
+          "indicator": "Considers everyone affected."
+        },
+        {
+          "key": "composure",
+          "label": "Composure",
+          "indicator": "Stays calm in tricky situations."
+        },
+        {
+          "key": "decisiveness",
+          "label": "Decisiveness",
+          "indicator": "Commits to a clear call."
+        },
+        {
+          "key": "risk_assessment",
+          "label": "Risk assessment",
+          "indicator": "Weighs the risks involved."
+        },
+        {
+          "key": "escalation_judgment",
+          "label": "Escalation judgement",
+          "indicator": "Knows when to escalate."
+        },
+        {
+          "key": "pragmatism",
+          "label": "Pragmatism",
+          "indicator": "Chooses realistic, workable options."
+        },
+        {
+          "key": "consequence_thinking",
+          "label": "Consequence thinking",
+          "indicator": "Anticipates downstream outcomes."
+        },
+        {
+          "key": "principled_reasoning",
+          "label": "Principle-based reasoning",
+          "indicator": "Reasons from sound principles."
+        },
+        {
+          "key": "flexibility",
+          "label": "Flexibility",
+          "indicator": "Adjusts the approach as facts change."
+        }
+      ],
+      "sub_competency_count": 12
+    },
+    {
+      "key": "creative_thinking",
+      "label": "Creative Thinking",
+      "description": "Original, lateral, and resourceful thinking.",
+      "developed_by_categories": [
+        "puzzles_brainteasers",
+        "creative_estimation"
+      ],
+      "category_coverage": 2,
+      "what_strong_looks_like": "Finds novel angles and structures creativity into a usable approach.",
+      "what_weak_looks_like": "Rigid, conventional, or unable to generate alternatives.",
+      "sub_competencies": [
+        {
+          "key": "idea_generation",
+          "label": "Idea generation",
+          "indicator": "Produces many candidate ideas."
+        },
+        {
+          "key": "lateral_thinking",
+          "label": "Lateral thinking",
+          "indicator": "Approaches from non-linear angles."
+        },
+        {
+          "key": "originality",
+          "label": "Originality",
+          "indicator": "Offers genuinely novel approaches."
+        },
+        {
+          "key": "resourcefulness",
+          "label": "Resourcefulness",
+          "indicator": "Makes the most of what's available."
+        },
+        {
+          "key": "reframing",
+          "label": "Reframing",
+          "indicator": "Sees the problem from a new frame."
+        },
+        {
+          "key": "analogical_thinking",
+          "label": "Analogical thinking",
+          "indicator": "Uses analogies to reason."
+        },
+        {
+          "key": "structured_creativity",
+          "label": "Structured creativity",
+          "indicator": "Channels creativity into something usable."
+        },
+        {
+          "key": "curiosity",
+          "label": "Curiosity",
+          "indicator": "Explores widely and asks why."
+        },
+        {
+          "key": "openness",
+          "label": "Openness",
+          "indicator": "Considers unconventional options."
+        },
+        {
+          "key": "synthesis",
+          "label": "Synthesis",
+          "indicator": "Combines ideas into something new."
+        },
+        {
+          "key": "divergent_convergent",
+          "label": "Divergent then convergent",
+          "indicator": "Expands options, then narrows wisely."
+        }
+      ],
+      "sub_competency_count": 11
+    },
+    {
+      "key": "ai_tool_fluency",
+      "label": "AI Tool Fluency",
+      "description": "Effective, judicious use of AI tools — using them well while knowing their limits.",
+      "developed_by_categories": [],
+      "category_coverage": 0,
+      "what_strong_looks_like": "Uses AI to accelerate work, verifies output, and understands the boundaries.",
+      "what_weak_looks_like": "Over-relies without checking, or avoids useful tools entirely.",
+      "sub_competencies": [
+        {
+          "key": "effective_prompting",
+          "label": "Effective prompting",
+          "indicator": "Writes clear, effective prompts."
+        },
+        {
+          "key": "output_verification",
+          "label": "Output verification",
+          "indicator": "Checks AI output rather than trusting blindly."
+        },
+        {
+          "key": "limitation_awareness",
+          "label": "Limitation awareness",
+          "indicator": "Understands what AI can't reliably do."
+        },
+        {
+          "key": "tool_selection",
+          "label": "Tool selection",
+          "indicator": "Picks the right tool for the task."
+        },
+        {
+          "key": "critical_evaluation",
+          "label": "Critical evaluation",
+          "indicator": "Judges AI suggestions on merit."
+        },
+        {
+          "key": "iteration_with_ai",
+          "label": "Iteration with AI",
+          "indicator": "Refines results through dialogue."
+        },
+        {
+          "key": "ethical_use",
+          "label": "Ethical use",
+          "indicator": "Uses AI responsibly and transparently."
+        },
+        {
+          "key": "productivity_gain",
+          "label": "Productivity gain",
+          "indicator": "Uses AI to accelerate real work."
+        },
+        {
+          "key": "workflow_integration",
+          "label": "Workflow integration",
+          "indicator": "Fits AI naturally into the process."
+        },
+        {
+          "key": "hallucination_detection",
+          "label": "Hallucination detection",
+          "indicator": "Spots fabricated or wrong output."
+        },
+        {
+          "key": "augmentation_mindset",
+          "label": "Augmentation over dependence",
+          "indicator": "Uses AI to augment, not replace, judgement."
+        }
+      ],
+      "sub_competency_count": 11,
+      "coverage_note": "Reserved competency — not yet exercised by any current question category."
+    }
+  ]
+}

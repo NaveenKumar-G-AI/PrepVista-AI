@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "description": "Platform-skin registry (Dossier Part 5). Each skin gives a real assessment platform a visual + behavioral profile so the test *feels* like the real one. Data-driven: the frontend reads header/branding, section-navigator UI, timer placement, palette, question-panel layout, calculator widget, and the enforced rules. New companies reuse an existing skin.",
+  "skins": {
+    "tcs_ion": {
+      "label": "TCS iON",
+      "vendor": "TCS iON Digital Assessment",
+      "header_style": "centre_proctored",
+      "palette": { "primary": "#0A2B5E", "accent": "#00A3E0", "bg": "#F4F7FB" },
+      "section_navigator": "locked_forward",
+      "timer_placement": "per_section_top_right",
+      "question_panel": "single_question_focus",
+      "calculator_widget": "on_screen_basic",
+      "enforced_rules": {
+        "navigation": "locked_forward",
+        "question_locking": true,
+        "tab_switch_policy": "terminate",
+        "rough_work": "physical_or_scratchpad"
+      },
+      "notes": "In-centre look; question locking (no revisit); tab switch terminates the exam."
+    },
+    "amcat": {
+      "label": "AMCAT",
+      "vendor": "Aspiring Minds AMCAT",
+      "header_style": "adaptive_single",
+      "palette": { "primary": "#1F3C88", "accent": "#F39C12", "bg": "#FFFFFF" },
+      "section_navigator": "hidden_adaptive",
+      "timer_placement": "master_top_bar",
+      "question_panel": "single_question_focus",
+      "calculator_widget": "none",
+      "enforced_rules": {
+        "navigation": "locked_forward",
+        "question_locking": true,
+        "tab_switch_policy": "flag",
+        "adaptive": true
+      },
+      "notes": "Adaptive feel; single-question focus; no back-navigation."
+    },
+    "cocubes": {
+      "label": "CoCubes",
+      "vendor": "CoCubes (Aon)",
+      "header_style": "stage_sectioned",
+      "palette": { "primary": "#2C3E50", "accent": "#E74C3C", "bg": "#F8F9FA" },
+      "section_navigator": "section_list_gated",
+      "timer_placement": "per_section_top_right",
+      "question_panel": "list_with_review",
+      "calculator_widget": "on_screen_basic",
+      "enforced_rules": {
+        "navigation": "free_within_section",
+        "question_locking": false,
+        "tab_switch_policy": "warn",
+        "sectional_cutoffs": true
+      },
+      "notes": "Accenture NLT; section list with sectional gates; navigation within rules; no negative marking."
+    },
+    "superset": {
+      "label": "Superset",
+      "vendor": "Superset Campus Portal",
+      "header_style": "campus_portal",
+      "palette": { "primary": "#6C3FC5", "accent": "#00C2A8", "bg": "#FFFFFF" },
+      "section_navigator": "multi_module",
+      "timer_placement": "per_module",
+      "question_panel": "mixed_by_module",
+      "calculator_widget": "on_screen_basic",
+      "enforced_rules": {
+        "navigation": "free_within_section",
+        "question_locking": false,
+        "tab_switch_policy": "warn",
+        "launches_external_modules": true
+      },
+      "notes": "Wipro/Cognizant/Capgemini campus portal; launches OA + voice/game modules."
+    },
+    "hackerrank_style": {
+      "label": "HackerRank-style Coding Console",
+      "vendor": "HackerRank / Codility family",
+      "header_style": "coding_console",
+      "palette": { "primary": "#1BA94C", "accent": "#0E1B2A", "bg": "#0B1622" },
+      "section_navigator": "problem_list",
+      "timer_placement": "master_top_bar",
+      "question_panel": "editor_with_testcases",
+      "calculator_widget": "none",
+      "enforced_rules": {
+        "navigation": "free_all",
+        "question_locking": false,
+        "tab_switch_policy": "flag",
+        "run_visible_tests": true,
+        "partial_scoring": true
+      },
+      "notes": "Amazon/Infosys/Goldman coding console; editor + test-case runner + partial score."
+    },
+    "codility_style": {
+      "label": "Codility-style Coding Console",
+      "vendor": "Codility",
+      "header_style": "coding_console",
+      "palette": { "primary": "#1E6FD9", "accent": "#0E1B2A", "bg": "#0B1622" },
+      "section_navigator": "problem_list",
+      "timer_placement": "master_top_bar",
+      "question_panel": "editor_with_testcases",
+      "calculator_widget": "none",
+      "enforced_rules": {
+        "navigation": "free_all",
+        "question_locking": false,
+        "tab_switch_policy": "flag",
+        "run_visible_tests": true,
+        "partial_scoring": true
+      },
+      "notes": "Microsoft/NVIDIA/SAP coding console; editor + test-case runner + partial score."
+    },
+    "proctored_meet": {
+      "label": "Proctored Meet / Screen-share",
+      "vendor": "Google Meet / Zoho Meet / phone-screen",
+      "header_style": "video_screenshare",
+      "palette": { "primary": "#111827", "accent": "#EA4335", "bg": "#0B1622" },
+      "section_navigator": "single_problem_focus",
+      "timer_placement": "interviewer_led",
+      "question_panel": "shared_editor_or_whiteboard",
+      "calculator_widget": "none",
+      "enforced_rules": {
+        "navigation": "free_all",
+        "question_locking": false,
+        "tab_switch_policy": "flag",
+        "screen_share": true,
+        "human_proctored": true
+      },
+      "notes": "Zoho/phone-screen/Google onsite style; screen-share + one-problem focus."
+    },
+    "custom": {
+      "label": "PrepVista Generic",
+      "vendor": "PrepVista",
+      "header_style": "prepvista_generic",
+      "palette": { "primary": "#4C6EF5", "accent": "#12B886", "bg": "#FFFFFF" },
+      "section_navigator": "section_list",
+      "timer_placement": "per_section_top_right",
+      "question_panel": "mixed",
+      "calculator_widget": "on_screen_basic",
+      "enforced_rules": {
+        "navigation": "free_within_section",
+        "question_locking": false,
+        "tab_switch_policy": "flag"
+      },
+      "notes": "Generic PrepVista skin for companies without a known platform (Tier-B/C default)."
+    }
+  }
+}

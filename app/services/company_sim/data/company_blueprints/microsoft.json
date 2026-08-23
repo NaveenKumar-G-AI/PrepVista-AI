@@ -1,0 +1,145 @@
+{
+  "company_id": "microsoft",
+  "display_name": "Microsoft",
+  "aliases": ["MSFT", "Microsoft IDC", "Microsoft India"],
+  "archetype": "premium_product",
+  "tier": "premium_product",
+  "tier_rank": "A",
+  "hiring_scale": "high",
+  "logo_asset": "microsoft.svg",
+  "brand_colors": { "primary": "#5E5E5E", "accent": "#00A4EF" },
+  "platform": {
+    "name": "Microsoft OA (Codility/HackerRank-style) → Super Day Loop",
+    "emulation_profile": "codility_style",
+    "proctored": true,
+    "tab_switch_policy": "flag",
+    "navigation": "free_all",
+    "on_screen_calculator": false,
+    "rough_work": "scratchpad"
+  },
+  "ai_assistance_allowed": true,
+  "packages": [
+    { "track": "sde", "label": "Software Engineer", "ctc_lpa": [30.0, 45.0], "gate": "coding+design+behavioral_hire" }
+  ],
+  "eligibility": {
+    "degrees": ["BE", "BTech", "ME", "MTech", "MCA", "MSc"]
+  },
+  "re_eligibility_gap_months": null,
+  "format_confidence": 0.82,
+  "last_verified": "2026-05",
+  "recent_changes": [
+    "Backtracking noticeably more common at Microsoft than peers; also DP, two-pointers, graphs.",
+    "Internships are a common entry path."
+  ],
+  "culture_values": ["growth_mindset", "customer_obsession", "one_microsoft", "diversity_inclusion"],
+  "what_they_value": "Strong DSA (backtracking-heavy), clean LLD, a crisp project demo, and clearing the AA bar.",
+  "rounds": [
+    {
+      "order": 1,
+      "round_id": "microsoft_oa",
+      "round_type": "coding_test",
+      "label": "Online Assessment — DSA + Debugging",
+      "is_elimination": true,
+      "difficulty_profile": "mixed",
+      "total_minutes": 90,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "dsa_1",     "label": "DSA Problem 1", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 40, "topics": ["backtracking", "dp", "two_pointers", "graphs"], "languages_allowed": ["C++", "Java", "Python", "C#"] },
+        { "section_id": "dsa_2",     "label": "DSA Problem 2", "competency": "coding", "item_type": "coding", "count": 1, "minutes": 40, "topics": ["backtracking", "trees", "strings"], "languages_allowed": ["C++", "Java", "Python", "C#"] },
+        { "section_id": "debugging", "label": "Debugging",     "competency": "coding", "item_type": "coding", "count": 1, "minutes": 10, "topics": ["bug_fix", "code_reading"], "languages_allowed": ["C++", "Java", "Python", "C#"] }
+      ],
+      "gate_rule": { "type": "coding_count", "params": { "min_solved_by_track": { "sde": 2 } } },
+      "notes": "1-2 rounds: DSA + debugging. Backtracking-weighted bank."
+    },
+    {
+      "order": 2,
+      "round_id": "microsoft_dsa1",
+      "round_type": "technical_interview",
+      "label": "Super Day — DSA Round 1",
+      "is_elimination": true,
+      "difficulty_profile": "medium",
+      "total_minutes": 50,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding", "label": "Live DSA", "competency": "coding", "item_type": "interview_qa", "count": 2, "minutes": 50, "topics": ["valid_parentheses", "reverse_linked_list", "find_peak_element", "group_anagrams"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "LC easy→hard span; whiteboard or shared editor."
+    },
+    {
+      "order": 3,
+      "round_id": "microsoft_dsa2",
+      "round_type": "technical_interview",
+      "label": "Super Day — DSA Round 2",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 50,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "coding", "label": "Live DSA (hard)", "competency": "coding", "item_type": "interview_qa", "count": 2, "minutes": 50, "topics": ["serialize_deserialize_tree", "word_search", "trapping_rain_water", "min_window_substring"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "Harder DSA; backtracking / graphs likely."
+    },
+    {
+      "order": 4,
+      "round_id": "microsoft_lld",
+      "round_type": "system_design",
+      "label": "Super Day — LLD / Machine Coding",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 60,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "lld", "label": "Low-Level Design", "competency": "system_design", "item_type": "interview_qa", "count": 1, "minutes": 60, "topics": ["class_design", "oops", "extensibility", "trade_offs"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.5 } },
+      "notes": "1 LLD round; System Design added for experienced candidates."
+    },
+    {
+      "order": 5,
+      "round_id": "microsoft_project",
+      "round_type": "technical_interview",
+      "label": "Project Presentation + Demo",
+      "is_elimination": false,
+      "difficulty_profile": "medium",
+      "total_minutes": 30,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "project", "label": "Past-Project Presentation with Brief Demo", "competency": "resume_based", "item_type": "interview_qa", "count": 3, "minutes": 30, "topics": ["project_depth", "ownership", "tech_choices", "demo"] }
+      ],
+      "gate_rule": { "type": "rubric", "params": { "min_score_0_10": 5.0 } },
+      "notes": "Sometimes an ad-hoc presentation on a past project with a brief demo."
+    },
+    {
+      "order": 6,
+      "round_id": "microsoft_aa",
+      "round_type": "bar_raiser",
+      "label": "As-Appropriate / Astute (AA) Final Gate",
+      "is_elimination": true,
+      "difficulty_profile": "hard",
+      "total_minutes": 45,
+      "negative_marking": { "enabled": false, "model": "none" },
+      "sections": [
+        { "section_id": "aa", "label": "Senior Bar-Calibration + Behavioral", "competency": "behavioral", "item_type": "interview_qa", "count": 4, "minutes": 45, "topics": ["bar_calibration", "growth_mindset", "collaboration"] }
+      ],
+      "gate_rule": { "type": "veto", "params": { "min_score_0_10": 5.5, "caps_outcome": true } },
+      "notes": "The AA round functions like Amazon's Bar Raiser — a senior who calibrates the bar and can cap the outcome."
+    }
+  ],
+  "outcome_model": {
+    "strategy": "rubric_verdict",
+    "attributes": ["coding", "system_design", "project", "behavioral"],
+    "tracks": [
+      { "track": "sde", "label": "Software Engineer", "requires": { "coding_hire": true, "lld_hire": true, "aa_pass": true } }
+    ],
+    "params": {
+      "verdict_scale": ["no_hire", "lean_no_hire", "lean_hire", "hire", "strong_hire"],
+      "veto_round": "microsoft_aa",
+      "order_high_to_low": ["sde"]
+    },
+    "gap_hints": {
+      "lean_hire_to_hire": "Tighten the LLD design (extensibility + trade-offs) and land a clean, well-narrated project demo."
+    }
+  }
+}
