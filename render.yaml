@@ -125,7 +125,7 @@ services:
       })();"
     envVars:
       - key: BACKEND_HEARTBEAT_BASE_URL
-        value: https://prepvistabeckend.onrender.com
+        value: https://prepvistabeckend1.onrender.com
       - key: FRONTEND_HEARTBEAT_BASE_URL
         value: https://prepvista-p1vo.onrender.com
 
@@ -168,6 +168,6 @@ services:
       })();"
     envVars:
       - key: BACKEND_HEARTBEAT_BASE_URL
-        value: https://prepvistabeckend.onrender.com
+        value: https://prepvistabeckend1.onrender.com
       - key: FRONTEND_HEARTBEAT_BASE_URL
         value: https://prepvista-p1vo.onrender.com
