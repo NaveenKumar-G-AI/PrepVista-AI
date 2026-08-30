@@ -198,6 +198,17 @@ def _compute_migration_checksum(sql: str) -> str:
     return hashlib.sha256(sql.encode("utf-8")).hexdigest()
 
 
+def _read_migration_sql(file_path: Path) -> str:
+    """Read UTF-8 migration SQL while discarding an optional leading BOM.
+
+    Some Windows editors save UTF-8 files with the EF BB BF signature. Plain
+    ``utf-8`` decoding preserves it as U+FEFF, which PostgreSQL treats as an
+    unexpected token before the first SQL statement. ``utf-8-sig`` accepts
+    both forms and removes the marker only when it is at the start of the file.
+    """
+    return file_path.read_text(encoding="utf-8-sig")
+
+
 _TRANSACTION_CONTROL_RE = re.compile(
     r"^\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END)\s*;\s*(?:--.*)?$",
     re.IGNORECASE,
@@ -702,13 +713,13 @@ async def _run_migrations(conn: asyncpg.Connection):
             continue
 
         try:
-            sql = migration_file.read_text(encoding="utf-8")
+            sql = _read_migration_sql(migration_file)
         except UnicodeDecodeError:
             if not already_applied:
                 logger.error(
                     "migration_file_encoding_error",
                     file=migration_file.name,
-                    detail="File is not valid UTF-8. Ensure the migration was saved without a BOM or in a non-UTF-8 encoding.",
+                    detail="File is not valid UTF-8 or UTF-8 with BOM.",
                 )
             continue
 

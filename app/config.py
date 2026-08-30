@@ -848,6 +848,7 @@ def get_allowed_hosts() -> list[str]:
     for required_host in [
         "prepvista.ai", "www.prepvista.ai", "prepvistaai.com", "www.prepvistaai.com",
         "prepvistabeckend.onrender.com", "prepvistabackend.onrender.com",
+        "prepvistabackend1.onrender.com", "prepvista-backend.onrender.com",
     ]:
         if required_host not in hosts:
             hosts.append(required_host)

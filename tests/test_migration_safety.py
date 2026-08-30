@@ -2,10 +2,22 @@
 
 from pathlib import Path
 
-from app.database.connection import _strip_outer_transaction
+from app.database.connection import _read_migration_sql, _strip_outer_transaction
 
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "app" / "database" / "migrations"
+
+
+def test_migration_reader_removes_optional_utf8_bom(tmp_path: Path) -> None:
+    migration = tmp_path / "001_example.sql"
+    migration.write_bytes(b"\xef\xbb\xbfSELECT 1;\n")
+
+    assert _read_migration_sql(migration) == "SELECT 1;\n"
+
+
+def test_repository_migrations_do_not_contain_utf8_bom() -> None:
+    for migration in MIGRATIONS_DIR.glob("*.sql"):
+        assert not migration.read_bytes().startswith(b"\xef\xbb\xbf"), migration.name
 
 
 def test_strips_outer_transaction_after_leading_comments() -> None:
