@@ -1,9 +1,7 @@
 -- PART 6: Offers, Joining, Placement Outcome
--- Postgres-flavored. Written as a reference migration - NOT executed
--- against a live database by this build (no DB is available in the
--- sandbox this was authored in). Review column names against your
--- repo's actual conventions (e.g. snake_case vs camelCase, uuid vs
--- bigint ids) before running it for real.
+-- Executed by the application migration runner. The offer-domain placement
+-- outcome table is deliberately named student_placement_outcomes because
+-- migration 022 already owns placement_outcomes for model calibration.
 --
 -- Deliberately does NOT create: students, companies, drives,
 -- applications, institutions, seasons, users, documents, or a generic
@@ -138,7 +136,7 @@ CREATE TABLE joining_records (
 CREATE INDEX idx_joining_student ON joining_records (student_id);
 CREATE INDEX idx_joining_status ON joining_records (status);
 
-CREATE TABLE placement_outcomes (
+CREATE TABLE student_placement_outcomes (
   id           UUID PRIMARY KEY,
   student_id   UUID NOT NULL,
   season_id    UUID NOT NULL,
@@ -156,8 +154,8 @@ CREATE TABLE placement_outcomes (
   UNIQUE (student_id, season_id)
 );
 
-CREATE INDEX idx_placement_outcomes_season ON placement_outcomes (season_id);
-CREATE INDEX idx_placement_outcomes_outcome ON placement_outcomes (outcome);
+CREATE INDEX idx_student_placement_outcomes_season ON student_placement_outcomes (season_id);
+CREATE INDEX idx_student_placement_outcomes_outcome ON student_placement_outcomes (outcome);
 
 -- Institution-configurable policy (multiple-offer rules + which outcomes
 -- count toward the "Verified Placement" KPI - spec sections 29 and 70).

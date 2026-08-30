@@ -20,7 +20,7 @@ import useSWR from 'swr';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { CreditCardIcon, ChartIcon, SparklesIcon } from '@/components/icons';
+import { CreditCardIcon } from '@/components/icons';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface BillingData {
@@ -280,11 +280,8 @@ export default function BillingPage() {
   );
 
   // SEC-8 — safe plan display
-  const planDisplay = useMemo(() => {
-    if (!data?.plan) return 'None';
-    const raw = String(data.plan);
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
-  }, [data?.plan]);
+  const rawPlan = data?.plan ? String(data.plan) : '';
+  const planDisplay = rawPlan ? rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1) : 'None';
 
   // C — Print billing summary
   const handlePrint = useCallback(() => window.print(), []);

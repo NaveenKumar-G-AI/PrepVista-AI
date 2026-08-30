@@ -156,22 +156,25 @@ export class ServerSttSession {
   }
 
   private onSocketMessage(ev: MessageEvent) {
-    let msg: any;
+    let parsed: unknown;
     try {
-      msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
+      parsed = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
     } catch {
       return;
     }
-    if (!msg) return;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+    const msg = parsed as Record<string, unknown>;
     if (msg.type === 'final') {
-      const text: string = (msg.final_transcript || '').trim();
+      const text = typeof msg.final_transcript === 'string' ? msg.final_transcript.trim() : '';
       if (this.pendingFinal) {
         const resolve = this.pendingFinal;
         this.pendingFinal = null;
         resolve(text);
       }
     } else if (msg.type === 'error') {
-      this.opts.onError?.(msg.message || 'Could not process audio, please try again.');
+      this.opts.onError?.(
+        typeof msg.message === 'string' ? msg.message : 'Could not process audio, please try again.',
+      );
       if (this.pendingFinal) {
         const resolve = this.pendingFinal;
         this.pendingFinal = null;

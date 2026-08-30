@@ -24,7 +24,7 @@ Instead of relying solely on generic study materials, PrepVista:
 
 User Resume Upload
 → PDF Text Extraction & Parsing
-→ Session Management (SQLite/Supabase)
+→ Session Management (PostgreSQL/Supabase)
 → LLM Processing (Llama-3 via Groq API)
 → Plan-Based Interview Generation
 → Real-Time Question Adaptation
@@ -82,10 +82,19 @@ User Resume Upload
 ```bash
 git clone https://github.com/Devil-nkp/PrepVista-AI.git
 cd PrepVista-AI
-pip install -r requirements.txt
+python -m venv .venv
+# Windows: .venv\Scripts\python -m pip install -r requirements.txt
+# Linux/macOS: .venv/bin/python -m pip install -r requirements.txt
+cd frontend
+npm ci
 ```
 
-Set your environment variables:
+Copy `.env.example` to `.env` for the backend and `frontend/.env.local.example` to
+`frontend/.env.local`. At minimum, configure the database, Supabase auth, one
+LLM provider, and the public backend/frontend URLs. Production validation rejects
+HTTP URLs, wildcard origins/hosts, weak JWT secrets, and debug mode.
+
+Selected variables:
 
 ```bash
 # LLM & API Keys
@@ -113,16 +122,52 @@ RESEND_API_KEY=your_resend_key
 
 # Environment
 ENVIRONMENT=development
-DEBUG=true
+PREPVISTA_DEBUG=true
 ```
 
-Run the application:
+Run both applications:
 
 ```bash
 uvicorn app.main:app --reload
+cd frontend && npm run dev
 ```
 
-Open your browser at `http://localhost:8000`
+Open `http://localhost:3000`. The backend API is at `http://localhost:8000`.
+
+## Production Deployment
+
+The repository includes `render.yaml` for the Dockerized FastAPI service and a
+Next.js production build for Vercel/Render. The backend runs numbered database
+migrations transactionally during startup; `/health/ready` reports ready only
+after startup dependencies are available.
+
+Before the first production deploy:
+
+1. Configure every non-placeholder secret from `.env.example` in the host.
+2. Create private Supabase Storage buckets named `interview-audio` and
+   `offer-documents` (or set the corresponding bucket variables).
+3. Set frontend `NEXT_PUBLIC_API_URL` to the HTTPS backend origin and configure
+   the frontend Supabase public values from `frontend/.env.local.example`.
+4. Keep `WEB_CONCURRENCY × DB_POOL_MAX_SIZE` within the database connection cap.
+5. Require both CI jobs on the deployment branch. CI compiles/tests/audits the
+   backend and lints/typechecks/builds/audits the frontend.
+
+Useful release checks:
+
+```bash
+python -m compileall -q app
+python -m pytest -q
+python -m pip check
+cd frontend
+npm ci
+npm audit --omit=dev
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Do not edit an already-applied numbered migration in a deployed environment.
+Add a new migration instead; startup checksum warnings identify schema drift.
 
 ---
 

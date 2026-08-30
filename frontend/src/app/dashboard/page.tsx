@@ -166,18 +166,19 @@ export default function DashboardPage() {
       return;
     }
 
-    try {
-      const storedSession = sessionStorage.getItem('pv_interview_session');
-      if (!storedSession) {
-        setStoredSessionId(null);
-        return;
-      }
+    const timer = window.setTimeout(() => {
+      try {
+        const storedSession = sessionStorage.getItem('pv_interview_session');
+        if (!storedSession) return;
 
-      const parsed = JSON.parse(storedSession) as { session_id?: string };
-      setStoredSessionId(parsed.session_id || null);
-    } catch {
-      setStoredSessionId(null);
-    }
+        const parsed = JSON.parse(storedSession) as { session_id?: string };
+        setStoredSessionId(parsed.session_id || null);
+      } catch {
+        // Invalid or stale session data is equivalent to no active interview.
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   if (authLoading || (!user && !error)) {

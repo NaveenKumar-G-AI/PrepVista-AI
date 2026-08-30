@@ -137,135 +137,147 @@ async def verify_payment(
         logger.error("razorpay_signature_verification_error", error=str(exc))
         raise HTTPException(status_code=400, detail="Payment verification failed.") from exc
 
+    newly_verified = False
     async with DatabaseConnection() as conn:
-        existing = await conn.fetchrow(
-            """SELECT id, status, plan FROM payments
-               WHERE razorpay_order_id = $1 AND user_id = $2""",
-            razorpay_order_id,
-            user_id,
-        )
+        async with conn.transaction():
+            existing = await conn.fetchrow(
+                """SELECT id, status, plan, razorpay_payment_id, verified_at
+                   FROM payments
+                   WHERE razorpay_order_id = $1 AND user_id = $2
+                   FOR UPDATE""",
+                razorpay_order_id,
+                user_id,
+            )
 
-        if not existing:
-            raise HTTPException(status_code=404, detail="Payment record not found.")
+            if not existing:
+                raise HTTPException(status_code=404, detail="Payment record not found.")
 
-        if existing["status"] == "verified":
-            logger.info("razorpay_payment_already_verified", order_id=razorpay_order_id)
-            return {"status": "already_verified", "plan": existing["plan"]}
+            if existing["status"] == "verified":
+                stored_payment_id = existing["razorpay_payment_id"]
+                if stored_payment_id and stored_payment_id != razorpay_payment_id:
+                    raise HTTPException(status_code=409, detail="Payment ID conflicts with the verified payment.")
+                verified_at = existing["verified_at"] or datetime.now(timezone.utc)
+            elif existing["status"] in ("created", "pending"):
+                newly_verified = True
+                verified_at = datetime.now(timezone.utc)
+                await conn.execute(
+                    """UPDATE payments
+                       SET status = 'verified',
+                           razorpay_payment_id = $1,
+                           razorpay_signature = $2,
+                           verified_at = $5
+                       WHERE razorpay_order_id = $3 AND user_id = $4""",
+                    razorpay_payment_id,
+                    razorpay_signature,
+                    razorpay_order_id,
+                    user_id,
+                    verified_at,
+                )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Payment cannot be verified. Current status: {existing['status']}",
+                )
 
-        if existing["status"] not in ("created", "pending"):
-            raise HTTPException(status_code=400, detail=f"Payment cannot be verified. Current status: {existing['status']}")
+            plan = existing["plan"]
+            await set_entitlement_status(
+                conn,
+                user_id,
+                plan,
+                "active",
+                source_order_id=razorpay_order_id,
+                activated_at=verified_at,
+            )
+            await sync_profile_plan_state(conn, user_id, plan)
 
-        plan = existing["plan"]
-        verified_at = datetime.now(timezone.utc)
+            if newly_verified:
+                await conn.execute(
+                    """UPDATE profiles
+                       SET interviews_used_this_period = 0,
+                           period_start = $2,
+                           updated_at = NOW()
+                       WHERE id = $1""",
+                    user_id,
+                    verified_at,
+                )
+                await conn.execute(
+                    """INSERT INTO usage_events (user_id, event_type, metadata)
+                       VALUES ($1, 'payment_verified', $2)""",
+                    user_id,
+                    json.dumps({
+                        "plan": plan,
+                        "order_id": razorpay_order_id,
+                        "payment_id": razorpay_payment_id,
+                    }),
+                )
 
-        await conn.execute(
-            """UPDATE payments
-               SET status = 'verified',
-                   razorpay_payment_id = $1,
-                   razorpay_signature = $2,
-                   verified_at = $5
-               WHERE razorpay_order_id = $3 AND user_id = $4""",
-            razorpay_payment_id,
-            razorpay_signature,
-            razorpay_order_id,
-            user_id,
-            verified_at,
-        )
+            profile = await conn.fetchrow(
+                "SELECT full_name, email FROM profiles WHERE id = $1",
+                user_id,
+            )
+            if not profile:
+                raise RuntimeError("Payment owner profile no longer exists")
 
-        await set_entitlement_status(
-            conn,
-            user_id,
-            plan,
-            "active",
-            source_order_id=razorpay_order_id,
-            activated_at=verified_at,
-        )
-        await sync_profile_plan_state(conn, user_id, plan)
-        await conn.execute(
-            """UPDATE profiles
-               SET interviews_used_this_period = 0,
-                   period_start = NOW(),
-                   updated_at = NOW()
-               WHERE id = $1""",
-            user_id,
-        )
+            # Recompute exact LTV values so retries never double-count revenue.
+            await conn.execute(
+                """INSERT INTO user_revenue_analytics (
+                       user_id, email, full_name, pro_purchase_count, career_purchase_count,
+                       pro_revenue_paise, career_revenue_paise, total_revenue_paise, last_payment_date
+                   )
+                   SELECT
+                       p.id, p.email, p.full_name,
+                       COUNT(pay.id) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified'),
+                       COUNT(pay.id) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified'),
+                       COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified'), 0),
+                       COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified'), 0),
+                       COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.status = 'verified'), 0),
+                       MAX(pay.created_at) FILTER (WHERE pay.status = 'verified')
+                   FROM profiles p
+                   JOIN payments pay ON pay.user_id = p.id
+                   WHERE p.id = $1
+                   GROUP BY p.id, p.email, p.full_name
+                   ON CONFLICT (user_id) DO UPDATE SET
+                       email = EXCLUDED.email,
+                       full_name = EXCLUDED.full_name,
+                       pro_purchase_count = EXCLUDED.pro_purchase_count,
+                       career_purchase_count = EXCLUDED.career_purchase_count,
+                       pro_revenue_paise = EXCLUDED.pro_revenue_paise,
+                       career_revenue_paise = EXCLUDED.career_revenue_paise,
+                       total_revenue_paise = EXCLUDED.total_revenue_paise,
+                       last_payment_date = EXCLUDED.last_payment_date,
+                       updated_at = NOW()""",
+                user_id,
+            )
 
-        await conn.execute(
-            """INSERT INTO usage_events (user_id, event_type, metadata)
-               VALUES ($1, 'payment_verified', $2)""",
-            user_id,
-            json.dumps({
-                "plan": plan,
-                "order_id": razorpay_order_id,
-                "payment_id": razorpay_payment_id,
-            }),
-        )
-
-        profile = await conn.fetchrow(
-            "SELECT full_name, email FROM profiles WHERE id = $1",
-            user_id,
-        )
-
-        # Upsert exact LTV aggregations into the new analytics table
-        await conn.execute(
-            """INSERT INTO user_revenue_analytics (
-                   user_id, email, full_name, pro_purchase_count, career_purchase_count, 
-                   pro_revenue_paise, career_revenue_paise, total_revenue_paise, last_payment_date
-               )
-               SELECT
-                   p.id as user_id,
-                   p.email,
-                   p.full_name,
-                   COUNT(pay.id) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified') as pro_purchase_count,
-                   COUNT(pay.id) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified') as career_purchase_count,
-                   COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified'), 0) as pro_revenue_paise,
-                   COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified'), 0) as career_revenue_paise,
-                   COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.status = 'verified'), 0) as total_revenue_paise,
-                   MAX(pay.created_at) FILTER (WHERE pay.status = 'verified') as last_payment_date
-               FROM profiles p
-               JOIN payments pay ON pay.user_id = p.id
-               WHERE p.id = $1
-               GROUP BY p.id, p.email, p.full_name
-               ON CONFLICT (user_id) DO UPDATE SET
-                   email = EXCLUDED.email,
-                   full_name = EXCLUDED.full_name,
-                   pro_purchase_count = EXCLUDED.pro_purchase_count,
-                   career_purchase_count = EXCLUDED.career_purchase_count,
-                   pro_revenue_paise = EXCLUDED.pro_revenue_paise,
-                   career_revenue_paise = EXCLUDED.career_revenue_paise,
-                   total_revenue_paise = EXCLUDED.total_revenue_paise,
-                   last_payment_date = EXCLUDED.last_payment_date,
-                   updated_at = NOW()""",
-            user_id
-        )
-
+    result_status = "verified" if newly_verified else "already_verified"
     logger.info("razorpay_payment_verified", order_id=razorpay_order_id, user_id=user_id, plan=plan)
 
-    try:
-        from app.services.email_service import send_admin_payment_notification
+    if newly_verified:
+        try:
+            from app.services.email_service import send_admin_payment_notification
 
-        plan_cfg = PLAN_CONFIG.get(plan, {})
-        await send_admin_payment_notification(
-            user_name=profile["full_name"] or "Unknown",
-            user_email=profile["email"],
-            plan=plan,
-            amount_display=plan_cfg.get("price_display", f"Rs {plan_cfg.get('price_paise', 0) // 100}"),
-            payment_status="verified",
-            razorpay_order_id=razorpay_order_id,
-            razorpay_payment_id=razorpay_payment_id,
-        )
-    except Exception as exc:
-        logger.error("admin_notification_email_failed", error=str(exc))
+            plan_cfg = PLAN_CONFIG.get(plan, {})
+            await send_admin_payment_notification(
+                user_name=profile["full_name"] or "Unknown",
+                user_email=profile["email"],
+                plan=plan,
+                amount_display=plan_cfg.get("price_display", f"Rs {plan_cfg.get('price_paise', 0) // 100}"),
+                payment_status="verified",
+                razorpay_order_id=razorpay_order_id,
+                razorpay_payment_id=razorpay_payment_id,
+            )
+        except Exception as exc:
+            logger.error("admin_notification_email_failed", error=str(exc))
 
     return {
-        "status": "verified",
+        "status": result_status,
         "plan": plan,
         "active_plan": plan,
         "message": f"Payment verified. Your {plan.title()} plan is active for one month.",
     }
 
 
-async def handle_webhook(raw_body: bytes | str, signature: str):
+async def handle_webhook(raw_body: bytes | str, signature: str, event_id: str | None = None):
     """
     Handle Razorpay webhook events. Idempotent - safe to process multiple times.
     Used for reconciliation, NOT as the primary payment verification path.
@@ -300,7 +312,12 @@ async def handle_webhook(raw_body: bytes | str, signature: str):
 
     event_type = payload.get("event", "")
     event_data = payload.get("payload", {})
-    event_id = payload.get("event_id", "")
+    # Razorpay's unique delivery identifier is supplied in the
+    # x-razorpay-event-id header by the router. Direct callers may provide the
+    # signed payload field for compatibility, but production never relies on it.
+    event_id = (event_id or payload.get("event_id") or "").strip()
+    if not event_id or len(event_id) > 200:
+        raise HTTPException(status_code=400, detail="Missing or invalid webhook event ID.")
 
     logger.info("razorpay_webhook_received", event_type=event_type, event_id=event_id)
 
@@ -308,10 +325,10 @@ async def handle_webhook(raw_body: bytes | str, signature: str):
     async with DatabaseConnection() as conn:
         # Layer 1: Global webhook_events table (primary idempotency)
         already_in_webhook = await conn.fetchval(
-            "SELECT event_id FROM webhook_events WHERE event_id = $1",
+            "SELECT processed FROM webhook_events WHERE event_id = $1",
             event_id,
         )
-        if already_in_webhook:
+        if already_in_webhook is True:
             logger.info("webhook_event_already_processed", event_id=event_id)
             return {"status": "already_processed"}
 
@@ -321,6 +338,12 @@ async def handle_webhook(raw_body: bytes | str, signature: str):
             event_id,
         )
         if already_processed is True:
+            await conn.execute(
+                """UPDATE webhook_events
+                   SET processed = TRUE, processed_at = COALESCE(processed_at, now())
+                   WHERE event_id = $1""",
+                event_id,
+            )
             logger.info("webhook_event_already_processed_legacy", event_id=event_id)
             return {"status": "already_processed"}
 
@@ -344,121 +367,176 @@ async def handle_webhook(raw_body: bytes | str, signature: str):
             json.dumps(payload),
         )
 
-    if event_type in ("payment.authorized", "payment.captured"):
+    if event_type == "payment.captured":
         payment_entity = event_data.get("payment", {}).get("entity", {})
         order_id = payment_entity.get("order_id")
         payment_id = payment_entity.get("id")
+        if not order_id or not payment_id:
+            raise HTTPException(status_code=400, detail="Captured payment is missing required identifiers.")
 
-        if order_id:
-            async with DatabaseConnection() as conn:
-                existing = await conn.fetchrow(
-                    "SELECT status FROM payments WHERE razorpay_order_id = $1",
+        async with DatabaseConnection() as conn:
+            async with conn.transaction():
+                payment_row = await conn.fetchrow(
+                    """SELECT user_id, plan, status, razorpay_payment_id, verified_at
+                       FROM payments
+                       WHERE razorpay_order_id = $1 FOR UPDATE""",
                     order_id,
                 )
-                if existing and existing["status"] != "verified":
-                    await conn.execute(
-                        """UPDATE payments
-                           SET status = 'verified',
-                               razorpay_payment_id = $1,
-                               verified_at = NOW()
-                           WHERE razorpay_order_id = $2 AND status != 'verified'""",
-                        payment_id,
-                        order_id,
-                    )
-                    payment_row = await conn.fetchrow(
-                        "SELECT user_id, plan FROM payments WHERE razorpay_order_id = $1",
-                        order_id,
-                    )
-                    if payment_row:
-                        activated_at = _coerce_webhook_time(payment_entity.get("created_at"))
-                        await set_entitlement_status(
-                            conn,
-                            payment_row["user_id"],
-                            payment_row["plan"],
-                            "active",
-                            source_order_id=order_id,
-                            activated_at=activated_at,
-                        )
-                        await sync_profile_plan_state(conn, payment_row["user_id"], payment_row["plan"])
-                        await conn.execute(
-                            """UPDATE profiles
-                               SET interviews_used_this_period = 0,
-                                   period_start = COALESCE($2, NOW()),
-                                   updated_at = NOW()
-                               WHERE id = $1""",
-                            payment_row["user_id"],
-                            activated_at,
-                        )
+                if not payment_row:
+                    logger.warning("webhook_payment_order_not_found", order_id=order_id, event_id=event_id)
+                    raise RuntimeError("Webhook references an unknown payment order")
+                if payment_row["status"] == "verified" and payment_row["razorpay_payment_id"] not in (None, payment_id):
+                    raise RuntimeError("Webhook payment ID conflicts with the verified payment")
+                if payment_row["status"] in ("failed", "expired", "refunded"):
+                    raise RuntimeError(f"Captured payment cannot transition from {payment_row['status']}")
 
-                        # Upsert exact LTV aggregations into the new analytics table upon webhook verified
-                        await conn.execute(
-                            """INSERT INTO user_revenue_analytics (
-                                   user_id, email, full_name, pro_purchase_count, career_purchase_count, 
-                                   pro_revenue_paise, career_revenue_paise, total_revenue_paise, last_payment_date
-                               )
-                               SELECT
-                                   p.id as user_id,
-                                   p.email,
-                                   p.full_name,
-                                   COUNT(pay.id) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified') as pro_purchase_count,
-                                   COUNT(pay.id) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified') as career_purchase_count,
-                                   COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified'), 0) as pro_revenue_paise,
-                                   COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified'), 0) as career_revenue_paise,
-                                   COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.status = 'verified'), 0) as total_revenue_paise,
-                                   MAX(pay.created_at) FILTER (WHERE pay.status = 'verified') as last_payment_date
-                               FROM profiles p
-                               JOIN payments pay ON pay.user_id = p.id
-                               WHERE p.id = $1
-                               GROUP BY p.id, p.email, p.full_name
-                               ON CONFLICT (user_id) DO UPDATE SET
-                                   email = EXCLUDED.email,
-                                   full_name = EXCLUDED.full_name,
-                                   pro_purchase_count = EXCLUDED.pro_purchase_count,
-                                   career_purchase_count = EXCLUDED.career_purchase_count,
-                                   pro_revenue_paise = EXCLUDED.pro_revenue_paise,
-                                   career_revenue_paise = EXCLUDED.career_revenue_paise,
-                                   total_revenue_paise = EXCLUDED.total_revenue_paise,
-                                   last_payment_date = EXCLUDED.last_payment_date,
-                                   updated_at = NOW()""",
-                            payment_row["user_id"]
-                        )
-                    logger.info("webhook_payment_reconciled", order_id=order_id)
+                newly_verified = payment_row["status"] != "verified"
+                activated_at = (
+                    payment_row["verified_at"]
+                    or _coerce_webhook_time(payment_entity.get("created_at"))
+                    or datetime.now(timezone.utc)
+                )
+                await conn.execute(
+                    """UPDATE payments
+                       SET status = 'verified',
+                           razorpay_payment_id = $1,
+                           verified_at = COALESCE(verified_at, $3)
+                       WHERE razorpay_order_id = $2""",
+                    payment_id,
+                    order_id,
+                    activated_at,
+                )
+                await set_entitlement_status(
+                    conn,
+                    payment_row["user_id"],
+                    payment_row["plan"],
+                    "active",
+                    source_order_id=order_id,
+                    activated_at=activated_at,
+                )
+                await sync_profile_plan_state(conn, payment_row["user_id"], payment_row["plan"])
+                if newly_verified:
+                    await conn.execute(
+                        """UPDATE profiles
+                           SET interviews_used_this_period = 0,
+                               period_start = $2,
+                               updated_at = NOW()
+                           WHERE id = $1""",
+                        payment_row["user_id"],
+                        activated_at,
+                    )
+                    await conn.execute(
+                        """INSERT INTO usage_events (user_id, event_type, metadata)
+                           VALUES ($1, 'payment_verified', $2)""",
+                        payment_row["user_id"],
+                        json.dumps({"plan": payment_row["plan"], "order_id": order_id, "payment_id": payment_id}),
+                    )
+
+                await conn.execute(
+                    """INSERT INTO user_revenue_analytics (
+                           user_id, email, full_name, pro_purchase_count, career_purchase_count,
+                           pro_revenue_paise, career_revenue_paise, total_revenue_paise, last_payment_date
+                       )
+                       SELECT
+                           p.id, p.email, p.full_name,
+                           COUNT(pay.id) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified'),
+                           COUNT(pay.id) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified'),
+                           COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'pro' AND pay.status = 'verified'), 0),
+                           COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.plan = 'career' AND pay.status = 'verified'), 0),
+                           COALESCE(SUM(pay.amount_paise) FILTER (WHERE pay.status = 'verified'), 0),
+                           MAX(pay.created_at) FILTER (WHERE pay.status = 'verified')
+                       FROM profiles p
+                       JOIN payments pay ON pay.user_id = p.id
+                       WHERE p.id = $1
+                       GROUP BY p.id, p.email, p.full_name
+                       ON CONFLICT (user_id) DO UPDATE SET
+                           email = EXCLUDED.email,
+                           full_name = EXCLUDED.full_name,
+                           pro_purchase_count = EXCLUDED.pro_purchase_count,
+                           career_purchase_count = EXCLUDED.career_purchase_count,
+                           pro_revenue_paise = EXCLUDED.pro_revenue_paise,
+                           career_revenue_paise = EXCLUDED.career_revenue_paise,
+                           total_revenue_paise = EXCLUDED.total_revenue_paise,
+                           last_payment_date = EXCLUDED.last_payment_date,
+                           updated_at = NOW()""",
+                    payment_row["user_id"],
+                )
+            logger.info("webhook_payment_reconciled", order_id=order_id)
+
+    elif event_type == "payment.authorized":
+        payment_entity = event_data.get("payment", {}).get("entity", {})
+        order_id = payment_entity.get("order_id")
+        payment_id = payment_entity.get("id")
+        if not order_id or not payment_id:
+            raise HTTPException(status_code=400, detail="Authorized payment is missing required identifiers.")
+        async with DatabaseConnection() as conn:
+            result = await conn.execute(
+                """UPDATE payments
+                   SET status = 'pending', razorpay_payment_id = COALESCE($1, razorpay_payment_id)
+                   WHERE razorpay_order_id = $2 AND status IN ('created','pending')""",
+                payment_id, order_id,
+            )
+            if result == "UPDATE 0":
+                known = await conn.fetchval(
+                    "SELECT EXISTS(SELECT 1 FROM payments WHERE razorpay_order_id = $1)", order_id
+                )
+                if not known:
+                    raise RuntimeError("Authorized webhook references an unknown payment order")
 
     elif event_type == "payment.failed":
         payment_entity = event_data.get("payment", {}).get("entity", {})
         order_id = payment_entity.get("order_id")
-        if order_id:
-            async with DatabaseConnection() as conn:
-                await conn.execute(
-                    """UPDATE payments SET status = 'failed'
-                       WHERE razorpay_order_id = $1 AND status IN ('created', 'pending')""",
-                    order_id,
+        if not order_id:
+            raise HTTPException(status_code=400, detail="Failed payment is missing its order identifier.")
+        async with DatabaseConnection() as conn:
+            result = await conn.execute(
+                """UPDATE payments SET status = 'failed'
+                   WHERE razorpay_order_id = $1 AND status IN ('created', 'pending')""",
+                order_id,
+            )
+            if result == "UPDATE 0":
+                known = await conn.fetchval(
+                    "SELECT EXISTS(SELECT 1 FROM payments WHERE razorpay_order_id = $1)", order_id
                 )
+                if not known:
+                    raise RuntimeError("Failed webhook references an unknown payment order")
 
     elif event_type == "refund.processed":
         payment_entity = event_data.get("refund", {}).get("entity", {})
         payment_id = payment_entity.get("payment_id")
-        if payment_id:
-            async with DatabaseConnection() as conn:
+        if not payment_id:
+            raise HTTPException(status_code=400, detail="Refund is missing its payment identifier.")
+        async with DatabaseConnection() as conn:
+            async with conn.transaction():
+                payment_row = await conn.fetchrow(
+                    """SELECT user_id, plan FROM payments
+                       WHERE razorpay_payment_id = $1 FOR UPDATE""",
+                    payment_id,
+                )
+                if not payment_row:
+                    raise RuntimeError("Refund webhook references an unknown payment")
                 await conn.execute(
-                    """UPDATE payments SET status = 'refunded'
+                    """UPDATE payments
+                       SET status = 'refunded', refunded_at = COALESCE(refunded_at, now())
                        WHERE razorpay_payment_id = $1""",
                     payment_id,
                 )
-                payment_row = await conn.fetchrow(
-                    "SELECT user_id, plan FROM payments WHERE razorpay_payment_id = $1",
-                    payment_id,
-                )
-                if payment_row:
-                    await set_entitlement_status(conn, payment_row["user_id"], payment_row["plan"], "refunded")
-                    await sync_profile_plan_state(conn, payment_row["user_id"])
-                    logger.info("refund_processed_plan_downgraded", payment_id=payment_id)
+                await set_entitlement_status(conn, payment_row["user_id"], payment_row["plan"], "refunded")
+                await sync_profile_plan_state(conn, payment_row["user_id"])
+            logger.info("refund_processed_plan_downgraded", payment_id=payment_id)
 
     # ── Mark the event as fully processed (idempotency completion) ──
     async with DatabaseConnection() as conn:
-        await conn.execute(
-            "UPDATE billing_events SET processed = TRUE WHERE provider_event_id = $1",
-            event_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "UPDATE billing_events SET processed = TRUE WHERE provider_event_id = $1",
+                event_id,
+            )
+            await conn.execute(
+                """UPDATE webhook_events
+                   SET processed = TRUE, processed_at = now()
+                   WHERE event_id = $1""",
+                event_id,
+            )
 
     return {"status": "processed"}

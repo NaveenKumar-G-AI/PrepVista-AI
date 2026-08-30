@@ -4,11 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PrepVista — Placement Command Centre</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="/vendor/echarts.min.js"></script>
+<script defer src="/vendor/jspdf.umd.min.js"></script>
+<script defer src="/vendor/html2canvas.min.js"></script>
 <style>
   :root{
     --canvas:#090A0E;--surface-0:#0E1015;--surface-1:#13161D;--surface-2:#191D27;--surface-3:#20252F;
@@ -827,7 +825,7 @@ function renderCurrent(){stopSpeech();disposeAll();AIMETA={};const host=document
   const fb=document.querySelector('.filterbar');if(fb)fb.style.display=isLb?'none':'';
   const vc=document.getElementById('vizCount');if(vc)vc.style.display=isLb?'none':'';
   if(isLb){document.getElementById('viewTitle').textContent=TITLES.leaderboard;
-    host.innerHTML='<iframe src="/scoreboard.html" title="Student Leaderboard" style="width:100%;height:1750px;border:none;display:block;background:#090A0E;border-radius:14px;"></iframe>';
+    host.innerHTML='<iframe src="/scoreboard.html?sample=1" title="Student Leaderboard sample" style="width:100%;height:1750px;border:none;display:block;background:#090A0E;border-radius:14px;"></iframe>';
     return;}
   VIEWS[currentTab](host);
   const pv=deriveFrom(pageList());

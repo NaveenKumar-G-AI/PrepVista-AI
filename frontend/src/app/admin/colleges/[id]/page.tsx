@@ -15,6 +15,94 @@ import { useAuth } from '@/lib/auth-context';
 
 type TabId = 'students' | 'analytics' | 'billing' | 'admins';
 
+interface OrganizationRecord {
+  id: string;
+  name: string;
+  org_code: string;
+  status: string;
+  contact_email: string | null;
+  contact_phone: string | null;
+  plan?: string | null;
+  seat_limit?: number | null;
+}
+
+interface OrganizationAdminRecord {
+  id: string;
+  full_name: string | null;
+  email: string;
+  role: string;
+  status: string;
+  last_login: string | null;
+}
+
+interface OrganizationDetail {
+  organization: OrganizationRecord;
+  admins: OrganizationAdminRecord[];
+  student_count: number;
+  active_access_count: number;
+}
+
+interface StudentRecord {
+  id: string;
+  full_name: string | null;
+  email: string;
+  student_code: string | null;
+  department_name: string | null;
+  year_name: string | null;
+  has_career_access: boolean;
+  added_at: string | null;
+}
+
+interface StudentsResponse {
+  students: StudentRecord[];
+  total: number;
+}
+
+interface DepartmentStatistic {
+  department_name: string;
+  total: number;
+  with_access: number;
+}
+
+interface OrganizationAnalytics {
+  total_students: number;
+  career_access_students: number;
+  department_stats: DepartmentStatistic[];
+  year_stats: Array<{ year_name: string; total: number }>;
+}
+
+interface BillingAllocation {
+  plan: string;
+  seat_limit: number;
+  billing_type: string;
+  amount_paise: number | null;
+  status: string;
+  created_at: string | null;
+}
+
+interface BillingPayment {
+  id: string;
+  amount_paise: number;
+  plan: string;
+  provider: string;
+  status: string;
+  razorpay_payment_id: string | null;
+  notes: string | null;
+  created_at: string | null;
+}
+
+interface OrganizationBilling {
+  organization: OrganizationRecord;
+  total_students: number;
+  career_access_count: number;
+  allocations: BillingAllocation[];
+  payments: BillingPayment[];
+}
+
+interface ActionMessage {
+  message?: string;
+}
+
 function formatDate(v?: string | null) {
   if (!v) return '—';
   const d = new Date(v);
@@ -52,13 +140,13 @@ export default function CollegeDetailPage() {
   const params = useParams();
   const orgId = params.id as string;
   const [tab, setTab] = useState<TabId>('students');
-  const [orgData, setOrgData] = useState<any>(null);
-  const [students, setStudents] = useState<any>(null);
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [billing, setBilling] = useState<any>(null);
+  const [orgData, setOrgData] = useState<OrganizationDetail | null>(null);
+  const [students, setStudents] = useState<StudentsResponse | null>(null);
+  const [analytics, setAnalytics] = useState<OrganizationAnalytics | null>(null);
+  const [billing, setBilling] = useState<OrganizationBilling | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [studentPage, setStudentPage] = useState(1);
+  const studentPage = 1;
   const [showAssignPlan, setShowAssignPlan] = useState(false);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
   const [billingAction, setBillingAction] = useState<string | null>(null);
@@ -68,7 +156,7 @@ export default function CollegeDetailPage() {
 
   const loadOrg = useCallback(async () => {
     try {
-      const res = await api.getOrganization<any>(orgId);
+      const res = await api.getOrganization<OrganizationDetail>(orgId);
       setOrgData(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load college.');
@@ -79,23 +167,29 @@ export default function CollegeDetailPage() {
 
   const loadStudents = useCallback(async () => {
     try {
-      const res = await api.getOrgStudentsAdmin<any>(orgId, `page=${studentPage}&page_size=20`);
+      const res = await api.getOrgStudentsAdmin<StudentsResponse>(orgId, `page=${studentPage}&page_size=20`);
       setStudents(res);
-    } catch { /* silent */ }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load students.');
+    }
   }, [orgId, studentPage]);
 
   const loadAnalytics = useCallback(async () => {
     try {
-      const res = await api.getOrgAnalyticsAdmin<any>(orgId);
+      const res = await api.getOrgAnalyticsAdmin<OrganizationAnalytics>(orgId);
       setAnalytics(res);
-    } catch { /* silent */ }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load analytics.');
+    }
   }, [orgId]);
 
   const loadBilling = useCallback(async () => {
     try {
-      const res = await api.getOrgBillingAdmin<any>(orgId);
+      const res = await api.getOrgBillingAdmin<OrganizationBilling>(orgId);
       setBilling(res);
-    } catch { /* silent */ }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load billing data.');
+    }
   }, [orgId]);
 
   useEffect(() => {
@@ -194,7 +288,7 @@ export default function CollegeDetailPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/[0.04]">
-                      {students.students.map((s: any) => (
+                      {students.students.map((s) => (
                         <tr key={s.id} className="hover:bg-white/[0.02]">
                           <td className="px-6 py-3">
                             <div className="font-semibold text-white">{s.full_name || 'Unnamed'}</div>
@@ -234,7 +328,7 @@ export default function CollegeDetailPage() {
                     <div className="card p-6">
                       <h3 className="text-lg font-semibold text-white mb-4">Department Breakdown</h3>
                       <div className="space-y-3">
-                        {analytics.department_stats.map((d: any) => (
+                        {analytics.department_stats.map((d) => (
                           <div key={d.department_name} className="flex items-center gap-4">
                             <div className="w-40 text-sm text-slate-300 truncate">{d.department_name}</div>
                             <div className="flex-1 h-3 rounded-full bg-slate-800/80 overflow-hidden">
@@ -280,7 +374,7 @@ export default function CollegeDetailPage() {
                         if (!confirm(`Grant Career access to ALL students in this college?`)) return;
                         setBillingAction('grant');
                         try {
-                          const res = await api.grantAllOrgAccess<any>(orgId);
+                          const res = await api.grantAllOrgAccess<ActionMessage>(orgId);
                           setBillingMsg(res.message || 'Access granted.');
                           loadBilling();
                         } catch (err) { setError(err instanceof Error ? err.message : 'Failed.'); }
@@ -294,7 +388,7 @@ export default function CollegeDetailPage() {
                         if (!confirm(`REVOKE Career access from ALL students in this college? They will be set to Free plan.`)) return;
                         setBillingAction('revoke');
                         try {
-                          const res = await api.revokeAllOrgAccess<any>(orgId);
+                          const res = await api.revokeAllOrgAccess<ActionMessage>(orgId);
                           setBillingMsg(res.message || 'Access revoked.');
                           loadBilling();
                         } catch (err) { setError(err instanceof Error ? err.message : 'Failed.'); }
@@ -308,7 +402,7 @@ export default function CollegeDetailPage() {
                         if (!confirm(`REVOKE the entire college plan? This will also remove Career access from all students.`)) return;
                         setBillingAction('revokePlan');
                         try {
-                          const res = await api.revokeOrgPlan<any>(orgId);
+                          const res = await api.revokeOrgPlan<ActionMessage>(orgId);
                           setBillingMsg(res.message || 'Plan revoked.');
                           loadBilling(); loadOrg();
                         } catch (err) { setError(err instanceof Error ? err.message : 'Failed.'); }
@@ -332,7 +426,7 @@ export default function CollegeDetailPage() {
                           e.preventDefault();
                           setBillingAction('assign');
                           try {
-                            const res = await api.assignOrgPlan<any>(orgId, planForm);
+                            const res = await api.assignOrgPlan<ActionMessage>(orgId, planForm);
                             setBillingMsg(res.message || 'Plan assigned.');
                             setShowAssignPlan(false);
                             loadBilling(); loadOrg();
@@ -391,7 +485,7 @@ export default function CollegeDetailPage() {
                           e.preventDefault();
                           setBillingAction('payment');
                           try {
-                            const res = await api.recordOrgPayment<any>(orgId, paymentForm);
+                            const res = await api.recordOrgPayment<ActionMessage>(orgId, paymentForm);
                             setBillingMsg(res.message || 'Payment recorded.');
                             setShowRecordPayment(false);
                             setPaymentForm({ amount_paise: 0, plan: 'college_standard', billing_type: 'annual', notes: '' });
@@ -440,7 +534,7 @@ export default function CollegeDetailPage() {
                             <tr><th className="px-4 py-2">Plan</th><th className="px-4 py-2">Seats</th><th className="px-4 py-2">Billing</th><th className="px-4 py-2">Amount</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Created</th></tr>
                           </thead>
                           <tbody className="divide-y divide-white/[0.04]">
-                            {billing.allocations.map((a: any, i: number) => (
+                            {billing.allocations.map((a, i) => (
                               <tr key={i} className="hover:bg-white/[0.02]">
                                 <td className="px-4 py-2 text-white font-semibold">{a.plan}</td>
                                 <td className="px-4 py-2 text-slate-300">{a.seat_limit}</td>
@@ -468,7 +562,7 @@ export default function CollegeDetailPage() {
                             <tr><th className="px-4 py-2">Amount</th><th className="px-4 py-2">Plan</th><th className="px-4 py-2">Provider</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Payment ID</th><th className="px-4 py-2">Date</th></tr>
                           </thead>
                           <tbody className="divide-y divide-white/[0.04]">
-                            {billing.payments.map((p: any) => (
+                            {billing.payments.map((p) => (
                               <tr key={p.id} className="hover:bg-white/[0.02]">
                                 <td className="px-4 py-2 text-white font-semibold">₹{(p.amount_paise / 100).toFixed(2)}</td>
                                 <td className="px-4 py-2 text-slate-300">{p.plan}</td>
@@ -498,7 +592,7 @@ export default function CollegeDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {admins.map((a: any) => (
+                  {admins.map((a) => (
                     <div key={a.id} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-6 py-4 flex items-center justify-between hover:bg-white/[0.05] transition-colors">
                       <div>
                         <div className="font-semibold text-white">{a.full_name || 'College Admin'}</div>

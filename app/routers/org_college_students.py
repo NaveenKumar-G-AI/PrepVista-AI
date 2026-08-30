@@ -137,10 +137,10 @@ async def add_student(
                     "UPDATE profiles SET org_student = TRUE, organization_id = $1 WHERE id = $2",
                     org_id, user_id,
                 )
-        await _log_action(
-            conn, org_id, admin.user_id, "add_student",
-            student_id=user_id, notes=f"Added {body.email}",
-        )
+            await _log_action(
+                conn, org_id, admin.user_id, "add_student",
+                student_id=user_id, notes=f"Added {body.email}",
+            )
     return {"status": "added", "student": dict(row)}
 
 
@@ -191,14 +191,15 @@ async def update_student(
             raise HTTPException(400, "No fields to update.")
         idx += 1; params.append(student_id)
         idx += 1; params.append(org_id)
-        await conn.execute(
-            f"UPDATE organization_students SET {', '.join(sets)}, updated_at = NOW() WHERE id = ${idx-1} AND organization_id = ${idx}",
-            *params,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "edit_student",
-            student_id=str(existing["user_id"]), notes="Updated student info",
-        )
+        async with conn.transaction():
+            await conn.execute(
+                f"UPDATE organization_students SET {', '.join(sets)}, updated_at = NOW() WHERE id = ${idx-1} AND organization_id = ${idx}",
+                *params,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "edit_student",
+                student_id=str(existing["user_id"]), notes="Updated student info",
+            )
     return {"status": "updated"}
 
 
@@ -238,7 +239,7 @@ async def remove_student(
                     "UPDATE profiles SET org_student = FALSE, organization_id = NULL WHERE id = $1",
                     user_id,
                 )
-        await _log_action(conn, org_id, admin.user_id, "remove_student", student_id=user_id)
+            await _log_action(conn, org_id, admin.user_id, "remove_student", student_id=user_id)
     return {"status": "removed"}
 
 
@@ -277,7 +278,7 @@ async def grant_career_access(
             await conn.execute(
                 "UPDATE profiles SET plan = $1 WHERE id = $2", COLLEGE_STUDENT_PLAN, user_id
             )
-        await _log_action(conn, org_id, admin.user_id, "grant_access", student_id=user_id)
+            await _log_action(conn, org_id, admin.user_id, "grant_access", student_id=user_id)
     return {"status": "granted"}
 
 
@@ -306,7 +307,7 @@ async def revoke_career_access(
                 student_id,
             )
             await conn.execute("UPDATE profiles SET plan = 'free' WHERE id = $1", user_id)
-        await _log_action(conn, org_id, admin.user_id, "revoke_access", student_id=user_id)
+            await _log_action(conn, org_id, admin.user_id, "revoke_access", student_id=user_id)
     return {"status": "revoked"}
 
 
@@ -470,10 +471,10 @@ async def bulk_upload_students(
                 success  += 1
                 available -= 1
 
-        await _log_action(
-            conn, org_id, admin.user_id, "bulk_add",
-            metadata={"success": success, "failed": len(failed), "granted": granted},
-        )
+            await _log_action(
+                conn, org_id, admin.user_id, "bulk_add",
+                metadata={"success": success, "failed": len(failed), "granted": granted},
+            )
 
     return {
         "total_rows":            len(rows),

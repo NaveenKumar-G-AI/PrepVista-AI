@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { AuthHeader } from '@/components/auth-header';
 import { DifficultySelector } from '@/components/difficulty-selector';
 import { PlanSelector } from '@/components/plan-selector';
-import { AlertIcon, BoltIcon, CrownIcon, FileIcon, InfoIcon, LockIcon, MicIcon, ShieldIcon, TargetIcon } from '@/components/icons';
+import { BoltIcon, CrownIcon, FileIcon, InfoIcon, LockIcon, MicIcon, ShieldIcon, TargetIcon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { getLowLimitNotice, getStartInterviewHref, getUsageHeadline, hasRemainingUsage, isUnlimitedUsage } from '@/lib/plan-usage';

@@ -12,7 +12,7 @@ import math
 import re
 import statistics as _stats
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
@@ -170,127 +170,70 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
     cohort_cat_avgs = _cohort_category_averages([_extract_cat_scores(r) for r in perf_rows])
     weakest_3       = _sorted_categories(cohort_cat_avgs, ascending=True)[:3]
 
-    # ── Part 1 Integration: Placement Funnel Summary ──────────────────────────
-    # Reads from placement_outcomes (college_id, placed, company_name).
-    # Wrapped in try/except for graceful degradation on older DB migrations.
-    placement_summary: dict | None = None
-    try:
-        async with DatabaseConnection() as conn:
-            po = await conn.fetchrow(
-                """SELECT
-                     COUNT(*)                              AS total_submissions,
-                     COUNT(*) FILTER (WHERE placed = TRUE)  AS placed_count,
-                     COUNT(DISTINCT company_name)           AS companies_engaged
-                   FROM placement_outcomes
-                   WHERE college_id = $1""",
-                org_id,
-            )
-        if po:
-            total_sub       = int(po["total_submissions"] or 0)
-            placed_count    = int(po["placed_count"] or 0)
-            companies_count = int(po["companies_engaged"] or 0)
-            placement_pct   = round(placed_count / total_sub * 100, 1) if total_sub > 0 else None
-            placement_summary = {
-                "total_submissions":    total_sub,
-                "placed_count":         placed_count,
-                "companies_engaged":    companies_count,
-                "placement_percentage": placement_pct,
-            }
-    except Exception:
-        placement_summary = None
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+    async with DatabaseConnection() as conn:
+        po = await conn.fetchrow(
+            """SELECT
+                 COUNT(*) AS total_submissions,
+                 COUNT(*) FILTER (WHERE placed = TRUE) AS placed_count,
+                 COUNT(DISTINCT company_name) AS companies_engaged
+               FROM placement_outcomes
+               WHERE college_id = $1""",
+            org_id,
+        )
+        recruiter_counts = await conn.fetchrow(
+            """SELECT
+                 COUNT(*) AS companies,
+                 COUNT(*) FILTER (WHERE relationship_stage NOT IN ('PROSPECT','INACTIVE')) AS active_relationships,
+                 COUNT(*) FILTER (WHERE relationship_stage = 'REPEAT_RECRUITER') AS repeat_recruiters,
+                 COUNT(*) FILTER (WHERE created_at >= $2) AS new_last_30d
+               FROM recruiter_companies
+               WHERE organization_id = $1 AND status = 'ACTIVE'""",
+            org_id, thirty_days_ago,
+        )
+        followup_counts = await conn.fetchrow(
+            """SELECT
+                 COUNT(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS')) AS open_followups,
+                 COUNT(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS') AND due_at < $2) AS overdue_followups
+               FROM recruiter_followups WHERE organization_id = $1""",
+            org_id, now,
+        )
+        drive_counts = await conn.fetchrow(
+            """SELECT
+                 COUNT(*) AS total_drives,
+                 COUNT(*) FILTER (WHERE status = 'DRAFT') AS draft_count,
+                 COUNT(*) FILTER (WHERE status = 'APPLICATIONS_OPEN') AS open_count,
+                 COUNT(*) FILTER (WHERE status = 'IN_PROGRESS') AS in_progress_count,
+                 COUNT(*) FILTER (WHERE status = 'COMPLETED') AS completed_count
+               FROM placement_drives
+               WHERE organization_id = $1 AND status != 'ARCHIVED'""",
+            org_id,
+        )
 
-    # ── Part 2 Integration: Recruiter Pulse ───────────────────────────────────
-    # Live counts from recruiter_companies and recruiter_followups.
-    # Graceful degradation when migration 025 hasn't been applied yet.
-    from datetime import datetime, timezone as _tz
-    recruiter_pulse: dict | None = None
-    try:
-        _now_ts = datetime.now(_tz.utc).isoformat()
-        _30d_ago = datetime.now(_tz.utc).replace(
-            day=max(1, datetime.now(_tz.utc).day - 30)
-        ).isoformat()
-        async with DatabaseConnection() as conn:
-            _rc = await conn.fetchrow(
-                """SELECT
-                     COUNT(*)                                                                         AS companies,
-                     COUNT(*) FILTER (WHERE relationship_stage NOT IN ('PROSPECT','INACTIVE'))        AS active_relationships,
-                     COUNT(*) FILTER (WHERE relationship_stage = 'REPEAT_RECRUITER')                 AS repeat_recruiters,
-                     COUNT(*) FILTER (WHERE created_at >= $2)                                        AS new_last_30d
-                   FROM recruiter_companies
-                   WHERE organization_id = $1 AND status = 'ACTIVE'""",
-                org_id, _30d_ago,
-            )
-            _fu = await conn.fetchrow(
-                """SELECT
-                     COUNT(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS'))                        AS open_followups,
-                     COUNT(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS') AND due_at < $2)        AS overdue_followups
-                   FROM recruiter_followups WHERE organization_id = $1""",
-                org_id, _now_ts,
-            )
-        recruiter_pulse = {
-            "companies":                  int(_rc["companies"] or 0),
-            "active_relationships":       int(_rc["active_relationships"] or 0),
-            "open_followups":             int(_fu["open_followups"] or 0),
-            "overdue_followups":          int(_fu["overdue_followups"] or 0),
-            "new_relationships_last_30d": int(_rc["new_last_30d"] or 0),
-            "repeat_recruiters":          int(_rc["repeat_recruiters"] or 0),
-        }
-    except Exception:
-        recruiter_pulse = None
-
-    # ── Part 3 Integration: Drives Summary ────────────────────────────────────
-    # Live KPI counts from placement_drives.
-    # Graceful degradation when migration 026 hasn't been applied yet.
-    drives_summary: dict | None = None
-    try:
-        async with DatabaseConnection() as conn:
-            _ds = await conn.fetchrow(
-                """SELECT
-                     COUNT(*)                                              AS total_drives,
-                     COUNT(*) FILTER (WHERE status = 'DRAFT')             AS draft_count,
-                     COUNT(*) FILTER (WHERE status = 'APPLICATIONS_OPEN') AS open_count,
-                     COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')       AS in_progress_count,
-                     COUNT(*) FILTER (WHERE status = 'COMPLETED')         AS completed_count
-                   FROM placement_drives
-                   WHERE organization_id = $1 AND status != 'ARCHIVED'""",
-                org_id,
-            )
-        drives_summary = {
-            "total_drives":      int(_ds["total_drives"] or 0),
-            "draft_count":       int(_ds["draft_count"] or 0),
-            "open_count":        int(_ds["open_count"] or 0),
-            "in_progress_count": int(_ds["in_progress_count"] or 0),
-            "completed_count":   int(_ds["completed_count"] or 0),
-        }
-    except Exception:
-        drives_summary = None
-
-    # ── Part 8 Integration: Readiness Intelligence (TPO Command Centre) ────────
-    # These fields correspond to the Part 8 analytics modules (zero-offer risk, pacing, etc).
-    # Since Part 8 is a demo implementation, we provide realistic stubs that map gracefully.
-    pacing = { "currentPct": 25, "baselinePct": 56.6, "deltaPts": -31.6 }
-    riskCounts = { "critical": 2, "high": 2, "medium": 5, "none": 3 }
-    package_data = {
-        "avgLPA": 26.3,
-        "medianLPA": 33,
-        "highestLPA": 38,
-        "lowestLPA": 8,
-        "byDept": [
-            { "dept": "CSE", "avgLPA": 38 },
-            { "dept": "ECE", "avgLPA": 33 },
-            { "dept": "MECH", "avgLPA": 8 },
-        ]
+    total_submissions = int(po["total_submissions"] or 0)
+    placed_count = int(po["placed_count"] or 0)
+    placement_summary = {
+        "total_submissions": total_submissions,
+        "placed_count": placed_count,
+        "companies_engaged": int(po["companies_engaged"] or 0),
+        "placement_percentage": round(placed_count / total_submissions * 100, 1) if total_submissions else None,
     }
-    drives_table = [
-        { "company": "Amazon", "tier": "DREAM", "ctc": 33, "applied": 1, "offered": 1, "conversionPct": 100, "deadlineDays": 2 },
-        { "company": "Deloitte", "tier": "CORE", "ctc": 12, "applied": 1, "offered": 0, "conversionPct": 0, "deadlineDays": 3 },
-        { "company": "L&T", "tier": "CORE", "ctc": 8, "applied": 1, "offered": 1, "conversionPct": 100, "deadlineDays": 5 },
-    ]
-    action_queue = [
-        { "priority": "CRITICAL", "type": "Zero-offer risk", "id": "STU-4471", "action": "Proactively match against active drives.", "evidence": ["2 applications, 2 rejections", "inactive 35 days"] },
-        { "priority": "HIGH", "type": "High readiness risk", "id": "STU-1190", "action": "Review risk and assign an intervention.", "evidence": ["no recent assessment", "no application activity"] },
-        { "priority": "MEDIUM", "type": "Drive deadline", "id": "Deloitte", "action": "Finalize eligibility list — closes in 3 days.", "evidence": [] },
-    ]
+    recruiter_pulse = {
+        "companies": int(recruiter_counts["companies"] or 0),
+        "active_relationships": int(recruiter_counts["active_relationships"] or 0),
+        "open_followups": int(followup_counts["open_followups"] or 0),
+        "overdue_followups": int(followup_counts["overdue_followups"] or 0),
+        "new_relationships_last_30d": int(recruiter_counts["new_last_30d"] or 0),
+        "repeat_recruiters": int(recruiter_counts["repeat_recruiters"] or 0),
+    }
+    drives_summary = {
+        "total_drives": int(drive_counts["total_drives"] or 0),
+        "draft_count": int(drive_counts["draft_count"] or 0),
+        "open_count": int(drive_counts["open_count"] or 0),
+        "in_progress_count": int(drive_counts["in_progress_count"] or 0),
+        "completed_count": int(drive_counts["completed_count"] or 0),
+    }
 
     return {
         # ── Existing fields (preserved verbatim) ──────────────────────────────
@@ -316,11 +259,6 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
         # ── Part 2: recruiter_pulse ───────────────────────────────────────────
         "recruiter_pulse": recruiter_pulse,
         "drives_summary": drives_summary,
-        "pacing": pacing,
-        "riskCounts": riskCounts,
-        "package": package_data,
-        "drives": drives_table,
-        "actionQueue": action_queue,
     }
 
 
@@ -1463,17 +1401,137 @@ def _cc_turn_outcome(answer_status: Any, classification: Any) -> str:
     return "Answered"
 
 
-def _cc_session_forensics(sess: list, evals_by_session: dict) -> tuple:
+def _cc_percentile_histories(by_user: dict[str, list]) -> dict[str, list[int]]:
+    """Return each student's real percentile at each interview ordinal.
+
+    Session 1 is compared with every other student's session 1, session 2 with
+    every session 2, and so on.  This avoids drawing interpolated or randomized
+    percentile journeys in the live dashboard.
+    """
+    max_sessions = max((len(rows) for rows in by_user.values()), default=0)
+    ordinal_pools: list[list[float]] = []
+    for ordinal in range(max_sessions):
+        ordinal_pools.append(
+            sorted(
+                float(rows[ordinal]["final_score"] or 0)
+                for rows in by_user.values()
+                if len(rows) > ordinal
+            )
+        )
+
+    histories: dict[str, list[int]] = {}
+    for user_id, rows in by_user.items():
+        values: list[int] = []
+        for ordinal, row in enumerate(rows):
+            score = float(row["final_score"] or 0)
+            pool = ordinal_pools[ordinal]
+            if len(pool) <= 1:
+                values.append(50)
+                continue
+            below = sum(value < score for value in pool)
+            equal = sum(value == score for value in pool)
+            mid_rank = below + ((equal - 1) / 2)
+            values.append(round(mid_rank / (len(pool) - 1) * 100))
+        histories[user_id] = values
+    return histories
+
+
+def _cc_tier_for_sessions(sess: list) -> tuple[str, bool]:
+    """Apply the same readiness rule used by the current student cards."""
+    if not sess:
+        return "At Risk", True
+    first_score = float(sess[0]["final_score"] or 0)
+    latest_score = float(sess[-1]["final_score"] or 0)
+    slope = (
+        (latest_score - first_score) / (len(sess) - 1)
+        if len(sess) > 1
+        else 0
+    )
+    stuck = len(sess) >= 3 and slope <= 0.35
+    if latest_score >= 76:
+        tier = "Ready"
+    elif latest_score >= 66:
+        tier = "Almost"
+    elif latest_score >= 52 and not stuck:
+        tier = "Developing"
+    else:
+        tier = "At Risk"
+    return tier, tier == "At Risk" or (stuck and latest_score < 60)
+
+
+def _cc_cohort_history(roster: list, by_user: dict[str, list], now: datetime) -> dict:
+    """Build twelve real weekly cohort snapshots from persisted sessions."""
+    current_week = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    starts = [current_week - timedelta(weeks=offset) for offset in range(11, -1, -1)]
+    labels: list[str] = []
+    readiness: list[float | None] = []
+    interviews: list[int] = []
+    at_risk: list[int] = []
+
+    for start in starts:
+        end = min(start + timedelta(weeks=1), now + timedelta(microseconds=1))
+        labels.append(start.strftime("%d %b"))
+        snapshot_scores: list[float] = []
+        snapshot_risk = 0
+        weekly_interviews = 0
+        for student in roster:
+            enrolled_at = student["enrolled_at"]
+            if enrolled_at and enrolled_at >= end:
+                continue
+            sessions = [
+                row for row in by_user.get(str(student["user_id"]), [])
+                if row["created_at"] and row["created_at"] < end
+            ]
+            weekly_interviews += sum(
+                1 for row in sessions
+                if row["created_at"] and start <= row["created_at"] < end
+            )
+            if sessions:
+                snapshot_scores.append(float(sessions[-1]["final_score"] or 0))
+            _, is_at_risk = _cc_tier_for_sessions(sessions)
+            if is_at_risk:
+                snapshot_risk += 1
+        readiness.append(
+            round(sum(snapshot_scores) / len(snapshot_scores), 1)
+            if snapshot_scores else None
+        )
+        interviews.append(weekly_interviews)
+        at_risk.append(snapshot_risk)
+
+    return {
+        "labels": labels,
+        "readiness": readiness,
+        "interviews": interviews,
+        "atRisk": at_risk,
+    }
+
+
+def _cc_session_forensics(
+    sess: list, evals_by_session: dict, percentile_history: list[int]
+) -> tuple:
     """Build the dashboard's per-student deep-dive (``det``) and single-session
-    forensics (``ses``) from real ``question_evaluations`` rows. Returns
-    ``(det, ses)`` or ``(None, None)`` when the student has no per-turn evaluation
-    data yet, in which case the client falls back to its deterministic seed."""
+    forensics (``ses``) from real ``question_evaluations`` rows. ``ses`` is
+    ``None`` when per-question evaluation data is unavailable.  The
+    student detail still contains real score/percentile history and never falls
+    back to generated values on the client."""
     scored = [s for s in sess if evals_by_session.get(str(s["id"]))]
-    if not scored:
-        return None, None
 
     # hist: final score of every finished session, chronological, clamped to chart range
-    hist = [max(20, min(99, round(float(s["final_score"] or 0)))) for s in sess] or [0]
+    hist = [max(0, min(100, round(float(s["final_score"] or 0)))) for s in sess] or [0]
+
+    if not scored:
+        return {
+            "hist": hist,
+            "sub": {"Relevance": 0, "Clarity": 0, "Specificity": 0, "Structure": 0},
+            "comp": {"Clarifications": 0, "Timeouts": 0, "Silences": 0, "Skips": 0, "Cutoffs": 0},
+            "rt": [],
+            "pj": percentile_history,
+            "covered": [],
+            "n": len(hist),
+            "hasTurnData": False,
+        }, None
 
     latest = scored[-1]
     latest_turns = evals_by_session[str(latest["id"])]
@@ -1522,7 +1580,36 @@ def _cc_session_forensics(sess: list, evals_by_session: dict) -> tuple:
         if t["answer_duration_seconds"] is not None
     ]
 
-    det = {"hist": hist, "sub": sub, "comp": comp, "rt": rt, "covered": covered, "n": len(hist)}
+    answers = []
+    for turn in latest_turns:
+        said = (
+            (turn["repaired_answer"] or "").strip()
+            or (turn["normalized_answer"] or "").strip()
+            or (turn["raw_answer"] or "").strip()
+        )
+        question = (turn["question_text"] or "").strip()
+        if not question or not said:
+            continue
+        answers.append({
+            "question": question,
+            "said": said,
+            "ideal": (turn["ideal_answer"] or "").strip(),
+            "good": (turn["what_worked"] or "").strip(),
+            "bad": (turn["what_was_missing"] or "").strip(),
+        })
+        if len(answers) == 2:
+            break
+
+    det = {
+        "hist": hist,
+        "sub": sub,
+        "comp": comp,
+        "rt": rt,
+        "pj": percentile_history,
+        "covered": covered,
+        "n": len(hist),
+        "hasTurnData": True,
+    }
 
     # ses: turn-by-turn forensics of the latest scored session
     turns = [
@@ -1530,13 +1617,13 @@ def _cc_session_forensics(sess: list, evals_by_session: dict) -> tuple:
             "i": int(t["turn_number"]),
             "fam": _cc_fam(t["rubric_category"]),
             "st": _cc_turn_outcome(t["answer_status"], t["classification"]),
-            "score": max(20, min(99, round(float(t["score"] or 0) * 10))),
+            "score": max(0, min(100, round(float(t["score"] or 0) * 10))),
             "rt": (round(float(t["answer_duration_seconds"]))
                    if t["answer_duration_seconds"] is not None else 0),
         }
         for t in latest_turns
     ]
-    ses = {"turns": turns}
+    ses = {"turns": turns, "answers": answers}
     return det, ses
 
 
@@ -1546,10 +1633,21 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         org = await conn.fetchrow(
-            "SELECT name, seat_limit FROM organizations WHERE id = $1", org_id
+            """SELECT name, seat_limit, access_expiry, plan
+               FROM organizations WHERE id = $1""",
+            org_id,
+        )
+        allocation = await conn.fetchrow(
+            """SELECT amount_paise, billing_type, start_date, end_date
+               FROM org_plan_allocations
+               WHERE organization_id = $1 AND status = 'active'
+               ORDER BY created_at DESC
+               LIMIT 1""",
+            org_id,
         )
         roster = await conn.fetch(
-            """SELECT os.user_id, p.full_name, p.email, cd.department_name
+            """SELECT os.user_id, os.created_at AS enrolled_at,
+                      p.full_name, p.email, cd.department_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
                LEFT JOIN college_departments cd ON cd.id = os.department_id
@@ -1573,7 +1671,9 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             session_ids = [s["id"] for s in session_rows]
             if session_ids:
                 eval_rows = await conn.fetch(
-                    """SELECT session_id, turn_number, rubric_category, classification,
+                    """SELECT session_id, turn_number, rubric_category, question_text,
+                              raw_answer, normalized_answer, repaired_answer, ideal_answer,
+                              what_worked, what_was_missing, classification,
                               answer_status, score, relevance_score, clarity_score,
                               specificity_score, structure_score, answer_duration_seconds
                        FROM question_evaluations
@@ -1591,6 +1691,8 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
         evals_by_session.setdefault(str(e["session_id"]), []).append(e)
 
     now = datetime.now(timezone.utc)
+    percentile_histories = _cc_percentile_histories(by_user)
+    cohort_history = _cc_cohort_history(roster, by_user, now)
     students: list[dict] = []
     depts_seen: dict[str, bool] = {}
 
@@ -1611,7 +1713,11 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             first_score = round(f_final)
             latest_score = round(l_final)
             n_sess = len(sess)
-            slope = round((latest_score - first_score) / max(2, n_sess) * 3, 2)
+            slope = round(
+                (latest_score - first_score) / (n_sess - 1)
+                if n_sess > 1 else 0,
+                2,
+            )
             stuck = n_sess >= 3 and slope <= 0.35
             if latest_score >= 76:
                 tier = "Ready"
@@ -1629,7 +1735,7 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
                 if (slope > 0.2 and latest_score < 76)
                 else None
             )
-            target_role = last["target_role"] or "Software Engineer"
+            target_role = (last["target_role"] or "").strip() or None
         else:
             skills_first = {sk: 0 for sk in _CC_SKILLS}
             skills_now = dict(skills_first)
@@ -1639,14 +1745,18 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             stuck = False
             tier = "At Risk"
             at_risk = True
-            last_active = 90
+            enrolled_at = r["enrolled_at"]
+            last_active = max(0, (now - enrolled_at).days) if enrolled_at else 0
             stt = None
-            target_role = "Software Engineer"
+            target_role = None
+
+        percentile_history = percentile_histories.get(uid, [])
 
         student = {
             "id": idx,
             "name": name,
             "dept": dept,
+            "enrolledAt": r["enrolled_at"],
             "sessions": n_sess,
             "started": started,
             "skillsFirst": skills_first,
@@ -1660,22 +1770,43 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             "lastActive": last_active,
             "stt": stt,
             "targetRole": target_role,
-            "inferredRole": target_role,
+            "pctHistory": percentile_history,
+            "scoreHistory": [
+                {"at": session["created_at"], "score": round(float(session["final_score"] or 0), 1)}
+                for session in sess
+            ],
         }
-        # Real per-turn forensics where we have evaluation data; otherwise the
-        # client keeps its deterministic seed for det()/sessionOf().
         if started:
-            det, ses = _cc_session_forensics(sess, evals_by_session)
-            if det is not None:
-                student["det"] = det
+            det, ses = _cc_session_forensics(
+                sess, evals_by_session, percentile_history
+            )
+            student["det"] = det
+            student["sessionLengths"] = [
+                len(evals_by_session.get(str(session["id"]), []))
+                for session in sess
+                if evals_by_session.get(str(session["id"]))
+            ]
+            if ses is not None:
                 student["ses"] = ses
         students.append(student)
+
+    annual_fee = None
+    if allocation and allocation["amount_paise"] is not None:
+        annual_fee = round(float(allocation["amount_paise"]) / 100, 2)
+    renewal_date = (
+        allocation["end_date"] if allocation and allocation["end_date"]
+        else (org["access_expiry"] if org else None)
+    )
 
     return {
         "college": (org["name"] if org and org["name"] else "Your Institution"),
         "batch": "All students",
         "seats": (org["seat_limit"] if org and org["seat_limit"] else len(roster)),
-        "annualFee": 100000,
+        "annualFee": annual_fee,
+        "billingType": allocation["billing_type"] if allocation else None,
+        "cycleStart": allocation["start_date"] if allocation else None,
+        "renewalDate": renewal_date,
+        "history": cohort_history,
         "depts": [{"code": d, "name": d} for d in depts_seen],
         "students": students,
     }
@@ -1745,26 +1876,24 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
 
         if started:
             first, last = sess[0], sess[-1]
-            first_score = round(float(first["final_score"] or 0))
-            latest_score = round(float(last["final_score"] or 0))
+            first_value = float(first["final_score"] or 0)
+            latest_value = float(last["final_score"] or 0)
+            latest_score = round(latest_value)
             n_sess = len(sess)
-            slope = round((latest_score - first_score) / max(2, n_sess) * 3, 2)
-            if latest_score >= 76:
-                tier = "Ready"
-            elif latest_score >= 66:
-                tier = "Almost"
-            elif latest_score >= 52:
-                tier = "Developing"
-            else:
-                tier = "At Risk"
+            slope = round(
+                (latest_value - first_value) / (n_sess - 1)
+                if n_sess > 1 else 0,
+                2,
+            )
+            tier, _ = _cc_tier_for_sessions(sess)
             score: int | None = latest_score
-            target_role = last["target_role"] or "Software Engineer"
+            target_role = (last["target_role"] or "").strip() or None
         else:
             n_sess = 0
             slope = 0
             tier = "Not started"
             score = None
-            target_role = "Software Engineer"
+            target_role = None
 
         students.append({
             "id": idx,

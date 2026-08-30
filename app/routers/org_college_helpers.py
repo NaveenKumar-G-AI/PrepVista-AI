@@ -706,23 +706,19 @@ async def _log_action(
     conn, org_id, admin_id, action, *,
     student_id=None, entity_type=None, entity_id=None, notes=None, metadata=None,
 ):
-    """Write an audit log entry that never blocks or fails the calling operation.
+    """Write an audit entry in the caller's transaction.
 
-    ✅ FIXED: Wrapped in try/except — previously an audit log INSERT failure
-    would propagate up and roll back the actual operation (add_student, etc.).
-    The audit log must never block or undo a real business action.
+    Audit persistence is part of the operation's integrity contract: a write
+    must roll back if its mandatory audit record cannot be stored.
     """
-    try:
-        await conn.execute(
-            """INSERT INTO organization_access_log
-               (organization_id, admin_user_id, student_user_id, action,
-                entity_type, entity_id, notes, metadata)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)""",
-            org_id, admin_id, student_id, action, entity_type, entity_id, notes,
-            json.dumps(metadata) if metadata else "{}",
-        )
-    except Exception:
-        pass  # Swallow silently — audit failure must never affect the user-facing response
+    await conn.execute(
+        """INSERT INTO organization_access_log
+           (organization_id, admin_user_id, student_user_id, action,
+            entity_type, entity_id, notes, metadata)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)""",
+        org_id, admin_id, student_id, action, entity_type, entity_id, notes,
+        json.dumps(metadata) if metadata else "{}",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

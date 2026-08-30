@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
 
 import { AuthHeader } from '@/components/auth-header';
-import { ChartIcon, CreditCardIcon, FeedbackIcon, GiftIcon, ShieldIcon, UserIcon } from '@/components/icons';
+import { CreditCardIcon, FeedbackIcon, GiftIcon, ShieldIcon, UserIcon } from '@/components/icons';
 import { api, ApiAdminLaunchOfferItem, ApiAdminOverview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -297,8 +298,8 @@ function GrantsSection({ data, loadOverview }: { data: ApiAdminOverview | null, 
       const res = await api.grantAdminAccess(selectedUserId, model, value, action);
       setSuccess(res.message || 'Grant applied successfully.');
       await loadOverview();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to apply grant.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to apply grant.');
     } finally {
       setLoading(false);
     }
@@ -391,9 +392,26 @@ function GrantsSection({ data, loadOverview }: { data: ApiAdminOverview | null, 
 }
 
 function SupportChatSection() {
-  const [users, setUsers] = useState<any[]>([]);
+  interface SupportUser {
+    id: string;
+    email: string;
+    last_message_at: string | null;
+    unread_count: number;
+  }
+  interface SupportMessage {
+    id: string;
+    sender_role: 'admin' | 'user';
+    content: string;
+    attachment_data: string | null;
+    created_at: string;
+  }
+  interface SupportUsersResponse { users: SupportUser[] }
+  interface SupportThreadResponse { messages: SupportMessage[] }
+  interface SupportReplyResponse { message: SupportMessage }
+
+  const [users, setUsers] = useState<SupportUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [thread, setThread] = useState<any[]>([]);
+  const [thread, setThread] = useState<SupportMessage[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
@@ -402,27 +420,27 @@ function SupportChatSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
-      const res: any = await api.getAdminSupportUsers();
+      const res = await api.getAdminSupportUsers<SupportUsersResponse>();
       setUsers(res.users || []);
     } catch (err) {
       console.error('Failed to load support users:', err);
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   useEffect(() => {
     const fetchThread = async () => {
       if (!selectedUserId) return;
       setLoadingThread(true);
       try {
-        const res: any = await api.getAdminSupportThread(selectedUserId);
+        const res = await api.getAdminSupportThread<SupportThreadResponse>(selectedUserId);
         setThread(res.messages || []);
       } catch (err) {
         console.error('Failed to load user thread:', err);
@@ -464,6 +482,10 @@ function SupportChatSection() {
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
           const compressedBase64 = canvas.toDataURL("image/jpeg", 0.6);
+          if (compressedBase64.length > 500_000) {
+            alert('The compressed image is still too large. Choose a smaller image.');
+            return;
+          }
           setBase64Image(compressedBase64);
         }
       };
@@ -478,7 +500,7 @@ function SupportChatSection() {
 
     setSending(true);
     try {
-      const res: any = await api.sendAdminSupportReply(selectedUserId, text, base64Image);
+      const res = await api.sendAdminSupportReply<SupportReplyResponse>(selectedUserId, text, base64Image);
       setThread(prev => [...prev, res.message]);
       setText('');
       setBase64Image(null);
@@ -567,11 +589,14 @@ function SupportChatSection() {
                             {isAdmin ? 'Admin (You)' : 'User'}
                           </div>
                           {m.attachment_data && (
-                            <img 
-                              src={m.attachment_data} 
-                              alt="Attachment" 
-                              className="mb-2 max-h-64 rounded-lg object-contain"
-                            />
+                            <NextImage
+                               src={m.attachment_data}
+                               alt="Attachment"
+                               width={512}
+                               height={256}
+                               unoptimized
+                               className="mb-2 max-h-64 rounded-lg object-contain"
+                             />
                           )}
                           {m.content && <div className="whitespace-pre-wrap">{m.content}</div>}
                         </div>
@@ -604,6 +629,7 @@ function SupportChatSection() {
                   <textarea
                     rows={2}
                     value={text}
+                    maxLength={5000}
                     onChange={e => setText(e.target.value)}
                     placeholder="Type official reply..."
                     className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -661,7 +687,7 @@ function UsersSection({ data }: { data: ApiAdminOverview | null }) {
 
       return false;
     });
-  }, [data?.users, searchQuery]);
+  }, [data, searchQuery]);
 
   return (
     <div className="fade-in">

@@ -9,7 +9,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { api, ApiUser } from '@/lib/api';
+import { api, ApiUser, AUTH_REQUIRED_EVENT } from '@/lib/api';
 import { deriveUsageForPlan } from '@/lib/plan-usage';
 import { getSupabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -147,6 +147,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
   }, [refreshUser]);
+
+  useEffect(() => {
+    const handleAuthenticationRequired = () => {
+      userRef.current = null;
+      setUser(null);
+      setLoading(false);
+      router.replace('/login');
+    };
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthenticationRequired);
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthenticationRequired);
+  }, [router]);
 
   useEffect(() => {
     // Prevent double-init in React StrictMode

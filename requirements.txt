@@ -21,13 +21,14 @@ groq==0.11.0
 openai==1.50.0
 
 # ── Razorpay Billing ────────────────
-setuptools<82.0.0          # razorpay uses pkg_resources (removed from Python 3.12 stdlib)
-razorpay==1.4.2
+# Razorpay 2.x no longer requires the vulnerable legacy pkg_resources path.
+setuptools==84.0.0
+razorpay==2.0.1
 
 # ── PDF Processing ──────────────────
 # pypdf/pdfminer parse user-uploaded resumes — bumped to clear a large set of
 # malicious-PDF CVEs (DoS / quadratic blowup / infinite loop on crafted files).
-pypdf==6.13.2
+pypdf==6.16.2
 pdfplumber==0.11.10
 pdfminer.six==20260107    # pinned explicitly (pdfplumber dep): clears CVE-2025-64512/70559
 fpdf2==2.8.1
@@ -41,7 +42,7 @@ fpdf2==2.8.1
 python-docx==1.1.2
 pytesseract==0.3.13
 pdf2image==1.17.0
-Pillow==12.2.0            # must satisfy pdfplumber>=12.2.0 (see line 31); pytesseract/pdf2image have no upper bound
+Pillow==12.3.0            # patched image decoders; satisfies pdfplumber/pytesseract/pdf2image
 
 # ── Logging ─────────────────────────
 structlog==24.4.0

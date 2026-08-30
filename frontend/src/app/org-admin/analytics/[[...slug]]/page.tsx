@@ -17,7 +17,16 @@ interface CommandCentrePayload {
   college: string;
   batch: string;
   seats: number;
-  annualFee: number;
+  annualFee: number | null;
+  billingType: string | null;
+  cycleStart: string | null;
+  renewalDate: string | null;
+  history: {
+    labels: string[];
+    readiness: Array<number | null>;
+    interviews: number[];
+    atRisk: number[];
+  };
   depts: Array<{ code: string; name: string }>;
   students: unknown[];
 }
@@ -36,15 +45,40 @@ export default function AnalyticsCommandCentrePage() {
     const trySend = () => {
       const win = iframeRef.current?.contentWindow;
       if (win && readyRef.current && dataRef.current) {
-        win.postMessage({ __pvcc: 'load', payload: dataRef.current }, '*');
+        win.postMessage({ __pvcc: 'load', payload: dataRef.current }, window.location.origin);
       }
     };
 
     // The embedded dashboard posts {__pvcc:'ready'} once its script has run.
     const onMessage = (e: MessageEvent) => {
-      if (e?.data && e.data.__pvcc === 'ready') {
+      const trusted = (
+        (e.origin === 'null' || e.origin === window.location.origin)
+        && e.source === iframeRef.current?.contentWindow
+        && e?.data
+      );
+      if (!trusted) return;
+      if (e.data.__pvcc === 'ready') {
         readyRef.current = true;
         trySend();
+        return;
+      }
+      if (
+        e.data.__pvcc === 'download'
+        && e.data.bytes instanceof ArrayBuffer
+        && e.data.bytes.byteLength <= 100 * 1024 * 1024
+      ) {
+        const filename = String(e.data.filename || 'PrepVista_Placement_Report.pdf')
+          .replace(/[^a-zA-Z0-9._-]/g, '_')
+          .slice(0, 180);
+        const url = URL.createObjectURL(new Blob([e.data.bytes], { type: 'application/pdf' }));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
       }
     };
     window.addEventListener('message', onMessage);
@@ -89,6 +123,7 @@ export default function AnalyticsCommandCentrePage() {
         ref={iframeRef}
         src="/command-centre.html?embed=1"
         title="Placement Command Centre"
+        sandbox="allow-scripts allow-downloads"
         style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
       />
     </div>

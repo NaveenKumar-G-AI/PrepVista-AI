@@ -8,16 +8,40 @@
 // requests — including JWT tokens and payment signatures — to the wrong host.
 // This catches misconfigured deploys before the first user login.
 const _rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
-if (!_rawApiUrl && typeof window !== 'undefined') {
-  console.error(
-    '[PrepVista] NEXT_PUBLIC_API_URL is not set. All API requests will fail. ' +
-    'Set this environment variable in your deployment configuration.'
-  );
+const _isProductionBuild = process.env.NODE_ENV === 'production';
+if (_isProductionBuild) {
+  let validProductionUrl = false;
+  try {
+    const parsed = new URL(_rawApiUrl);
+    validProductionUrl = parsed.protocol === 'https:' && !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+  } catch {
+    validProductionUrl = false;
+  }
+  if (!validProductionUrl) {
+    throw new Error(
+      'NEXT_PUBLIC_API_URL must be a non-local HTTPS URL for a production frontend build.'
+    );
+  }
 }
 const API_URL = _rawApiUrl || 'http://localhost:8000';
+export const AUTH_REQUIRED_EVENT = 'prepvista:auth-required';
+
+function notifyAuthenticationRequired(): boolean {
+  if (
+    typeof window !== 'undefined' &&
+    !window.location.pathname.startsWith('/login') &&
+    !window.location.pathname.startsWith('/referral') &&
+    !window.location.pathname.startsWith('/r/') &&
+    window.location.pathname !== '/'
+  ) {
+    window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
+    return true;
+  }
+  return false;
+}
 
 export * from './api-types';
-import { ApiUser, ApiReferralEntry, ApiReferralSummary, ApiPublicReferral, ApiPublicGrowth, ApiFeedbackItem, ApiFeedbackResponse, ApiLaunchOfferState, ApiAdminLaunchOfferItem, ApiAdminUserItem, ApiAdminReferralItem, ApiAdminOverview, AuthTokensResponse, SignupCodeResponse, OAuthCompleteResponse, ApiOptions, CacheEntry } from './api-types';
+import { ApiUser, ApiReferralSummary, ApiPublicReferral, ApiPublicGrowth, ApiFeedbackItem, ApiFeedbackResponse, ApiAdminOverview, AuthTokensResponse, SignupCodeResponse, OAuthCompleteResponse, ApiOptions, CacheEntry } from './api-types';
 
 /** Generate a short client-side request ID for log correlation (enterprise requirement). */
 function generateRequestId(): string {
@@ -411,15 +435,7 @@ class ApiClient {
           this.refreshToken = null;
           this.cache.clear();
           // Navigate to login if on a protected page
-          if (
-            typeof window !== 'undefined' &&
-            !window.location.pathname.startsWith('/login') &&
-            !window.location.pathname.startsWith('/referral') &&
-            !window.location.pathname.startsWith('/r/') &&
-            window.location.pathname !== '/'
-          ) {
-            window.location.href = '/login';
-          }
+          notifyAuthenticationRequired();
         }
       });
     }
@@ -447,7 +463,7 @@ class ApiClient {
   }
 
   async request<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
-    const { method = 'GET', body, headers = {}, isFormData = false, retries = 1, timeoutMs } = options;
+    const { method = 'GET', body, headers = {}, isFormData = false, retries = 1, timeoutMs = 30000 } = options;
 
     const requestHeaders: Record<string, string> = { ...headers };
     const currentToken = this.getToken();
@@ -498,14 +514,7 @@ class ApiClient {
             if (!retryResp.ok) {
               if (retryResp.status === 401) {
                 this.clearTokens();
-                if (
-                typeof window !== 'undefined' &&
-                !window.location.pathname.startsWith('/login') &&
-                !window.location.pathname.startsWith('/referral') &&
-                !window.location.pathname.startsWith('/r/') &&
-                window.location.pathname !== '/'
-              ) {
-                  window.location.href = '/login';
+                if (notifyAuthenticationRequired()) {
                   // ✅ FIXED: return early after redirect — previously both the redirect
                   // AND throw parseError fired, causing a redundant async parseError call
                   // after navigation had already started. Confusing for future engineers.
@@ -524,9 +533,7 @@ class ApiClient {
         // If it's still 401 after refresh attempt, or no refresh token exists
         if (response.status === 401) {
           this.clearTokens();
-          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/referral') && !window.location.pathname.startsWith('/r/') && window.location.pathname !== '/') {
-            window.location.href = '/login';
-          }
+          notifyAuthenticationRequired();
         }
 
         if (!response.ok) {
@@ -826,11 +833,14 @@ class ApiClient {
     // ✅ SEC: Cap attachment_data — base64 of a 10MB file = 13MB string.
     // Client-side cap is a second layer; server also validates.
     const _MAX_ATTACHMENT_B64 = 1 * 1024 * 1024; // 1MB base64 ≈ 750KB file
+    if (attachment_data && attachment_data.length > 1_000_000) {
+      throw new Error('Support attachment is too large. Choose a smaller image.');
+    }
     const safeAttachment = attachment_data && attachment_data.length > _MAX_ATTACHMENT_B64
       ? null  // silently drop oversized attachment — caller should validate file size before calling
       : attachment_data;
     // ✅ SEC: Cap content length
-    const safeContent = typeof content === 'string' ? content.slice(0, 10_000) : '';
+    const safeContent = typeof content === 'string' ? content.slice(0, 5_000) : '';
     return this.request<T>('/support/me', {
       method: 'POST',
       body: { content: safeContent, attachment_data: safeAttachment },
@@ -848,9 +858,12 @@ class ApiClient {
   }
   async sendAdminSupportReply<T = unknown>(userId: string, content: string, attachment_data: string | null = null) {
     const _MAX_ATTACHMENT_B64 = 1 * 1024 * 1024;
+    if (attachment_data && attachment_data.length > 500_000) {
+      throw new Error('Support attachment is too large. Choose a smaller image.');
+    }
     const safeAttachment = attachment_data && attachment_data.length > _MAX_ATTACHMENT_B64
       ? null : attachment_data;
-    const safeContent = typeof content === 'string' ? content.slice(0, 10_000) : '';
+    const safeContent = typeof content === 'string' ? content.slice(0, 5_000) : '';
     return this.request<T>(`/admin/support/${encodeURIComponent(userId)}`, {
       method: 'POST',
       body: { content: safeContent, attachment_data: safeAttachment },
@@ -1294,12 +1307,6 @@ class ApiClient {
     return adaptActivity(raw) as T;
   }
 
-  // Role-fit (target role -> readiness flow) has no backend source data yet; return
-  // a valid empty shape so the tab renders its "no data" state instead of erroring.
-  async getCohortRoleFit<T = unknown>(_params?: { department?: string; year?: number }): Promise<T> {
-    return { nodes: [], links: [] } as T;
-  }
-
   // ── Part 2: Recruiter Companies CRM ──────────────────────────────────────────
   async listRecruiterCompanies<T = unknown>(params: Record<string, string | boolean | number> = {}): Promise<T> {
     const qs = new URLSearchParams(
@@ -1310,6 +1317,38 @@ class ApiClient {
 
   async createRecruiterCompany<T = unknown>(body: Record<string, unknown>): Promise<T> {
     return this.request<T>('/org/my/companies', { method: 'POST', body });
+  }
+
+  async getRecruiterCompany<T = unknown>(id: string): Promise<T> {
+    return this.request<T>(`/org/my/companies/${id}`);
+  }
+
+  async changeRecruiterCompanyStage<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/companies/${id}/stage`, { method: 'POST', body });
+  }
+
+  async addRecruiterContact<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/companies/${id}/contacts`, { method: 'POST', body });
+  }
+
+  async logRecruiterActivity<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/companies/${id}/activities`, { method: 'POST', body });
+  }
+
+  async createRecruiterFollowup<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/companies/${id}/followups`, { method: 'POST', body });
+  }
+
+  async addRecruiterCompanyNote<T = unknown>(id: string, body: string): Promise<T> {
+    return this.request<T>(`/org/my/companies/${id}/notes`, { method: 'POST', body: { body } });
+  }
+
+  async getRecruiterFollowups<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/followups');
+  }
+
+  async completeRecruiterFollowup<T = unknown>(id: string): Promise<T> {
+    return this.request<T>(`/org/my/followups/${id}/complete`, { method: 'PATCH' });
   }
 
   async getRecruiterPulse<T = unknown>(): Promise<T> {
@@ -1332,8 +1371,33 @@ class ApiClient {
   async schedulePlacementInterview<T = unknown>(body: Record<string, unknown>): Promise<T> {
     return this.request<T>('/org/my/placement-interviews', { method: 'POST', body });
   }
+  async listPlacementDrives<T = unknown>(params: Record<string, string> = {}): Promise<T> {
+    const qs = new URLSearchParams(params).toString();
+    return this.request<T>(`/org/my/drives${qs ? '?' + qs : ''}`);
+  }
+  async createPlacementDrive<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/drives', { method: 'POST', body });
+  }
+  async getPlacementDrive<T = unknown>(id: string): Promise<T> {
+    return this.request<T>(`/org/my/drives/${id}`);
+  }
+  async transitionPlacementDrive<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/drives/${id}/status`, { method: 'POST', body });
+  }
+  async addPlacementDriveRule<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/drives/${id}/rules`, { method: 'POST', body });
+  }
+  async computePlacementDriveSnapshot<T = unknown>(id: string): Promise<T> {
+    return this.request<T>(`/org/my/drives/${id}/snapshot`, { method: 'POST' });
+  }
+  async listPlacementRounds<T = unknown>(driveId: string): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/rounds/${driveId}`);
+  }
   async recordPlacementAttendance<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
     return this.request<T>(`/org/my/placement-interviews/${id}/attendance`, { method: 'POST', body });
+  }
+  async transitionPlacementInterview<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/${id}/status`, { method: 'POST', body });
   }
   async enterPlacementResult<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
     return this.request<T>(`/org/my/placement-interviews/${id}/results`, { method: 'POST', body });
@@ -1353,14 +1417,128 @@ class ApiClient {
   async getPlacementAnalytics<T = unknown>(): Promise<T> {
     return this.request<T>('/org/my/placement-interviews/analytics/summary');
   }
+  async importPlacementResults<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/placement-interviews/results/import', { method: 'POST', body });
+  }
+  async publishPlacementResultsBatch<T = unknown>(interviewIds: string[]): Promise<T> {
+    return this.request<T>('/org/my/placement-interviews/results/publish-batch', {
+      method: 'POST',
+      body: { interview_ids: interviewIds },
+    });
+  }
+  async resolvePlacementIssue<T = unknown>(interviewId: string, issueId: string, resolution: string): Promise<T> {
+    return this.request<T>(`/org/my/placement-interviews/${interviewId}/issues/${issueId}/resolve`, {
+      method: 'POST',
+      body: { resolution },
+    });
+  }
 
   // ── Part 6: Offers & Joining ──────────────────────────────────────────────
+  // Organization communications
+  async listOrgMessages<T = unknown>(page = 1, pageSize = 25): Promise<T> {
+    return this.request<T>(`/org/my/communications/messages?page=${page}&page_size=${pageSize}`);
+  }
+
+  async sendOrgMessage<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/communications/messages', { method: 'POST', body });
+  }
+
+  async draftOrgMessage<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/communications/draft', { method: 'POST', body });
+  }
+
+  async listOrgCommunicationIssues<T = unknown>(status = '', page = 1, pageSize = 25): Promise<T> {
+    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (status) query.set('status', status);
+    return this.request<T>(`/org/my/communications/issues?${query.toString()}`);
+  }
+
+  async respondOrgCommunicationIssue<T = unknown>(issueId: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/communications/issues/${encodeURIComponent(issueId)}/respond`, {
+      method: 'POST', body,
+    });
+  }
+
+  async getCommunicationInbox<T = unknown>(page = 1, pageSize = 25): Promise<T> {
+    return this.request<T>(`/org/my/communications/inbox?page=${page}&page_size=${pageSize}`);
+  }
+
+  async listCommunicationMemberships<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/communications/memberships');
+  }
+
+  async openCommunication<T = unknown>(messageId: string): Promise<T> {
+    return this.request<T>(`/org/my/communications/inbox/${encodeURIComponent(messageId)}/open`, { method: 'POST' });
+  }
+
+  async acknowledgeCommunication<T = unknown>(messageId: string): Promise<T> {
+    return this.request<T>(`/org/my/communications/inbox/${encodeURIComponent(messageId)}/acknowledge`, { method: 'POST' });
+  }
+
+  async listMyCommunicationIssues<T = unknown>(): Promise<T> {
+    return this.request<T>('/org/my/communications/issues/mine');
+  }
+
+  async createCommunicationIssue<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/communications/issues/mine', { method: 'POST', body });
+  }
+
   async getOffersSummary<T = unknown>(): Promise<T> {
     return this.request<T>('/org/my/offers/analytics/summary');
   }
 
   async getOffersInsights<T = unknown>(): Promise<T> {
     return this.request<T>('/org/my/offers/analytics/insights');
+  }
+
+  async listOffers<T = unknown>(params: Record<string, string | number> = {}): Promise<T> {
+    const qs = new URLSearchParams(Object.entries(params).map(([key, value]) => [key, String(value)])).toString();
+    return this.request<T>(`/org/my/offers${qs ? `?${qs}` : ''}`);
+  }
+
+  async listPlacementSeasons<T = unknown>(includeClosed = false): Promise<T> {
+    return this.request<T>(`/org/my/offers/seasons?include_closed=${includeClosed}`);
+  }
+
+  async createPlacementSeason<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/offers/seasons', { method: 'POST', body });
+  }
+
+  async closePlacementSeason<T = unknown>(id: string): Promise<T> {
+    return this.request<T>(`/org/my/offers/seasons/${id}/close`, { method: 'POST' });
+  }
+
+  async createOffer<T = unknown>(body: Record<string, unknown>): Promise<T> {
+    return this.request<T>('/org/my/offers', { method: 'POST', body });
+  }
+
+  async getOffer<T = unknown>(id: string): Promise<T> {
+    return this.request<T>(`/org/my/offers/${id}`);
+  }
+
+  async transitionOffer<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/offers/${id}/status`, { method: 'POST', body });
+  }
+
+  async updateOfferJoining<T = unknown>(id: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(`/org/my/offers/${id}/joining`, { method: 'POST', body });
+  }
+
+  async uploadOfferDocument<T = unknown>(offerId: string, file: File, documentType: string): Promise<T> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_type', documentType);
+    return this.request<T>(`/org/my/offers/${offerId}/documents`, {
+      method: 'POST', body: formData, isFormData: true,
+    });
+  }
+
+  async verifyOfferDocument<T = unknown>(offerId: string, documentId: string): Promise<T> {
+    return this.request<T>(`/org/my/offers/${offerId}/documents/${documentId}/verify`, { method: 'POST' });
+  }
+
+  async getOfferDocumentDownload<T = { url: string; expires_in: number }>(offerId: string, documentId: string): Promise<T> {
+    return this.request<T>(`/org/my/offers/${offerId}/documents/${documentId}/download`);
   }
 }
 

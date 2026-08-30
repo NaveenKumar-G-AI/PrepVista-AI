@@ -13,24 +13,16 @@ const liveWaveformBars = [22, 28, 18, 30, 42, 34, 56, 44, 62, 38, 24, 40, 58, 36
 const secondaryWaveformBars = [18, 34, 22, 48, 36, 58, 44, 62, 28, 54, 38, 30, 44, 60, 35, 26];
 
 export default function PrepVistaLandingPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const hasTrackedLandingViewRef = useRef(false);
   const [publicGrowth, setPublicGrowth] = useState<ApiPublicGrowth | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    const hasToken = !!(
-      sessionStorage.getItem('pv_access_token') || 
-      localStorage.getItem('pv_refresh_token') || 
-      sessionStorage.getItem('pv_refresh_token')
-    );
-    if (hasToken) {
+    if (!authLoading && user) {
       router.replace('/dashboard');
-    } else {
-      setCheckingAuth(false);
     }
-  }, [router]);
+  }, [authLoading, router, user]);
 
   const howItWorks = [
     {
@@ -141,7 +133,7 @@ export default function PrepVistaLandingPage() {
     void api.trackEvent('cta clicked', { location, cta });
   };
 
-  if (checkingAuth) {
+  if (authLoading || user) {
     return <div className="min-h-screen bg-[#050b1a]" />;
   }
 

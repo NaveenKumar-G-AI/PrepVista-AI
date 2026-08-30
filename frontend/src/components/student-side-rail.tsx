@@ -8,7 +8,7 @@
 
 import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 import {
   ChartIcon,
@@ -74,7 +74,6 @@ function RailLink({ item, pathname }: { item: RailItem; pathname: string }) {
 
 export function StudentSideRail({ startInterviewHref, liveSessionHref, hasQuota }: StudentSideRailProps) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const practiceItems: RailItem[] = [
     {
@@ -104,6 +103,12 @@ export function StudentSideRail({ startInterviewHref, liveSessionHref, hasQuota 
   ];
 
   const workspaceItems: RailItem[] = [
+    {
+      href: '/student-dashboard/communications',
+      label: 'Messages',
+      description: 'Placement office inbox',
+      icon: FeedbackIcon,
+    },
     {
       href: '/analytics',
       label: 'Analytics',
@@ -139,6 +144,7 @@ export function StudentSideRail({ startInterviewHref, liveSessionHref, hasQuota 
   const mobileNavItems: Array<{ href: string; label: string; icon: RailIcon }> = [
     { href: '/student-dashboard', label: 'Home', icon: HomeIcon },
     { href: startInterviewHref === '/pricing' ? '/student-dashboard' : '/interview/setup', label: 'Practice', icon: PlayIcon },
+    { href: '/student-dashboard/communications', label: 'Messages', icon: FeedbackIcon },
     { href: '/history', label: 'Sessions', icon: FolderIcon },
     { href: '/analytics', label: 'Analytics', icon: ChartIcon },
     { href: '/profile', label: 'Profile', icon: UserIcon },

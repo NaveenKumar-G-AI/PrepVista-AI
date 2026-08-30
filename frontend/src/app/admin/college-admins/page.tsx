@@ -35,6 +35,12 @@ interface CreateAdminForm {
   phone: string;
 }
 
+interface OrganizationOption {
+  id: string;
+  name: string;
+  org_code: string;
+}
+
 function statusBadge(s: string) {
   if (s === 'active') return 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20';
   if (s === 'suspended') return 'bg-rose-500/15 text-rose-400 ring-1 ring-rose-500/20';
@@ -51,7 +57,7 @@ export default function CollegeAdminsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [admins, setAdmins] = useState<OrgAdmin[]>([]);
-  const [orgs, setOrgs] = useState<any[]>([]);
+  const [orgs, setOrgs] = useState<OrganizationOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -65,7 +71,7 @@ export default function CollegeAdminsPage() {
     try {
       const [adminsRes, orgsRes] = await Promise.all([
         api.listOrgAdmins<{ admins: OrgAdmin[] }>(),
-        api.listOrganizations<{ organizations: any[] }>('page_size=200'),
+        api.listOrganizations<{ organizations: OrganizationOption[] }>('page_size=200'),
       ]);
       setAdmins(adminsRes.admins || []);
       setOrgs(orgsRes.organizations || []);

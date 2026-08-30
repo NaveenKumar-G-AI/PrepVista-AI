@@ -30,7 +30,7 @@ avoid locking student-facing writes:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 import structlog
 
 from app.database.connection import DatabaseConnection
@@ -53,9 +53,10 @@ _MAX_ATTACHMENT_DATA_LENGTH: int = 500_000
 # Base64 data URIs must begin with "data:" followed by a recognised MIME type.
 # Raw base64 without a data URI prefix is also accepted for backward compat.
 _ALLOWED_ATTACHMENT_PREFIXES: tuple[str, ...] = (
-    "data:image/",
-    "data:application/pdf",
-    "data:text/",
+    "data:image/jpeg;base64,",
+    "data:image/png;base64,",
+    "data:image/webp;base64,",
+    "data:image/gif;base64,",
 )
 
 # Inbox page size. Smaller than the old fixed cap (200) to allow cursor
@@ -74,8 +75,16 @@ def require_admin(current_user: UserProfile = Depends(get_current_user)) -> User
 
 
 class AdminReplyRequest(BaseModel):
-    content: str
-    attachment_data: str | None = None
+    content: str = Field(default="", max_length=_MAX_REPLY_CONTENT_LENGTH)
+    attachment_data: str | None = Field(default=None, max_length=_MAX_ATTACHMENT_DATA_LENGTH)
+
+    @model_validator(mode="after")
+    def validate_message(self) -> "AdminReplyRequest":
+        if not self.content.strip() and not self.attachment_data:
+            raise ValueError("Reply must contain text or an image attachment.")
+        if self.attachment_data and not self.attachment_data.startswith(_ALLOWED_ATTACHMENT_PREFIXES):
+            raise ValueError("Attachment must be a JPEG, PNG, WebP, or GIF image data URI.")
+        return self
 
 
 @router.get("/users")

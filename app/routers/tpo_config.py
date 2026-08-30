@@ -152,33 +152,34 @@ async def update_placement_config(
     """Create or update the college's placement config (upsert, one row per org)."""
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        await conn.execute(
-            """INSERT INTO college_placement_config
-                   (organization_id, target_companies, readiness_threshold,
-                    focus_pillars, notes, updated_by, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, NOW())
-               ON CONFLICT (organization_id) DO UPDATE SET
-                   target_companies    = EXCLUDED.target_companies,
-                   readiness_threshold = EXCLUDED.readiness_threshold,
-                   focus_pillars       = EXCLUDED.focus_pillars,
-                   notes               = EXCLUDED.notes,
-                   updated_by          = EXCLUDED.updated_by,
-                   updated_at          = NOW()""",
-            org_id,
-            json.dumps(body.target_companies),
-            body.readiness_threshold,
-            json.dumps(body.focus_pillars),
-            body.notes,
-            admin.user_id,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "placement_config_update",
-            entity_type="placement_config",
-            metadata={
-                "target_companies": body.target_companies,
-                "readiness_threshold": body.readiness_threshold,
-                "focus_pillars": body.focus_pillars,
-            },
-        )
+        async with conn.transaction():
+            await conn.execute(
+                """INSERT INTO college_placement_config
+                       (organization_id, target_companies, readiness_threshold,
+                        focus_pillars, notes, updated_by, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                   ON CONFLICT (organization_id) DO UPDATE SET
+                       target_companies    = EXCLUDED.target_companies,
+                       readiness_threshold = EXCLUDED.readiness_threshold,
+                       focus_pillars       = EXCLUDED.focus_pillars,
+                       notes               = EXCLUDED.notes,
+                       updated_by          = EXCLUDED.updated_by,
+                       updated_at          = NOW()""",
+                org_id,
+                json.dumps(body.target_companies),
+                body.readiness_threshold,
+                json.dumps(body.focus_pillars),
+                body.notes,
+                admin.user_id,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "placement_config_update",
+                entity_type="placement_config",
+                metadata={
+                    "target_companies": body.target_companies,
+                    "readiness_threshold": body.readiness_threshold,
+                    "focus_pillars": body.focus_pillars,
+                },
+            )
 
     return {"status": "updated"}

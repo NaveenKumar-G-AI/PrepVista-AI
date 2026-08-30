@@ -13,6 +13,16 @@ services:
     envVars:
       - key: ENVIRONMENT
         value: production
+      - key: PREPVISTA_DEBUG
+        value: "false"
+      - key: ALLOWED_HOSTS
+        value: prepvista.ai,www.prepvista.ai,prepvistaai.com,www.prepvistaai.com,prepvistabeckend.onrender.com,prepvistabackend.onrender.com,prepvista-backend.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://prepvista.ai,https://www.prepvista.ai,https://prepvistaai.com,https://www.prepvistaai.com,https://prepvista-ai.vercel.app,https://prepvista-p1vo.onrender.com
+      - key: SECURE_HEADERS_ENABLED
+        value: "true"
+      - key: MAX_REQUEST_SIZE_MB
+        value: "10"
       - key: FRONTEND_URL
         sync: false
       - key: BACKEND_URL
@@ -25,12 +35,28 @@ services:
         sync: false
       - key: SUPABASE_JWT_SECRET
         sync: false
+      - key: OFFER_DOCUMENT_BUCKET
+        value: offer-documents
+      - key: OFFER_DOCUMENT_MAX_MB
+        value: "8"
       - key: DATABASE_URL
         sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: STT_SERVER_ENABLED
+        sync: false
+      - key: GROQ_WHISPER_MODEL
+        value: whisper-large-v3
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_MODEL
+        value: nova-2
+      - key: INTERVIEW_AUDIO_BUCKET
+        value: interview-audio
+      - key: AUDIO_RETENTION_DAYS
+        value: "90"
       - key: ADMIN_EMAIL
         sync: false
       - key: RAZORPAY_KEY_ID

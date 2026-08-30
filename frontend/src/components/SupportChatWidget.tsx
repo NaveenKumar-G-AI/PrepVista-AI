@@ -1,14 +1,27 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import NextImage from 'next/image';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+
+interface SupportMessage {
+  id: string;
+  sender_role: 'user' | 'admin';
+  content: string;
+  attachment_data: string | null;
+  created_at: string;
+}
+
+interface SupportThreadResponse { messages: SupportMessage[] }
+interface SupportMessageResponse { message: SupportMessage }
 
 export function SupportChatWidget() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [text, setText] = useState('');
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -17,10 +30,11 @@ export function SupportChatWidget() {
 
   const loadMessages = async () => {
     try {
-      const res: any = await api.getMySupportThread();
+      setError('');
+      const res = await api.getMySupportThread<SupportThreadResponse>();
       setMessages(res.messages || []);
     } catch (err) {
-      console.error('Failed to load support thread:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load support messages.');
     }
   };
 
@@ -65,6 +79,11 @@ export function SupportChatWidget() {
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
           const compressedBase64 = canvas.toDataURL("image/jpeg", 0.6);
+          if (compressedBase64.length > 1024 * 1024) {
+            setError('The compressed image is still too large. Choose a smaller image.');
+            return;
+          }
+          setError('');
           setBase64Image(compressedBase64);
         }
       };
@@ -78,14 +97,14 @@ export function SupportChatWidget() {
     if (!text.trim() && !base64Image) return;
 
     setLoading(true);
+    setError('');
     try {
-      const res: any = await api.sendSupportMessage(text, base64Image);
+      const res = await api.sendSupportMessage<SupportMessageResponse>(text, base64Image);
       setMessages(prev => [...prev, res.message]);
       setText('');
       setBase64Image(null);
     } catch (err) {
-      console.error('Failed to send message:', err);
-      alert('Failed to send message.');
+      setError(err instanceof Error ? err.message : 'Failed to send message.');
     } finally {
       setLoading(false);
     }
@@ -115,25 +134,29 @@ export function SupportChatWidget() {
 
           {/* Messages Area */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+            {error && <div role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-500">{error}</div>}
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center text-tertiary">
                 <svg className="mb-3 h-8 w-8 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                 <p className="text-sm">No messages yet.<br/>Send us a message below!</p>
               </div>
             ) : (
-              messages.map((m, i) => {
+              messages.map((m) => {
                 const isUser = m.sender_role === 'user';
                 return (
-                  <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                  <div key={m.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed shadow-sm ${
                       isUser 
                         ? 'bg-blue-600 text-white rounded-tr-none' 
                         : 'rounded-tl-none border text-secondary'
                     }`} style={isUser ? undefined : { borderColor: 'var(--border-color)', background: 'var(--bg-hover)' }}>
                       {m.attachment_data && (
-                        <img 
+                        <NextImage
                           src={m.attachment_data} 
                           alt="Attachment" 
+                          width={512}
+                          height={192}
+                          unoptimized
                           className="mb-2 max-h-48 rounded-lg object-contain w-full"
                         />
                       )}
@@ -175,6 +198,7 @@ export function SupportChatWidget() {
               <textarea
                 rows={1}
                 value={text}
+                maxLength={5000}
                 onChange={e => setText(e.target.value)}
                 placeholder="Type your message..."
                 className="max-h-24 min-h-[44px] w-full resize-none rounded-xl border px-3 py-2.5 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 select-auto"

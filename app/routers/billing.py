@@ -216,9 +216,12 @@ async def razorpay_webhook(request: Request):
     signature = request.headers.get("x-razorpay-signature", "")
     if not signature:
         raise HTTPException(status_code=400, detail="Missing Razorpay signature header.")
+    razorpay_event_id = request.headers.get("x-razorpay-event-id", "").strip()
+    if not razorpay_event_id or len(razorpay_event_id) > 200:
+        raise HTTPException(status_code=400, detail="Missing or invalid Razorpay event ID header.")
 
     event_type = payload.get("event", "unknown") if isinstance(payload, dict) else "unknown"
-    event_id = payload.get("id", "unknown") if isinstance(payload, dict) else "unknown"
+    event_id = razorpay_event_id
 
     logger.info(
         "billing_webhook_received",
@@ -226,11 +229,13 @@ async def razorpay_webhook(request: Request):
         event_id=event_id,
     )
 
-    # Return HTTP 200 on internal failures to stop Razorpay automatic retries.
-    # Retries on a non-idempotent handler cause double plan activation / double
-    # payment records. ERROR log fires on-call alerts for manual reprocessing.
+    # Razorpay uses at-least-once delivery and retries non-2xx responses. The
+    # service is idempotent by x-razorpay-event-id, so transient failures must
+    # return 503; acknowledging them with 200 would permanently lose payments.
     try:
-        result = await handle_webhook(raw_body, signature)
+        result = await handle_webhook(raw_body, signature, event_id)
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(
             "billing_webhook_failed",
@@ -238,7 +243,7 @@ async def razorpay_webhook(request: Request):
             event_id=event_id,
             error=str(exc),
         )
-        return {"status": "received", "note": "Processing error logged for review."}
+        raise HTTPException(status_code=503, detail="Webhook processing failed; retry required.") from exc
 
     logger.info(
         "billing_webhook_processed",

@@ -12,7 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Static browser bundles are copied verbatim and are not application source.
+    // Linting the minified ECharts bundle produced thousands of false positives.
+    "public/**",
   ]),
+  {
+    rules: {
+      // Product copy legitimately contains apostrophes and quotation marks.
+      "react/no-unescaped-entities": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

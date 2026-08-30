@@ -4,9 +4,11 @@ Uses Pydantic Settings for type-safe env var management.
 """
 
 import os
+import re
 from enum import IntEnum
 from functools import lru_cache
 from typing import Any
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,12 +28,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
+        populate_by_name=True,
     )
 
     # App
     APP_NAME: str = "PrepVista"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
+    # Use an application-specific environment name. Generic DEBUG is commonly
+    # injected by shells/build platforms with values such as "release", which
+    # are not booleans and previously prevented the service from importing.
+    DEBUG: bool = Field(default=False, validation_alias="PREPVISTA_DEBUG")
     ENVIRONMENT: str = "production"
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_URL: str = "http://localhost:8000"
@@ -127,6 +133,8 @@ class Settings(BaseSettings):
     # Private Supabase Storage bucket holding retained interview audio for the
     # dispute/audit trail. Must be created out-of-band (see deployment notes).
     INTERVIEW_AUDIO_BUCKET: str = Field(default="interview-audio", description="Supabase Storage bucket for interview audio")
+    OFFER_DOCUMENT_BUCKET: str = Field(default="offer-documents", description="Private Supabase Storage bucket for offer and joining evidence")
+    OFFER_DOCUMENT_MAX_MB: int = Field(default=8, ge=1, le=25, description="Maximum offer evidence upload size in MiB")
     # Minimum retention for dispute resolution. Surfaced in the report header.
     AUDIO_RETENTION_DAYS: int = Field(default=90, description="Days interview audio is retained for dispute resolution")
     # Default spoken-language hint passed to the STT engine.
@@ -188,6 +196,8 @@ class Settings(BaseSettings):
         "ENVIRONMENT",
         "FRONTEND_URL",
         "BACKEND_URL",
+        "ALLOWED_HOSTS",
+        "CORS_ALLOWED_ORIGINS",
         "ADMIN_EMAIL",
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
@@ -222,28 +232,20 @@ class Settings(BaseSettings):
     def _normalize_urls(cls, value: str) -> str:
         return value.rstrip("/") if value else value
 
+    @field_validator("INTERVIEW_AUDIO_BUCKET", "OFFER_DOCUMENT_BUCKET")
+    @classmethod
+    def _validate_storage_bucket(cls, value: str) -> str:
+        value = value.strip()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]", value):
+            raise ValueError("Storage bucket names must be 3-64 lowercase letters, numbers, dots, underscores, or hyphens")
+        return value
+
     @field_validator("FRONTEND_URL", "BACKEND_URL", mode="after")
     @classmethod
-    def _enforce_https_in_production(cls, value: str) -> str:
-        # ✅ SEC: Enforce HTTPS in production. HTTP OAuth redirect URIs allow token
-        # interception via network sniffing and open-redirect attacks.
-        # The Vercel breach chain started with OAuth token theft — HTTP makes this trivial.
-        # ENVIRONMENT is validated before this runs via Pydantic field ordering.
-        import os
-        env = os.getenv("ENVIRONMENT", "production").lower().strip()
-        if env == "production" and value and value.startswith("http://"):
-            raise ValueError(
-                f"URL must use HTTPS in production (got: {value}). "
-                "HTTP endpoints allow OAuth token interception."
-            )
-        # ✅ SEC: Block wildcard CORS in production. A '*' CORS policy lets any
-        # malicious website make credentialed requests to your API using a
-        # logged-in student's browser session — instant account takeover.
-        if env == "production" and "*" in (value or ""):
-            raise ValueError(
-                "Wildcard (*) is not allowed in CORS_ALLOWED_ORIGINS or ALLOWED_HOSTS in production. "
-                "Set explicit origins: CORS_ALLOWED_ORIGINS=https://prepvista.ai"
-            )
+    def _validate_public_urls(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if value and (parsed.scheme not in {"http", "https"} or not parsed.hostname):
+            raise ValueError("URL must be an absolute http:// or https:// URL")
         return value
 
     @field_validator("ENVIRONMENT")
@@ -295,6 +297,22 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_provider_config(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            for field_name in ("FRONTEND_URL", "BACKEND_URL"):
+                value = getattr(self, field_name)
+                if not value.startswith("https://"):
+                    raise ValueError(f"{field_name} must use HTTPS in production")
+
+            allowed_hosts = {item.strip() for item in self.ALLOWED_HOSTS.split(",") if item.strip()}
+            cors_origins = {item.strip() for item in self.CORS_ALLOWED_ORIGINS.split(",") if item.strip()}
+            if "*" in allowed_hosts or "*" in cors_origins:
+                raise ValueError(
+                    "Wildcard hosts/origins are not allowed in production; configure "
+                    "explicit ALLOWED_HOSTS and CORS_ALLOWED_ORIGINS values"
+                )
+            if any(urlparse(origin).scheme != "https" for origin in cors_origins):
+                raise ValueError("Every production CORS_ALLOWED_ORIGINS entry must use HTTPS")
+
         if self.ENVIRONMENT == "production" and not self.GROQ_API_KEY and not self.OPENAI_API_KEY:
             raise ValueError("At least one LLM provider API key must be configured in production")
 
@@ -357,6 +375,12 @@ class Settings(BaseSettings):
             )
         if self.DB_ANALYTICS_POOL_MAX_SIZE < 1:
             raise ValueError("DB_ANALYTICS_POOL_MAX_SIZE must be >= 1")
+
+        if self.OFFER_DOCUMENT_MAX_MB >= self.MAX_REQUEST_SIZE_MB:
+            raise ValueError(
+                "OFFER_DOCUMENT_MAX_MB must be smaller than MAX_REQUEST_SIZE_MB "
+                "to leave room for multipart request overhead"
+            )
 
         # ✅ ADDED: Interview count drift check. Settings and PLAN_CONFIG both define
         # interview limits. Mismatch = billing logic silently uses different limits
@@ -805,7 +829,6 @@ def get_allowed_hosts() -> list[str]:
     # Also allow whatever host BACKEND_URL resolves to, so a changed Render URL is accepted
     # without another code change. Browsers send the public backend host in the Host header.
     try:
-        from urllib.parse import urlparse
         backend_host = urlparse(get_settings().BACKEND_URL).hostname
         if backend_host and backend_host not in hosts:
             hosts.append(backend_host)
@@ -813,8 +836,7 @@ def get_allowed_hosts() -> list[str]:
         pass
 
     # If we added specific hosts, we should remove '*' to actually secure it (unless they explicitly passed * in dev)
-    import os
-    if os.getenv("ENVIRONMENT", "production").lower() == "production" and "*" in hosts:
+    if get_settings().ENVIRONMENT == "production" and "*" in hosts:
         hosts.remove("*")
         
     return hosts
@@ -836,7 +858,10 @@ def get_cors_origins() -> list[str]:
     for required_domain in [
         "https://www.prepvistaai.com",
         "https://prepvistaai.com",
+        "https://prepvista-ai.vercel.app",
+        "https://prepvista-p1vo.onrender.com",
         "https://prepvistaai.onrender.com",
+        get_settings().FRONTEND_URL,
     ]:
         if required_domain not in origins:
             origins.append(required_domain)

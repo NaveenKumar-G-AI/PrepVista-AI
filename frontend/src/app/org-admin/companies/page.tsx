@@ -53,6 +53,16 @@ const STAGE_COLORS: Record<string, string> = {
   INACTIVE:              'bg-slate-600/15 text-slate-500',
 };
 
+function safeWebsite(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CompaniesPage() {
@@ -276,22 +286,24 @@ export default function CompaniesPage() {
                   <tr key={c.id} className="hover:bg-white/[0.03] transition-colors">
                     <td className="px-4 py-3">
                       <div className="font-semibold text-white flex items-center gap-2">
-                        {c.name}
+                        <Link href={`/org-admin/companies/${c.id}`} className="hover:text-blue-300 hover:underline">
+                          {c.name}
+                        </Link>
                         {c.is_repeat_recruiter && (
                           <span className="text-[9px] font-bold uppercase tracking-wide text-teal-400 bg-teal-500/15 rounded-full px-2 py-0.5">
                             Repeat
                           </span>
                         )}
                       </div>
-                      {c.website && (
+                      {safeWebsite(c.website) && (
                         <a
-                          href={c.website}
+                          href={safeWebsite(c.website) ?? undefined}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[11px] text-blue-400/70 hover:text-blue-400 transition-colors"
                           onClick={e => e.stopPropagation()}
                         >
-                          {c.website.replace(/^https?:\/\/(www\.)?/, '')}
+                          {c.website?.replace(/^https?:\/\/(www\.)?/, '')}
                         </a>
                       )}
                     </td>

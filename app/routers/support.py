@@ -4,7 +4,7 @@ Endpoints allowing end-users to persist their conversations and query admin resp
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, Field, model_validator
 import structlog
 
 from app.database.connection import DatabaseConnection
@@ -15,16 +15,18 @@ logger = structlog.get_logger("prepvista.support")
 
 
 class SupportMessageRequest(BaseModel):
-    content: str
-    attachment_data: str | None = None
+    content: str = Field(default="", max_length=5000)
+    attachment_data: str | None = Field(default=None, max_length=1_000_000)
 
-    @root_validator(pre=True)
-    def check_empty(cls, values):
-        content = values.get('content', '').strip()
-        attachment = values.get('attachment_data')
-        if not content and not attachment:
+    @model_validator(mode="after")
+    def check_empty(self) -> "SupportMessageRequest":
+        if not self.content.strip() and not self.attachment_data:
             raise ValueError("Message must contain either text content or an image attachment.")
-        return values
+        if self.attachment_data and not self.attachment_data.startswith(
+            ("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,", "data:image/gif;base64,")
+        ):
+            raise ValueError("Attachment must be a JPEG, PNG, WebP, or GIF image data URI.")
+        return self
 
 
 @router.get("/me")

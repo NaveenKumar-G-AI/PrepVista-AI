@@ -15,7 +15,10 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
+from app.routers import billing
 from app.services import razorpay_service
 
 
@@ -73,3 +76,68 @@ def test_webhook_rejects_missing_signature(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         asyncio.run(razorpay_service.handle_webhook(b'{"event": "x"}', ""))
     assert exc.value.status_code == 400
+
+
+def _billing_client() -> TestClient:
+    app = FastAPI()
+    app.include_router(billing.router, prefix="/billing")
+    return TestClient(app)
+
+
+def test_webhook_route_requires_provider_event_id(monkeypatch):
+    called = False
+
+    async def fake_handle(*_args):
+        nonlocal called
+        called = True
+        return {"status": "processed"}
+
+    monkeypatch.setattr(billing, "handle_webhook", fake_handle)
+    response = _billing_client().post(
+        "/billing/webhook",
+        content=b'{"event":"payment.captured"}',
+        headers={"x-razorpay-signature": "valid-signature"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing or invalid Razorpay event ID header."
+    assert called is False
+
+
+def test_webhook_route_passes_exact_event_id(monkeypatch):
+    received = None
+
+    async def fake_handle(raw_body, signature, event_id):
+        nonlocal received
+        received = (raw_body, signature, event_id)
+        return {"status": "processed"}
+
+    monkeypatch.setattr(billing, "handle_webhook", fake_handle)
+    raw_body = b'{"event":"payment.captured"}'
+    response = _billing_client().post(
+        "/billing/webhook",
+        content=raw_body,
+        headers={
+            "x-razorpay-signature": "valid-signature",
+            "x-razorpay-event-id": "evt_unique_123",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {"status": "processed"}
+    assert received == (raw_body, "valid-signature", "evt_unique_123")
+
+
+def test_webhook_route_requests_retry_on_internal_failure(monkeypatch):
+    async def fake_handle(*_args):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(billing, "handle_webhook", fake_handle)
+    response = _billing_client().post(
+        "/billing/webhook",
+        content=b'{"event":"payment.captured"}',
+        headers={
+            "x-razorpay-signature": "valid-signature",
+            "x-razorpay-event-id": "evt_retry_123",
+        },
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Webhook processing failed; retry required."

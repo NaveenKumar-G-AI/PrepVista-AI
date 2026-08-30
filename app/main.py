@@ -28,6 +28,7 @@ from app.routers.offers import router as offers_router
 from app.routers.training import router as training_router
 from app.routers.assessments import router as assessments_router
 from app.routers.ai_health import router as ai_health_router
+from app.routers.communications import router as communications_router
 from app.services.user_activity import refresh_user_activity_stats
 
 
@@ -349,12 +350,43 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _enforce_request_size(request: Request, call_next):
         content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > _max_body_bytes:
-            return JSONResponse(
-                {"detail": f"Request body exceeds the {settings.MAX_REQUEST_SIZE_MB} MB limit."},
-                status_code=413,
-                headers=NO_STORE_HEADERS,
-            )
+        if content_length:
+            try:
+                declared_size = int(content_length)
+            except ValueError:
+                return JSONResponse(
+                    {"detail": "Invalid Content-Length header."},
+                    status_code=400,
+                    headers=NO_STORE_HEADERS,
+                )
+            if declared_size < 0:
+                return JSONResponse(
+                    {"detail": "Invalid Content-Length header."},
+                    status_code=400,
+                    headers=NO_STORE_HEADERS,
+                )
+            if declared_size > _max_body_bytes:
+                return JSONResponse(
+                    {"detail": f"Request body exceeds the {settings.MAX_REQUEST_SIZE_MB} MB limit."},
+                    status_code=413,
+                    headers=NO_STORE_HEADERS,
+                )
+
+        # Content-Length is optional (for example, chunked transfer encoding)
+        # and can be forged. Count the actual bytes before route code parses or
+        # stores them, stopping as soon as the configured limit is crossed.
+        chunks: list[bytes] = []
+        received_size = 0
+        async for chunk in request.stream():
+            received_size += len(chunk)
+            if received_size > _max_body_bytes:
+                return JSONResponse(
+                    {"detail": f"Request body exceeds the {settings.MAX_REQUEST_SIZE_MB} MB limit."},
+                    status_code=413,
+                    headers=NO_STORE_HEADERS,
+                )
+            chunks.append(chunk)
+        request._body = b"".join(chunks)
         return await call_next(request)
 
     # ── Security Headers ─────────────────────────
@@ -424,6 +456,7 @@ def create_app() -> FastAPI:
     app.include_router(assessments_router, prefix="/api/tpo/assessments", tags=["Assessment Engine"])
     # Part 4 — AI Provider Health (college-admin scoped)
     app.include_router(ai_health_router, prefix="/org/my", tags=["AI Providers"])
+    app.include_router(communications_router, prefix="/org/my", tags=["Communications"])
     # STT WebSocket (/ws/stt/{session_id}) + REST fallback (/api/stt/transcribe).
     # Mounted at root so the paths match the Fix 1 spec exactly.
     app.include_router(stt_ws.router, tags=["Speech-to-Text"])

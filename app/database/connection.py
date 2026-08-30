@@ -31,6 +31,7 @@ Hardening applied:
 import asyncio
 import hashlib
 import random
+import re
 
 import asyncpg
 import structlog
@@ -195,6 +196,45 @@ def _compute_migration_checksum(sql: str) -> str:
     original filename instead of being added as a new numbered file.
     """
     return hashlib.sha256(sql.encode("utf-8")).hexdigest()
+
+
+_TRANSACTION_CONTROL_RE = re.compile(
+    r"^\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END)\s*;\s*(?:--.*)?$",
+    re.IGNORECASE,
+)
+
+
+def _strip_outer_transaction(sql: str) -> tuple[str, bool]:
+    """Remove a migration file's redundant outer BEGIN/COMMIT envelope.
+
+    The runner owns transaction boundaries so the migration and its bookkeeping
+    row commit atomically. A few historical migration files also declared an
+    explicit transaction; sending those files through ``conn.execute`` while an
+    asyncpg transaction is active can fail on a fresh database. Only standalone
+    transaction-control lines at the first and last executable positions are
+    removed. The original SQL is still used for checksum/drift detection.
+    """
+    lines = sql.splitlines(keepends=True)
+    executable = [
+        index
+        for index, line in enumerate(lines)
+        if line.strip() and not line.lstrip().startswith("--")
+    ]
+    if len(executable) < 2:
+        return sql, False
+
+    first, last = executable[0], executable[-1]
+    first_statement = lines[first].strip().upper()
+    last_statement = lines[last].strip().upper()
+    if (
+        first_statement not in {"BEGIN;", "START TRANSACTION;"}
+        or last_statement not in {"COMMIT;", "END;"}
+        or not _TRANSACTION_CONTROL_RE.fullmatch(lines[first].rstrip("\r\n"))
+        or not _TRANSACTION_CONTROL_RE.fullmatch(lines[last].rstrip("\r\n"))
+    ):
+        return sql, False
+
+    return "".join(lines[:first] + lines[first + 1:last] + lines[last + 1:]), True
 
 
 # ---------------------------------------------------------------------------
@@ -721,14 +761,18 @@ async def _run_migrations(conn: asyncpg.Connection):
         # Detect whether this migration can safely run inside a transaction.
         # PostgreSQL raises an error if CONCURRENTLY operations appear inside
         # a transaction block — those migrations run outside one.
-        use_transaction = "concurrently" not in sql.lower()
+        # The runner owns transaction boundaries. Historical migrations that
+        # carry their own outer BEGIN/COMMIT are unwrapped only for execution;
+        # checksums continue to cover the original, immutable file content.
+        execution_sql, stripped_outer_transaction = _strip_outer_transaction(sql)
+        use_transaction = "concurrently" not in execution_sql.lower()
 
         try:
             if use_transaction:
                 # Atomic migration: both the DDL and the version record are
                 # committed together or rolled back together.
                 async with conn.transaction():
-                    await conn.execute(sql, timeout=MIGRATION_STATEMENT_TIMEOUT)
+                    await conn.execute(execution_sql, timeout=MIGRATION_STATEMENT_TIMEOUT)
                     await conn.execute(
                         "INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)",
                         version,
@@ -740,7 +784,7 @@ async def _run_migrations(conn: asyncpg.Connection):
                 # crashes between execute and INSERT, the migration re-runs
                 # on the next startup — migration authors must ensure
                 # CONCURRENTLY migrations are idempotent (IF NOT EXISTS etc.).
-                await conn.execute(sql, timeout=MIGRATION_STATEMENT_TIMEOUT)
+                await conn.execute(execution_sql, timeout=MIGRATION_STATEMENT_TIMEOUT)
                 await conn.execute(
                     "INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)",
                     version,
@@ -752,6 +796,7 @@ async def _run_migrations(conn: asyncpg.Connection):
                 "migration_applied",
                 version=version,
                 transactional=use_transaction,
+                stripped_outer_transaction=stripped_outer_transaction,
             )
 
         except Exception as exc:

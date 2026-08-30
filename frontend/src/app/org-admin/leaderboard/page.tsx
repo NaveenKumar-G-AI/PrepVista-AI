@@ -34,13 +34,18 @@ export default function LeaderboardPage() {
     const trySend = () => {
       const win = iframeRef.current?.contentWindow;
       if (win && readyRef.current && dataRef.current) {
-        win.postMessage({ __pvsb: 'load', payload: dataRef.current }, '*');
+        win.postMessage({ __pvsb: 'load', payload: dataRef.current }, window.location.origin);
       }
     };
 
     // The embedded scoreboard posts {__pvsb:'ready'} once its script has run.
     const onMessage = (e: MessageEvent) => {
-      if (e?.data && e.data.__pvsb === 'ready') {
+      if (
+        (e.origin === 'null' || e.origin === window.location.origin)
+        && e.source === iframeRef.current?.contentWindow
+        && e?.data
+        && e.data.__pvsb === 'ready'
+      ) {
         readyRef.current = true;
         trySend();
       }
@@ -87,6 +92,7 @@ export default function LeaderboardPage() {
         ref={iframeRef}
         src="/scoreboard.html?embed=1"
         title="Student Leaderboard"
+        sandbox="allow-scripts"
         style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
       />
     </div>

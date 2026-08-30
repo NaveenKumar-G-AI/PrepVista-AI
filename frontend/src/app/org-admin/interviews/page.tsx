@@ -1,709 +1,704 @@
-// @ts-nocheck
 "use client";
 
-import React, { useState, useMemo } from "react";
-import {
-  CheckCircle2, XCircle, Clock3, Calendar, MapPin, Video,
-  ChevronRight, ChevronLeft, Upload, Users, FileWarning, GraduationCap,
-  Building2, ArrowRight, ShieldCheck, History, Send, X
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CalendarPlus,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  Loader2,
+  RefreshCw,
+  Search,
+  Send,
+  XCircle,
+} from "lucide-react";
 
-/* ============================================================
-   DESIGN TOKENS
-   A placement/registrar "operations console" identity: deep ledger
-   navy chrome, warm paper content surface, brass accent for emphasis.
-   Status is always icon + color + label together (never color alone).
-   ============================================================ */
+import { api } from "@/lib/api";
 
-/* ============================================================
-   SEED DATA — labeled demo data, same shape the tested backend uses.
-   ============================================================ */
-const ROSTER = [
-  { regNo: "26CO101", name: "Priya Sharma", dept: "Computer Science" },
-  { regNo: "26EC102", name: "Arjun Iyer", dept: "Electronics & Comm." },
-  { regNo: "26IT103", name: "Meera Nair", dept: "Information Technology" },
-  { regNo: "26CO104", name: "Karthik Reddy", dept: "Computer Science" },
-  { regNo: "26EC105", name: "Divya Menon", dept: "Electronics & Comm." },
-  { regNo: "26IT106", name: "Rohit Verma", dept: "Information Technology" },
-  { regNo: "26CO107", name: "Sneha Pillai", dept: "Computer Science" },
-  { regNo: "26EC108", name: "Vikram Rao", dept: "Electronics & Comm." },
-  { regNo: "26IT109", name: "Ishita Gupta", dept: "Information Technology" },
-  { regNo: "26CO110", name: "Sanjay Kumar", dept: "Computer Science" },
-  { regNo: "26EC111", name: "Ananya Menon", dept: "Electronics & Comm." },
-  { regNo: "26IT112", name: "Nikhil Sharma", dept: "Information Technology" },
-];
+type InterviewStatus =
+  | "SCHEDULED" | "CONFIRMED" | "ATTENDED" | "COMPLETED" | "NO_SHOW"
+  | "CANCELLED" | "RESCHEDULED" | "RESULT_PENDING" | "RESULT_PUBLISHED";
+type AttendanceStatus = "NOT_RECORDED" | "PRESENT" | "LATE" | "ABSENT" | "EXCUSED";
+type ResultValue = "PASS" | "FAIL" | "HOLD" | "NO_SHOW" | "DISQUALIFIED" | "PENDING";
+type PublicationState = "INTERNAL_RESULT" | "TPO_REVIEWED" | "PUBLISHED_TO_STUDENT";
 
-function hoursFromNow(h) {
-  return new Date(Date.now() + h * 3600 * 1000);
+interface InterviewRow {
+  id: string;
+  drive_id: string;
+  round_execution_id: string | null;
+  student_id: string;
+  scheduled_at: string | null;
+  interview_status: InterviewStatus;
+  attendance_status: AttendanceStatus;
+  location_or_link: string | null;
+  student_name: string;
+  student_email: string;
+  student_code: string | null;
+  department_name: string | null;
+  drive_title: string;
+  company_name: string;
+  role: string;
+  round_name: string | null;
+  result: ResultValue | null;
+  remarks: string | null;
+  publication_state: PublicationState | null;
+  result_version: number | null;
+  published_at: string | null;
 }
-function fmtDateTime(d) {
-  return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+interface InterviewListResponse {
+  items: InterviewRow[];
+  total: number;
+  page: number;
+  page_size: number;
 }
-function fmtShort(d) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+interface InterviewIssue {
+  id: string;
+  issue_type: string;
+  description: string | null;
+  status: "OPEN" | "RESOLVED";
+  resolution: string | null;
+  created_at: string;
 }
 
-const seedInterviews = () => [
-  { id: "iv1", ...ROSTER[0], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(3), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/priya", instructions: "Join 10 min early with your ID visible.",
-    status: "SCHEDULED", attendance: "NOT_RECORDED", confirmed: false,
-    issue: { type: "CANNOT_ACCESS_LINK", details: "Meeting link returns a 404.", status: "OPEN" }, result: null },
-  { id: "iv2", ...ROSTER[1], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(26), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/arjun", instructions: "Join 10 min early with your ID visible.",
-    status: "CONFIRMED", attendance: "NOT_RECORDED", confirmed: true, issue: null, result: null },
-  { id: "iv3", ...ROSTER[2], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-2), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/meera", instructions: "Join 10 min early with your ID visible.",
-    status: "RESULT_PENDING", attendance: "PRESENT", confirmed: true, issue: null, result: null },
-  { id: "iv4", ...ROSTER[3], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-3), mode: "ON_CAMPUS", location: "Placement Cell, Room 2", instructions: "Bring a printed resume.",
-    status: "RESULT_PENDING", attendance: "PRESENT", confirmed: true, issue: null, result: null },
-  { id: "iv5", ...ROSTER[4], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-4), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/divya", instructions: "Join 10 min early with your ID visible.",
-    status: "RESULT_PENDING", attendance: "LATE", confirmed: true, issue: null, result: null },
-  { id: "iv6", ...ROSTER[5], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-20), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/rohit", instructions: "Join 10 min early with your ID visible.",
-    status: "RESULT_PUBLISHED", attendance: "PRESENT", confirmed: true, issue: null,
-    result: { value: "PASS", remarks: "Strong DSA fundamentals, clear communication.", publishedAt: hoursFromNow(-6), history: [{ v: 1, value: "PASS", source: "TPO_ENTERED" }] } },
-  { id: "iv7", ...ROSTER[6], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-21), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/sneha", instructions: "Join 10 min early with your ID visible.",
-    status: "RESULT_PUBLISHED", attendance: "PRESENT", confirmed: true, issue: null,
-    result: { value: "FAIL", remarks: "Struggled with system design tradeoffs.", publishedAt: hoursFromNow(-6), history: [{ v: 1, value: "FAIL", source: "TPO_ENTERED" }] } },
-  { id: "iv8", ...ROSTER[7], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-22), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/vikram", instructions: "Join 10 min early with your ID visible.",
-    status: "RESULT_PUBLISHED", attendance: "PRESENT", confirmed: true, issue: null,
-    result: { value: "HOLD", remarks: "Panel wants a second opinion on the design round.", publishedAt: hoursFromNow(-6), history: [{ v: 1, value: "HOLD", source: "TPO_ENTERED" }] } },
-  { id: "iv9", ...ROSTER[8], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-23), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/ishita", instructions: "Join 10 min early with your ID visible.",
-    status: "NO_SHOW", attendance: "ABSENT", confirmed: true, issue: null, result: null },
-  { id: "iv10", ...ROSTER[9], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-1), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/sanjay", instructions: "Join 10 min early with your ID visible.",
-    status: "CANCELLED", attendance: "NOT_RECORDED", confirmed: false, issue: null, result: null },
-  { id: "iv11", ...ROSTER[10], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-5), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/ananya", instructions: "Join 10 min early with your ID visible.",
-    status: "RESULT_PENDING", attendance: "PRESENT", confirmed: true, issue: null, result: null },
-  { id: "iv12", ...ROSTER[11], company: "Solstice Robotics", role: "Graduate Software Engineer", round: "Technical",
-    scheduledAt: hoursFromNow(-24), mode: "ONLINE", meetingRef: "https://meet.example.edu/iv/nikhil", instructions: "Join 10 min early with your ID visible.",
-    status: "RESULT_PUBLISHED", attendance: "PRESENT", confirmed: true, issue: null,
-    result: { value: "PASS", remarks: "Excellent problem decomposition.", publishedAt: hoursFromNow(-6), history: [{ v: 1, value: "PASS", source: "TPO_ENTERED" }] } },
-];
+interface ResultRecord {
+  id: string;
+  result: ResultValue;
+  remarks: string | null;
+  publication_state: PublicationState;
+  version: number;
+  result_source: string;
+  created_at: string;
+  published_at: string | null;
+}
 
-const SAMPLE_CSV =
-  "Register Number,Name,Result,Remarks\n" +
-  "26IT103,Meera Nair,PASS,Panel scoresheet upload\n" +
-  "26CO104,Karthik Reddy,FAIL,Panel scoresheet upload\n" +
-  "26EC105,Divya Menon,HOLD,Needs second opinion\n" +
-  "26EC111,Ananya Menon,PASS,Panel scoresheet upload\n" +
-  "26EC111,Ananya Menon,PASS,duplicate row test\n" +
-  "26CO999,Unknown Student,PASS,unrecognized register number\n" +
-  "26EC108,Vikram Rao,PASS,recruiter says reconsider (conflict test)\n";
+interface InterviewDetailResponse {
+  interview: InterviewRow;
+  current_result: ResultRecord | null;
+  result_history: ResultRecord[];
+  issues: InterviewIssue[];
+  legal_next_states: InterviewStatus[];
+  audit: Array<{ action: string; actor_label: string | null; occurred_at: string }>;
+}
 
-/* ============================================================
-   SMALL PRESENTATIONAL PIECES
-   ============================================================ */
-const STATUS_META = {
-  SCHEDULED: { label: "Scheduled", textClass: 'text-slate-400', bgClass: 'bg-white/5', Icon: Calendar },
-  CONFIRMED: { label: "Confirmed", textClass: 'text-blue-400', bgClass: 'bg-white/5', Icon: CheckCircle2 },
-  RESULT_PENDING: { label: "Result Pending", textClass: 'text-amber-400', bgClass: 'bg-amber-500/10', Icon: Clock3 },
-  RESULT_PUBLISHED: { label: "Published", textClass: 'text-emerald-400', bgClass: 'bg-emerald-500/10', Icon: CheckCircle2 },
-  NO_SHOW: { label: "No Show", textClass: 'text-rose-400', bgClass: 'bg-rose-500/10', Icon: XCircle },
-  CANCELLED: { label: "Cancelled", textClass: 'text-slate-400', bgClass: 'bg-white/5', Icon: X },
+interface Drive {
+  id: string;
+  title: string;
+  company_name: string;
+  role: string;
+  status: string;
+}
+
+interface CollegeStudent {
+  user_id: string;
+  student_code: string | null;
+  full_name: string;
+  email: string;
+  department_name: string | null;
+}
+
+interface Round {
+  id: string;
+  name: string;
+  sequence: number;
+}
+
+interface PendingResult {
+  interview_id: string;
+  result: ResultValue;
+  remarks: string | null;
+  publication_state: PublicationState;
+  student_name: string;
+  student_code: string | null;
+  company_name: string;
+  drive_title: string;
+}
+
+interface ImportInput {
+  student_code: string;
+  interview_id?: string;
+  result: string;
+  remarks?: string;
+}
+
+interface ImportValidation {
+  committed: number;
+  valid: Array<ImportInput & { row: number; student_name: string; interview_id: string }>;
+  errors: Array<{ row: number; student_code: string; code: string; detail?: string }>;
+  atomic: boolean;
+}
+
+const STATUS_STYLE: Record<InterviewStatus, string> = {
+  SCHEDULED: "border-slate-500/30 bg-slate-500/10 text-slate-300",
+  CONFIRMED: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+  ATTENDED: "border-cyan-500/30 bg-cyan-500/10 text-cyan-300",
+  COMPLETED: "border-violet-500/30 bg-violet-500/10 text-violet-300",
+  NO_SHOW: "border-rose-500/30 bg-rose-500/10 text-rose-300",
+  CANCELLED: "border-slate-500/30 bg-slate-500/10 text-slate-400",
+  RESCHEDULED: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  RESULT_PENDING: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  RESULT_PUBLISHED: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
 };
-const RESULT_META = {
-  PASS: { label: "PASS", textClass: 'text-emerald-400', bgClass: 'bg-emerald-500/10', Icon: CheckCircle2 },
-  FAIL: { label: "FAIL", textClass: 'text-rose-400', bgClass: 'bg-rose-500/10', Icon: XCircle },
-  HOLD: { label: "HOLD", textClass: 'text-amber-400', bgClass: 'bg-amber-500/10', Icon: Clock3 },
+
+const RESULT_STYLE: Record<ResultValue, string> = {
+  PASS: "text-emerald-300",
+  FAIL: "text-rose-300",
+  HOLD: "text-amber-300",
+  NO_SHOW: "text-rose-300",
+  DISQUALIFIED: "text-rose-300",
+  PENDING: "text-slate-300",
 };
 
-function Chip({ textClass, bgClass, Icon, children }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${textClass} ${bgClass}`}>
-      {Icon ? <Icon size={13} strokeWidth={2.5} /> : null}
-      {children}
-    </span>
-  );
+const ALL_STATUSES = Object.keys(STATUS_STYLE) as InterviewStatus[];
+const RESULT_VALUES = Object.keys(RESULT_STYLE) as ResultValue[];
+
+function formatDate(value: string | null): string {
+  if (!value) return "Not scheduled";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Invalid date";
+  return date.toLocaleString(undefined, {
+    weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  });
 }
-function StatusChip({ status }) {
-  const m = STATUS_META[status] || STATUS_META.SCHEDULED;
-  return <Chip textClass={m.textClass} bgClass={m.bgClass} Icon={m.Icon}>{m.label}</Chip>;
+
+function friendlyStatus(value: string): string {
+  return value.toLowerCase().split("_").map((word) => word[0].toUpperCase() + word.slice(1)).join(" ");
 }
-function ResultChip({ value }) {
-  if (!value) return <span className="text-xs" className="text-slate-400">—</span>;
-  const m = RESULT_META[value];
-  return <Chip textClass={m.textClass} bgClass={m.bgClass} Icon={m.Icon}>{m.label}</Chip>;
+
+function StatusBadge({ status }: { status: InterviewStatus }) {
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[status]}`}>{friendlyStatus(status)}</span>;
 }
-function SectionLabel({ children }) {
-  return (
-    <div className="text-xs font-bold uppercase tracking-widest mb-2" className="text-amber-500">
-      {children}
-    </div>
-  );
+
+function ResultBadge({ result }: { result: ResultValue | null }) {
+  if (!result) return <span className="text-xs text-slate-500">Not entered</span>;
+  return <span className={`text-xs font-bold ${RESULT_STYLE[result]}`}>{friendlyStatus(result)}</span>;
 }
-function Card({ children, className = "", onClick }) {
-  return (
-    <div onClick={onClick}
-         className={`rounded-xl border p-4 bg-white ${onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""} ${className}`}
-         >
-      {children}
-    </div>
-  );
-}
-function MetricCard({ label, value, accent }) {
-  return (
-    <div className="rounded-xl p-4 flex-1 min-w-[120px]" style={{ backgroundColor: C.white, border: `1px solid ${C.line}` }}>
-      <div className="text-xs font-semibold uppercase tracking-wide" className="text-slate-400">{label}</div>
-      <div className="text-2xl font-bold mt-1" >{value}</div>
-    </div>
-  );
-}
-function Button({ children, onClick, variant = "primary", disabled, small }) {
-  const styles = {
-    primary: { backgroundColor: C.navy, color: C.white },
-    brass: { backgroundColor: C.brass, color: C.navy },
-    ghost: { backgroundColor: "transparent", color: C.navy, border: `1px solid ${C.line}` },
-    danger: { backgroundColor: C.brick, color: C.white },
+
+function ActionButton({ children, onClick, disabled, tone = "primary", type = "button" }: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  tone?: "primary" | "secondary" | "danger";
+  type?: "button" | "submit";
+}) {
+  const tones = {
+    primary: "bg-blue-600 text-white hover:bg-blue-500",
+    secondary: "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+    danger: "bg-rose-600 text-white hover:bg-rose-500",
   };
   return (
-    <button onClick={onClick} disabled={disabled}
-      className={`rounded-lg font-semibold transition-opacity ${small ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} ${disabled ? "opacity-40 cursor-not-allowed" : "hover:opacity-85"}`}
-      style={styles[variant]}>
+    <button type={type} onClick={onClick} disabled={disabled}
+      className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]}`}>
       {children}
     </button>
   );
 }
 
-/* ============================================================
-   TPO — Overview + list
-   ============================================================ */
-function TpoOverview({ interviews, issues }) {
-  const today = interviews.filter((i) => fmtShort(i.scheduledAt) === fmtShort(new Date()));
-  const upcoming = interviews.filter((i) => i.scheduledAt > new Date() && i.status !== "CANCELLED");
-  const resultsPending = interviews.filter((i) => i.status === "RESULT_PENDING");
-  const published = interviews.filter((i) => i.status === "RESULT_PUBLISHED");
-  const noShows = interviews.filter((i) => i.status === "NO_SHOW");
-  const openIssues = issues.filter((x) => x.status === "OPEN");
-  return (
-    <div className="flex flex-wrap gap-3 mb-6">
-      <MetricCard label="Today's Interviews" value={today.length} />
-      <MetricCard label="Upcoming" value={upcoming.length} />
-      <MetricCard label="Results Pending" value={resultsPending.length} accent="text-amber-400" />
-      <MetricCard label="Published" value={published.length} accent="text-emerald-400" />
-      <MetricCard label="No-Shows" value={noShows.length} accent="text-rose-400" />
-      <MetricCard label="Issues Open" value={openIssues.length} accent={openIssues.length ? "text-rose-400" : undefined} />
-    </div>
-  );
+function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <section className={`rounded-xl border border-white/10 bg-white/[0.03] ${className}`}>{children}</section>;
 }
 
-function InterviewRow({ iv, onOpen }) {
-  return (
-    <tr className="border-b hover:bg-[--rowhover] cursor-pointer"  onClick={() => onOpen(iv.id)}>
-      <td className="py-2.5 px-3">
-        <div className="font-semibold" className="text-white">{iv.name}</div>
-        <div className="text-xs font-mono" className="text-slate-400">{iv.regNo}</div>
-      </td>
-      <td className="py-2.5 px-3 text-sm" className="text-slate-400">{iv.dept}</td>
-      <td className="py-2.5 px-3 text-sm">{iv.round}</td>
-      <td className="py-2.5 px-3 text-sm whitespace-nowrap">{fmtDateTime(iv.scheduledAt)}</td>
-      <td className="py-2.5 px-3"><StatusChip status={iv.status} /></td>
-      <td className="py-2.5 px-3"><ResultChip value={iv.result ? iv.result.value : null} /></td>
-      <td className="py-2.5 px-3 text-right"><ChevronRight size={16} className="text-slate-400" /></td>
-    </tr>
-  );
-}
+function SchedulePanel({ drives, students, onClose, onCreated }: {
+  drives: Drive[];
+  students: CollegeStudent[];
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+}) {
+  const [driveId, setDriveId] = useState(drives[0]?.id ?? "");
+  const [studentId, setStudentId] = useState(students[0]?.user_id ?? "");
+  const [roundId, setRoundId] = useState("");
+  const [rounds, setRounds] = useState<Round[]>([]);
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [location, setLocation] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-function TpoInterviewList({ interviews, onOpen }) {
-  const [status, setStatus] = useState("ALL");
-  const [dept, setDept] = useState("ALL");
-  const [search, setSearch] = useState("");
-  const depts = useMemo(() => Array.from(new Set(interviews.map((i) => i.dept))), [interviews]);
+  useEffect(() => {
+    let active = true;
+    if (!driveId) return;
+    api.listPlacementRounds<{ rounds: Round[] }>(driveId)
+      .then((response) => { if (active) setRounds(response.rounds ?? []); })
+      .catch((requestError: unknown) => { if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load rounds."); });
+    return () => { active = false; };
+  }, [driveId]);
 
-  const filtered = interviews.filter((i) => {
-    if (status !== "ALL" && i.status !== status) return false;
-    if (dept !== "ALL" && i.dept !== dept) return false;
-    if (search && !(i.name.toLowerCase().includes(search.toLowerCase()) || i.regNo.toLowerCase().includes(search.toLowerCase()))) return false;
-    return true;
-  }).sort((a, b) => a.scheduledAt - b.scheduledAt);
-
-  return (
-    <Card>
-      <div className="flex flex-wrap gap-2 mb-3">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or register no."
-               className="px-3 py-1.5 rounded-lg text-sm border flex-1 min-w-[180px]"  />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-2 py-1.5 rounded-lg text-sm border" >
-          <option value="ALL">All statuses</option>
-          {Object.keys(STATUS_META).map((s) => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
-        </select>
-        <select value={dept} onChange={(e) => setDept(e.target.value)} className="px-2 py-1.5 rounded-lg text-sm border" >
-          <option value="ALL">All departments</option>
-          {depts.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="text-xs font-bold uppercase tracking-wide" className="text-slate-400">
-              <th className="py-2 px-3">Student</th><th className="py-2 px-3">Department</th>
-              <th className="py-2 px-3">Round</th><th className="py-2 px-3">Scheduled</th>
-              <th className="py-2 px-3">Status</th><th className="py-2 px-3">Result</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((iv) => <InterviewRow key={iv.id} iv={iv} onOpen={onOpen} />)}
-          </tbody>
-        </table>
-        {filtered.length === 0 && <div className="text-sm text-center py-8" className="text-slate-400">No interviews match these filters.</div>}
-      </div>
-    </Card>
-  );
-}
-
-/* ============================================================
-   TPO — Interview detail (attendance + result entry + history)
-   ============================================================ */
-function TpoInterviewDetail({ iv, onBack, onRecordAttendance, onEnterResult, onResolveIssue }) {
-  const [resultValue, setResultValue] = useState("PASS");
-  const [remarks, setRemarks] = useState("");
-  const hasCurrentResult = !!iv.result;
-
-  return (
-    <Card>
-      <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold mb-4" className="text-blue-400">
-        <ChevronLeft size={16} /> Back to list
-      </button>
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-widest" className="text-amber-500">{iv.company} · {iv.round} Interview</div>
-          <div className="text-xl font-bold mt-0.5" >{iv.name}</div>
-          <div className="text-sm font-mono" className="text-slate-400">{iv.regNo} · {iv.dept}</div>
-        </div>
-        <StatusChip status={iv.status} />
-      </div>
-
-      <div className="grid sm:grid-cols-2 gap-3 mb-5 text-sm">
-        <div className="flex items-center gap-2"><Calendar size={15} className="text-slate-400" /> {fmtDateTime(iv.scheduledAt)}</div>
-        <div className="flex items-center gap-2">
-          {iv.mode === "ONLINE" ? <Video size={15} className="text-slate-400" /> : <MapPin size={15} className="text-slate-400" />}
-          {iv.mode === "ONLINE" ? "Online" : iv.location || "On campus"}
-        </div>
-        <div className="flex items-center gap-2"><ShieldCheck size={15} className="text-slate-400" /> Attendance: {iv.attendance}</div>
-        <div className="flex items-center gap-2"><CheckCircle2 size={15} className="text-slate-400" /> Student confirmed: {iv.confirmed ? "Yes" : "No"}</div>
-      </div>
-
-      {iv.issue && (
-        <div className="rounded-lg p-3 mb-4 flex items-start gap-2" >
-          <FileWarning size={16}  />
-          <div className="text-sm flex-1">
-            <div className="font-semibold" className="text-rose-400">Student reported an issue — {iv.issue.status}</div>
-            <div className="text-white">{iv.issue.details}</div>
-          </div>
-          {iv.issue.status === "OPEN" && (
-            <Button small variant="ghost" onClick={() => onResolveIssue(iv.id)}>Mark resolved</Button>
-          )}
-        </div>
-      )}
-
-      {iv.attendance === "NOT_RECORDED" && (
-        <div className="mb-5">
-          <SectionLabel>Record attendance</SectionLabel>
-          <div className="flex gap-2">
-            <Button small onClick={() => onRecordAttendance(iv.id, "PRESENT")}>Present</Button>
-            <Button small variant="ghost" onClick={() => onRecordAttendance(iv.id, "LATE")}>Late</Button>
-            <Button small variant="danger" onClick={() => onRecordAttendance(iv.id, "ABSENT")}>Absent</Button>
-          </div>
-        </div>
-      )}
-
-      {(iv.status === "RESULT_PENDING" || hasCurrentResult) && (
-        <div className="mb-2">
-          <SectionLabel>{hasCurrentResult ? "Current result (internal)" : "Enter result"}</SectionLabel>
-          {hasCurrentResult ? (
-            <div className="flex items-center gap-3 mb-2">
-              <ResultChip value={iv.result.value} />
-              <span className="text-sm" className="text-slate-400">{iv.result.remarks}</span>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-end gap-2">
-              <select value={resultValue} onChange={(e) => setResultValue(e.target.value)} className="px-3 py-2 rounded-lg border text-sm" >
-                <option value="PASS">PASS</option><option value="FAIL">FAIL</option><option value="HOLD">HOLD</option>
-              </select>
-              <input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Remarks (panel notes)"
-                     className="px-3 py-2 rounded-lg border text-sm flex-1 min-w-[180px]"  />
-              <Button onClick={() => onEnterResult(iv.id, resultValue, remarks)}>Save (internal only)</Button>
-            </div>
-          )}
-          {hasCurrentResult && iv.result.history && iv.result.history.length > 1 && (
-            <div className="mt-3 text-xs" className="text-slate-400">
-              <div className="flex items-center gap-1 font-semibold mb-1"><History size={12} /> Version history</div>
-              {iv.result.history.map((h) => <div key={h.v}>v{h.v}: {h.value} ({h.source})</div>)}
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-/* ============================================================
-   TPO — Results Pending workbench
-   ============================================================ */
-function ResultsPendingWorkbench({ interviews, onOpen }) {
-  const pending = interviews.filter((i) => i.status === "RESULT_PENDING").sort((a, b) => a.scheduledAt - b.scheduledAt);
-  return (
-    <Card>
-      <SectionLabel>Results Pending — {pending.length}</SectionLabel>
-      {pending.length === 0 ? (
-        <div className="text-sm py-6 text-center" className="text-slate-400">Nothing waiting on a result right now.</div>
-      ) : (
-        <div className="divide-y" >
-          {pending.map((iv) => {
-            const hoursWaiting = Math.max(0, Math.round((Date.now() - iv.scheduledAt.getTime()) / 3600000));
-            return (
-              <div key={iv.id} className="py-2.5 flex items-center justify-between cursor-pointer" onClick={() => onOpen(iv.id)}>
-                <div>
-                  <div className="font-semibold text-sm">{iv.name} <span className="font-mono font-normal" className="text-slate-400">· {iv.regNo}</span></div>
-                  <div className="text-xs" className="text-slate-400">{iv.company} — {iv.round}, completed {fmtDateTime(iv.scheduledAt)}</div>
-                </div>
-                <Chip color={hoursWaiting > 24 ? C.brick : C.amber} bg={hoursWaiting > 24 ? C.brickBg : C.amberBg}>
-                  {hoursWaiting}h waiting
-                </Chip>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-/* ============================================================
-   TPO — Import panel (real client-side validation via PapaParse)
-   ============================================================ */
-function ImportPanel({ interviews, onCommitImport }) {
-  const [csvText, setCsvText] = useState(SAMPLE_CSV);
-  const [preview, setPreview] = useState(null);
-
-  function validate() {
-    const parsed = Papa.parse(csvText.trim(), { header: true, skipEmptyLines: true });
-    const seen = new Set();
-    const buckets = { valid: [], unknown: [], duplicate: [], conflict: [] };
-    parsed.data.forEach((row) => {
-      const regNo = (row["Register Number"] || "").trim();
-      const result = (row["Result"] || "").trim().toUpperCase();
-      if (!regNo) return;
-      if (seen.has(regNo)) { buckets.duplicate.push({ regNo, result }); return; }
-      seen.add(regNo);
-      const student = ROSTER.find((s) => s.regNo === regNo);
-      if (!student) { buckets.unknown.push({ regNo, result }); return; }
-      const iv = interviews.find((i) => i.regNo === regNo);
-      if (iv && iv.result && iv.result.value !== result) {
-        buckets.conflict.push({ regNo, name: student.name, existing: iv.result.value, incoming: result });
-        return;
-      }
-      buckets.valid.push({ regNo, name: student.name, result, remarks: row["Remarks"] || "" });
-    });
-    setPreview(buckets);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!driveId || !studentId || !scheduledAt) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.schedulePlacementInterview({
+        drive_id: driveId,
+        student_id: studentId,
+        round_execution_id: roundId || null,
+        scheduled_at: new Date(scheduledAt).toISOString(),
+        location_or_link: location.trim() || null,
+      });
+      await onCreated();
+      onClose();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to schedule interview.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <Card>
-      <SectionLabel>Import recruiter results (CSV)</SectionLabel>
-      <textarea value={csvText} onChange={(e) => { setCsvText(e.target.value); setPreview(null); }}
-                className="w-full h-32 text-xs font-mono p-2 rounded-lg border mb-3"  />
-      <Button variant="ghost" onClick={validate}><span className="inline-flex items-center gap-1"><Upload size={14} /> Validate file</span></Button>
+    <Panel className="mb-5 p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-bold text-white">Schedule placement interview</h2>
+        <button onClick={onClose} aria-label="Close scheduling form" className="text-slate-400 hover:text-white"><XCircle size={20} /></button>
+      </div>
+      <form onSubmit={submit} className="grid gap-3 md:grid-cols-2">
+        <label className="text-xs font-semibold text-slate-400">Drive
+          <select required value={driveId} onChange={(event) => { setDriveId(event.target.value); setRoundId(""); }} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white">
+            {drives.map((drive) => <option value={drive.id} key={drive.id}>{drive.company_name} — {drive.role}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-slate-400">Student
+          <select required value={studentId} onChange={(event) => setStudentId(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white">
+            {students.map((student) => <option value={student.user_id} key={student.user_id}>{student.full_name} ({student.student_code || student.email})</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-slate-400">Round (optional)
+          <select value={roundId} onChange={(event) => setRoundId(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white">
+            <option value="">No assigned round</option>
+            {rounds.map((round) => <option value={round.id} key={round.id}>{round.sequence}. {round.name}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-slate-400">Date and time
+          <input required type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" />
+        </label>
+        <label className="text-xs font-semibold text-slate-400 md:col-span-2">Location or meeting link
+          <input value={location} maxLength={500} onChange={(event) => setLocation(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" placeholder="Room 204 or https://meet…" />
+        </label>
+        {error && <div role="alert" className="text-sm text-rose-300 md:col-span-2">{error}</div>}
+        <div className="flex gap-2 md:col-span-2">
+          <ActionButton type="submit" disabled={busy || !drives.length || !students.length}>{busy ? "Scheduling…" : "Schedule interview"}</ActionButton>
+          <ActionButton onClick={onClose} tone="secondary">Cancel</ActionButton>
+        </div>
+      </form>
+    </Panel>
+  );
+}
 
-      {preview && (
-        <div className="mt-4 space-y-3">
-          <div className="flex flex-wrap gap-2 text-sm">
-            <Chip color={C.forest} bg={C.forestBg}>{preview.valid.length} valid</Chip>
-            <Chip color={C.brick} bg={C.brickBg}>{preview.unknown.length} unknown student</Chip>
-            <Chip color={C.amber} bg={C.amberBg}>{preview.duplicate.length} duplicate in file</Chip>
-            <Chip color={C.brick} bg={C.brickBg}>{preview.conflict.length} conflict</Chip>
+function DetailPanel({ detail, busy, onBack, onMutate }: {
+  detail: InterviewDetailResponse;
+  busy: boolean;
+  onBack: () => void;
+  onMutate: (action: () => Promise<unknown>) => Promise<void>;
+}) {
+  const interview = detail.interview;
+  const [result, setResult] = useState<ResultValue>(detail.current_result?.result ?? "PASS");
+  const [remarks, setRemarks] = useState(detail.current_result?.remarks ?? "");
+  const [resolutions, setResolutions] = useState<Record<string, string>>({});
+  const canRecordAttendance = ["SCHEDULED", "CONFIRMED"].includes(interview.interview_status);
+  const canEnterResult = ["ATTENDED", "COMPLETED", "RESULT_PENDING", "NO_SHOW"].includes(interview.interview_status)
+    && detail.current_result?.publication_state !== "PUBLISHED_TO_STUDENT";
+
+  async function publish() {
+    await onMutate(async () => {
+      if (detail.current_result?.publication_state === "INTERNAL_RESULT") {
+        await api.reviewPlacementResults(interview.id, { notes: "Reviewed and approved for publication." });
+      }
+      await api.publishPlacementResults(interview.id, {});
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <button onClick={onBack} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-300"><ArrowLeft size={16} /> Back to interviews</button>
+      <Panel className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-300">{interview.company_name} · {interview.round_name || "Interview"}</p>
+            <h2 className="mt-1 text-xl font-bold text-white">{interview.student_name}</h2>
+            <p className="text-sm text-slate-400">{interview.student_code || interview.student_email} · {interview.department_name || "Department not assigned"}</p>
           </div>
-          {preview.conflict.length > 0 && (
-            <div className="text-xs rounded-lg p-2" >
-              {preview.conflict.map((c, idx) => (
-                <div key={idx}>Conflict: {c.name} ({c.regNo}) — published result is {c.existing}, file says {c.incoming}. Not imported; resolve manually.</div>
+          <StatusBadge status={interview.interview_status} />
+        </div>
+        <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+          <p><span className="text-slate-500">When:</span> {formatDate(interview.scheduled_at)}</p>
+          <p><span className="text-slate-500">Where:</span> {interview.location_or_link || "Not specified"}</p>
+          <p><span className="text-slate-500">Role:</span> {interview.role}</p>
+          <p><span className="text-slate-500">Attendance:</span> {friendlyStatus(interview.attendance_status)}</p>
+        </div>
+      </Panel>
+
+      {canRecordAttendance && (
+        <Panel className="p-5">
+          <h3 className="mb-3 font-bold text-white">Record attendance</h3>
+          <div className="flex flex-wrap gap-2">
+            {(["PRESENT", "LATE", "ABSENT", "EXCUSED"] as AttendanceStatus[]).map((status) => (
+              <ActionButton key={status} disabled={busy} tone={status === "ABSENT" ? "danger" : "secondary"}
+                onClick={() => onMutate(() => api.recordPlacementAttendance(interview.id, { attendance_status: status }))}>
+                {friendlyStatus(status)}
+              </ActionButton>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {detail.legal_next_states.length > 0 && (
+        <Panel className="p-5">
+          <h3 className="mb-3 font-bold text-white">Lifecycle actions</h3>
+          <div className="flex flex-wrap gap-2">
+            {detail.legal_next_states.map((status) => (
+              <ActionButton key={status} disabled={busy} tone="secondary"
+                onClick={() => onMutate(() => api.transitionPlacementInterview(interview.id, { to_status: status }))}>
+                Move to {friendlyStatus(status)}
+              </ActionButton>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      <Panel className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-bold text-white">Result</h3>
+          {detail.current_result && <span className="text-xs text-slate-400">Version {detail.current_result.version} · {friendlyStatus(detail.current_result.publication_state)}</span>}
+        </div>
+        {canEnterResult ? (
+          <div className="mt-3 grid gap-3">
+            <select value={result} onChange={(event) => setResult(event.target.value as ResultValue)} className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white sm:w-64">
+              {RESULT_VALUES.map((value) => <option value={value} key={value}>{friendlyStatus(value)}</option>)}
+            </select>
+            <textarea value={remarks} onChange={(event) => setRemarks(event.target.value)} maxLength={4000} rows={3} placeholder="Recruiter or panel remarks" className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" />
+            <div className="flex flex-wrap gap-2">
+              <ActionButton disabled={busy} onClick={() => onMutate(() => api.enterPlacementResult(interview.id, { result, remarks, result_source: "TPO_ENTERED" }))}>Save internal result</ActionButton>
+              {detail.current_result && <ActionButton disabled={busy} tone="danger" onClick={publish}>Review and publish</ActionButton>}
+            </div>
+          </div>
+        ) : detail.current_result ? (
+          <div className="mt-3">
+            <ResultBadge result={detail.current_result.result} />
+            <p className="mt-2 text-sm text-slate-300">{detail.current_result.remarks || "No remarks."}</p>
+            {detail.current_result.publication_state !== "PUBLISHED_TO_STUDENT" && (
+              <div className="mt-3"><ActionButton disabled={busy} tone="danger" onClick={publish}>Review and publish</ActionButton></div>
+            )}
+          </div>
+        ) : <p className="mt-3 text-sm text-slate-400">Complete attendance before entering a result.</p>}
+
+        {detail.result_history.length > 0 && (
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Version history</p>
+            <div className="space-y-2">
+              {detail.result_history.map((record) => (
+                <div key={record.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span><ResultBadge result={record.result} /> <span className="ml-2 text-slate-400">v{record.version} · {record.result_source}</span></span>
+                  <span className="text-xs text-slate-500">{formatDate(record.created_at)}</span>
+                </div>
               ))}
             </div>
-          )}
-          {preview.unknown.length > 0 && (
-            <div className="text-xs" className="text-slate-400">
-              Unknown: {preview.unknown.map((u) => u.regNo).join(", ")} — no student with this register number.
-            </div>
-          )}
-          <Button variant="brass" disabled={preview.valid.length === 0} onClick={() => { onCommitImport(preview.valid); setPreview(null); }}>
-            Commit {preview.valid.length} valid result{preview.valid.length === 1 ? "" : "s"} (internal only)
-          </Button>
-        </div>
+          </div>
+        )}
+      </Panel>
+
+      {detail.issues.length > 0 && (
+        <Panel className="p-5">
+          <h3 className="mb-3 font-bold text-white">Reported issues</h3>
+          <div className="space-y-3">
+            {detail.issues.map((issue) => (
+              <div key={issue.id} className="rounded-lg border border-white/10 bg-black/10 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div><p className="text-sm font-semibold text-white">{friendlyStatus(issue.issue_type)}</p><p className="mt-1 text-sm text-slate-400">{issue.description || "No description provided."}</p></div>
+                  <span className={issue.status === "OPEN" ? "text-xs font-bold text-rose-300" : "text-xs font-bold text-emerald-300"}>{issue.status}</span>
+                </div>
+                {issue.status === "OPEN" ? (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input value={resolutions[issue.id] ?? ""} maxLength={2000} onChange={(event) => setResolutions((current) => ({ ...current, [issue.id]: event.target.value }))} placeholder="Resolution provided to the student" className="flex-1 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" />
+                    <ActionButton disabled={busy || !(resolutions[issue.id] ?? "").trim()} onClick={() => onMutate(() => api.resolvePlacementIssue(interview.id, issue.id, resolutions[issue.id].trim()))}>Resolve</ActionButton>
+                  </div>
+                ) : issue.resolution && <p className="mt-2 text-xs text-emerald-200">Resolution: {issue.resolution}</p>}
+              </div>
+            ))}
+          </div>
+        </Panel>
       )}
-    </Card>
+    </div>
   );
 }
 
-/* ============================================================
-   TPO — Review & Publish
-   ============================================================ */
-function ReviewPublishPanel({ interviews, onPublishAll }) {
-  const [confirming, setConfirming] = useState(false);
-  const readyToPublish = interviews.filter((i) => i.result && i.status !== "RESULT_PUBLISHED");
-  const counts = { PASS: 0, FAIL: 0, HOLD: 0 };
-  readyToPublish.forEach((i) => { counts[i.result.value] = (counts[i.result.value] || 0) + 1; });
-  const missing = interviews.filter((i) => i.status === "RESULT_PENDING" && !i.result).length;
+function ImportPanel({ drives, onCommitted }: { drives: Drive[]; onCommitted: () => Promise<void> }) {
+  const [csvText, setCsvText] = useState("Student Code,Interview ID,Result,Remarks\n");
+  const [driveId, setDriveId] = useState("");
+  const [rows, setRows] = useState<ImportInput[]>([]);
+  const [preview, setPreview] = useState<ImportValidation | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  function parseRows(): ImportInput[] {
+    const parsed = Papa.parse<Record<string, string>>(csvText, { header: true, skipEmptyLines: true });
+    if (parsed.errors.length) throw new Error(`CSV row ${parsed.errors[0].row ?? 0}: ${parsed.errors[0].message}`);
+    return parsed.data.map((row) => ({
+      student_code: (row["Student Code"] || row["Register Number"] || "").trim(),
+      interview_id: (row["Interview ID"] || "").trim() || undefined,
+      result: (row.Result || "").trim().toUpperCase(),
+      remarks: (row.Remarks || "").trim() || undefined,
+    })).filter((row) => row.student_code || row.interview_id || row.result);
+  }
+
+  async function validate() {
+    setBusy(true);
+    setError("");
+    try {
+      const parsedRows = parseRows();
+      if (!parsedRows.length) throw new Error("Add at least one result row.");
+      const response = await api.importPlacementResults<ImportValidation>({ rows: parsedRows, drive_id: driveId || null, commit: false });
+      setRows(parsedRows);
+      setPreview(response);
+    } catch (requestError) {
+      setPreview(null);
+      setError(requestError instanceof Error ? requestError.message : "Unable to validate CSV.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commit() {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await api.importPlacementResults<ImportValidation>({ rows, drive_id: driveId || null, commit: true });
+      setPreview(response);
+      if (response.committed > 0) {
+        await onCommitted();
+        setCsvText("Student Code,Interview ID,Result,Remarks\n");
+        setRows([]);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to import results.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <Card>
-      <SectionLabel>Review before publication</SectionLabel>
-      {readyToPublish.length === 0 ? (
-        <div className="text-sm py-4" className="text-slate-400">No internally-entered results waiting to publish.</div>
-      ) : (
-        <>
-          <div className="flex flex-wrap gap-2 mb-3">
-            <Chip color={C.forest} bg={C.forestBg}>{counts.PASS} PASS</Chip>
-            <Chip color={C.brick} bg={C.brickBg}>{counts.FAIL} FAIL</Chip>
-            <Chip color={C.amber} bg={C.amberBg}>{counts.HOLD} HOLD</Chip>
-            {missing > 0 && <Chip color={C.inkSoft} bg={C.slateBg}>{missing} still missing</Chip>}
-          </div>
-          {!confirming ? (
-            <Button variant="brass" onClick={() => setConfirming(true)}>Publish {readyToPublish.length} results to students</Button>
-          ) : (
-            <div className="rounded-lg p-3" className="bg-white/5">
-              <div className="text-sm font-semibold mb-2" className="text-white">
-                Publish results to {readyToPublish.length} students? This is visible to them immediately.
-              </div>
-              <div className="flex gap-2">
-                <Button variant="danger" small onClick={() => { onPublishAll(readyToPublish.map((i) => i.id)); setConfirming(false); }}>
-                  Confirm publish
-                </Button>
-                <Button variant="ghost" small onClick={() => setConfirming(false)}>Cancel</Button>
-              </div>
+    <Panel className="p-5">
+      <h2 className="font-bold text-white">Import recruiter results</h2>
+      <p className="mt-1 text-sm text-slate-400">Preview is read-only. Commit succeeds atomically only when every row is valid. Add Interview ID when one student has multiple interviews.</p>
+      <select value={driveId} onChange={(event) => { setDriveId(event.target.value); setPreview(null); }} className="mt-4 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white sm:w-96">
+        <option value="">All drives (student must have one matching interview)</option>
+        {drives.map((drive) => <option value={drive.id} key={drive.id}>{drive.company_name} — {drive.role}</option>)}
+      </select>
+      <textarea value={csvText} onChange={(event) => { setCsvText(event.target.value); setPreview(null); }} rows={10} className="mt-3 w-full rounded-lg border border-white/10 bg-slate-950 p-3 font-mono text-xs text-white" />
+      <div className="mt-3 flex gap-2"><ActionButton disabled={busy} onClick={validate}>{busy ? "Checking…" : "Validate CSV"}</ActionButton></div>
+      {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
+      {preview && (
+        <div className="mt-4 space-y-3">
+          <div className="flex gap-3 text-sm"><span className="text-emerald-300">{preview.valid.length} valid</span><span className="text-rose-300">{preview.errors.length} errors</span></div>
+          {preview.errors.length > 0 && (
+            <div className="max-h-48 overflow-auto rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-xs text-rose-200">
+              {preview.errors.map((item) => <p key={`${item.row}-${item.code}`}>Row {item.row} ({item.student_code || "blank"}): {friendlyStatus(item.code)}{item.detail ? ` — ${item.detail}` : ""}</p>)}
             </div>
           )}
+          {preview.valid.length > 0 && <p className="text-xs text-slate-400">Ready: {preview.valid.map((item) => `${item.student_name} (${item.result})`).join(", ")}</p>}
+          <ActionButton disabled={busy || preview.errors.length > 0 || preview.valid.length === 0} tone="danger" onClick={commit}>Commit {preview.valid.length} internal results</ActionButton>
+          {preview.committed > 0 && <p className="text-sm text-emerald-300"><CheckCircle2 className="mr-1 inline" size={15} />Imported {preview.committed} results.</p>}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function PublishPanel({ items, busy, onPublish }: { items: PendingResult[]; busy: boolean; onPublish: (ids: string[]) => Promise<void> }) {
+  const [confirming, setConfirming] = useState(false);
+  const counts = useMemo(() => items.reduce<Record<string, number>>((current, item) => {
+    current[item.result] = (current[item.result] ?? 0) + 1;
+    return current;
+  }, {}), [items]);
+
+  return (
+    <Panel className="p-5">
+      <h2 className="font-bold text-white">Review and publish</h2>
+      <p className="mt-1 text-sm text-slate-400">Publication is atomic and immediately makes these results visible to students.</p>
+      {items.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No results are waiting for publication.</p> : (
+        <>
+          <div className="my-4 flex flex-wrap gap-2">{Object.entries(counts).map(([result, count]) => <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-slate-300" key={result}>{count} {friendlyStatus(result)}</span>)}</div>
+          <div className="max-h-96 overflow-auto rounded-lg border border-white/10">
+            {items.map((item) => (
+              <div key={item.interview_id} className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 p-3 last:border-0">
+                <div><p className="text-sm font-semibold text-white">{item.student_name} <span className="font-normal text-slate-500">{item.student_code}</span></p><p className="text-xs text-slate-400">{item.company_name} · {item.drive_title} · {friendlyStatus(item.publication_state)}</p></div>
+                <ResultBadge result={item.result} />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
+            {!confirming ? <ActionButton tone="danger" onClick={() => setConfirming(true)}>Publish all {items.length} results</ActionButton> : (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3">
+                <span className="mr-auto text-sm text-rose-100">Confirm publication to {items.length} students.</span>
+                <ActionButton disabled={busy} tone="danger" onClick={async () => { await onPublish(items.map((item) => item.interview_id)); setConfirming(false); }}>{busy ? "Publishing…" : "Confirm"}</ActionButton>
+                <ActionButton disabled={busy} tone="secondary" onClick={() => setConfirming(false)}>Cancel</ActionButton>
+              </div>
+            )}
+          </div>
         </>
       )}
-    </Card>
+    </Panel>
   );
 }
 
-/* ============================================================
-   STUDENT VIEWS
-   ============================================================ */
-function ResultMessage({ result }) {
-  if (!result) return null;
-  if (result.value === "PASS") return (
-    <div className="rounded-lg p-3 flex items-center gap-2" >
-      <CheckCircle2 size={18} className="text-emerald-400" />
-      <span className="font-semibold text-sm" className="text-emerald-400">Congratulations — you've progressed to the next round.</span>
-    </div>
-  );
-  if (result.value === "FAIL") return (
-    <div className="rounded-lg p-3 flex items-center gap-2" >
-      <XCircle size={18} className="text-rose-400" />
-      <span className="font-semibold text-sm" className="text-rose-400">Not selected for the next stage.</span>
-    </div>
-  );
-  return (
-    <div className="rounded-lg p-3 flex items-center gap-2" >
-      <Clock3 size={18}  />
-      <span className="font-semibold text-sm" >Result pending further review. The TPO will update you when a decision is available.</span>
-    </div>
-  );
-}
+export default function PlacementInterviewsPage() {
+  const [interviews, setInterviews] = useState<InterviewRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
+  const [querySearch, setQuerySearch] = useState("");
+  const [drives, setDrives] = useState<Drive[]>([]);
+  const [students, setStudents] = useState<CollegeStudent[]>([]);
+  const [pending, setPending] = useState<PendingResult[]>([]);
+  const [detail, setDetail] = useState<InterviewDetailResponse | null>(null);
+  const [tab, setTab] = useState<"interviews" | "import" | "publish">("interviews");
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-function StudentInterviewCard({ iv, onOpen }) {
+  useEffect(() => {
+    const handle = window.setTimeout(() => { setQuerySearch(search.trim()); setPage(1); }, 300);
+    return () => window.clearTimeout(handle);
+  }, [search]);
+
+  const loadList = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = { page: String(page), page_size: "50" };
+      if (status) params.status = status;
+      if (querySearch) params.search = querySearch;
+      const response = await api.getPlacementInterviews<InterviewListResponse>(params);
+      setInterviews(response.items ?? []);
+      setTotal(response.total ?? 0);
+      setError("");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load interviews.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, querySearch, status]);
+
+  const loadPending = useCallback(async () => {
+    const response = await api.getPendingReviewPlacementResults<{ items: PendingResult[] }>();
+    setPending(response.items ?? []);
+  }, []);
+
+  useEffect(() => { void loadList(); }, [loadList]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      api.listPlacementDrives<{ items: Drive[] }>(),
+      api.listCollegeStudents<{ students: CollegeStudent[] }>("page_size=100"),
+    ]).then(([driveResponse, studentResponse]) => {
+      if (!active) return;
+      setDrives(driveResponse.items ?? []);
+      setStudents(studentResponse.students ?? []);
+    }).catch((requestError: unknown) => {
+      if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load scheduling data.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "publish") return;
+    loadPending().catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load pending results."));
+  }, [loadPending, tab]);
+
+  async function openInterview(id: string) {
+    setLoading(true);
+    try {
+      setDetail(await api.getPlacementInterview<InterviewDetailResponse>(id));
+      setError("");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load interview details.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function mutate(action: () => Promise<unknown>) {
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      await loadList();
+      if (detail) setDetail(await api.getPlacementInterview<InterviewDetailResponse>(detail.interview.id));
+      if (tab === "publish") await loadPending();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "The operation could not be completed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pageCount = Math.max(1, Math.ceil(total / 50));
+
   return (
-    <Card onClick={() => onOpen(iv.id)} className="mb-2">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-widest" className="text-amber-500">{iv.company}</div>
-          <div className="font-semibold" >{iv.round} Interview</div>
-          <div className="text-sm mt-1 flex items-center gap-1" className="text-slate-400"><Calendar size={13} /> {fmtDateTime(iv.scheduledAt)}</div>
+    <div className="mx-auto max-w-7xl space-y-5 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><h1 className="text-2xl font-bold text-white">Placement Interviews</h1><p className="text-sm text-slate-400">Schedule interviews, record attendance, and control result publication.</p></div>
+        <div className="flex gap-2">
+          <ActionButton tone="secondary" disabled={loading} onClick={() => { void loadList(); }}><RefreshCw className="mr-1 inline" size={15} /> Refresh</ActionButton>
+          <ActionButton disabled={!drives.length || !students.length} onClick={() => setShowSchedule(true)}><CalendarPlus className="mr-1 inline" size={15} /> Schedule</ActionButton>
         </div>
-        <StatusChip status={iv.status} />
       </div>
-      {iv.result && <div className="mt-2"><ResultChip value={iv.result.value} /></div>}
-    </Card>
-  );
-}
 
-function StudentDashboard({ interviews, studentReg, onOpen }) {
-  const mine = interviews.filter((i) => i.regNo === studentReg);
-  const upcoming = mine.filter((i) => (i.status === "SCHEDULED" || i.status === "CONFIRMED") && i.scheduledAt > new Date());
-  const completedWithResult = mine.filter((i) => i.result);
-  const pendingResult = mine.filter((i) => !i.result && i.status !== "SCHEDULED" && i.status !== "CONFIRMED" && i.status !== "CANCELLED");
+      {error && <div role="alert" className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-200"><AlertCircle className="mt-0.5 shrink-0" size={16} />{error}</div>}
+      {showSchedule && <SchedulePanel drives={drives} students={students} onClose={() => setShowSchedule(false)} onCreated={loadList} />}
 
-  if (mine.length === 0) return <div className="text-sm py-10 text-center" className="text-slate-400">No interviews on record for this student yet.</div>;
-
-  return (
-    <div>
-      <SectionLabel>Upcoming</SectionLabel>
-      {upcoming.length ? upcoming.map((iv) => <StudentInterviewCard key={iv.id} iv={iv} onOpen={onOpen} />) : <div className="text-sm mb-4" className="text-slate-400">Nothing scheduled right now.</div>}
-      <div className="h-3" />
-      <SectionLabel>Pending Result</SectionLabel>
-      {pendingResult.length ? pendingResult.map((iv) => <StudentInterviewCard key={iv.id} iv={iv} onOpen={onOpen} />) : <div className="text-sm mb-4" className="text-slate-400">Nothing waiting on a result.</div>}
-      <div className="h-3" />
-      <SectionLabel>Completed</SectionLabel>
-      {completedWithResult.length ? completedWithResult.map((iv) => <StudentInterviewCard key={iv.id} iv={iv} onOpen={onOpen} />) : <div className="text-sm" className="text-slate-400">No results yet.</div>}
-    </div>
-  );
-}
-
-function StudentInterviewDetail({ iv, onBack, onConfirm, onReportIssue }) {
-  const [reporting, setReporting] = useState(false);
-  const [issueText, setIssueText] = useState("");
-  return (
-    <Card>
-      <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold mb-4" className="text-blue-400">
-        <ChevronLeft size={16} /> Back
-      </button>
-      <div className="text-xs font-bold uppercase tracking-widest" className="text-amber-500">{iv.company}</div>
-      <div className="text-xl font-bold mt-0.5 mb-3" >{iv.round} Interview</div>
-      <div className="space-y-2 text-sm mb-4">
-        <div className="flex items-center gap-2"><Calendar size={15} className="text-slate-400" /> {fmtDateTime(iv.scheduledAt)}</div>
-        <div className="flex items-center gap-2">
-          {iv.mode === "ONLINE" ? <Video size={15} className="text-slate-400" /> : <MapPin size={15} className="text-slate-400" />}
-          {iv.mode === "ONLINE" ? (iv.meetingRef || "Link available closer to the interview") : (iv.location || "On campus")}
+      {!detail && (
+        <div className="flex flex-wrap gap-2 border-b border-white/10 pb-3">
+          {(["interviews", "import", "publish"] as const).map((value) => (
+            <button key={value} onClick={() => setTab(value)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab === value ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+              {value === "interviews" ? "All interviews" : value === "import" ? <><FileUp className="mr-1 inline" size={14} />Import results</> : <><Send className="mr-1 inline" size={14} />Review & publish</>}
+            </button>
+          ))}
         </div>
-        {iv.instructions && <div className="text-sm italic" className="text-slate-400">{iv.instructions}</div>}
-      </div>
-      <div className="mb-4"><StatusChip status={iv.status} /></div>
+      )}
 
-      {iv.result ? (
-        <ResultMessage result={iv.result} />
-      ) : (iv.status === "SCHEDULED" || iv.status === "CONFIRMED") ? (
-        <div className="flex flex-wrap gap-2">
-          {!iv.confirmed && <Button small onClick={() => onConfirm(iv.id)}>Confirm attendance</Button>}
-          {!reporting ? (
-            <Button small variant="ghost" onClick={() => setReporting(true)}>Report an issue</Button>
+      {detail ? <DetailPanel key={`${detail.interview.id}-${detail.current_result?.version ?? 0}`} detail={detail} busy={busy} onBack={() => setDetail(null)} onMutate={mutate} /> : tab === "import" ? (
+        <ImportPanel drives={drives} onCommitted={async () => { await Promise.all([loadList(), loadPending()]); }} />
+      ) : tab === "publish" ? (
+        <PublishPanel items={pending} busy={busy} onPublish={async (ids) => mutate(() => api.publishPlacementResultsBatch(ids))} />
+      ) : (
+        <Panel>
+          <div className="flex flex-wrap gap-2 border-b border-white/10 p-4">
+            <label className="relative min-w-64 flex-1"><Search className="absolute left-3 top-2.5 text-slate-500" size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search student name, email, or code" className="w-full rounded-lg border border-white/10 bg-slate-950 py-2 pl-9 pr-3 text-sm text-white" /></label>
+            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white">
+              <option value="">All statuses</option>{ALL_STATUSES.map((value) => <option value={value} key={value}>{friendlyStatus(value)}</option>)}
+            </select>
+          </div>
+          {loading ? <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400"><Loader2 className="animate-spin" size={18} />Loading interviews…</div> : interviews.length === 0 ? (
+            <div className="py-16 text-center text-sm text-slate-500">No interviews match this view.</div>
           ) : (
-            <div className="w-full mt-2 flex gap-2">
-              <input value={issueText} onChange={(e) => setIssueText(e.target.value)} placeholder="What's wrong?"
-                     className="px-3 py-2 rounded-lg border text-sm flex-1"  />
-              <Button small onClick={() => { onReportIssue(iv.id, issueText); setReporting(false); setIssueText(""); }}>
-                <span className="inline-flex items-center gap-1"><Send size={12} /> Send</span>
-              </Button>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Drive</th><th className="p-3">Scheduled</th><th className="p-3">Status</th><th className="p-3">Result</th><th className="p-3"></th></tr></thead>
+                <tbody>{interviews.map((interview) => (
+                  <tr key={interview.id} onClick={() => { void openInterview(interview.id); }} className="cursor-pointer border-b border-white/5 hover:bg-white/[0.04]">
+                    <td className="p-3"><p className="font-semibold text-white">{interview.student_name}</p><p className="text-xs text-slate-500">{interview.student_code || interview.student_email} · {interview.department_name || "No department"}</p></td>
+                    <td className="p-3"><p className="text-slate-200">{interview.company_name}</p><p className="text-xs text-slate-500">{interview.round_name || interview.role}</p></td>
+                    <td className="whitespace-nowrap p-3 text-slate-300">{formatDate(interview.scheduled_at)}</td>
+                    <td className="p-3"><StatusBadge status={interview.interview_status} /></td>
+                    <td className="p-3"><ResultBadge result={interview.result} /></td>
+                    <td className="p-3 text-right"><ChevronRight className="inline text-slate-600" size={16} /></td>
+                  </tr>
+                ))}</tbody>
+              </table>
             </div>
           )}
-        </div>
-      ) : (
-        <div className="text-sm" className="text-slate-400">Result pending — you'll see it here as soon as it's published.</div>
+          <div className="flex items-center justify-between border-t border-white/10 p-4 text-sm text-slate-400">
+            <span>{total} interview{total === 1 ? "" : "s"}</span>
+            <div className="flex items-center gap-2"><button disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded p-1 disabled:opacity-30" aria-label="Previous page"><ChevronLeft size={18} /></button><span>Page {page} of {pageCount}</span><button disabled={page >= pageCount} onClick={() => setPage((current) => current + 1)} className="rounded p-1 disabled:opacity-30" aria-label="Next page"><ChevronRight size={18} /></button></div>
+          </div>
+        </Panel>
       )}
-    </Card>
-  );
-}
-
-/* ============================================================
-   APP SHELL
-   ============================================================ */
-export default function InterviewResultsCentre() {
-  const [interviews, setInterviews] = useState(seedInterviews);
-  const [issues, setIssues] = useState([{ id: "iss1", interviewId: "iv1", status: "OPEN", details: "Meeting link returns a 404." }]);
-  const [role, setRole] = useState("TPO");
-  const [tpoTab, setTpoTab] = useState("list");
-  const [openId, setOpenId] = useState(null);
-  const [studentReg, setStudentReg] = useState(ROSTER[2].regNo);
-  const [studentOpenId, setStudentOpenId] = useState(null);
-
-  function updateIv(id, patch) {
-    setInterviews((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
-  }
-  function recordAttendance(id, status) {
-    updateIv(id, { attendance: status, status: status === "ABSENT" ? "NO_SHOW" : "RESULT_PENDING" });
-  }
-  function enterResult(id, value, remarks) {
-    updateIv(id, { result: { value, remarks, publishedAt: null, history: [{ v: 1, value, source: "TPO_ENTERED" }] } });
-  }
-  function resolveIssue(id) {
-    setInterviews((prev) => prev.map((i) => (i.id === id && i.issue ? { ...i, issue: { ...i.issue, status: "RESOLVED" } } : i)));
-  }
-  function commitImport(validRows) {
-    setInterviews((prev) => prev.map((iv) => {
-      const row = validRows.find((r) => r.regNo === iv.regNo);
-      if (!row) return iv;
-      return { ...iv, status: "RESULT_PENDING", result: { value: row.result, remarks: row.remarks, publishedAt: null, history: [{ v: 1, value: row.result, source: "IMPORTED" }] } };
-    }));
-  }
-  function publishAll(ids) {
-    setInterviews((prev) => prev.map((iv) => (ids.includes(iv.id) ? { ...iv, status: "RESULT_PUBLISHED", result: { ...iv.result, publishedAt: new Date() } } : iv)));
-  }
-  function confirmAttendance(id) {
-    updateIv(id, { confirmed: true, status: "CONFIRMED" });
-  }
-  function reportIssue(id, details) {
-    updateIv(id, { issue: { type: "OTHER", details: details || "Student reported an issue.", status: "OPEN" } });
-  }
-
-  const openIv = interviews.find((i) => i.id === openId);
-  const studentOpenIv = interviews.find((i) => i.id === studentOpenId);
-  const eligibleForNextRound = interviews.filter((i) => i.result && i.result.value === "PASS" && i.status === "RESULT_PUBLISHED").length;
-
-  return (
-    <div className="min-h-full w-full" >
-      {/* top chrome */}
-      <div className="px-5 py-4 flex items-center justify-between" >
-        <div className="flex items-center gap-2">
-          <GraduationCap size={20} className="text-amber-400" />
-          <span className="font-bold text-white tracking-wide" >PrepVista — Interview &amp; Result Centre</span>
-        </div>
-        <div className="flex gap-1 rounded-lg p-1" >
-          <button onClick={() => setRole("TPO")} className="px-3 py-1.5 rounded-md text-sm font-semibold"
-                  >
-            <span className="inline-flex items-center gap-1"><Building2 size={13} /> TPO</span>
-          </button>
-          <button onClick={() => setRole("STUDENT")} className="px-3 py-1.5 rounded-md text-sm font-semibold"
-                  >
-            <span className="inline-flex items-center gap-1"><Users size={13} /> Student</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto p-5">
-        {role === "TPO" ? (
-          <>
-            <TpoOverview interviews={interviews} issues={issues} />
-            {eligibleForNextRound > 0 && (
-              <div className="mb-4 text-sm rounded-lg px-3 py-2 inline-flex items-center gap-2" >
-                <ArrowRight size={14} /> {eligibleForNextRound} students now eligible for the HR round.
-              </div>
-            )}
-            {!openIv ? (
-              <>
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {[["list", "All Interviews"], ["pending", "Results Pending"], ["import", "Import"], ["publish", "Review & Publish"]].map(([key, label]) => (
-                    <button key={key} onClick={() => setTpoTab(key)}
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold border"
-                      >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {tpoTab === "list" && <TpoInterviewList interviews={interviews} onOpen={setOpenId} />}
-                {tpoTab === "pending" && <ResultsPendingWorkbench interviews={interviews} onOpen={setOpenId} />}
-                {tpoTab === "import" && <ImportPanel interviews={interviews} onCommitImport={commitImport} />}
-                {tpoTab === "publish" && <ReviewPublishPanel interviews={interviews} onPublishAll={publishAll} />}
-              </>
-            ) : (
-              <TpoInterviewDetail iv={openIv} onBack={() => setOpenId(null)}
-                onRecordAttendance={recordAttendance} onEnterResult={enterResult} onResolveIssue={resolveIssue} />
-            )}
-          </>
-        ) : (
-          <>
-            <div className="mb-4 flex items-center gap-2 text-sm">
-              <span className="text-slate-400">Viewing as:</span>
-              <select value={studentReg} onChange={(e) => { setStudentReg(e.target.value); setStudentOpenId(null); }}
-                      className="px-2 py-1 rounded-lg border text-sm" >
-                {ROSTER.map((s) => <option key={s.regNo} value={s.regNo}>{s.name}</option>)}
-              </select>
-            </div>
-            {!studentOpenIv ? (
-              <StudentDashboard interviews={interviews} studentReg={studentReg} onOpen={setStudentOpenId} />
-            ) : (
-              <StudentInterviewDetail iv={studentOpenIv} onBack={() => setStudentOpenId(null)}
-                onConfirm={confirmAttendance} onReportIssue={reportIssue} />
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }

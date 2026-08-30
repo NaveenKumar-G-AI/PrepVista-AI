@@ -97,7 +97,13 @@ function safeClone<T>(obj: T): T {
 }
 
 // ─── Module-level dropdown cache ─────────────────────────────────────────────
-interface DropdownCache { departments: any[]; years: any[]; batches: any[]; loaded: boolean; inflight: boolean; }
+interface DropdownOption {
+  id: string;
+  department_name?: string;
+  year_name?: string;
+  batch_name?: string;
+}
+interface DropdownCache { departments: DropdownOption[]; years: DropdownOption[]; batches: DropdownOption[]; loaded: boolean; inflight: boolean; }
 const _dropdownCache: DropdownCache = { departments: [], years: [], batches: [], loaded: false, inflight: false };
 
 // ─── Toast System ─────────────────────────────────────────────────────────────
@@ -226,9 +232,9 @@ export default function StudentDetailPage() {
   const [editError, setEditError] = useState('');
   const [formDirty, setFormDirty] = useState(false);
 
-  const [departments, setDepartments] = useState<any[]>(_dropdownCache.departments);
-  const [years, setYears] = useState<any[]>(_dropdownCache.years);
-  const [batches, setBatches] = useState<any[]>(_dropdownCache.batches);
+  const [departments, setDepartments] = useState<DropdownOption[]>(_dropdownCache.departments);
+  const [years, setYears] = useState<DropdownOption[]>(_dropdownCache.years);
+  const [batches, setBatches] = useState<DropdownOption[]>(_dropdownCache.batches);
   const [dropdownsLoading, setDropdownsLoading] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const { toasts, add: addToast } = useToast();
@@ -239,14 +245,16 @@ export default function StudentDetailPage() {
     _dropdownCache.inflight = true; setDropdownsLoading(true);
     try {
       const [d, y, b] = await Promise.all([
-        api.listCollegeDepartments<{ departments: any[] }>(),
-        api.listCollegeYears<{ years: any[] }>(),
-        api.listCollegeBatches<{ batches: any[] }>(),
+        api.listCollegeDepartments<{ departments: DropdownOption[] }>(),
+        api.listCollegeYears<{ years: DropdownOption[] }>(),
+        api.listCollegeBatches<{ batches: DropdownOption[] }>(),
       ]);
       _dropdownCache.departments = d.departments || []; _dropdownCache.years = y.years || []; _dropdownCache.batches = b.batches || [];
       _dropdownCache.loaded = true;
       setDepartments(_dropdownCache.departments); setYears(_dropdownCache.years); setBatches(_dropdownCache.batches);
-    } catch { /* non-critical */ } finally { _dropdownCache.inflight = false; setDropdownsLoading(false); }
+    } catch (error) {
+      setEditError(toSafeError(error, 'Could not load department, year, and batch options.'));
+    } finally { _dropdownCache.inflight = false; setDropdownsLoading(false); }
   }, []);
 
   const openEdit = useCallback(() => {
@@ -484,7 +492,7 @@ export default function StudentDetailPage() {
                         <select value={value} onChange={e => { set(e.target.value); setFormDirty(true); }}
                           className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none [&>option]:bg-slate-900">
                           <option value="">None</option>
-                          {options.map((o: any) => <option key={o.id} value={o.id}>{o[nameKey]}</option>)}
+                          {options.map((o) => <option key={o.id} value={o.id}>{o[nameKey as keyof DropdownOption]}</option>)}
                         </select>
                       )}
                     </div>

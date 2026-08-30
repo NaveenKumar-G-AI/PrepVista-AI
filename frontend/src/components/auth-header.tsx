@@ -10,7 +10,6 @@ import { BrandLogo } from '@/components/brand-logo';
 
 import {
   ArrowLeftIcon,
-  BuildingIcon,
   ChartIcon,
   CreditCardIcon,
   FeedbackIcon,

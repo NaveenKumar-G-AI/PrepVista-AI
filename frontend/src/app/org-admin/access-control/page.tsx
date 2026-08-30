@@ -5,7 +5,6 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { KeyIcon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { useOrgContext } from '../layout';
 

@@ -151,7 +151,7 @@ export default function PricingPage() {
       return;
     }
     if (!user) {
-      window.location.href = '/login?mode=signup';
+      router.push('/login?mode=signup');
       return;
     }
     if (planId === 'free') {
@@ -199,7 +199,7 @@ export default function PricingPage() {
           try {
             await api.verifyPayment(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
             await refreshUser();
-            window.location.href = '/dashboard?payment=success';
+            router.push('/dashboard?payment=success');
           } catch {
             setError('Payment verification failed. If charged, please contact support.');
           } finally {

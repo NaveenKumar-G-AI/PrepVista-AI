@@ -46,15 +46,16 @@ async def create_department(
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO college_departments (organization_id, department_name, department_code, notes)
-               VALUES ($1,$2,$3,$4) RETURNING *""",
-            org_id, body.name, body.code, body.notes,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_add",
-            entity_type="department", entity_id=row["id"],
-        )
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                """INSERT INTO college_departments (organization_id, department_name, department_code, notes)
+                   VALUES ($1,$2,$3,$4) RETURNING *""",
+                org_id, body.name, body.code, body.notes,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_add",
+                entity_type="department", entity_id=row["id"],
+            )
     return {"status": "created", "department": dict(row)}
 
 
@@ -73,14 +74,15 @@ async def update_department(
         )
         if not existing:
             raise HTTPException(404, "Department not found.")
-        await conn.execute(
-            "UPDATE college_departments SET department_name=$1, department_code=$2, notes=$3, updated_at=NOW() WHERE id=$4 AND organization_id=$5",
-            body.name, body.code, body.notes, dept_id, org_id,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_edit",
-            entity_type="department", entity_id=dept_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "UPDATE college_departments SET department_name=$1, department_code=$2, notes=$3, updated_at=NOW() WHERE id=$4 AND organization_id=$5",
+                body.name, body.code, body.notes, dept_id, org_id,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_edit",
+                entity_type="department", entity_id=dept_id,
+            )
     return {"status": "updated"}
 
 
@@ -98,13 +100,14 @@ async def delete_department(
         )
         if count > 0:
             raise HTTPException(400, f"Cannot delete: {count} active students in this department.")
-        await conn.execute(
-            "DELETE FROM college_departments WHERE id = $1 AND organization_id = $2", dept_id, org_id
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_delete",
-            entity_type="department", entity_id=dept_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM college_departments WHERE id = $1 AND organization_id = $2", dept_id, org_id
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_delete",
+                entity_type="department", entity_id=dept_id,
+            )
     return {"status": "deleted"}
 
 
@@ -129,14 +132,15 @@ async def create_year(
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        row = await conn.fetchrow(
-            "INSERT INTO college_years (organization_id, year_name, notes) VALUES ($1,$2,$3) RETURNING *",
-            org_id, body.name, body.notes,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_add",
-            entity_type="year", entity_id=row["id"],
-        )
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "INSERT INTO college_years (organization_id, year_name, notes) VALUES ($1,$2,$3) RETURNING *",
+                org_id, body.name, body.notes,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_add",
+                entity_type="year", entity_id=row["id"],
+            )
     return {"status": "created", "year": dict(row)}
 
 
@@ -154,14 +158,15 @@ async def update_year(
         )
         if not existing:
             raise HTTPException(404, "Year not found.")
-        await conn.execute(
-            "UPDATE college_years SET year_name=$1, notes=$2, updated_at=NOW() WHERE id=$3 AND organization_id=$4",
-            body.name, body.notes, year_id, org_id,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_edit",
-            entity_type="year", entity_id=year_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "UPDATE college_years SET year_name=$1, notes=$2, updated_at=NOW() WHERE id=$3 AND organization_id=$4",
+                body.name, body.notes, year_id, org_id,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_edit",
+                entity_type="year", entity_id=year_id,
+            )
     return {"status": "updated"}
 
 
@@ -187,13 +192,14 @@ async def delete_year(
         if batch_count > 0:
             raise HTTPException(400, f"Cannot delete: {batch_count} batches depend on this year. Move or delete them first.")
 
-        await conn.execute(
-            "DELETE FROM college_years WHERE id = $1 AND organization_id = $2", year_id, org_id
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_delete",
-            entity_type="year", entity_id=year_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM college_years WHERE id = $1 AND organization_id = $2", year_id, org_id
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_delete",
+                entity_type="year", entity_id=year_id,
+            )
     return {"status": "deleted"}
 
 
@@ -211,7 +217,7 @@ async def reorder_years(
                     "UPDATE college_years SET display_order = $1 WHERE id = $2 AND organization_id = $3",
                     idx, y_id, org_id,
                 )
-        await _log_action(conn, org_id, admin.user_id, "segment_reorder", entity_type="year")
+            await _log_action(conn, org_id, admin.user_id, "segment_reorder", entity_type="year")
     return {"status": "reordered"}
 
 
@@ -238,15 +244,16 @@ async def create_batch(
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO college_batches (organization_id, batch_name, batch_code, year_id, notes)
-               VALUES ($1,$2,$3,$4,$5) RETURNING *""",
-            org_id, body.name, body.code, body.year_id, body.notes,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_add",
-            entity_type="batch", entity_id=row["id"],
-        )
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                """INSERT INTO college_batches (organization_id, batch_name, batch_code, year_id, notes)
+                   VALUES ($1,$2,$3,$4,$5) RETURNING *""",
+                org_id, body.name, body.code, body.year_id, body.notes,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_add",
+                entity_type="batch", entity_id=row["id"],
+            )
     return {"status": "created", "batch": dict(row)}
 
 
@@ -264,14 +271,15 @@ async def update_batch(
         )
         if not existing:
             raise HTTPException(404, "Batch not found.")
-        await conn.execute(
-            "UPDATE college_batches SET batch_name=$1, batch_code=$2, year_id=$3, notes=$4, updated_at=NOW() WHERE id=$5 AND organization_id=$6",
-            body.name, body.code, body.year_id, body.notes, batch_id, org_id,
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_edit",
-            entity_type="batch", entity_id=batch_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "UPDATE college_batches SET batch_name=$1, batch_code=$2, year_id=$3, notes=$4, updated_at=NOW() WHERE id=$5 AND organization_id=$6",
+                body.name, body.code, body.year_id, body.notes, batch_id, org_id,
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_edit",
+                entity_type="batch", entity_id=batch_id,
+            )
     return {"status": "updated"}
 
 
@@ -289,13 +297,14 @@ async def delete_batch(
         )
         if count > 0:
             raise HTTPException(400, f"Cannot delete: {count} active students in this batch.")
-        await conn.execute(
-            "DELETE FROM college_batches WHERE id = $1 AND organization_id = $2", batch_id, org_id
-        )
-        await _log_action(
-            conn, org_id, admin.user_id, "segment_delete",
-            entity_type="batch", entity_id=batch_id,
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM college_batches WHERE id = $1 AND organization_id = $2", batch_id, org_id
+            )
+            await _log_action(
+                conn, org_id, admin.user_id, "segment_delete",
+                entity_type="batch", entity_id=batch_id,
+            )
     return {"status": "deleted"}
 
 

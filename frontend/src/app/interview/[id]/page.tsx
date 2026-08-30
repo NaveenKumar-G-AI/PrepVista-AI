@@ -394,14 +394,6 @@ function getTimestamp() {
   return Date.now();
 }
 
-function isBrowserMobile() {
-  if (typeof navigator === 'undefined') {
-    return false;
-  }
-
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
 let _normCacheInput = '';
 let _normCacheOutput = '';
 
@@ -1425,7 +1417,7 @@ export default function LiveInterviewPage() {
     });
   }
 
-  function terminateInterviewLocally(data: CompletedResponse, reason: string) {
+  function terminateInterviewLocally(data: CompletedResponse) {
     // Persist result data so the terminated overlay can show the partial score
     // during the brief window before router.push fires.
     if (data) {
@@ -1523,7 +1515,7 @@ export default function LiveInterviewPage() {
         return;
       }
 
-      terminateInterviewLocally(response, response.termination_reason || 'Interview terminated by server.');
+      terminateInterviewLocally(response);
     } catch (error) {
       isSubmittingRef.current = false;
 
@@ -1549,7 +1541,12 @@ export default function LiveInterviewPage() {
       // recovering server.  With jitter, retries spread across a 800 ms window.
       if (attempt < MAX_SUBMIT_RETRIES) {
         submitRetryCountRef.current = attempt + 1;
-        const jitter = Math.floor(Math.random() * 300);
+        // A stable request-key hash spreads concurrent clients across the retry
+        // window without introducing an impure random call in the component.
+        const jitter = Array.from(requestKey).reduce(
+          (hash, character) => ((hash * 31) + character.charCodeAt(0)) % 300,
+          attempt * 97,
+        );
         const delay = SUBMIT_BASE_DELAY_MS * Math.pow(2, attempt) + jitter; // 500–800, 1000–1300, 2000–2300
         setStatusText(`Network slow. Retrying your answer (${attempt + 1}/${MAX_SUBMIT_RETRIES})...`);
         setTimerMessage('Holding your answer and retrying now...');
@@ -1601,7 +1598,7 @@ export default function LiveInterviewPage() {
         reason,
         elapsedSeconds,
       );
-      terminateInterviewLocally(response, reason);
+      terminateInterviewLocally(response);
     } catch {
       uiStateRef.current = 'TERMINATED';
       setUiState('TERMINATED');

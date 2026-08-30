@@ -144,13 +144,6 @@ function safeArray<T>(val: unknown): T[] {
  * Replaces predictable constant optimistic IDs with cryptographically
  * random values. Prevents targeted race-condition attacks on known IDs.
  */
-function genSecureId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}_${crypto.randomUUID()}`;
-  }
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
    DOMAIN INTERFACES (unchanged)
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -449,7 +442,6 @@ export default function YearsBatchesPage() {
     } finally {
       if (isMountedRef.current) setInlineSaving(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inlineEdit, inlineValue, inlineSaving, years, batches, showError, showSuccess, load]);
 
   const handleInlineKeyDown = (e: React.KeyboardEvent) => {

@@ -134,7 +134,7 @@ const DEGREE_PREFIXES = new Set(['btech', 'be', 'mtech', 'me', 'diploma', 'bsc',
 
 function normalizeDepartmentCode(value: string): string | null {
   if (!value.trim()) return null;
-  let key = value.trim().toLowerCase()
+  const key = value.trim().toLowerCase()
     .replace(/\./g, '')
     .replace(/-/g, ' ')
     .replace(/&/g, ' and ')

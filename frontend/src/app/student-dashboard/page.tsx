@@ -100,17 +100,19 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      const storedSession = sessionStorage.getItem('pv_interview_session');
-      if (!storedSession) {
-        setStoredSessionId(null);
-        return;
+    const timer = window.setTimeout(() => {
+      try {
+        const storedSession = sessionStorage.getItem('pv_interview_session');
+        if (!storedSession) return;
+
+        const parsed = JSON.parse(storedSession) as { session_id?: string };
+        setStoredSessionId(parsed.session_id || null);
+      } catch {
+        // Invalid or stale session data is equivalent to no active interview.
       }
-      const parsed = JSON.parse(storedSession) as { session_id?: string };
-      setStoredSessionId(parsed.session_id || null);
-    } catch {
-      setStoredSessionId(null);
-    }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Skeleton while loading
@@ -139,12 +141,6 @@ export default function StudentDashboardPage() {
   const startInterviewHref = hasRemainingUsage(usage) ? '/interview/setup' : '/student-dashboard';
   const liveSessionHref = storedSessionId ? `/interview/${storedSessionId}` : '/history';
   const hasQuota = hasRemainingUsage(usage);
-  const currentFeedbackSessionId =
-    data?.current_feedback_session_id
-    || data?.recent_sessions?.find(session => session.state === 'FINISHED')?.id
-    || null;
-  const currentFeedbackHref = currentFeedbackSessionId ? `/report/${currentFeedbackSessionId}` : null;
-
   return (
     <div className="grid gap-6 xl:grid-cols-[auto_1fr]">
       <StudentSideRail

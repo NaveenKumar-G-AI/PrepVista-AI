@@ -203,9 +203,7 @@ function safeNum(val: unknown, fallback = 0, min = 0, max = 1_000_000): number {
  * Frequency values for schedule are allowlisted — only 'weekly' | 'monthly'.
  */
 const ALLOWED_SORT_COLS  = new Set(['full_name', 'avg_score', 'best_score', 'total_interviews', '']);
-const ALLOWED_SORT_DIRS  = new Set(['asc', 'desc']);
 const ALLOWED_FREQUENCIES = new Set(['weekly', 'monthly']);
-const ALLOWED_PAGE_LIMITS = new Set([50, 100, 200]);
 const PREVIEW_LIMIT_DEFAULT = 100;
 
 /* ═══════════════════════════════════════════════════════════════════════════

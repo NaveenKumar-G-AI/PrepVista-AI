@@ -23,12 +23,13 @@ New API surface:
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Literal, Optional
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.database.connection import DatabaseConnection
 from app.dependencies import OrgAdminProfile, require_org_admin
@@ -37,9 +38,6 @@ router = APIRouter(prefix="/companies", tags=["recruiter-companies"])
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 def _normalize(name: str) -> str:
     return re.sub(r"\s+", " ", name.strip()).lower()
@@ -60,39 +58,96 @@ VALID_STAGES = {
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
 class CreateCompanyRequest(BaseModel):
-    name: str
-    legal_name: Optional[str] = None
-    website: Optional[str] = None
-    sector: Optional[str] = None
-    company_size: Optional[str] = None
-    headquarters_city: Optional[str] = None
-    description: Optional[str] = None
+    name: str = Field(min_length=1, max_length=200)
+    legal_name: str | None = Field(default=None, max_length=200)
+    website: str | None = Field(default=None, max_length=500)
+    sector: str | None = Field(default=None, max_length=200)
+    company_size: str | None = Field(default=None, max_length=100)
+    headquarters_city: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=4000)
     allow_duplicate: bool = False
 
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        value = re.sub(r"\s+", " ", value.strip())
+        if not value:
+            raise ValueError("company name must not be blank")
+        return value
+
+    @field_validator("website")
+    @classmethod
+    def validate_website(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        value = value.strip()
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("website must be an absolute http or https URL")
+        return value
+
 class ChangeStageRequest(BaseModel):
-    stage: str
-    reason: Optional[str] = None
+    stage: str = Field(min_length=1, max_length=40)
+    reason: str | None = Field(default=None, max_length=1000)
 
 class AddContactRequest(BaseModel):
-    name: str
-    designation: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    linkedin_url: Optional[str] = None
-    preferred_channel: Optional[str] = None
+    name: str = Field(min_length=1, max_length=200)
+    designation: str | None = Field(default=None, max_length=200)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=50)
+    linkedin_url: str | None = Field(default=None, max_length=500)
+    preferred_channel: Literal["EMAIL", "PHONE", "WHATSAPP", "LINKEDIN", "OTHER"] | None = None
     is_primary: bool = False
 
+    @field_validator("name")
+    @classmethod
+    def strip_contact_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("contact name must not be blank")
+        return value
+
 class LogActivityRequest(BaseModel):
-    type: str
-    subject: Optional[str] = None
-    summary: Optional[str] = None
-    next_action: Optional[str] = None
+    type: Literal[
+        "CALL", "EMAIL", "MEETING", "VISIT", "RECRUITER_REQUEST",
+        "REQUIREMENT_RECEIVED", "DRIVE_DISCUSSION", "FOLLOWUP", "NOTE", "OTHER",
+    ]
+    subject: str | None = Field(default=None, max_length=500)
+    summary: str | None = Field(default=None, max_length=4000)
+    next_action: str | None = Field(default=None, max_length=1000)
 
 class CreateFollowupRequest(BaseModel):
-    title: str
-    description: Optional[str] = None
-    priority: str = "MEDIUM"
-    due_at: str   # ISO datetime string
+    title: str = Field(min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=4000)
+    priority: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = "MEDIUM"
+    due_at: datetime
+
+    @field_validator("title")
+    @classmethod
+    def strip_followup_title(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("follow-up title must not be blank")
+        return value
+
+    @field_validator("due_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("due_at must include a timezone offset")
+        return value
+
+
+class AddCompanyNoteRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=8000)
+
+    @field_validator("body")
+    @classmethod
+    def strip_note(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("note must not be blank")
+        return value
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -101,19 +156,15 @@ class CreateFollowupRequest(BaseModel):
 async def recruiter_pulse(admin: OrgAdminProfile = Depends(require_org_admin())):
     """Recruiter Pulse KPIs for the dashboard widget.
 
-    Returns live counts — nothing hardcoded. Gracefully returns zeros when the
-    recruiter_companies table has no rows (new org). Matches Part 2
-    commandCentreService.getRecruiterPulse() output shape.
+    Returns live counts with a rolling 30-day window. An organization with no
+    recruiter records naturally receives zero counts.
     """
     org_id = admin.organization_id
-    now_ts = _now()
-    thirty_ago = datetime.now(timezone.utc).replace(
-        day=max(1, datetime.now(timezone.utc).day - 30)
-    ).isoformat()
+    now_ts = datetime.now(timezone.utc)
+    thirty_days_ago = now_ts - timedelta(days=30)
 
-    try:
-        async with DatabaseConnection() as conn:
-            row = await conn.fetchrow(
+    async with DatabaseConnection() as conn:
+        row = await conn.fetchrow(
                 """
                 SELECT
                   COUNT(*)                                                         AS companies,
@@ -124,9 +175,9 @@ async def recruiter_pulse(admin: OrgAdminProfile = Depends(require_org_admin()))
                 FROM recruiter_companies
                 WHERE organization_id = $1 AND status = 'ACTIVE'
                 """,
-                org_id, thirty_ago,
-            )
-            fu_row = await conn.fetchrow(
+            org_id, thirty_days_ago,
+        )
+        fu_row = await conn.fetchrow(
                 """
                 SELECT
                   COUNT(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS'))               AS open_followups,
@@ -134,9 +185,9 @@ async def recruiter_pulse(admin: OrgAdminProfile = Depends(require_org_admin()))
                 FROM recruiter_followups
                 WHERE organization_id = $1
                 """,
-                org_id, now_ts,
-            )
-            req_row = await conn.fetchrow(
+            org_id, now_ts,
+        )
+        req_row = await conn.fetchrow(
                 """
                 SELECT COUNT(*) AS requirements_received
                 FROM recruiter_activities
@@ -144,16 +195,8 @@ async def recruiter_pulse(admin: OrgAdminProfile = Depends(require_org_admin()))
                   AND type = 'REQUIREMENT_RECEIVED'
                   AND occurred_at >= $2
                 """,
-                org_id, thirty_ago,
-            )
-    except Exception:
-        # Table absent (migration not yet run) — return empty pulse
-        return {
-            "companies": 0, "active_relationships": 0, "open_followups": 0,
-            "overdue_followups": 0, "new_relationships_last_30d": 0,
-            "repeat_recruiters": 0, "requirements_received_last_30d": 0,
-            "is_empty": True,
-        }
+            org_id, thirty_days_ago,
+        )
 
     return {
         "companies":                      int(row["companies"] or 0),
@@ -178,6 +221,8 @@ async def list_recruiter_companies(
 ):
     """List companies with search/stage/repeat filters and pagination."""
     org_id = admin.organization_id
+    if stage and stage not in VALID_STAGES:
+        raise HTTPException(422, "Invalid relationship stage")
     conditions = ["organization_id = $1", "status = 'ACTIVE'"]
     params: list = [org_id]
 
@@ -185,7 +230,7 @@ async def list_recruiter_companies(
         params.append(f"%{search.lower()}%")
         conditions.append(f"normalized_name ILIKE ${len(params)}")
 
-    if stage and stage in VALID_STAGES:
+    if stage:
         params.append(stage)
         conditions.append(f"relationship_stage = ${len(params)}")
 
@@ -226,30 +271,36 @@ async def create_recruiter_company(
     domain  = _extract_domain(body.website)
 
     async with DatabaseConnection() as conn:
-        # Duplicate detection
-        if not body.allow_duplicate:
-            dup = await conn.fetchrow(
-                "SELECT id, name FROM recruiter_companies WHERE organization_id = $1 AND normalized_name = $2 AND status = 'ACTIVE'",
-                org_id, norm,
+        async with conn.transaction():
+            if not body.allow_duplicate:
+                dup = await conn.fetchrow(
+                    """SELECT id, name FROM recruiter_companies
+                       WHERE organization_id = $1 AND status = 'ACTIVE'
+                         AND (normalized_name = $2 OR ($3::text IS NOT NULL AND website_domain = $3))
+                       LIMIT 1""",
+                    org_id, norm, domain,
+                )
+                if dup:
+                    raise HTTPException(
+                        409,
+                        detail={"error": "Duplicate company name or website domain", "duplicate_id": str(dup["id"])},
+                    )
+
+            row = await conn.fetchrow(
+                """INSERT INTO recruiter_companies
+                   (organization_id, name, normalized_name, legal_name, website, website_domain,
+                    sector, company_size, headquarters_city, description, relationship_stage)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'PROSPECT')
+                   RETURNING *""",
+                org_id, body.name, norm, body.legal_name, body.website, domain,
+                body.sector, body.company_size, body.headquarters_city, body.description,
             )
-            if dup:
-                raise HTTPException(409, detail={"error": "Duplicate company name", "duplicate_id": str(dup["id"])})
-
-        row = await conn.fetchrow(
-            """INSERT INTO recruiter_companies
-               (organization_id, name, normalized_name, legal_name, website, website_domain,
-                sector, company_size, headquarters_city, description, relationship_stage)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'PROSPECT')
-               RETURNING *""",
-            org_id, body.name.strip(), norm, body.legal_name, body.website, domain,
-            body.sector, body.company_size, body.headquarters_city, body.description,
-        )
-
-        # Write stage history row
-        await conn.execute(
-            "INSERT INTO recruiter_status_history (company_id, old_stage, new_stage, reason) VALUES ($1, NULL, 'PROSPECT', 'Created')",
-            row["id"],
-        )
+            await conn.execute(
+                """INSERT INTO recruiter_status_history
+                   (company_id, old_stage, new_stage, actor_id, reason)
+                   VALUES ($1, NULL, 'PROSPECT', $2, 'Created')""",
+                row["id"], admin.user_id,
+            )
 
     return dict(row)
 
@@ -281,12 +332,17 @@ async def get_recruiter_company(
             "SELECT * FROM recruiter_followups WHERE company_id = $1 AND status IN ('OPEN','IN_PROGRESS') ORDER BY due_at",
             company_id,
         )
+        notes = await conn.fetch(
+            "SELECT * FROM recruiter_company_notes WHERE company_id = $1 ORDER BY created_at DESC LIMIT 50",
+            company_id,
+        )
 
     return {
         "company":    dict(company),
         "contacts":   [dict(r) for r in contacts],
         "activities": [dict(r) for r in activities],
         "followups":  [dict(r) for r in followups],
+        "notes":      [dict(r) for r in notes],
     }
 
 
@@ -302,24 +358,27 @@ async def change_company_stage(
 
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        old = await conn.fetchrow(
-            "SELECT relationship_stage FROM recruiter_companies WHERE id = $1 AND organization_id = $2",
-            company_id, org_id,
-        )
-        if not old:
-            raise HTTPException(404, "Company not found")
+        async with conn.transaction():
+            old = await conn.fetchrow(
+                "SELECT relationship_stage FROM recruiter_companies WHERE id = $1 AND organization_id = $2 FOR UPDATE",
+                company_id, org_id,
+            )
+            if not old:
+                raise HTTPException(404, "Company not found")
+            if old["relationship_stage"] == body.stage:
+                return {"ok": True, "stage": body.stage, "idempotent": True}
 
-        is_repeat = body.stage == "REPEAT_RECRUITER"
-        await conn.execute(
-            """UPDATE recruiter_companies
-               SET relationship_stage = $1, is_repeat_recruiter = $2, updated_at = now()
-               WHERE id = $3""",
-            body.stage, is_repeat, company_id,
-        )
-        await conn.execute(
-            "INSERT INTO recruiter_status_history (company_id, old_stage, new_stage, actor_id, reason) VALUES ($1,$2,$3,$4,$5)",
-            company_id, old["relationship_stage"], body.stage, admin.user_id, body.reason,
-        )
+            is_repeat = body.stage == "REPEAT_RECRUITER"
+            await conn.execute(
+                """UPDATE recruiter_companies
+                   SET relationship_stage = $1, is_repeat_recruiter = $2, updated_at = now()
+                   WHERE id = $3""",
+                body.stage, is_repeat, company_id,
+            )
+            await conn.execute(
+                "INSERT INTO recruiter_status_history (company_id, old_stage, new_stage, actor_id, reason) VALUES ($1,$2,$3,$4,$5)",
+                company_id, old["relationship_stage"], body.stage, admin.user_id, body.reason,
+            )
 
     return {"ok": True, "stage": body.stage}
 
@@ -333,29 +392,29 @@ async def add_recruiter_contact(
     """Add a contact to a company."""
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        exists = await conn.fetchval(
-            "SELECT 1 FROM recruiter_companies WHERE id = $1 AND organization_id = $2",
-            company_id, org_id,
-        )
-        if not exists:
-            raise HTTPException(404, "Company not found")
-
-        # If new contact is primary, demote existing primary
-        if body.is_primary:
-            await conn.execute(
-                "UPDATE recruiter_contacts SET is_primary = FALSE WHERE company_id = $1 AND is_primary = TRUE",
-                company_id,
+        async with conn.transaction():
+            exists = await conn.fetchval(
+                "SELECT 1 FROM recruiter_companies WHERE id = $1 AND organization_id = $2 FOR UPDATE",
+                company_id, org_id,
             )
+            if not exists:
+                raise HTTPException(404, "Company not found")
 
-        row = await conn.fetchrow(
-            """INSERT INTO recruiter_contacts
-               (organization_id, company_id, name, designation, email, phone,
-                linkedin_url, preferred_channel, is_primary)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-               RETURNING *""",
-            org_id, company_id, body.name, body.designation, body.email,
-            body.phone, body.linkedin_url, body.preferred_channel, body.is_primary,
-        )
+            if body.is_primary:
+                await conn.execute(
+                    "UPDATE recruiter_contacts SET is_primary = FALSE WHERE company_id = $1 AND is_primary = TRUE",
+                    company_id,
+                )
+
+            row = await conn.fetchrow(
+                """INSERT INTO recruiter_contacts
+                   (organization_id, company_id, name, designation, email, phone,
+                    linkedin_url, preferred_channel, is_primary)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                   RETURNING *""",
+                org_id, company_id, body.name, body.designation, str(body.email) if body.email else None,
+                body.phone, body.linkedin_url, body.preferred_channel, body.is_primary,
+            )
     return dict(row)
 
 
@@ -368,23 +427,23 @@ async def log_recruiter_activity(
     """Log an activity against a company."""
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        exists = await conn.fetchval(
-            "SELECT 1 FROM recruiter_companies WHERE id = $1 AND organization_id = $2",
-            company_id, org_id,
-        )
-        if not exists:
-            raise HTTPException(404, "Company not found")
+        async with conn.transaction():
+            exists = await conn.fetchval(
+                "SELECT 1 FROM recruiter_companies WHERE id = $1 AND organization_id = $2 FOR UPDATE",
+                company_id, org_id,
+            )
+            if not exists:
+                raise HTTPException(404, "Company not found")
 
-        row = await conn.fetchrow(
-            """INSERT INTO recruiter_activities
-               (organization_id, company_id, actor_id, type, subject, summary, next_action)
-               VALUES ($1,$2,$3,$4,$5,$6,$7)
-               RETURNING *""",
-            org_id, company_id, admin.user_id, body.type,
-            body.subject, body.summary, body.next_action,
-        )
-        # Bump company updated_at
-        await conn.execute("UPDATE recruiter_companies SET updated_at = now() WHERE id = $1", company_id)
+            row = await conn.fetchrow(
+                """INSERT INTO recruiter_activities
+                   (organization_id, company_id, actor_id, type, subject, summary, next_action)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7)
+                   RETURNING *""",
+                org_id, company_id, admin.user_id, body.type,
+                body.subject, body.summary, body.next_action,
+            )
+            await conn.execute("UPDATE recruiter_companies SET updated_at = now() WHERE id = $1", company_id)
     return dict(row)
 
 
@@ -415,6 +474,31 @@ async def create_recruiter_followup(
     return dict(row)
 
 
+@router.post("/{company_id}/notes", status_code=201)
+async def add_company_note(
+    company_id: UUID,
+    body: AddCompanyNoteRequest,
+    admin: OrgAdminProfile = Depends(require_org_admin()),
+):
+    """Append a tenant-scoped note to the company dossier."""
+    org_id = admin.organization_id
+    async with DatabaseConnection() as conn:
+        exists = await conn.fetchval(
+            "SELECT 1 FROM recruiter_companies WHERE id = $1 AND organization_id = $2",
+            company_id, org_id,
+        )
+        if not exists:
+            raise HTTPException(404, "Company not found")
+        row = await conn.fetchrow(
+            """INSERT INTO recruiter_company_notes
+               (organization_id, company_id, author_id, body)
+               VALUES ($1,$2,$3,$4)
+               RETURNING *""",
+            org_id, company_id, admin.user_id, body.body,
+        )
+    return dict(row)
+
+
 # ── Follow-up command centre (standalone endpoint, no company_id) ─────────────
 
 followup_router = APIRouter(prefix="/followups", tags=["recruiter-followups"])
@@ -424,9 +508,8 @@ async def followup_command_centre(admin: OrgAdminProfile = Depends(require_org_a
     """Bucketised follow-up command centre: OVERDUE / TODAY / THIS_WEEK / OPEN."""
     org_id = admin.organization_id
     now = datetime.now(timezone.utc)
-    today_end   = now.replace(hour=23, minute=59, second=59).isoformat()
-    week_end    = now.replace(hour=23, minute=59, second=59,
-                              day=min(now.day + 6, 28)).isoformat()
+    today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    week_end = today_end + timedelta(days=6)
 
     async with DatabaseConnection() as conn:
         rows = await conn.fetch(
@@ -439,11 +522,10 @@ async def followup_command_centre(admin: OrgAdminProfile = Depends(require_org_a
         )
 
     buckets: dict = {"OVERDUE": [], "TODAY": [], "THIS_WEEK": [], "OPEN": []}
-    now_iso = now.isoformat()
     for r in rows:
         d = dict(r)
-        due = str(d["due_at"])
-        if due < now_iso:
+        due = d["due_at"]
+        if due < now:
             buckets["OVERDUE"].append(d)
         elif due <= today_end:
             buckets["TODAY"].append(d)
@@ -462,13 +544,25 @@ async def complete_followup(
 ):
     """Mark a follow-up as completed."""
     async with DatabaseConnection() as conn:
-        row = await conn.fetchrow(
-            """UPDATE recruiter_followups
-               SET status = 'COMPLETED', completed_at = now(), completed_by = $1, updated_at = now()
-               WHERE id = $2 AND organization_id = $3
-               RETURNING *""",
-            admin.user_id, followup_id, admin.organization_id,
-        )
-        if not row:
-            raise HTTPException(404, "Follow-up not found")
+        async with conn.transaction():
+            current = await conn.fetchrow(
+                """SELECT * FROM recruiter_followups
+                   WHERE id = $1 AND organization_id = $2 FOR UPDATE""",
+                followup_id, admin.organization_id,
+            )
+            if not current:
+                raise HTTPException(404, "Follow-up not found")
+            if current["status"] == "COMPLETED":
+                result = dict(current)
+                result["idempotent"] = True
+                return result
+            if current["status"] == "CANCELLED":
+                raise HTTPException(422, "A cancelled follow-up cannot be completed")
+            row = await conn.fetchrow(
+                """UPDATE recruiter_followups
+                   SET status = 'COMPLETED', completed_at = now(), completed_by = $1, updated_at = now()
+                   WHERE id = $2
+                   RETURNING *""",
+                admin.user_id, followup_id,
+            )
     return dict(row)

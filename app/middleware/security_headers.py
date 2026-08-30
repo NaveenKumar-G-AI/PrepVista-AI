@@ -25,8 +25,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 # silently merges two directives into one invalid token with no browser error.
 
 _CSP_DEFAULT_SRC     = "default-src 'self'"
-_CSP_STYLE_SRC       = "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
-_CSP_FONT_SRC        = "font-src 'self' https://fonts.gstatic.com"
+_CSP_STYLE_SRC       = "style-src 'self' 'unsafe-inline'"
+_CSP_FONT_SRC        = "font-src 'self' data:"
 _CSP_IMG_SRC         = "img-src 'self' data: blob: https:"
 _CSP_MEDIA_SRC       = "media-src 'self'"
 _CSP_CONNECT_SRC     = (

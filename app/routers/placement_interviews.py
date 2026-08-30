@@ -33,12 +33,13 @@ API surface (all under /org/my/placement-interviews):
 from __future__ import annotations
 
 import json
+import asyncpg
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.database.connection import DatabaseConnection
 from app.dependencies import OrgAdminProfile, require_org_admin
@@ -85,21 +86,18 @@ def _now_iso() -> str:
 
 async def _emit_event(conn, event_type: str, interview_id=None, drive_id=None,
                       student_id=None, actor_id=None, payload: dict | None = None):
-    """Append to placement_interview_events — never raises."""
-    try:
-        await conn.execute(
-            """INSERT INTO placement_interview_events
-               (event_type, interview_id, drive_id, student_id, actor_id, payload)
-               VALUES ($1,$2,$3,$4,$5,$6)""",
-            event_type,
-            UUID(interview_id) if interview_id else None,
-            UUID(drive_id)     if drive_id     else None,
-            UUID(student_id)   if student_id   else None,
-            UUID(actor_id)     if actor_id     else None,
-            json.dumps(payload or {}),
-        )
-    except Exception:
-        pass
+    """Append to the immutable event stream in the caller's transaction."""
+    await conn.execute(
+        """INSERT INTO placement_interview_events
+           (event_type, interview_id, drive_id, student_id, actor_id, payload)
+           VALUES ($1,$2,$3,$4,$5,$6)""",
+        event_type,
+        UUID(interview_id) if interview_id else None,
+        UUID(drive_id)     if drive_id     else None,
+        UUID(student_id)   if student_id   else None,
+        UUID(actor_id)     if actor_id     else None,
+        json.dumps(payload or {}),
+    )
 
 
 async def _audit(conn, actor_id, actor_label: str, action: str,
@@ -122,10 +120,10 @@ class CreateRoundRequest(BaseModel):
     sequence: int
 
 class ScheduleInterviewRequest(BaseModel):
-    drive_id:          str
-    round_execution_id: Optional[str] = None
-    student_id:        str
-    scheduled_at:      Optional[str] = None
+    drive_id:          UUID
+    round_execution_id: Optional[UUID] = None
+    student_id:        UUID
+    scheduled_at:      Optional[datetime] = None
     location_or_link:  Optional[str] = None
 
 class AttendanceRequest(BaseModel):
@@ -143,6 +141,23 @@ class EnterResultRequest(BaseModel):
 class ReviewResultRequest(BaseModel):
     notes: Optional[str] = None
 
+class ImportResultRow(BaseModel):
+    student_code: str = Field(min_length=1, max_length=100)
+    interview_id: Optional[UUID] = None
+    result: str
+    remarks: Optional[str] = Field(default=None, max_length=4000)
+
+class ImportResultsRequest(BaseModel):
+    rows: list[ImportResultRow] = Field(min_length=1, max_length=1000)
+    drive_id: Optional[UUID] = None
+    commit: bool = False
+
+class PublishBatchRequest(BaseModel):
+    interview_ids: list[UUID] = Field(min_length=1, max_length=500)
+
+class ResolveIssueRequest(BaseModel):
+    resolution: str = Field(min_length=1, max_length=2000)
+
 
 # ── Valid value sets ───────────────────────────────────────────────────────────
 
@@ -150,6 +165,81 @@ VALID_INTERVIEW_STATUSES = set(_INTERVIEW_TRANSITIONS.keys())
 VALID_ATTENDANCE          = {"PRESENT", "LATE", "ABSENT", "EXCUSED"}
 VALID_RESULTS             = {"PASS", "FAIL", "HOLD", "NO_SHOW", "DISQUALIFIED", "PENDING"}
 VALID_SOURCES             = {"TPO_ENTERED", "IMPORTED", "ADMIN_IMPORTED", "SYSTEM_GENERATED", "OTHER_APPROVED_SOURCE"}
+RESULT_ENTRY_STATUSES     = {"ATTENDED", "COMPLETED", "RESULT_PENDING", "NO_SHOW"}
+
+
+async def _store_internal_result(
+    conn,
+    interview,
+    *,
+    result_value: str,
+    remarks: str | None,
+    result_source: str,
+    admin: OrgAdminProfile,
+):
+    """Create the next immutable result version for one locked interview."""
+    if interview["interview_status"] not in RESULT_ENTRY_STATUSES:
+        raise HTTPException(
+            422,
+            f"Results cannot be entered while the interview is {interview['interview_status']}",
+        )
+
+    previous = await conn.fetchrow(
+        """SELECT * FROM placement_interview_results
+           WHERE interview_id = $1 AND is_current = TRUE FOR UPDATE""",
+        interview["id"],
+    )
+    if previous and previous["publication_state"] == "PUBLISHED_TO_STUDENT":
+        raise HTTPException(
+            422,
+            "This interview already has a published result. Use the correction workflow instead.",
+        )
+
+    next_version = int(previous["version"] or 0) + 1 if previous else 1
+    if previous:
+        await conn.execute(
+            "UPDATE placement_interview_results SET is_current = FALSE WHERE id = $1",
+            previous["id"],
+        )
+
+    result = await conn.fetchrow(
+        """INSERT INTO placement_interview_results
+           (interview_id, version, result, publication_state, result_source, remarks, entered_by)
+           VALUES ($1,$2,$3,'INTERNAL_RESULT',$4,$5,$6) RETURNING *""",
+        interview["id"],
+        next_version,
+        result_value,
+        result_source,
+        remarks,
+        admin.user_id,
+    )
+    current_status = interview["interview_status"]
+    if _can_transition(current_status, "RESULT_PENDING", _INTERVIEW_TRANSITIONS):
+        await conn.execute(
+            """UPDATE placement_interviews
+               SET interview_status = 'RESULT_PENDING', version = version + 1, updated_at = now()
+               WHERE id = $1""",
+            interview["id"],
+        )
+    await _audit(
+        conn,
+        admin.user_id,
+        admin.email,
+        "RESULT_CREATED" if next_version == 1 else "RESULT_UPDATED",
+        "placement_interview_result",
+        str(interview["id"]),
+        new_value={"result": result_value, "version": next_version, "source": result_source},
+    )
+    await _emit_event(
+        conn,
+        "INTERVIEW_RESULT_CREATED" if next_version == 1 else "INTERVIEW_RESULT_UPDATED",
+        interview_id=str(interview["id"]),
+        drive_id=str(interview["drive_id"]),
+        student_id=str(interview["student_id"]),
+        actor_id=admin.user_id,
+        payload={"result": result_value, "version": next_version, "source": result_source},
+    )
+    return result
 
 
 # ── Routes: Rounds ─────────────────────────────────────────────────────────────
@@ -200,44 +290,80 @@ async def create_round(
 
 @router.get("")
 async def list_interviews(
-    drive_id:          Optional[str] = Query(None),
-    round_execution_id: Optional[str] = Query(None),
+    drive_id:          Optional[UUID] = Query(None),
+    round_execution_id: Optional[UUID] = Query(None),
     status:            Optional[str] = Query(None),
+    search:            Optional[str] = Query(None, max_length=100),
+    page:              int = Query(1, ge=1),
+    page_size:         int = Query(50, ge=1, le=100),
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
     org_id = admin.organization_id
-    if status and status not in VALID_INTERVIEW_STATUSES:
+    normalized_status = status.upper() if status else None
+    if normalized_status and normalized_status not in VALID_INTERVIEW_STATUSES:
         raise HTTPException(422, "Invalid interview_status")
 
     clauses = ["pi.organization_id = $1"]
     params: list = [org_id]
 
     if drive_id:
-        params.append(UUID(drive_id))
+        params.append(drive_id)
         clauses.append(f"pi.drive_id = ${len(params)}")
     if round_execution_id:
-        params.append(UUID(round_execution_id))
+        params.append(round_execution_id)
         clauses.append(f"pi.round_execution_id = ${len(params)}")
-    if status:
-        params.append(status)
+    if normalized_status:
+        params.append(normalized_status)
         clauses.append(f"pi.interview_status = ${len(params)}")
+    if search and search.strip():
+        params.append(f"%{search.strip().lower()}%")
+        clauses.append(
+            f"(LOWER(p.full_name) LIKE ${len(params)} OR LOWER(p.email) LIKE ${len(params)} "
+            f"OR LOWER(COALESCE(os.student_code, '')) LIKE ${len(params)})"
+        )
 
     where = " AND ".join(clauses)
     async with DatabaseConnection() as conn:
+        total = await conn.fetchval(
+            f"""SELECT COUNT(*)
+                FROM placement_interviews pi
+                JOIN profiles p ON p.id = pi.student_id
+                LEFT JOIN organization_students os
+                  ON os.user_id = pi.student_id AND os.organization_id = pi.organization_id
+                WHERE {where}""",
+            *params,
+        )
+        query_params = [*params, page_size, (page - 1) * page_size]
         rows = await conn.fetch(
             f"""SELECT pi.id, pi.drive_id, pi.round_execution_id, pi.student_id,
                        pi.scheduled_at, pi.interview_status, pi.attendance_status,
                        pi.location_or_link, pi.created_at, pi.updated_at,
                        p.full_name AS student_name, p.email AS student_email,
-                       pd.title AS drive_title, pd.company_name
+                       os.student_code, cd.department_name,
+                       pd.title AS drive_title, pd.company_name, pd.role,
+                       dre.name AS round_name,
+                       pir.result, pir.remarks, pir.publication_state,
+                       pir.version AS result_version, pir.published_at
                 FROM placement_interviews pi
                 JOIN profiles p ON p.id = pi.student_id
                 JOIN placement_drives pd ON pd.id = pi.drive_id
+                LEFT JOIN organization_students os
+                  ON os.user_id = pi.student_id AND os.organization_id = pi.organization_id
+                LEFT JOIN college_departments cd ON cd.id = os.department_id
+                LEFT JOIN drive_round_executions dre ON dre.id = pi.round_execution_id
+                LEFT JOIN placement_interview_results pir
+                  ON pir.interview_id = pi.id AND pir.is_current = TRUE
                 WHERE {where}
-                ORDER BY pi.scheduled_at ASC NULLS LAST, pi.created_at DESC""",
-            *params,
+                ORDER BY pi.scheduled_at ASC NULLS LAST, pi.created_at DESC
+                LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}""",
+            *query_params,
         )
-    return {"items": [dict(r) for r in rows]}
+    return {
+        "items": [dict(r) for r in rows],
+        "total": int(total or 0),
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.post("")
@@ -246,44 +372,57 @@ async def schedule_interview(
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
     org_id = admin.organization_id
-    drive_id = UUID(body.drive_id)
+    drive_id = body.drive_id
 
     async with DatabaseConnection() as conn:
-        drive = await conn.fetchval(
-            "SELECT 1 FROM placement_drives WHERE id = $1 AND organization_id = $2",
-            drive_id, org_id,
-        )
-        if not drive:
-            raise HTTPException(404, "Drive not found")
+        async with conn.transaction():
+            drive = await conn.fetchval(
+                "SELECT 1 FROM placement_drives WHERE id = $1 AND organization_id = $2",
+                drive_id, org_id,
+            )
+            if not drive:
+                raise HTTPException(404, "Drive not found")
 
-        student = await conn.fetchval(
-            "SELECT 1 FROM organization_students WHERE user_id = $1 AND organization_id = $2 AND status = 'active'",
-            UUID(body.student_id), org_id,
-        )
-        if not student:
-            raise HTTPException(422, "Student is not an active member of this organization")
+            student = await conn.fetchval(
+                "SELECT 1 FROM organization_students WHERE user_id = $1 AND organization_id = $2 AND status = 'active'",
+                body.student_id, org_id,
+            )
+            if not student:
+                raise HTTPException(422, "Student is not an active member of this organization")
 
-        scheduled_dt = datetime.fromisoformat(body.scheduled_at) if body.scheduled_at else None
+            if body.round_execution_id:
+                valid_round = await conn.fetchval(
+                    """SELECT 1 FROM drive_round_executions
+                       WHERE id = $1 AND drive_id = $2 AND organization_id = $3""",
+                    body.round_execution_id,
+                    drive_id,
+                    org_id,
+                )
+                if not valid_round:
+                    raise HTTPException(422, "Round does not belong to this drive")
 
-        row = await conn.fetchrow(
-            """INSERT INTO placement_interviews
-               (organization_id, drive_id, round_execution_id, student_id,
-                scheduled_at, location_or_link, created_by)
-               VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *""",
-            org_id,
-            drive_id,
-            UUID(body.round_execution_id) if body.round_execution_id else None,
-            UUID(body.student_id),
-            scheduled_dt,
-            body.location_or_link,
-            admin.user_id,
-        )
-        await _audit(conn, admin.user_id, admin.email, "INTERVIEW_SCHEDULED",
-                     "placement_interview", str(row["id"]),
-                     new_value={"drive_id": str(drive_id), "student_id": body.student_id})
-        await _emit_event(conn, "INTERVIEW_SCHEDULED",
-                          interview_id=str(row["id"]), drive_id=str(drive_id),
-                          student_id=body.student_id, actor_id=admin.user_id)
+            try:
+                row = await conn.fetchrow(
+                    """INSERT INTO placement_interviews
+                       (organization_id, drive_id, round_execution_id, student_id,
+                        scheduled_at, location_or_link, created_by)
+                       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *""",
+                    org_id,
+                    drive_id,
+                    body.round_execution_id,
+                    body.student_id,
+                    body.scheduled_at,
+                    body.location_or_link,
+                    admin.user_id,
+                )
+            except asyncpg.UniqueViolationError as exc:
+                raise HTTPException(409, "This student already has an active interview in that round") from exc
+            await _audit(conn, admin.user_id, admin.email, "INTERVIEW_SCHEDULED",
+                         "placement_interview", str(row["id"]),
+                         new_value={"drive_id": str(drive_id), "student_id": str(body.student_id)})
+            await _emit_event(conn, "INTERVIEW_SCHEDULED",
+                              interview_id=str(row["id"]), drive_id=str(drive_id),
+                              student_id=str(body.student_id), actor_id=admin.user_id)
     return dict(row)
 
 
@@ -328,27 +467,238 @@ async def pending_results_workbench(
 async def pending_review(
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
-    """Results entered internally but not yet reviewed by TPO."""
+    """Current results awaiting review or publication."""
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         rows = await conn.fetch(
-            """SELECT pir.id AS result_id, pir.result, pir.remarks,
+            """SELECT pir.id AS result_id, pir.result, pir.remarks, pir.publication_state,
                       pi.id AS interview_id, pi.student_id, pi.drive_id, pi.scheduled_at,
-                      p.full_name AS student_name, pd.title AS drive_title, pd.company_name
+                      p.full_name AS student_name, os.student_code,
+                      pd.title AS drive_title, pd.company_name
                FROM placement_interview_results pir
                JOIN placement_interviews pi ON pi.id = pir.interview_id
                JOIN profiles p  ON p.id  = pi.student_id
+               LEFT JOIN organization_students os
+                 ON os.user_id = pi.student_id AND os.organization_id = pi.organization_id
                JOIN placement_drives pd ON pd.id = pi.drive_id
                WHERE pi.organization_id = $1
                  AND pir.is_current = TRUE
-                 AND pir.publication_state = 'INTERNAL_RESULT'
+                 AND pir.publication_state IN ('INTERNAL_RESULT', 'TPO_REVIEWED')
                ORDER BY pir.created_at ASC""",
             org_id,
         )
     return {"items": [dict(r) for r in rows], "count": len(rows)}
 
 
-@router.get("/{interview_id}")
+@router.post("/results/import")
+async def import_results(
+    body: ImportResultsRequest,
+    admin: OrgAdminProfile = Depends(require_org_admin()),
+):
+    """Validate or atomically import recruiter results by student code.
+
+    ``commit=false`` is a side-effect-free preview. A commit is all-or-nothing:
+    any unknown, ambiguous, invalid, or already-published row prevents every
+    write so an operator never gets a misleading partial import.
+    """
+    org_id = admin.organization_id
+    errors: list[dict] = []
+    valid: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            for index, incoming in enumerate(body.rows, start=1):
+                student_code = incoming.student_code.strip()
+                result_value = incoming.result.strip().upper()
+                duplicate_key = (student_code.casefold(), str(incoming.interview_id or body.drive_id or ""))
+                if duplicate_key in seen:
+                    errors.append({"row": index, "student_code": student_code, "code": "DUPLICATE_ROW"})
+                    continue
+                seen.add(duplicate_key)
+
+                if result_value not in VALID_RESULTS:
+                    errors.append({
+                        "row": index,
+                        "student_code": student_code,
+                        "code": "INVALID_RESULT",
+                        "detail": f"Use one of: {', '.join(sorted(VALID_RESULTS))}",
+                    })
+                    continue
+
+                clauses = [
+                    "pi.organization_id = $1",
+                    "LOWER(os.student_code) = $2",
+                ]
+                params: list = [org_id, student_code.lower()]
+                if incoming.interview_id:
+                    params.append(incoming.interview_id)
+                    clauses.append(f"pi.id = ${len(params)}")
+                if body.drive_id:
+                    params.append(body.drive_id)
+                    clauses.append(f"pi.drive_id = ${len(params)}")
+
+                matches = await conn.fetch(
+                    f"""SELECT pi.*, p.full_name AS student_name, os.student_code,
+                               pir.result AS current_result,
+                               pir.publication_state AS current_publication_state
+                        FROM placement_interviews pi
+                        JOIN profiles p ON p.id = pi.student_id
+                        JOIN organization_students os
+                          ON os.user_id = pi.student_id AND os.organization_id = pi.organization_id
+                        LEFT JOIN placement_interview_results pir
+                          ON pir.interview_id = pi.id AND pir.is_current = TRUE
+                        WHERE {' AND '.join(clauses)}
+                        ORDER BY pi.scheduled_at DESC NULLS LAST
+                        FOR UPDATE OF pi""",
+                    *params,
+                )
+                if not matches:
+                    errors.append({"row": index, "student_code": student_code, "code": "NOT_FOUND"})
+                    continue
+                if len(matches) > 1:
+                    errors.append({
+                        "row": index,
+                        "student_code": student_code,
+                        "code": "AMBIGUOUS_INTERVIEW",
+                        "detail": "Provide an Interview ID or choose a drive before importing.",
+                    })
+                    continue
+
+                interview = matches[0]
+                if interview["interview_status"] not in RESULT_ENTRY_STATUSES:
+                    errors.append({
+                        "row": index,
+                        "student_code": student_code,
+                        "code": "INVALID_INTERVIEW_STATE",
+                        "detail": f"Interview is {interview['interview_status']}",
+                    })
+                    continue
+                if interview["current_publication_state"] == "PUBLISHED_TO_STUDENT":
+                    errors.append({
+                        "row": index,
+                        "student_code": student_code,
+                        "code": "ALREADY_PUBLISHED",
+                        "detail": f"Published result is {interview['current_result']}",
+                    })
+                    continue
+
+                valid.append({
+                    "row": index,
+                    "student_code": student_code,
+                    "student_name": interview["student_name"],
+                    "interview_id": str(interview["id"]),
+                    "result": result_value,
+                    "remarks": incoming.remarks,
+                    "_interview": interview,
+                })
+
+            if body.commit and errors:
+                return {"committed": 0, "valid": [], "errors": errors, "atomic": True}
+
+            committed = 0
+            if body.commit:
+                for item in valid:
+                    await _store_internal_result(
+                        conn,
+                        item["_interview"],
+                        result_value=item["result"],
+                        remarks=item["remarks"],
+                        result_source="IMPORTED",
+                        admin=admin,
+                    )
+                    committed += 1
+
+    public_valid = [{k: v for k, v in item.items() if k != "_interview"} for item in valid]
+    return {"committed": committed, "valid": public_valid, "errors": errors, "atomic": True}
+
+
+@router.post("/results/publish-batch")
+async def publish_results_batch(
+    body: PublishBatchRequest,
+    admin: OrgAdminProfile = Depends(require_org_admin()),
+):
+    """Review and publish a set of current results in one transaction."""
+    interview_ids = list(dict.fromkeys(body.interview_ids))
+    org_id = admin.organization_id
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            rows = await conn.fetch(
+                """SELECT pi.*, pir.id AS result_id, pir.result,
+                          pir.publication_state
+                   FROM placement_interviews pi
+                   LEFT JOIN placement_interview_results pir
+                     ON pir.interview_id = pi.id AND pir.is_current = TRUE
+                   WHERE pi.organization_id = $1 AND pi.id = ANY($2::uuid[])
+                   FOR UPDATE OF pi""",
+                org_id,
+                interview_ids,
+            )
+            if len(rows) != len(interview_ids):
+                raise HTTPException(404, "One or more interviews were not found")
+            missing = [str(row["id"]) for row in rows if not row["result_id"]]
+            if missing:
+                raise HTTPException(422, {"message": "Every interview must have a result", "interview_ids": missing})
+            invalid = [
+                str(row["id"])
+                for row in rows
+                if row["publication_state"] not in {"INTERNAL_RESULT", "TPO_REVIEWED", "PUBLISHED_TO_STUDENT"}
+            ]
+            if invalid:
+                raise HTTPException(422, {"message": "One or more results cannot be published", "interview_ids": invalid})
+
+            published = 0
+            already_published = 0
+            for row in rows:
+                if row["publication_state"] == "PUBLISHED_TO_STUDENT":
+                    already_published += 1
+                    continue
+                if row["publication_state"] == "INTERNAL_RESULT":
+                    await conn.execute(
+                        """UPDATE placement_interview_results
+                           SET publication_state = 'TPO_REVIEWED', reviewed_by = $1, reviewed_at = now()
+                           WHERE id = $2""",
+                        admin.user_id,
+                        row["result_id"],
+                    )
+                    await _audit(
+                        conn, admin.user_id, admin.email, "RESULT_REVIEWED",
+                        "placement_interview_result", str(row["id"]),
+                    )
+
+                await conn.execute(
+                    """UPDATE placement_interview_results
+                       SET publication_state = 'PUBLISHED_TO_STUDENT', published_at = now()
+                       WHERE id = $1""",
+                    row["result_id"],
+                )
+                if _can_transition(row["interview_status"], "RESULT_PUBLISHED", _INTERVIEW_TRANSITIONS):
+                    await conn.execute(
+                        """UPDATE placement_interviews
+                           SET interview_status = 'RESULT_PUBLISHED', version = version + 1, updated_at = now()
+                           WHERE id = $1""",
+                        row["id"],
+                    )
+                await _audit(
+                    conn, admin.user_id, admin.email, "RESULT_PUBLISHED",
+                    "placement_interview_result", str(row["id"]),
+                    new_value={"result": row["result"]},
+                )
+                await _emit_event(
+                    conn,
+                    "INTERVIEW_RESULT_PUBLISHED",
+                    interview_id=str(row["id"]),
+                    drive_id=str(row["drive_id"]),
+                    student_id=str(row["student_id"]),
+                    actor_id=admin.user_id,
+                    payload={"result": row["result"]},
+                )
+                published += 1
+
+    return {"ok": True, "published": published, "already_published": already_published}
+
+
+@router.get("/{interview_id:uuid}")
 async def get_interview(
     interview_id: UUID,
     admin: OrgAdminProfile = Depends(require_org_admin()),
@@ -357,10 +707,16 @@ async def get_interview(
     async with DatabaseConnection() as conn:
         row = await conn.fetchrow(
             """SELECT pi.*, p.full_name AS student_name, p.email AS student_email,
-                      pd.title AS drive_title, pd.company_name, pd.role
+                      os.student_code, cd.department_name,
+                      pd.title AS drive_title, pd.company_name, pd.role,
+                      dre.name AS round_name
                FROM placement_interviews pi
                JOIN profiles p ON p.id = pi.student_id
                JOIN placement_drives pd ON pd.id = pi.drive_id
+               LEFT JOIN organization_students os
+                 ON os.user_id = pi.student_id AND os.organization_id = pi.organization_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id
+               LEFT JOIN drive_round_executions dre ON dre.id = pi.round_execution_id
                WHERE pi.id = $1 AND pi.organization_id = $2""",
             interview_id, org_id,
         )
@@ -396,7 +752,7 @@ async def get_interview(
     }
 
 
-@router.post("/{interview_id}/attendance")
+@router.post("/{interview_id:uuid}/attendance")
 async def record_attendance(
     interview_id: UUID,
     body: AttendanceRequest,
@@ -408,44 +764,45 @@ async def record_attendance(
 
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM placement_interviews WHERE id = $1 AND organization_id = $2",
-            interview_id, org_id,
-        )
-        if not row:
-            raise HTTPException(404, "Interview not found")
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT * FROM placement_interviews WHERE id = $1 AND organization_id = $2 FOR UPDATE",
+                interview_id, org_id,
+            )
+            if not row:
+                raise HTTPException(404, "Interview not found")
 
-        old_att = row["attendance_status"]
-        old_status = row["interview_status"]
+            old_att = row["attendance_status"]
+            old_status = row["interview_status"]
 
-        # Determine new interview_status from attendance
-        new_statuses = _ATTENDANCE_FROM_STATUS.get(att, [])
-        new_status = new_statuses[0] if new_statuses else old_status
+            # Determine new interview_status from attendance
+            new_statuses = _ATTENDANCE_FROM_STATUS.get(att, [])
+            new_status = new_statuses[0] if new_statuses else old_status
 
-        # Validate interview status transition if changing
-        if new_status != old_status and not _can_transition(old_status, new_status, _INTERVIEW_TRANSITIONS):
-            raise HTTPException(422, f"Cannot transition from {old_status} to {new_status} via attendance {att}")
+            # Validate interview status transition if changing
+            if new_status != old_status and not _can_transition(old_status, new_status, _INTERVIEW_TRANSITIONS):
+                raise HTTPException(422, f"Cannot transition from {old_status} to {new_status} via attendance {att}")
 
-        await conn.execute(
-            """UPDATE placement_interviews
-               SET attendance_status = $1, interview_status = $2,
-                   version = version + 1, updated_at = now()
-               WHERE id = $3 AND version = $4""",
-            att, new_status, interview_id, row["version"],
-        )
-        await _audit(conn, admin.user_id, admin.email, "ATTENDANCE_RECORDED",
-                     "placement_interview", str(interview_id),
-                     old_value={"attendance_status": old_att, "interview_status": old_status},
-                     new_value={"attendance_status": att, "interview_status": new_status})
-        await _emit_event(conn, "INTERVIEW_ATTENDANCE_RECORDED",
-                          interview_id=str(interview_id), drive_id=str(row["drive_id"]),
-                          student_id=str(row["student_id"]), actor_id=admin.user_id,
-                          payload={"attendance": att, "new_status": new_status})
+            await conn.execute(
+                """UPDATE placement_interviews
+                   SET attendance_status = $1, interview_status = $2,
+                       version = version + 1, updated_at = now()
+                   WHERE id = $3""",
+                att, new_status, interview_id,
+            )
+            await _audit(conn, admin.user_id, admin.email, "ATTENDANCE_RECORDED",
+                         "placement_interview", str(interview_id),
+                         old_value={"attendance_status": old_att, "interview_status": old_status},
+                         new_value={"attendance_status": att, "interview_status": new_status})
+            await _emit_event(conn, "INTERVIEW_ATTENDANCE_RECORDED",
+                              interview_id=str(interview_id), drive_id=str(row["drive_id"]),
+                              student_id=str(row["student_id"]), actor_id=admin.user_id,
+                              payload={"attendance": att, "new_status": new_status})
 
     return {"ok": True, "attendance_status": att, "interview_status": new_status}
 
 
-@router.post("/{interview_id}/status")
+@router.post("/{interview_id:uuid}/status")
 async def transition_interview_status(
     interview_id: UUID,
     body: TransitionStatusRequest,
@@ -457,36 +814,37 @@ async def transition_interview_status(
 
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM placement_interviews WHERE id = $1 AND organization_id = $2",
-            interview_id, org_id,
-        )
-        if not row:
-            raise HTTPException(404, "Interview not found")
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT * FROM placement_interviews WHERE id = $1 AND organization_id = $2 FOR UPDATE",
+                interview_id, org_id,
+            )
+            if not row:
+                raise HTTPException(404, "Interview not found")
 
-        from_s = row["interview_status"]
-        if not _can_transition(from_s, to_s, _INTERVIEW_TRANSITIONS):
-            raise HTTPException(422, f"Cannot transition from {from_s} to {to_s}")
+            from_s = row["interview_status"]
+            if not _can_transition(from_s, to_s, _INTERVIEW_TRANSITIONS):
+                raise HTTPException(422, f"Cannot transition from {from_s} to {to_s}")
 
-        await conn.execute(
-            """UPDATE placement_interviews
-               SET interview_status = $1, version = version + 1, updated_at = now()
-               WHERE id = $2 AND version = $3""",
-            to_s, interview_id, row["version"],
-        )
-        await _audit(conn, admin.user_id, admin.email, "STATUS_CHANGED",
-                     "placement_interview", str(interview_id),
-                     old_value={"interview_status": from_s},
-                     new_value={"interview_status": to_s, "reason": body.reason})
-        await _emit_event(conn, "INTERVIEW_UPDATED",
-                          interview_id=str(interview_id), drive_id=str(row["drive_id"]),
-                          student_id=str(row["student_id"]), actor_id=admin.user_id,
-                          payload={"from": from_s, "to": to_s})
+            await conn.execute(
+                """UPDATE placement_interviews
+                   SET interview_status = $1, version = version + 1, updated_at = now()
+                   WHERE id = $2""",
+                to_s, interview_id,
+            )
+            await _audit(conn, admin.user_id, admin.email, "STATUS_CHANGED",
+                         "placement_interview", str(interview_id),
+                         old_value={"interview_status": from_s},
+                         new_value={"interview_status": to_s, "reason": body.reason})
+            await _emit_event(conn, "INTERVIEW_UPDATED",
+                              interview_id=str(interview_id), drive_id=str(row["drive_id"]),
+                              student_id=str(row["student_id"]), actor_id=admin.user_id,
+                              payload={"from": from_s, "to": to_s})
 
     return {"ok": True, "from_status": from_s, "to_status": to_s}
 
 
-@router.post("/{interview_id}/results")
+@router.post("/{interview_id:uuid}/results")
 async def enter_result(
     interview_id: UUID,
     body: EnterResultRequest,
@@ -497,63 +855,33 @@ async def enter_result(
     result_val = body.result.upper()
     if result_val not in VALID_RESULTS:
         raise HTTPException(422, f"Invalid result. Must be one of: {sorted(VALID_RESULTS)}")
-    if body.result_source not in VALID_SOURCES:
-        raise HTTPException(422, f"Invalid result_source")
+    result_source = body.result_source.upper()
+    if result_source not in VALID_SOURCES:
+        raise HTTPException(422, "Invalid result_source")
 
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        interview = await conn.fetchrow(
-            "SELECT * FROM placement_interviews WHERE id = $1 AND organization_id = $2",
-            interview_id, org_id,
-        )
-        if not interview:
-            raise HTTPException(404, "Interview not found")
-
-        # Check for already-published result (must use correction path instead)
-        prev = await conn.fetchrow(
-            "SELECT * FROM placement_interview_results WHERE interview_id = $1 AND is_current = TRUE",
-            interview_id,
-        )
-        if prev and prev["publication_state"] == "PUBLISHED_TO_STUDENT":
-            raise HTTPException(422,
-                "This interview already has a published result. "
-                "Use POST /{id}/results/correct to create a corrected version.")
-
-        next_version = (int(prev["version"]) + 1) if prev else 1
-
-        # Retire old current version
-        if prev:
-            await conn.execute(
-                "UPDATE placement_interview_results SET is_current = FALSE WHERE id = $1",
-                prev["id"],
-            )
-
-        row = await conn.fetchrow(
-            """INSERT INTO placement_interview_results
-               (interview_id, version, result, publication_state, result_source, remarks, entered_by)
-               VALUES ($1,$2,$3,'INTERNAL_RESULT',$4,$5,$6) RETURNING *""",
-            interview_id, next_version, result_val, body.result_source,
-            body.remarks, admin.user_id,
-        )
-        # Advance interview status to RESULT_PENDING if possible
-        current_s = interview["interview_status"]
-        if _can_transition(current_s, "RESULT_PENDING", _INTERVIEW_TRANSITIONS):
-            await conn.execute(
-                "UPDATE placement_interviews SET interview_status = 'RESULT_PENDING', updated_at = now() WHERE id = $1",
+        async with conn.transaction():
+            interview = await conn.fetchrow(
+                """SELECT * FROM placement_interviews
+                   WHERE id = $1 AND organization_id = $2 FOR UPDATE""",
                 interview_id,
+                org_id,
             )
-        await _audit(conn, admin.user_id, admin.email,
-                     "RESULT_CREATED" if next_version == 1 else "RESULT_UPDATED",
-                     "placement_interview_result", str(interview_id),
-                     new_value={"result": result_val, "version": next_version})
-        await _emit_event(conn, "INTERVIEW_RESULT_CREATED" if next_version == 1 else "INTERVIEW_RESULT_UPDATED",
-                          interview_id=str(interview_id), drive_id=str(interview["drive_id"]),
-                          student_id=str(interview["student_id"]), actor_id=admin.user_id,
-                          payload={"result": result_val, "version": next_version})
+            if not interview:
+                raise HTTPException(404, "Interview not found")
+            row = await _store_internal_result(
+                conn,
+                interview,
+                result_value=result_val,
+                remarks=body.remarks,
+                result_source=result_source,
+                admin=admin,
+            )
     return dict(row)
 
 
-@router.post("/{interview_id}/results/review")
+@router.post("/{interview_id:uuid}/results/review")
 async def review_result(
     interview_id: UUID,
     body: ReviewResultRequest,
@@ -562,36 +890,41 @@ async def review_result(
     """Advance publication_state from INTERNAL_RESULT -> TPO_REVIEWED."""
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        interview = await conn.fetchval(
-            "SELECT 1 FROM placement_interviews WHERE id = $1 AND organization_id = $2",
-            interview_id, org_id,
-        )
-        if not interview:
-            raise HTTPException(404, "Interview not found")
+        async with conn.transaction():
+            result = await conn.fetchrow(
+                """SELECT pir.*
+                   FROM placement_interview_results pir
+                   JOIN placement_interviews pi ON pi.id = pir.interview_id
+                   WHERE pir.interview_id = $1 AND pir.is_current = TRUE
+                     AND pi.organization_id = $2
+                   FOR UPDATE OF pir""",
+                interview_id, org_id,
+            )
+            if not result:
+                interview_exists = await conn.fetchval(
+                    "SELECT 1 FROM placement_interviews WHERE id = $1 AND organization_id = $2",
+                    interview_id, org_id,
+                )
+                if not interview_exists:
+                    raise HTTPException(404, "Interview not found")
+                raise HTTPException(422, "No result has been entered for this interview yet.")
+            if not _can_transition(result["publication_state"], "TPO_REVIEWED", _PUBLICATION_TRANSITIONS):
+                raise HTTPException(422, f"Result is already in state '{result['publication_state']}'")
 
-        result = await conn.fetchrow(
-            "SELECT * FROM placement_interview_results WHERE interview_id = $1 AND is_current = TRUE",
-            interview_id,
-        )
-        if not result:
-            raise HTTPException(422, "No result has been entered for this interview yet.")
-        if not _can_transition(result["publication_state"], "TPO_REVIEWED", _PUBLICATION_TRANSITIONS):
-            raise HTTPException(422, f"Result is already in state '{result['publication_state']}'")
-
-        await conn.execute(
-            """UPDATE placement_interview_results
-               SET publication_state = 'TPO_REVIEWED', reviewed_by = $1, reviewed_at = now()
-               WHERE id = $2""",
-            admin.user_id, result["id"],
-        )
-        await _audit(conn, admin.user_id, admin.email, "RESULT_REVIEWED",
-                     "placement_interview_result", str(interview_id))
-        await _emit_event(conn, "INTERVIEW_RESULT_REVIEWED",
-                          interview_id=str(interview_id), actor_id=admin.user_id)
+            await conn.execute(
+                """UPDATE placement_interview_results
+                   SET publication_state = 'TPO_REVIEWED', reviewed_by = $1, reviewed_at = now()
+                   WHERE id = $2""",
+                admin.user_id, result["id"],
+            )
+            await _audit(conn, admin.user_id, admin.email, "RESULT_REVIEWED",
+                         "placement_interview_result", str(interview_id))
+            await _emit_event(conn, "INTERVIEW_RESULT_REVIEWED",
+                              interview_id=str(interview_id), actor_id=admin.user_id)
     return {"ok": True, "publication_state": "TPO_REVIEWED"}
 
 
-@router.post("/{interview_id}/results/publish")
+@router.post("/{interview_id:uuid}/results/publish")
 async def publish_result(
     interview_id: UUID,
     admin: OrgAdminProfile = Depends(require_org_admin()),
@@ -600,54 +933,58 @@ async def publish_result(
     Idempotent — re-publishing an already-published result is a safe no-op."""
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        interview = await conn.fetchrow(
-            "SELECT * FROM placement_interviews WHERE id = $1 AND organization_id = $2",
-            interview_id, org_id,
-        )
-        if not interview:
-            raise HTTPException(404, "Interview not found")
+        async with conn.transaction():
+            interview = await conn.fetchrow(
+                "SELECT * FROM placement_interviews WHERE id = $1 AND organization_id = $2 FOR UPDATE",
+                interview_id, org_id,
+            )
+            if not interview:
+                raise HTTPException(404, "Interview not found")
 
-        result = await conn.fetchrow(
-            "SELECT * FROM placement_interview_results WHERE interview_id = $1 AND is_current = TRUE",
-            interview_id,
-        )
-        if not result:
-            raise HTTPException(422, "No result has been entered for this interview yet.")
-
-        # Idempotency guard
-        if result["publication_state"] == "PUBLISHED_TO_STUDENT":
-            return {"ok": True, "publication_state": "PUBLISHED_TO_STUDENT", "idempotent": True}
-
-        if not _can_transition(result["publication_state"], "PUBLISHED_TO_STUDENT", _PUBLICATION_TRANSITIONS):
-            raise HTTPException(422,
-                f"Result must be TPO_REVIEWED before publishing. "
-                f"Current state: {result['publication_state']}")
-
-        await conn.execute(
-            """UPDATE placement_interview_results
-               SET publication_state = 'PUBLISHED_TO_STUDENT', published_at = now()
-               WHERE id = $1""",
-            result["id"],
-        )
-        # Advance interview status to RESULT_PUBLISHED
-        if _can_transition(interview["interview_status"], "RESULT_PUBLISHED", _INTERVIEW_TRANSITIONS):
-            await conn.execute(
-                "UPDATE placement_interviews SET interview_status = 'RESULT_PUBLISHED', updated_at = now() WHERE id = $1",
+            result = await conn.fetchrow(
+                """SELECT * FROM placement_interview_results
+                   WHERE interview_id = $1 AND is_current = TRUE FOR UPDATE""",
                 interview_id,
             )
-        await _audit(conn, admin.user_id, admin.email, "RESULT_PUBLISHED",
-                     "placement_interview_result", str(interview_id),
-                     new_value={"result": result["result"]})
-        await _emit_event(conn, "INTERVIEW_RESULT_PUBLISHED",
-                          interview_id=str(interview_id), drive_id=str(interview["drive_id"]),
-                          student_id=str(interview["student_id"]), actor_id=admin.user_id,
-                          payload={"result": result["result"]})
+            if not result:
+                raise HTTPException(422, "No result has been entered for this interview yet.")
+
+            # Idempotency guard
+            if result["publication_state"] == "PUBLISHED_TO_STUDENT":
+                return {"ok": True, "publication_state": "PUBLISHED_TO_STUDENT", "idempotent": True}
+
+            if not _can_transition(result["publication_state"], "PUBLISHED_TO_STUDENT", _PUBLICATION_TRANSITIONS):
+                raise HTTPException(422,
+                    f"Result must be TPO_REVIEWED before publishing. "
+                    f"Current state: {result['publication_state']}")
+
+            await conn.execute(
+                """UPDATE placement_interview_results
+                   SET publication_state = 'PUBLISHED_TO_STUDENT', published_at = now()
+                   WHERE id = $1""",
+                result["id"],
+            )
+            # Advance interview status to RESULT_PUBLISHED
+            if _can_transition(interview["interview_status"], "RESULT_PUBLISHED", _INTERVIEW_TRANSITIONS):
+                await conn.execute(
+                    """UPDATE placement_interviews
+                       SET interview_status = 'RESULT_PUBLISHED', version = version + 1, updated_at = now()
+                       WHERE id = $1""",
+                    interview_id,
+                )
+            await _audit(conn, admin.user_id, admin.email, "RESULT_PUBLISHED",
+                         "placement_interview_result", str(interview_id),
+                         new_value={"result": result["result"]})
+            await _emit_event(conn, "INTERVIEW_RESULT_PUBLISHED",
+                              interview_id=str(interview_id), drive_id=str(interview["drive_id"]),
+                              student_id=str(interview["student_id"]), actor_id=admin.user_id,
+                              payload={"result": result["result"]})
     return {"ok": True, "publication_state": "PUBLISHED_TO_STUDENT"}
 
 
 @router.get("/analytics/summary")
 async def analytics_summary(
-    drive_id: Optional[str] = Query(None),
+    drive_id: Optional[UUID] = Query(None),
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
     """Drive-level analytics: attendance rates, pass/fail/hold, turnaround.
@@ -655,59 +992,55 @@ async def analytics_summary(
     org_id = admin.organization_id
     MIN_SAMPLE = 5   # Part 5 section 45: readiness-vs-outcome gate
 
-    try:
-        async with DatabaseConnection() as conn:
-            # Attendance breakdown
-            att_q = "SELECT attendance_status, COUNT(*) AS c FROM placement_interviews WHERE organization_id = $1"
-            params: list = [org_id]
-            if drive_id:
-                params.append(UUID(drive_id))
-                att_q += f" AND drive_id = ${len(params)}"
-            att_q += " GROUP BY attendance_status"
-            att_rows = await conn.fetch(att_q, *params)
-            att_counts = {r["attendance_status"]: int(r["c"]) for r in att_rows}
-            total_att = sum(att_counts.values())
-            present_like = att_counts.get("PRESENT", 0) + att_counts.get("LATE", 0)
+    async with DatabaseConnection() as conn:
+        # Attendance breakdown
+        att_q = "SELECT attendance_status, COUNT(*) AS c FROM placement_interviews WHERE organization_id = $1"
+        params: list = [org_id]
+        if drive_id:
+            params.append(drive_id)
+            att_q += f" AND drive_id = ${len(params)}"
+        att_q += " GROUP BY attendance_status"
+        att_rows = await conn.fetch(att_q, *params)
+        att_counts = {r["attendance_status"]: int(r["c"]) for r in att_rows}
+        total_att = sum(att_counts.values())
+        present_like = att_counts.get("PRESENT", 0) + att_counts.get("LATE", 0)
 
-            # Result rates (published only)
-            res_q = """SELECT pir.result, COUNT(*) AS c
-                       FROM placement_interview_results pir
-                       JOIN placement_interviews pi ON pi.id = pir.interview_id
-                       WHERE pi.organization_id = $1
-                         AND pir.is_current = TRUE
-                         AND pir.publication_state = 'PUBLISHED_TO_STUDENT'"""
-            res_params: list = [org_id]
-            if drive_id:
-                res_params.append(UUID(drive_id))
-                res_q += f" AND pi.drive_id = ${len(res_params)}"
-            res_q += " GROUP BY pir.result"
-            res_rows = await conn.fetch(res_q, *res_params)
-            res_counts = {r["result"]: int(r["c"]) for r in res_rows}
-            total_res = sum(res_counts.values())
+        # Result rates (published only)
+        res_q = """SELECT pir.result, COUNT(*) AS c
+                   FROM placement_interview_results pir
+                   JOIN placement_interviews pi ON pi.id = pir.interview_id
+                   WHERE pi.organization_id = $1
+                     AND pir.is_current = TRUE
+                     AND pir.publication_state = 'PUBLISHED_TO_STUDENT'"""
+        res_params: list = [org_id]
+        if drive_id:
+            res_params.append(drive_id)
+            res_q += f" AND pi.drive_id = ${len(res_params)}"
+        res_q += " GROUP BY pir.result"
+        res_rows = await conn.fetch(res_q, *res_params)
+        res_counts = {r["result"]: int(r["c"]) for r in res_rows}
+        total_res = sum(res_counts.values())
 
-            # Turnaround: avg hours from COMPLETED audit to published_at
-            turn_q = """SELECT AVG(EXTRACT(EPOCH FROM (pir.published_at - pia.occurred_at))/3600) AS avg_hours
-                        FROM placement_interview_results pir
-                        JOIN placement_interviews pi ON pi.id = pir.interview_id
-                        JOIN LATERAL (
-                            SELECT occurred_at FROM placement_interview_audit
-                            WHERE entity_type = 'placement_interview' AND entity_id = pi.id::text
-                              AND action = 'ATTENDANCE_RECORDED'
-                            ORDER BY occurred_at ASC LIMIT 1
-                        ) pia ON TRUE
-                        WHERE pi.organization_id = $1
-                          AND pir.is_current = TRUE
-                          AND pir.publication_state = 'PUBLISHED_TO_STUDENT'
-                          AND pir.published_at IS NOT NULL"""
-            turn_params: list = [org_id]
-            if drive_id:
-                turn_params.append(UUID(drive_id))
-                turn_q += f" AND pi.drive_id = ${len(turn_params)}"
-            turn_row = await conn.fetchrow(turn_q, *turn_params)
-            avg_turnaround_hours = round(float(turn_row["avg_hours"]), 1) if turn_row and turn_row["avg_hours"] else None
-
-    except Exception:
-        return {"available": False}
+        # Turnaround: avg hours from attendance audit to result publication.
+        turn_q = """SELECT AVG(EXTRACT(EPOCH FROM (pir.published_at - pia.occurred_at))/3600) AS avg_hours
+                    FROM placement_interview_results pir
+                    JOIN placement_interviews pi ON pi.id = pir.interview_id
+                    JOIN LATERAL (
+                        SELECT occurred_at FROM placement_interview_audit
+                        WHERE entity_type = 'placement_interview' AND entity_id = pi.id::text
+                          AND action = 'ATTENDANCE_RECORDED'
+                        ORDER BY occurred_at ASC LIMIT 1
+                    ) pia ON TRUE
+                    WHERE pi.organization_id = $1
+                      AND pir.is_current = TRUE
+                      AND pir.publication_state = 'PUBLISHED_TO_STUDENT'
+                      AND pir.published_at IS NOT NULL"""
+        turn_params: list = [org_id]
+        if drive_id:
+            turn_params.append(drive_id)
+            turn_q += f" AND pi.drive_id = ${len(turn_params)}"
+        turn_row = await conn.fetchrow(turn_q, *turn_params)
+        avg_turnaround_hours = round(float(turn_row["avg_hours"]), 1) if turn_row and turn_row["avg_hours"] else None
 
     return {
         "available": True,
@@ -724,3 +1057,58 @@ async def analytics_summary(
         },
         "avg_result_turnaround_hours": avg_turnaround_hours,
     }
+
+
+@router.post("/{interview_id:uuid}/issues/{issue_id:uuid}/resolve")
+async def resolve_issue(
+    interview_id: UUID,
+    issue_id: UUID,
+    body: ResolveIssueRequest,
+    admin: OrgAdminProfile = Depends(require_org_admin()),
+):
+    org_id = admin.organization_id
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                """SELECT pii.*, pi.drive_id, pi.student_id
+                   FROM placement_interview_issues pii
+                   JOIN placement_interviews pi ON pi.id = pii.interview_id
+                   WHERE pii.id = $1 AND pii.interview_id = $2
+                     AND pi.organization_id = $3
+                   FOR UPDATE OF pii""",
+                issue_id,
+                interview_id,
+                org_id,
+            )
+            if not issue:
+                raise HTTPException(404, "Interview issue not found")
+            if issue["status"] == "RESOLVED":
+                return {"ok": True, "status": "RESOLVED", "idempotent": True}
+
+            await conn.execute(
+                """UPDATE placement_interview_issues
+                   SET status = 'RESOLVED', resolution = $1, resolved_at = now()
+                   WHERE id = $2""",
+                body.resolution.strip(),
+                issue_id,
+            )
+            await _audit(
+                conn,
+                admin.user_id,
+                admin.email,
+                "ISSUE_RESOLVED",
+                "placement_interview_issue",
+                str(issue_id),
+                old_value={"status": issue["status"]},
+                new_value={"status": "RESOLVED", "resolution": body.resolution.strip()},
+            )
+            await _emit_event(
+                conn,
+                "INTERVIEW_ISSUE_RESOLVED",
+                interview_id=str(interview_id),
+                drive_id=str(issue["drive_id"]),
+                student_id=str(issue["student_id"]),
+                actor_id=admin.user_id,
+                payload={"issue_id": str(issue_id)},
+            )
+    return {"ok": True, "status": "RESOLVED"}

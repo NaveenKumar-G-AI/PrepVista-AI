@@ -104,12 +104,6 @@ interface DashboardData {
   recruiter_pulse?: RecruiterPulse | null;
   /** Part 3 integration. Optional: null when migration 026 not yet applied. */
   drives_summary?: DrivesSummary | null;
-  /** Part 8 integration. */
-  pacing?: { currentPct: number; baselinePct: number; deltaPts: number };
-  riskCounts?: { critical: number; high: number; medium: number; none: number };
-  package?: { avgLPA: number; medianLPA: number; highestLPA: number; lowestLPA: number; byDept: any[] };
-  drives?: any[];
-  actionQueue?: any[];
 }
 
 /** Part 2 — live recruiter CRM counts from recruiter_companies & recruiter_followups. */
@@ -813,156 +807,6 @@ function DashboardSkeleton() {
   );
 }
 
-/**
- * Part 8 Integration — Season Pacing Widget.
- */
-function SeasonPacingWidget({ pacing, seasonLabel }: { pacing: DashboardData['pacing']; seasonLabel: string }) {
-  if (!pacing) return null;
-  const behindSchedule = pacing.deltaPts < 0;
-  return (
-    <div className="flex items-center gap-2 mb-6 slide-up">
-      <span className="text-sm font-medium" style={{ color: behindSchedule ? '#f43f5e' : '#10b981' }}>
-        {behindSchedule ? '▼' : '▲'} {Math.abs(pacing.deltaPts)} pts {behindSchedule ? "behind" : "ahead of"} last season at this point ({pacing.currentPct}% through) for {seasonLabel}
-      </span>
-    </div>
-  );
-}
-
-/**
- * Part 8 Integration — Action Queue Row.
- */
-function ActionRow({ item }: { item: any }) {
-  const [open, setOpen] = useState(false);
-  const style = {
-    CRITICAL: { cls: "bg-rose-500/10 text-rose-400 border border-rose-500/20", label: "CRITICAL" },
-    HIGH: { cls: "bg-amber-500/10 text-amber-400 border border-amber-500/20", label: "HIGH" },
-    MEDIUM: { cls: "bg-blue-500/10 text-blue-400 border border-blue-500/20", label: "MEDIUM" },
-  }[item.priority as string] || { cls: "bg-slate-500/10 text-slate-400 border border-slate-500/20", label: item.priority };
-  
-  const hasEvidence = item.evidence && item.evidence.length > 0;
-  return (
-    <div className="p-4 border-b border-white/10 hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => hasEvidence && setOpen(!open)}>
-      <div className="flex items-center gap-3">
-        <span className={`text-[10px] font-bold tracking-widest px-2 py-1 rounded-md ${style.cls}`}>{style.label}</span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-sm font-bold text-white">{item.id}</span>
-            <span className="text-xs text-slate-400">{item.type}</span>
-          </div>
-          <p className="text-sm text-slate-300 mt-1">{item.action}</p>
-        </div>
-        {hasEvidence && <span className="text-slate-500 text-xs">{open ? '▼' : '▶'}</span>}
-      </div>
-      {open && hasEvidence && (
-        <ul className="mt-3 ml-4 list-disc text-xs text-slate-400 space-y-1 pl-4">
-          {item.evidence.map((e: string, i: number) => <li key={i}>{e}</li>)}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-/**
- * Part 8 Integration — Action Queue Widget.
- */
-function ActionQueueWidget({ queue }: { queue: DashboardData['actionQueue'] }) {
-  if (!queue || !queue.length) return null;
-  return (
-    <div className="card !p-0 slide-up overflow-hidden">
-      <div className="p-4 border-b border-white/10 bg-white/[0.02]">
-        <h3 className="text-sm font-semibold text-white">Today's Action Queue</h3>
-        <p className="text-xs text-slate-500 mt-0.5">{queue.length} priority items needing attention</p>
-      </div>
-      <div>
-        {queue.map((item, i) => <ActionRow key={i} item={item} />)}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Part 8 Integration — Zero Offer Risk & Package Snapshot
- */
-function Part8Widgets({ riskCounts, pkg }: { riskCounts: DashboardData['riskCounts'], pkg: DashboardData['package'] }) {
-  if (!riskCounts || !pkg) return null;
-  return (
-    <div className="grid grid-cols-2 gap-4 slide-up">
-      <div className="card !p-5">
-        <h3 className="text-sm font-semibold text-white mb-2">Zero-Offer Risk</h3>
-        <div className="flex items-baseline gap-3 mb-2">
-          <span className="text-3xl font-bold text-rose-400">{riskCounts.critical + riskCounts.high}</span>
-          <span className="text-xs text-slate-400">need attention now</span>
-        </div>
-        <p className="text-[11px] text-slate-500">
-          {riskCounts.critical} critical · {riskCounts.high} high · {riskCounts.medium} medium
-        </p>
-      </div>
-      <div className="card !p-5">
-        <h3 className="text-sm font-semibold text-white mb-2">Package Snapshot</h3>
-        <div className="flex items-baseline gap-3 mb-2">
-          <span className="text-3xl font-bold text-emerald-400">₹{pkg.avgLPA}L</span>
-          <span className="text-xs text-slate-400">average</span>
-        </div>
-        <p className="text-[11px] text-slate-500">
-          highest ₹{pkg.highestLPA}L · median ₹{pkg.medianLPA}L
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Part 8 Integration — Active & Recent Drives Table.
- */
-function DrivesTableWidget({ drives }: { drives: DashboardData['drives'] }) {
-  if (!drives || !drives.length) return null;
-  return (
-    <div className="card !p-0 slide-up overflow-hidden">
-      <div className="p-4 border-b border-white/10 bg-white/[0.02]">
-        <h3 className="text-sm font-semibold text-white">Active &amp; Recent Drives</h3>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-slate-300">
-          <thead className="text-[10px] uppercase tracking-wider text-slate-500 bg-white/[0.02]">
-            <tr>
-              <th className="p-4 font-medium">Company</th>
-              <th className="p-4 font-medium">Tier</th>
-              <th className="p-4 font-medium">CTC</th>
-              <th className="p-4 font-medium">Applied</th>
-              <th className="p-4 font-medium">Offered</th>
-              <th className="p-4 font-medium">Conv.</th>
-              <th className="p-4 font-medium">Deadline</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {drives.map(d => (
-              <tr key={d.company} className="hover:bg-white/[0.02] transition-colors">
-                <td className="p-4 font-medium text-white">{d.company}</td>
-                <td className="p-4">
-                  <span className={`text-[9px] font-bold tracking-widest px-2 py-1 rounded-md ${
-                    d.tier === 'DREAM' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' :
-                    d.tier === 'CORE' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  }`}>
-                    {d.tier}
-                  </span>
-                </td>
-                <td className="p-4 font-mono">₹{d.ctc}L</td>
-                <td className="p-4">{d.applied}</td>
-                <td className="p-4">{d.offered}</td>
-                <td className="p-4">{d.conversionPct === null ? '—' : `${d.conversionPct}%`}</td>
-                <td className={`p-4 ${d.deadlineDays !== null && d.deadlineDays <= 3 ? 'text-rose-400' : 'text-slate-500'}`}>
-                  {d.deadlineDays === null ? 'closed' : `${d.deadlineDays}d`}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1193,12 +1037,6 @@ export default function OrgAdminDashboard() {
 
       {/* ── Part 1: Placement Funnel Summary ──────────────────────────────────── */}
       <PlacementFunnelWidget summary={data?.placement_summary} />
-
-      {/* ── Part 8 Integration: Readiness Intelligence (TPO Command Centre) ───── */}
-      <SeasonPacingWidget pacing={data?.pacing} seasonLabel="2026" />
-      <Part8Widgets riskCounts={data?.riskCounts} pkg={data?.package} />
-      <ActionQueueWidget queue={data?.actionQueue} />
-      <DrivesTableWidget drives={data?.drives} />
 
       {/* ── Part 2: Recruiter Pulse ────────────────────────────────────────────── */}
       <RecruiterPulseWidget pulse={data?.recruiter_pulse} />

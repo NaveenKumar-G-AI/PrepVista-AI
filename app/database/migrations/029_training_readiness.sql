@@ -217,7 +217,7 @@ CREATE TABLE "intervention" (
 
 CREATE TABLE "intervention_assignment" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"intervention_id" text NOT NULL,
+	"intervention_id" uuid NOT NULL,
 	"student_id" uuid NOT NULL,
 	"assigned_by" text NOT NULL,
 	"reason" text NOT NULL,

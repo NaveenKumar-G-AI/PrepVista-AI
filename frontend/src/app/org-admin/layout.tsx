@@ -61,6 +61,23 @@ interface ReadinessTierCounts {
   at_risk: number;
 }
 
+interface CollegeDashboardResponse {
+  organization?: {
+    name?: string | null;
+    org_code?: string | null;
+    seat_limit?: number | null;
+    seats_used?: number | null;
+    plan?: string | null;
+    access_expiry?: string | null;
+  } | null;
+  performance_summary?: {
+    cohort_avg_score?: number | null;
+    zero_offer_risk_count?: number | null;
+    students_with_sessions?: number | null;
+    readiness_tier_counts?: ReadinessTierCounts | null;
+  } | null;
+}
+
 /** Context value exposed to all /org-admin/* child pages via useOrgContext(). */
 interface OrgContext {
   // ── Identity & enrolment (existing) ──────────────────────────────────────
@@ -125,11 +142,6 @@ export function useOrgContext() {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/org-admin', label: 'Dashboard', icon: SparklesIcon, exact: true },
-  { href: '/org-admin/ai-officer', label: 'AI Officer', icon: SparklesIcon },
-  { href: '/org-admin/placement-radar', label: 'Placement Radar', icon: ChartIcon },
-  { href: '/org-admin/action-engine', label: 'Action Engine', icon: ChartIcon },
-  { href: '/org-admin/forecast-strategy', label: 'Forecast & Strategy', icon: ChartIcon },
-  { href: '/org-admin/system-hardening', label: 'System Hardening', icon: KeyIcon },
   { href: '/org-admin/students', label: 'Students', icon: UsersIcon },
   { href: '/org-admin/departments', label: 'Departments', icon: BuildingIcon },
   { href: '/org-admin/years-batches', label: 'Years & Batches', icon: LayersIcon },
@@ -137,6 +149,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/org-admin/communications', label: 'Communications', icon: TargetIcon },
   { href: '/org-admin/leaderboard', label: 'Leaderboard', icon: CrownIcon },
   { href: '/org-admin/placement-config', label: 'Placement Config', icon: TargetIcon },
+  { href: '/org-admin/companies', label: 'Companies', icon: BuildingIcon },
+  { href: '/org-admin/drives', label: 'Placement Drives', icon: TargetIcon },
+  { href: '/org-admin/interviews', label: 'Interviews', icon: UsersIcon },
+  { href: '/org-admin/offers', label: 'Offers', icon: CreditCardIcon },
   { href: '/org-admin/access-control', label: 'Access Control', icon: KeyIcon },
   { href: '/org-admin/reports', label: 'Reports', icon: DownloadIcon },
   { href: '/org-admin/billing', label: 'Billing', icon: CreditCardIcon },
@@ -195,6 +211,7 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
   const [seatLimit, setSeatLimit] = useState(0);
   const [seatsUsed, setSeatsUsed] = useState(0);
   const [orgLoading, setOrgLoading] = useState(true);
+  const [orgLoadError, setOrgLoadError] = useState('');
 
   // ── NEW: plan identity ────────────────────────────────────────────────────
   const [plan, setPlan] = useState('');
@@ -211,7 +228,8 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
 
   const refreshOrg = useCallback(async () => {
     try {
-      const res = await api.getCollegeDashboard<any>();
+      setOrgLoadError('');
+      const res = await api.getCollegeDashboard<CollegeDashboardResponse>();
       const org = res.organization;
 
       if (org) {
@@ -239,7 +257,8 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
         setStudentsWithSessions(typeof ps.students_with_sessions === 'number' ? ps.students_with_sessions : 0);
         setReadinessTierCounts(ps.readiness_tier_counts ?? null);
       }
-    } catch {
+    } catch (error) {
+      setOrgLoadError(error instanceof Error ? error.message : 'Organization summary could not be loaded.');
       /* silent — org/context data is non-critical for page render */
     } finally {
       setOrgLoading(false);
@@ -585,6 +604,12 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
 
             {/* ── Main Content ── */}
             <main className="flex-1 min-w-0 pb-20 lg:pb-0" id="org-admin-main">
+              {orgLoadError && (
+                <div role="alert" className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-500">
+                  {orgLoadError}{' '}
+                  <button type="button" onClick={() => void refreshOrg()} className="font-semibold underline">Retry</button>
+                </div>
+              )}
               {children}
             </main>
 

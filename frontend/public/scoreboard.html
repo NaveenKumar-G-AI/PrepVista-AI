@@ -4,9 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PrepVista — Student Scoreboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script src="/vendor/echarts.min.js"></script>
 <style>
   :root{
     --canvas:#090A0E;--surface-0:#0E1015;--surface-1:#13161D;--surface-2:#191D27;--surface-3:#20252F;
@@ -35,8 +33,6 @@
   .top .brandname{font-size:12px;color:var(--accent-2);font-weight:600;}
   .grow{flex:1;}
   .live{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:6px 12px;background:var(--surface-1);}
-  .samplebtn{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:6px 12px;background:var(--surface-1);text-decoration:none;transition:border-color .18s,color .18s;}
-  .samplebtn:hover{border-color:var(--border-strong);color:var(--text);}
   .live .dot{width:7px;height:7px;border-radius:50%;background:var(--ready);animation:pulse 2.4s infinite;}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.55);}70%{box-shadow:0 0 0 7px rgba(52,211,153,0);}100%{box-shadow:0 0 0 0 rgba(52,211,153,0);}}
   .filterbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-lg);background:linear-gradient(180deg,var(--surface-1),var(--surface-0));margin-bottom:18px;box-shadow:var(--shadow-1);}
@@ -162,15 +158,14 @@
 <div class="wrap">
   <div class="top">
     <div class="logo"></div>
-    <div><h1>Student Scoreboard</h1><div class="sub">Lakshmi Institute of Technology · placement-readiness rankings</div></div>
+    <div><h1>Student Scoreboard</h1><div class="sub" id="collegeSub">Loading institution · placement-readiness rankings</div></div>
     <div class="grow"></div>
     <div style="text-align:right"><div class="brandname">PrepVista</div><div class="sub">Placement Intelligence</div></div>
-    <a class="samplebtn" href="/scoreboard.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg>View Sample</a>
     <span class="live"><span class="dot"></span> Live</span>
   </div>
   <div class="filterbar">
     <div class="fgroup"><span class="flabel">Department</span>
-      <div class="dd" id="deptDD"><button class="dd-btn" id="deptBtn">All departments <span class="count" id="deptCount">6</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-panel" id="deptPanel"></div></div>
+      <div class="dd" id="deptDD"><button class="dd-btn" id="deptBtn">All departments <span class="count" id="deptCount">0</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-panel" id="deptPanel"></div></div>
     </div>
     <div class="fgroup"><span class="flabel">Year</span><div class="seg" id="yearSeg"></div></div>
     <div class="fgroup"><span class="flabel">Tier</span><div class="chips" id="tierChips">
@@ -196,37 +191,38 @@
   <div class="foot">Ranks are by placement-readiness score within the active filter · Powered by PrepVista</div>
 </div>
 <script>
-let DEPTS=[{code:'CSE',name:'Computer Science'},{code:'IT',name:'Information Tech'},{code:'ECE',name:'Electronics & Comm'},{code:'EEE',name:'Electrical'},{code:'MECH',name:'Mechanical'},{code:'CIVIL',name:'Civil'}];
-let YEARS=[2024,2025,2026,2027];
+let DEPTS=[];
+let YEARS=[];
 const SERIES=['#6366F1','#22D3EE','#34D399','#FBBF24','#FB7185','#A78BFA'];
 const TIER_COLOR={'Ready':'#34D399','Almost':'#38BDF8','Developing':'#FBBF24','At Risk':'#FB7185','Not started':'#565C6E'};
 const TIER_CLASS={'Ready':'Ready','Almost':'Almost','Developing':'Developing','At Risk':'AtRisk','Not started':'NotStarted'};
-const ROLES=['Software Engineer','Data Analyst','Data Scientist','Embedded Engineer','Core Mechanical','Site Engineer','Product Analyst','QA Engineer','Network Engineer'];
-function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-const rnd=mulberry32(20260618);
-const rint=(a,b)=>Math.floor(rnd()*(b-a+1))+a;
-const pick=a=>a[Math.floor(rnd()*a.length)];
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const round=(v,d=0)=>{const f=10**d;return Math.round(v*f)/f;};
 const avg=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
-const FIRST=['Aarav','Vivaan','Aditya','Vihaan','Arjun','Sai','Reyansh','Krishna','Ishaan','Rohan','Karthik','Ananya','Diya','Saanvi','Aadhya','Pari','Anika','Navya','Riya','Meera','Kavya','Ishita','Tara','Nisha','Priya','Sneha','Lakshmi','Deepa','Rahul','Vikram','Suresh','Manoj','Ajay','Naveen','Harish','Divya','Pooja','Swathi','Bhavya','Akhil','Teja','Varun','Nikhil','Gokul','Madhan','Yamini','Keerthi','Sruthi','Hari','Bala','Sanjay','Mohan','Geetha','Revathi','Dinesh','Lokesh'];
-const LAST=['Sharma','Reddy','Iyer','Nair','Menon','Rao','Kumar','Krishnan','Pillai','Subramanian','Verma','Gupta','Patel','Das','Bose','Naidu','Murthy','Chandran','Raman','Venkat','Joshi','Mehta','Shetty','Hegde','Banerjee'];
-const DEPT_BIAS={CSE:9,IT:5,ECE:1,EEE:-2,MECH:-5,CIVIL:-7};
-const YEAR_BIAS={2024:-3,2025:2,2026:7,2027:-9};
-const YEAR_WT=[2026,2026,2026,2025,2025,2027,2024,2027,2025,2026];
-function makeStudents(){const out=[];const dw=['CSE','CSE','CSE','IT','IT','ECE','ECE','EEE','MECH','MECH','CIVIL'];
-  for(let i=0;i<540;i++){
-    const dept=pick(dw);const year=pick(YEAR_WT);const started=rnd()>0.16;const sessions=started?rint(1,16):0;
-    let score=null,slope=0,tier='Not started',pct=null;
-    if(started){const base=50+(DEPT_BIAS[dept]||0)+(YEAR_BIAS[year]||0)+(rnd()*26-9);const grow=Math.min(sessions,12)*(0.5+rnd()*1.4);
-      score=clamp(round(base+grow+(rnd()*8-4)),21,99);
-      slope=round((rnd()*3.2-0.5),2);
-      tier=score>=76?'Ready':score>=66?'Almost':score>=52?'Developing':'At Risk';}
-    out.push({id:i,name:pick(FIRST)+' '+pick(LAST),dept,year,sessions,started,score,slope,tier,pct,targetRole:pick(ROLES)});
-  }
-  return out;
-}
-let STUDENTS=makeStudents();
+const esc=v=>String(v==null?'':v).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+let STUDENTS=[];
+const SAMPLE_PAYLOAD={
+  college:'Sample Institution (Demo Data)',
+  depts:[
+    {code:'CSE',name:'Computer Science'},
+    {code:'ECE',name:'Electronics and Communication'},
+    {code:'ME',name:'Mechanical Engineering'}
+  ],
+  years:[2026,2027],
+  students:[
+    {id:'sample-01',name:'Sample Student 01',dept:'CSE',year:2026,sessions:9,started:true,score:92,slope:2.0,tier:'Ready',targetRole:'Software Engineer'},
+    {id:'sample-02',name:'Sample Student 02',dept:'ECE',year:2026,sessions:8,started:true,score:88,slope:1.4,tier:'Ready',targetRole:'Embedded Engineer'},
+    {id:'sample-03',name:'Sample Student 03',dept:'ME',year:2026,sessions:8,started:true,score:84,slope:1.1,tier:'Ready',targetRole:'Design Engineer'},
+    {id:'sample-04',name:'Sample Student 04',dept:'CSE',year:2027,sessions:6,started:true,score:79,slope:1.8,tier:'Almost',targetRole:'Data Analyst'},
+    {id:'sample-05',name:'Sample Student 05',dept:'ECE',year:2027,sessions:5,started:true,score:75,slope:0.8,tier:'Almost',targetRole:'Network Engineer'},
+    {id:'sample-06',name:'Sample Student 06',dept:'ME',year:2027,sessions:5,started:true,score:71,slope:0.5,tier:'Almost',targetRole:'Operations Engineer'},
+    {id:'sample-07',name:'Sample Student 07',dept:'CSE',year:2026,sessions:4,started:true,score:66,slope:1.2,tier:'Developing',targetRole:'QA Engineer'},
+    {id:'sample-08',name:'Sample Student 08',dept:'ECE',year:2026,sessions:4,started:true,score:61,slope:-0.2,tier:'Developing',targetRole:'Support Engineer'},
+    {id:'sample-09',name:'Sample Student 09',dept:'ME',year:2026,sessions:3,started:true,score:56,slope:0.3,tier:'Developing',targetRole:'Production Engineer'},
+    {id:'sample-10',name:'Sample Student 10',dept:'CSE',year:2027,sessions:2,started:true,score:47,slope:-1.5,tier:'At Risk',targetRole:null},
+    {id:'sample-11',name:'Sample Student 11',dept:'ECE',year:2027,sessions:1,started:true,score:40,slope:0,tier:'At Risk',targetRole:null},
+    {id:'sample-12',name:'Sample Student 12',dept:'ME',year:2027,sessions:0,started:false,score:null,slope:0,tier:'Not started',targetRole:null}
+  ]
+};
 const state={depts:new Set(DEPTS.map(d=>d.code)),year:'all',tiers:new Set(['Ready','Almost','Developing','At Risk']),search:'',sortKey:'score',sortDir:-1};
 function passTier(s){if(s.started)return state.tiers.has(s.tier);return state.tiers.size===4;}
 function filtered(){const q=state.search.trim().toLowerCase();
@@ -251,7 +247,7 @@ function render(){
   document.getElementById('kpis').innerHTML=[
     {l:'Students shown',v:list.length,s:scored.length+' scored · '+(list.length-scored.length)+' not started'},
     {l:'Average readiness',v:avgScore+'<small>/100</small>',s:'across scored students'},
-    {l:'Top scorer',v:top?top.score+'<small>/100</small>':'—',s:top?top.name+' · '+top.dept:'no data'},
+    {l:'Top scorer',v:top?top.score+'<small>/100</small>':'—',s:top?esc(top.name)+' · '+esc(top.dept):'no data'},
     {l:'Placement-ready',v:readyN,s:scored.length?round(readyN/scored.length*100)+'% of scored':'—'}
   ].map(k=>'<div class="kpi"><div class="kl">'+k.l+'</div><div class="kv tnum">'+k.v+'</div><div class="ks">'+k.s+'</div></div>').join('');
   /* context line */
@@ -268,19 +264,18 @@ function render(){
 }
 function renderPodium(top3){const order=[1,0,2];const cls=['p1','p2','p3'];const box=document.getElementById('podium');
   if(!top3.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">No scored students match these filters.</div>';return;}
-  const crown=['','👑',''];
   box.innerHTML=order.map(pos=>{const s=top3[pos];if(!s)return '<div></div>';const rankCls=pos===0?'p1':pos===1?'p2':'p3';const tc=TIER_COLOR[s.tier];
-    return '<div class="pcard '+rankCls+'">'+(pos===0?'<div class="crown">👑</div>':'')+'<div class="pmedal">'+(pos+1)+'</div><div class="pavatar">'+initials(s.name)+'</div><div class="pname">'+s.name+'</div><div class="pmeta">'+s.dept+' · Year '+s.year+'</div><div class="pscore tnum">'+s.score+'<small>/100</small></div><div class="ptier" style="color:'+tc+';background:'+tc+'22">'+s.tier+'</div></div>';
+    return '<div class="pcard '+rankCls+'">'+(pos===0?'<div class="crown">👑</div>':'')+'<div class="pmedal">'+(pos+1)+'</div><div class="pavatar">'+esc(initials(s.name))+'</div><div class="pname">'+esc(s.name)+'</div><div class="pmeta">'+esc(s.dept)+' · Year '+(s.year==null?'—':s.year)+'</div><div class="pscore tnum">'+s.score+'<small>/100</small></div><div class="ptier" style="color:'+tc+';background:'+tc+'22">'+s.tier+'</div></div>';
   }).join('');
 }
 function renderTopChart(top10){const o=ech('topChart');if(!o)return;const data=[...top10].reverse();
-  o.setOption({grid:{left:8,right:38,top:10,bottom:8,containLabel:true},tooltip:{...TIP,formatter:p=>p.name+'<br/><b>'+p.value+'</b>/100'},
+  o.setOption({grid:{left:8,right:38,top:10,bottom:8,containLabel:true},tooltip:{...TIP,formatter:p=>esc(p.name)+'<br/><b>'+p.value+'</b>/100'},
     xAxis:{type:'value',max:100,...AX,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},
     yAxis:{type:'category',data:data.map(s=>s.name.split(' ')[0]+' '+(s.name.split(' ')[1]||'').slice(0,1)+'.'),...AX,axisLabel:{color:'#AFB4C2',fontSize:11}},
     series:[{type:'bar',data:data.map(s=>({value:s.score,itemStyle:{borderRadius:[0,6,6,0],color:grad(TIER_COLOR[s.tier]+'ff',TIER_COLOR[s.tier]+'88')}})),barMaxWidth:18,label:{show:true,position:'right',color:'#EAECF2',fontSize:11,fontWeight:600,formatter:'{c}'}}],animationDuration:700,animationEasing:'cubicOut'},true);}
 function renderDeptChart(scored){const o=ech('deptChart');if(!o)return;
   const rows=DEPTS.map(d=>{const ds=scored.filter(s=>s.dept===d.code);return {code:d.code,avg:ds.length?round(avg(ds.map(s=>s.score)),1):0,n:ds.length};}).filter(r=>r.n>0).sort((a,b)=>b.avg-a.avg);
-  o.setOption({grid:{left:8,right:32,top:10,bottom:8,containLabel:true},tooltip:{...TIP,formatter:p=>p.name+'<br/><b>'+p.value+'</b>/100 · '+rows[p.dataIndex].n+' students'},
+  o.setOption({grid:{left:8,right:32,top:10,bottom:8,containLabel:true},tooltip:{...TIP,formatter:p=>esc(p.name)+'<br/><b>'+p.value+'</b>/100 · '+rows[p.dataIndex].n+' students'},
     xAxis:{type:'value',max:100,...AX,splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},
     yAxis:{type:'category',data:rows.map(r=>r.code),...AX,axisLabel:{color:'#AFB4C2',fontSize:12,fontWeight:600}},
     series:[{type:'bar',data:rows.map((r,i)=>({value:r.avg,itemStyle:{borderRadius:[0,6,6,0],color:grad(SERIES[i%SERIES.length]+'ff',SERIES[i%SERIES.length]+'77')}})),barMaxWidth:22,label:{show:true,position:'right',color:'#EAECF2',fontSize:11,fontWeight:600,formatter:'{c}'}}],animationDuration:700},true);}
@@ -294,13 +289,13 @@ function renderTable(list,scoredN){const body=document.getElementById('lbBody');
     const tc=TIER_COLOR[s.tier];
     const scoreHtml=s.score==null?'<span style="color:var(--faint)">—</span>':'<div class="scorecell"><span class="v">'+s.score+'</span><div class="bar"><i style="width:'+s.score+'%;background:linear-gradient(90deg,'+tc+'cc,'+tc+')"></i></div></div>';
     const m=s.started?s.slope:null;const momCls=m==null?'flat':m>0.3?'up':m<-0.1?'down':'flat';const momHtml=m==null?'<span class="mom flat">—</span>':'<span class="mom '+momCls+'">'+(m>0?'▲ +':m<0?'▼ ':'')+m.toFixed(2)+'</span>';
-    return '<tr class="'+(medal&&rank===1?'top1':'')+'"><td>'+rkHtml+'</td><td><div class="who"><div class="av">'+initials(s.name)+'</div><div><div class="nm">'+s.name+'</div><div class="sb">'+s.targetRole+'</div></div></div></td><td><span class="deptbadge">'+s.dept+'</span></td><td><span class="yr">'+s.year+'</span></td><td>'+scoreHtml+'</td><td>'+momHtml+'</td><td class="tnum">'+s.sessions+'</td><td><span class="tier '+TIER_CLASS[s.tier]+'"><span class="d"></span>'+s.tier+'</span></td></tr>';
+    return '<tr class="'+(medal&&rank===1?'top1':'')+'"><td>'+rkHtml+'</td><td><div class="who"><div class="av">'+esc(initials(s.name))+'</div><div><div class="nm">'+esc(s.name)+'</div><div class="sb">'+esc(s.targetRole||'Target role not set')+'</div></div></div></td><td><span class="deptbadge">'+esc(s.dept)+'</span></td><td><span class="yr">'+(s.year==null?'—':s.year)+'</span></td><td>'+scoreHtml+'</td><td>'+momHtml+'</td><td class="tnum">'+s.sessions+'</td><td><span class="tier '+TIER_CLASS[s.tier]+'"><span class="d"></span>'+s.tier+'</span></td></tr>';
   }).join('');
 }
 /* ---- filter wiring ---- */
 const deptPanel=document.getElementById('deptPanel');
 function buildDeptPanel(){
-  deptPanel.innerHTML=DEPTS.map(d=>'<div class="dd-opt sel" data-c="'+d.code+'"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg></span>'+d.name+' <span style="margin-left:auto;color:var(--faint);font-size:11px">'+d.code+'</span></div>').join('');
+  deptPanel.innerHTML=DEPTS.map(d=>'<div class="dd-opt sel" data-c="'+esc(d.code)+'"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg></span>'+esc(d.name)+' <span style="margin-left:auto;color:var(--faint);font-size:11px">'+esc(d.code)+'</span></div>').join('');
   deptPanel.querySelectorAll('.dd-opt').forEach(o=>o.onclick=e=>{e.stopPropagation();const c=o.dataset.c;if(state.depts.has(c)&&state.depts.size>1){state.depts.delete(c);o.classList.remove('sel');}else{state.depts.add(c);o.classList.add('sel');}updateDeptBtn();render();});
 }
 buildDeptPanel();
@@ -321,19 +316,22 @@ document.getElementById('resetBtn').onclick=()=>{state.depts=new Set(DEPTS.map(d
 window.addEventListener('resize',()=>{['topChart','deptChart'].forEach(id=>{const el=document.getElementById(id);if(el&&el._chart)el._chart.resize();});});
 /* ── Real-data seam: parent (org-admin) injects live cohort via PVSB.load ── */
 window.PVSB={load:function(payload){try{
-  if(payload&&Array.isArray(payload.depts)&&payload.depts.length)DEPTS=payload.depts;
-  if(payload&&Array.isArray(payload.years)&&payload.years.length)YEARS=payload.years;
+  if(payload&&Array.isArray(payload.depts))DEPTS=payload.depts;
+  if(payload&&Array.isArray(payload.years))YEARS=payload.years;
   if(payload&&Array.isArray(payload.students))STUDENTS=payload.students;
+  document.getElementById('collegeSub').textContent=(payload&&payload.college||'Your Institution')+' · placement-readiness rankings';
   state.depts=new Set(DEPTS.map(d=>d.code));state.year='all';state.tiers=new Set(['Ready','Almost','Developing','At Risk']);state.search='';state.sortKey='score';state.sortDir=-1;
   buildDeptPanel();buildYearSeg();updateDeptBtn();renderHead();render();
 }catch(e){console.error('PVSB.load',e);}}};
-window.addEventListener('message',function(e){if(e&&e.data&&e.data.__pvsb==='load')window.PVSB.load(e.data.payload);});
+window.addEventListener('message',function(e){if(e.origin===window.location.origin&&e.source===window.parent&&e.data&&e.data.__pvsb==='load')window.PVSB.load(e.data.payload);});
 
 /* ---- boot ---- */
 var __sbEmbed=/[?&]embed=1/.test(location.search);
+var __sbSample=/[?&]sample=1/.test(location.search);
 updateDeptBtn();renderHead();
-if(__sbEmbed){try{window.parent&&window.parent.postMessage({__pvsb:'ready'},'*');}catch(e){}}
-else{render();}
+if(__sbEmbed){try{window.parent&&window.parent.postMessage({__pvsb:'ready'},window.location.origin);}catch(e){}}
+else if(__sbSample){window.PVSB.load(SAMPLE_PAYLOAD);}
+else{document.getElementById('collegeSub').textContent='Open this scoreboard from the organization admin portal';render();}
 </script>
 </body>
 </html>

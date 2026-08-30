@@ -194,15 +194,6 @@ function isSortDirSafe(d: string): d is SortDir {
  * Prevents path traversal: `../../../etc/passwd.csv`
  * Strips: forward slash, backslash, dot-dot, null bytes, shell metacharacters.
  */
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/\.\./g, '')
-    .replace(/[/\\:*?"<>|]/g, '_')
-    .replace(/[\x00-\x1F\x7F]/g, '')
-    .replace(/\s+/g, '_')
-    .slice(0, 100);
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
    DOMAIN INTERFACES (unchanged)
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -438,7 +429,7 @@ export default function StudentsPage() {
       setYears(safeArray<Year>(y?.years));
       setBatches(safeArray<Batch>(b?.batches));
       segmentsLoadedRef.current = true;
-    } catch (err) {
+    } catch {
       if (!isMountedRef.current) return;
       setSegmentError('Could not load filter options. ');
     }
