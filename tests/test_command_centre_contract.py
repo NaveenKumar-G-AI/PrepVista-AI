@@ -158,3 +158,12 @@ def test_live_scoreboard_contains_no_generated_cohort_fallback():
     ).read_text(encoding="utf-8")
     assert 'sandbox="allow-scripts"' in page
     assert "(latest_value - first_value) / (n_sess - 1)" in backend
+
+
+def test_command_centre_uses_canonical_enrollment_timestamp_column():
+    backend = (
+        ROOT / "app" / "routers" / "org_college_analytics.py"
+    ).read_text(encoding="utf-8")
+
+    assert "os.added_at AS enrolled_at" in backend
+    assert "os.created_at AS enrolled_at" not in backend

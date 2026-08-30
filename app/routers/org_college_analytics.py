@@ -1646,7 +1646,7 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             org_id,
         )
         roster = await conn.fetch(
-            """SELECT os.user_id, os.created_at AS enrolled_at,
+            """SELECT os.user_id, os.added_at AS enrolled_at,
                       p.full_name, p.email, cd.department_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
