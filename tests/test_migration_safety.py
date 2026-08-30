@@ -90,10 +90,20 @@ def test_org_integrity_migration_repairs_missing_session_bridge_first() -> None:
 
     add_org_position = sql.index("ADD COLUMN IF NOT EXISTS organization_id")
     add_department_position = sql.index("ADD COLUMN IF NOT EXISTS department_id")
+    add_session_number_position = sql.index("ADD COLUMN IF NOT EXISTS session_number")
+    add_score_delta_position = sql.index("ADD COLUMN IF NOT EXISTS score_delta")
     first_session_update = sql.index("UPDATE interview_sessions session")
 
     assert add_org_position < first_session_update
     assert add_department_position < first_session_update
+    assert add_session_number_position < first_session_update
+    assert add_score_delta_position < first_session_update
     assert "REFERENCES organizations(id) ON DELETE SET NULL" in sql
     assert "REFERENCES college_departments(id) ON DELETE SET NULL" in sql
     assert "CREATE INDEX IF NOT EXISTS idx_sessions_org_finished" in sql
+    assert "CREATE OR REPLACE FUNCTION _session_finished_sync()" in sql
+    assert "CREATE OR REPLACE TRIGGER trg_session_finished" in sql
+    assert "WITH scored_sessions AS" in sql
+    assert "WITH session_history AS" in sql
+    assert "LEFT JOIN latest_sessions latest_session" in sql
+    assert "latest_session.organization_id = enrollment.organization_id" in sql
