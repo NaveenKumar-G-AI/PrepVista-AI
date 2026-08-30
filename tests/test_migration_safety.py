@@ -81,3 +81,19 @@ def test_season_migration_backfills_existing_ids_before_foreign_keys() -> None:
     foreign_key_position = sql.index("ADD CONSTRAINT offers_season_fk")
     assert insert_position < foreign_key_position
     assert "FOREIGN KEY (institution_id, season_id)" in sql
+
+
+def test_org_integrity_migration_repairs_missing_session_bridge_first() -> None:
+    sql = (MIGRATIONS_DIR / "033_reconcile_org_student_integrity.sql").read_text(
+        encoding="utf-8"
+    )
+
+    add_org_position = sql.index("ADD COLUMN IF NOT EXISTS organization_id")
+    add_department_position = sql.index("ADD COLUMN IF NOT EXISTS department_id")
+    first_session_update = sql.index("UPDATE interview_sessions session")
+
+    assert add_org_position < first_session_update
+    assert add_department_position < first_session_update
+    assert "REFERENCES organizations(id) ON DELETE SET NULL" in sql
+    assert "REFERENCES college_departments(id) ON DELETE SET NULL" in sql
+    assert "CREATE INDEX IF NOT EXISTS idx_sessions_org_finished" in sql

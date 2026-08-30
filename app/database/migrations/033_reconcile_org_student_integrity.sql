@@ -1,5 +1,29 @@
 -- Reconcile organization enrollment counters and historical interview context.
 --
+-- Some long-lived databases applied an earlier revision of migration 017 before
+-- the interview-session analytics bridge was added to that file.  Their
+-- schema_migrations row therefore exists even though these two columns do not.
+-- Restore the bridge here before any statement below references it.  Keeping
+-- this repair in the still-unapplied migration 033 makes startup self-healing
+-- without rewriting the checksum of an already-applied migration.
+ALTER TABLE interview_sessions
+    ADD COLUMN IF NOT EXISTS organization_id UUID
+        REFERENCES organizations(id) ON DELETE SET NULL;
+
+ALTER TABLE interview_sessions
+    ADD COLUMN IF NOT EXISTS department_id UUID
+        REFERENCES college_departments(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_sessions_org
+    ON interview_sessions(organization_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_org_finished
+    ON interview_sessions(organization_id, finished_at DESC)
+    WHERE state = 'FINISHED';
+
+CREATE INDEX IF NOT EXISTS idx_sessions_org_dept
+    ON interview_sessions(organization_id, department_id);
+--
 -- organization_students already owns a trigger that recomputes seats_used. Older
 -- application code also incremented/decremented the same counter, so production
 -- values can be doubled or otherwise drifted. Rebuild them from source-of-truth
