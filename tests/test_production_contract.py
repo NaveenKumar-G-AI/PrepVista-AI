@@ -32,13 +32,26 @@ def test_production_settings_accept_explicit_https_hosts_and_origins() -> None:
     assert settings.DEBUG is False
 
 
-def test_production_settings_reject_wildcard_host() -> None:
-    try:
-        _production_settings(ALLOWED_HOSTS="*")
-    except ValueError as exc:
-        assert "Wildcard" in str(exc)
-    else:
-        raise AssertionError("production wildcard host was accepted")
+def test_production_settings_sanitize_legacy_bare_wildcards() -> None:
+    settings = _production_settings(
+        ALLOWED_HOSTS="*",
+        CORS_ALLOWED_ORIGINS="*",
+    )
+
+    assert settings.ALLOWED_HOSTS == "prepvistabeckend.onrender.com"
+    assert settings.CORS_ALLOWED_ORIGINS == "https://prepvista-ai.vercel.app"
+    assert "*" not in settings.ALLOWED_HOSTS
+    assert "*" not in settings.CORS_ALLOWED_ORIGINS
+
+
+def test_production_settings_strip_wildcard_from_explicit_lists() -> None:
+    settings = _production_settings(
+        ALLOWED_HOSTS="*,api.prepvista.ai",
+        CORS_ALLOWED_ORIGINS="*,https://prepvista.ai/",
+    )
+
+    assert settings.ALLOWED_HOSTS == "api.prepvista.ai"
+    assert settings.CORS_ALLOWED_ORIGINS == "https://prepvista.ai"
 
 
 def test_namespaced_debug_setting_ignores_generic_shell_variable(monkeypatch) -> None:

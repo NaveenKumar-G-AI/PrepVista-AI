@@ -303,15 +303,41 @@ class Settings(BaseSettings):
                 if not value.startswith("https://"):
                     raise ValueError(f"{field_name} must use HTTPS in production")
 
-            allowed_hosts = {item.strip() for item in self.ALLOWED_HOSTS.split(",") if item.strip()}
-            cors_origins = {item.strip() for item in self.CORS_ALLOWED_ORIGINS.split(",") if item.strip()}
-            if "*" in allowed_hosts or "*" in cors_origins:
+            # Older Render services may retain ALLOWED_HOSTS=* or
+            # CORS_ALLOWED_ORIGINS=* even after render.yaml is updated. Never
+            # pass that wildcard to either middleware: remove it and derive a
+            # least-privilege fallback from the already validated public URLs.
+            allowed_hosts = [
+                item.strip()
+                for item in self.ALLOWED_HOSTS.split(",")
+                if item.strip() and item.strip() != "*"
+            ]
+            backend_host = urlparse(self.BACKEND_URL).hostname
+            if not allowed_hosts and backend_host:
+                allowed_hosts = [backend_host]
+            if not allowed_hosts:
                 raise ValueError(
-                    "Wildcard hosts/origins are not allowed in production; configure "
-                    "explicit ALLOWED_HOSTS and CORS_ALLOWED_ORIGINS values"
+                    "ALLOWED_HOSTS must contain an explicit host in production"
+                )
+
+            cors_origins = [
+                item.strip().rstrip("/")
+                for item in self.CORS_ALLOWED_ORIGINS.split(",")
+                if item.strip() and item.strip() != "*"
+            ]
+            frontend_url = urlparse(self.FRONTEND_URL)
+            frontend_origin = f"{frontend_url.scheme}://{frontend_url.netloc}"
+            if not cors_origins and frontend_url.netloc:
+                cors_origins = [frontend_origin]
+            if not cors_origins:
+                raise ValueError(
+                    "CORS_ALLOWED_ORIGINS must contain an explicit origin in production"
                 )
             if any(urlparse(origin).scheme != "https" for origin in cors_origins):
                 raise ValueError("Every production CORS_ALLOWED_ORIGINS entry must use HTTPS")
+
+            self.ALLOWED_HOSTS = ",".join(dict.fromkeys(allowed_hosts))
+            self.CORS_ALLOWED_ORIGINS = ",".join(dict.fromkeys(cors_origins))
 
         if self.ENVIRONMENT == "production" and not self.GROQ_API_KEY and not self.OPENAI_API_KEY:
             raise ValueError("At least one LLM provider API key must be configured in production")
