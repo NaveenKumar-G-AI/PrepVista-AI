@@ -100,7 +100,7 @@ services:
     buildCommand: echo "PrepVista heartbeat v3 primary ready"
     startCommand: >-
       node -e "
-      const bBase=(process.env.BACKEND_HEARTBEAT_BASE_URL||'https://prepvistabackend.onrender.com').replace(/\/$/,'');
+      const bBase=(process.env.BACKEND_HEARTBEAT_BASE_URL||'https://prepvistabeckend.onrender.com').replace(/\/$/,'');
       const fBase=(process.env.FRONTEND_HEARTBEAT_BASE_URL||'https://prepvistaai.com').replace(/\/$/,'');
       const bUrls=[bBase+'/health/awake',bBase+'/health/ready',bBase+'/health',bBase+'/'];
       const fUrls=fBase?[fBase+'/',fBase+'/api/health',fBase+'/ping']:[];
@@ -125,7 +125,7 @@ services:
       })();"
     envVars:
       - key: BACKEND_HEARTBEAT_BASE_URL
-        value: https://prepvistabackend.onrender.com
+        value: https://prepvistabeckend.onrender.com
       - key: FRONTEND_HEARTBEAT_BASE_URL
         value: https://prepvistaai.com
 
@@ -143,7 +143,7 @@ services:
     buildCommand: echo "PrepVista heartbeat v3 backup ready"
     startCommand: >-
       node -e "
-      const bBase=(process.env.BACKEND_HEARTBEAT_BASE_URL||'https://prepvistabackend.onrender.com').replace(/\/$/,'');
+      const bBase=(process.env.BACKEND_HEARTBEAT_BASE_URL||'https://prepvistabeckend.onrender.com').replace(/\/$/,'');
       const fBase=(process.env.FRONTEND_HEARTBEAT_BASE_URL||'https://prepvistaai.com').replace(/\/$/,'');
       const bUrls=[bBase+'/health/awake',bBase+'/health/ready',bBase+'/health',bBase+'/'];
       const fUrls=fBase?[fBase+'/',fBase+'/api/health',fBase+'/ping']:[];
@@ -168,6 +168,6 @@ services:
       })();"
     envVars:
       - key: BACKEND_HEARTBEAT_BASE_URL
-        value: https://prepvistabackend.onrender.com
+        value: https://prepvistabeckend.onrender.com
       - key: FRONTEND_HEARTBEAT_BASE_URL
         value: https://prepvistaai.com
