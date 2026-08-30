@@ -576,6 +576,7 @@ async def _fetch_perf_aggregate(
         LEFT JOIN college_years       cy ON cy.id   = os.year_id
         LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
         LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
+                                             AND isess.organization_id = os.organization_id
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
         WHERE os.organization_id = $1
           AND os.status = 'active'
@@ -612,6 +613,7 @@ async def _fetch_session_series(
             isess.rubric_scores
         FROM organization_students os
         JOIN interview_sessions isess ON isess.user_id = os.user_id
+                                     AND isess.organization_id = os.organization_id
                                      AND isess.state = 'FINISHED'
         WHERE os.organization_id = $1
           AND os.status = 'active'

@@ -74,6 +74,7 @@ async def submit_outcome(
             SELECT s.id
             FROM interview_sessions s
             JOIN organization_students os ON os.user_id = s.user_id
+                                         AND os.organization_id = s.organization_id
             WHERE s.id = $1 AND os.organization_id = $2
             """,
             body.session_id,

@@ -36,7 +36,7 @@ from app.routers.org_college_helpers import (
     _fetch_session_series, _compute_student_growth_map, _is_stuck,
     _compute_percentile, _time_to_threshold, _sanitize_csv_cell,
     _RUBRIC_CATEGORIES, _render_cohort_summary_export, _segment_filter_clause,
-    _fetch_perf_aggregate
+    _fetch_perf_aggregate, _READINESS_TARGET,
 )
 
 router = APIRouter()
@@ -143,6 +143,7 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
                        FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_role_fit
                FROM organization_students os
                LEFT JOIN interview_sessions isess ON isess.user_id = os.user_id
+                                                    AND isess.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY os.user_id""",
             org_id,
@@ -573,6 +574,7 @@ async def analytics_growth(
                 ROUND(AVG((isess.rubric_scores->>'role_fit')::numeric)::numeric, 1)        AS role_fit
             FROM organization_students os
             JOIN interview_sessions isess ON isess.user_id = os.user_id
+                                         AND isess.organization_id = os.organization_id
                                          AND isess.state = 'FINISHED'
             WHERE os.organization_id = $1
               AND os.status          = 'active'
@@ -592,6 +594,7 @@ async def analytics_growth(
                 COUNT(*) AS session_count
             FROM organization_students os
             JOIN interview_sessions isess ON isess.user_id = os.user_id
+                                         AND isess.organization_id = os.organization_id
                                          AND isess.state = 'FINISHED'
             WHERE os.organization_id = $1
               AND os.status          = 'active'
@@ -841,9 +844,12 @@ async def student_performance(
                       ) AS quality_flags, isess.state
                FROM interview_sessions isess
                LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
-               WHERE isess.user_id = $1 AND isess.state = 'FINISHED'
+               WHERE isess.user_id = $1
+                 AND isess.organization_id = $2
+                 AND isess.state = 'FINISHED'
                ORDER BY isess.created_at ASC""",
             user_id,
+            org_id,
         )
 
         # Query 2: All cohort avg scores for percentile rank computation
@@ -851,6 +857,7 @@ async def student_performance(
             """SELECT ROUND(AVG(isess.final_score)::numeric, 1) AS avg_score
                FROM organization_students os
                JOIN interview_sessions isess ON isess.user_id = os.user_id
+                                            AND isess.organization_id = os.organization_id
                                             AND isess.state = 'FINISHED'
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY os.user_id""",
@@ -961,11 +968,15 @@ async def access_control_summary(
         )
         total_seats  = org["seat_limit"] if org else 0
         used         = org["seats_used"] if org else 0
-        access_count = await conn.fetchval(
-            """SELECT COUNT(*) FROM organization_students
-               WHERE organization_id=$1 AND has_career_access=TRUE AND status='active'""",
+        access_counts = await conn.fetchrow(
+            """SELECT COUNT(*) FILTER (WHERE has_career_access=TRUE) AS with_access,
+                      COUNT(*) FILTER (WHERE has_career_access=FALSE) AS without_access
+               FROM organization_students
+               WHERE organization_id=$1 AND status='active'""",
             org_id,
         )
+        access_count = int(access_counts["with_access"] or 0)
+        without_access_count = int(access_counts["without_access"] or 0)
         no_access = await conn.fetch(
             """SELECT os.id, os.student_code, p.email, p.full_name,
                       cd.department_name, cy.year_name, cb.batch_name
@@ -1002,8 +1013,10 @@ async def access_control_summary(
     return {
         "total_seats":             total_seats,
         "used_seats":              used,
-        "available_seats":         total_seats - used,
+        "available_seats":         max(0, total_seats - used),
         "career_access_count":     access_count,
+        "students_with_access_total": access_count,
+        "students_without_access_total": without_access_count,
         "students_without_access": [dict(r) for r in no_access],
         "students_with_access":    [dict(r) for r in with_access],
         "recent_access_log":       [dict(r) for r in recent_log],
@@ -1139,6 +1152,7 @@ async def export_student_reports(
                               AND aqf.star_usage_score >= 5.0)  AS star_usage_count
                     FROM interview_sessions isess
                     LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
+                    WHERE isess.organization_id = $1
                     GROUP BY isess.user_id
                 ) si ON si.user_id = os.user_id
                 WHERE {w} ORDER BY p.full_name""",
@@ -1326,16 +1340,24 @@ async def export_cohort_report(
 #  (window.PVCC.load) consumes, so every one of the 67 charts renders on live data.
 # ══════════════════════════════════════════════════════════════════════════════
 
-# The dashboard's six canonical skills, mapped to real rubric categories (averaged;
-# fallback = the session's final score). Values are scaled 0–10 → 0–100.
-_CC_SKILLS = ['Technical Depth', 'Problem Solving', 'Communication', 'Behavioral', 'System Design', 'Specificity']
+# Six dashboard skill groups mapped only to persisted canonical rubric keys.
+# Values are scaled 0–10 → 0–100. A missing skill remains None; it is never
+# replaced with the session's final score or another synthetic value.
+_CC_SKILLS = [
+    'Technical Depth',
+    'Problem Solving',
+    'Communication',
+    'Behavioral Evidence',
+    'Professionalism & Fit',
+    'Conciseness',
+]
 _CC_SKILL_MAP = {
     'Technical Depth': ['technical_depth'],
     'Problem Solving': ['problem_solving', 'reasoning'],
     'Communication': ['communication', 'vocal_delivery'],
-    'Behavioral': ['structure_star', 'teamwork', 'leadership'],
-    'System Design': ['reasoning', 'technical_depth'],
-    'Specificity': ['conciseness', 'vocabulary'],
+    'Behavioral Evidence': ['structure_star', 'teamwork', 'leadership', 'adaptability'],
+    'Professionalism & Fit': ['professionalism', 'role_fit'],
+    'Conciseness': ['conciseness'],
 }
 
 
@@ -1351,20 +1373,37 @@ def _cc_coerce(v: Any) -> dict:
         return {}
 
 
-def _cc_skills(rubric: dict, fallback: float) -> dict:
-    """Map a session's rubric_scores (0–10 per category) to the 6 skills on 0–100."""
-    out: dict[str, float] = {}
+def _cc_skills(rubric: dict) -> dict[str, float | None]:
+    """Map persisted rubric scores onto dashboard groups without fabrication."""
+    out: dict[str, float | None] = {}
     for sk in _CC_SKILLS:
-        vals = []
+        vals: list[float] = []
         for cat in _CC_SKILL_MAP[sk]:
             c = rubric.get(cat)
             if c is not None:
                 try:
-                    vals.append(float(c) * 10.0)
+                    value = float(c)
+                    if math.isfinite(value):
+                        vals.append(max(0.0, min(100.0, value * 10.0)))
                 except (TypeError, ValueError):
                     pass
-        out[sk] = round(sum(vals) / len(vals)) if vals else round(fallback)
+        out[sk] = round(sum(vals) / len(vals), 1) if vals else None
     return out
+
+
+def _cc_skill_snapshots(sessions: list) -> tuple[dict, dict]:
+    """Return earliest and latest actually measured value for every skill."""
+    first: dict[str, float | None] = {skill: None for skill in _CC_SKILLS}
+    latest: dict[str, float | None] = dict(first)
+    for session in sessions:
+        measured = _cc_skills(_cc_coerce(session["rubric_scores"]))
+        for skill, value in measured.items():
+            if value is None:
+                continue
+            if first[skill] is None:
+                first[skill] = value
+            latest[skill] = value
+    return first, latest
 
 
 # Human labels for the 14 canonical rubric categories, used as the dashboard's
@@ -1437,7 +1476,7 @@ def _cc_percentile_histories(by_user: dict[str, list]) -> dict[str, list[int]]:
 
 
 def _cc_tier_for_sessions(sess: list) -> tuple[str, bool]:
-    """Apply the same readiness rule used by the current student cards."""
+    """Apply the shared college-analytics readiness and intervention rules."""
     if not sess:
         return "At Risk", True
     first_score = float(sess[0]["final_score"] or 0)
@@ -1447,16 +1486,14 @@ def _cc_tier_for_sessions(sess: list) -> tuple[str, bool]:
         if len(sess) > 1
         else 0
     )
-    stuck = len(sess) >= 3 and slope <= 0.35
-    if latest_score >= 76:
-        tier = "Ready"
-    elif latest_score >= 66:
-        tier = "Almost"
-    elif latest_score >= 52 and not stuck:
-        tier = "Developing"
-    else:
-        tier = "At Risk"
-    return tier, tier == "At Risk" or (stuck and latest_score < 60)
+    key = _readiness_tier(latest_score, len(sess))
+    tier = {
+        _TIER_READY: "Ready",
+        _TIER_ALMOST_READY: "Almost",
+        _TIER_DEVELOPING: "Developing",
+        _TIER_AT_RISK: "At Risk",
+    }[key]
+    return tier, _zero_offer_risk(latest_score, len(sess), slope)
 
 
 def _cc_cohort_history(roster: list, by_user: dict[str, list], now: datetime) -> dict:
@@ -1524,7 +1561,7 @@ def _cc_session_forensics(
     if not scored:
         return {
             "hist": hist,
-            "sub": {"Relevance": 0, "Clarity": 0, "Specificity": 0, "Structure": 0},
+            "sub": {"Relevance": None, "Clarity": None, "Specificity": None, "Structure": None},
             "comp": {"Clarifications": 0, "Timeouts": 0, "Silences": 0, "Skips": 0, "Cutoffs": 0},
             "rt": [],
             "pj": percentile_history,
@@ -1537,9 +1574,9 @@ def _cc_session_forensics(
     latest_turns = evals_by_session[str(latest["id"])]
 
     # sub: average of the four answer sub-scores across the latest scored session (0–10)
-    def _avg(col: str) -> float:
+    def _avg(col: str) -> float | None:
         vals = [float(t[col]) for t in latest_turns if t[col] is not None]
-        return round(sum(vals) / len(vals), 1) if vals else 0
+        return round(sum(vals) / len(vals), 1) if vals else None
 
     sub = {
         "Relevance": _avg("relevance_score"),
@@ -1617,7 +1654,10 @@ def _cc_session_forensics(
             "i": int(t["turn_number"]),
             "fam": _cc_fam(t["rubric_category"]),
             "st": _cc_turn_outcome(t["answer_status"], t["classification"]),
-            "score": max(0, min(100, round(float(t["score"] or 0) * 10))),
+            "score": (
+                max(0, min(100, round(float(t["score"]) * 10)))
+                if t["score"] is not None else None
+            ),
             "rt": (round(float(t["answer_duration_seconds"]))
                    if t["answer_duration_seconds"] is not None else 0),
         }
@@ -1646,12 +1686,20 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             org_id,
         )
         roster = await conn.fetch(
-            """SELECT os.user_id, os.added_at AS enrolled_at,
-                      p.full_name, p.email, cd.department_name
+            """SELECT os.id AS enrollment_id, os.user_id, os.student_code,
+                      os.department_id, os.year_id, os.batch_id, os.section,
+                      os.readiness_tier AS stored_readiness_tier,
+                      os.is_zero_offer_risk AS stored_zero_offer_risk,
+                      os.target_score, os.added_at AS enrolled_at,
+                      p.full_name, p.email,
+                      cd.department_name, cd.department_code,
+                      cy.year_name, cb.batch_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
                LEFT JOIN college_departments cd ON cd.id = os.department_id
-               WHERE os.organization_id = $1 AND os.status != 'removed'
+               LEFT JOIN college_years cy ON cy.id = os.year_id
+               LEFT JOIN college_batches cb ON cb.id = os.batch_id
+               WHERE os.organization_id = $1 AND os.status = 'active'
                ORDER BY p.full_name NULLS LAST""",
             org_id,
         )
@@ -1662,9 +1710,13 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             session_rows = await conn.fetch(
                 """SELECT id, user_id, final_score, rubric_scores, created_at, target_role
                    FROM interview_sessions
-                   WHERE user_id = ANY($1::uuid[]) AND state = 'FINISHED'
+                   WHERE user_id = ANY($1::uuid[])
+                     AND organization_id = $2
+                     AND state = 'FINISHED'
+                     AND final_score IS NOT NULL
                    ORDER BY user_id, created_at ASC""",
                 user_ids,
+                org_id,
             )
             # Per-turn evaluations feed the Session Forensics tab. Fetched sequentially
             # on this same connection (never gathered — see asyncpg single-conn rule).
@@ -1694,12 +1746,16 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
     percentile_histories = _cc_percentile_histories(by_user)
     cohort_history = _cc_cohort_history(roster, by_user, now)
     students: list[dict] = []
-    depts_seen: dict[str, bool] = {}
+    depts_seen: dict[str, str] = {}
 
-    for idx, r in enumerate(roster):
+    for r in roster:
         uid = str(r["user_id"])
-        dept = ((r["department_name"] or "").strip()) or "Unassigned"
-        depts_seen[dept] = True
+        department_name = ((r["department_name"] or "").strip()) or "Unassigned"
+        department_code = (
+            ((r["department_code"] or "").strip())
+            or (str(r["department_id"]) if r["department_id"] else "unassigned")
+        )
+        depts_seen[department_code] = department_name
         sess = by_user.get(uid, [])
         started = len(sess) > 0
         name = ((r["full_name"] or "") or (r["email"] or "Student").split("@")[0]).strip() or "Student"
@@ -1708,8 +1764,7 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             first, last = sess[0], sess[-1]
             f_final = float(first["final_score"] or 0)
             l_final = float(last["final_score"] or 0)
-            skills_first = _cc_skills(_cc_coerce(first["rubric_scores"]), f_final)
-            skills_now = _cc_skills(_cc_coerce(last["rubric_scores"]), l_final)
+            skills_first, skills_now = _cc_skill_snapshots(sess)
             first_score = round(f_final)
             latest_score = round(l_final)
             n_sess = len(sess)
@@ -1719,25 +1774,18 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
                 2,
             )
             stuck = n_sess >= 3 and slope <= 0.35
-            if latest_score >= 76:
-                tier = "Ready"
-            elif latest_score >= 66:
-                tier = "Almost"
-            elif latest_score >= 52 and not stuck:
-                tier = "Developing"
-            else:
-                tier = "At Risk"
-            at_risk = tier == "At Risk" or (stuck and latest_score < 60)
+            tier, at_risk = _cc_tier_for_sessions(sess)
             last_dt = last["created_at"]
             last_active = max(0, (now - last_dt).days) if last_dt else 90
+            target_score = float(r["target_score"] or _READINESS_TARGET)
             stt = (
-                math.ceil((76 - latest_score) / max(slope, 0.2))
-                if (slope > 0.2 and latest_score < 76)
+                math.ceil((target_score - latest_score) / slope)
+                if (slope > 0.2 and latest_score < target_score)
                 else None
             )
             target_role = (last["target_role"] or "").strip() or None
         else:
-            skills_first = {sk: 0 for sk in _CC_SKILLS}
+            skills_first = {sk: None for sk in _CC_SKILLS}
             skills_now = dict(skills_first)
             first_score = latest_score = 0
             n_sess = 0
@@ -1749,13 +1797,20 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             last_active = max(0, (now - enrolled_at).days) if enrolled_at else 0
             stt = None
             target_role = None
+            target_score = float(r["target_score"] or _READINESS_TARGET)
 
         percentile_history = percentile_histories.get(uid, [])
 
         student = {
-            "id": idx,
+            "id": str(r["enrollment_id"]),
+            "userId": uid,
+            "studentCode": r["student_code"],
             "name": name,
-            "dept": dept,
+            "dept": department_code,
+            "departmentName": department_name,
+            "year": r["year_name"],
+            "batch": r["batch_name"],
+            "section": r["section"],
             "enrolledAt": r["enrolled_at"],
             "sessions": n_sess,
             "started": started,
@@ -1769,7 +1824,10 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             "atRisk": at_risk,
             "lastActive": last_active,
             "stt": stt,
+            "targetScore": target_score,
             "targetRole": target_role,
+            "storedReadinessTier": r["stored_readiness_tier"],
+            "storedZeroOfferRisk": bool(r["stored_zero_offer_risk"]),
             "pctHistory": percentile_history,
             "scoreHistory": [
                 {"at": session["created_at"], "score": round(float(session["final_score"] or 0), 1)}
@@ -1801,13 +1859,13 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
     return {
         "college": (org["name"] if org and org["name"] else "Your Institution"),
         "batch": "All students",
-        "seats": (org["seat_limit"] if org and org["seat_limit"] else len(roster)),
+        "seats": (org["seat_limit"] if org and org["seat_limit"] is not None else 0),
         "annualFee": annual_fee,
         "billingType": allocation["billing_type"] if allocation else None,
         "cycleStart": allocation["start_date"] if allocation else None,
         "renewalDate": renewal_date,
         "history": cohort_history,
-        "depts": [{"code": d, "name": d} for d in depts_seen],
+        "depts": [{"code": code, "name": name} for code, name in depts_seen.items()],
         "students": students,
     }
 
@@ -1834,7 +1892,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
             "SELECT name FROM organizations WHERE id = $1", org_id
         )
         roster = await conn.fetch(
-            """SELECT os.user_id, p.full_name, p.email, cd.department_name,
+            """SELECT os.id AS enrollment_id, os.user_id, p.full_name, p.email, cd.department_name,
                       cy.year_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
@@ -1850,9 +1908,12 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
             session_rows = await conn.fetch(
                 """SELECT user_id, final_score, created_at, target_role
                    FROM interview_sessions
-                   WHERE user_id = ANY($1::uuid[]) AND state = 'FINISHED'
+                   WHERE user_id = ANY($1::uuid[])
+                     AND organization_id = $2
+                     AND state = 'FINISHED'
                    ORDER BY user_id, created_at ASC""",
                 user_ids,
+                org_id,
             )
 
     by_user: dict[str, list] = {}
@@ -1863,7 +1924,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
     depts_seen: dict[str, bool] = {}
     years_seen: set[int] = set()
 
-    for idx, r in enumerate(roster):
+    for r in roster:
         uid = str(r["user_id"])
         dept = ((r["department_name"] or "").strip()) or "Unassigned"
         depts_seen[dept] = True
@@ -1896,7 +1957,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
             target_role = None
 
         students.append({
-            "id": idx,
+            "id": str(r["enrollment_id"]),
             "name": name,
             "dept": dept,
             "year": yr,

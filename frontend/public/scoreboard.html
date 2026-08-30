@@ -265,8 +265,9 @@ function render(){
 function renderPodium(top3){const order=[1,0,2];const cls=['p1','p2','p3'];const box=document.getElementById('podium');
   if(!top3.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">No scored students match these filters.</div>';return;}
   box.innerHTML=order.map(pos=>{const s=top3[pos];if(!s)return '<div></div>';const rankCls=pos===0?'p1':pos===1?'p2':'p3';const tc=TIER_COLOR[s.tier];
-    return '<div class="pcard '+rankCls+'">'+(pos===0?'<div class="crown">👑</div>':'')+'<div class="pmedal">'+(pos+1)+'</div><div class="pavatar">'+esc(initials(s.name))+'</div><div class="pname">'+esc(s.name)+'</div><div class="pmeta">'+esc(s.dept)+' · Year '+(s.year==null?'—':s.year)+'</div><div class="pscore tnum">'+s.score+'<small>/100</small></div><div class="ptier" style="color:'+tc+';background:'+tc+'22">'+s.tier+'</div></div>';
+    return '<div class="pcard '+rankCls+'" data-student-id="'+esc(s.id)+'" style="cursor:pointer">'+(pos===0?'<div class="crown">👑</div>':'')+'<div class="pmedal">'+(pos+1)+'</div><div class="pavatar">'+esc(initials(s.name))+'</div><div class="pname">'+esc(s.name)+'</div><div class="pmeta">'+esc(s.dept)+' · Year '+(s.year==null?'—':s.year)+'</div><div class="pscore tnum">'+s.score+'<small>/100</small></div><div class="ptier" style="color:'+tc+';background:'+tc+'22">'+s.tier+'</div></div>';
   }).join('');
+  box.querySelectorAll('[data-student-id]').forEach(el=>el.onclick=()=>openStudent(el.dataset.studentId));
 }
 function renderTopChart(top10){const o=ech('topChart');if(!o)return;const data=[...top10].reverse();
   o.setOption({grid:{left:8,right:38,top:10,bottom:8,containLabel:true},tooltip:{...TIP,formatter:p=>esc(p.name)+'<br/><b>'+p.value+'</b>/100'},
@@ -289,9 +290,11 @@ function renderTable(list,scoredN){const body=document.getElementById('lbBody');
     const tc=TIER_COLOR[s.tier];
     const scoreHtml=s.score==null?'<span style="color:var(--faint)">—</span>':'<div class="scorecell"><span class="v">'+s.score+'</span><div class="bar"><i style="width:'+s.score+'%;background:linear-gradient(90deg,'+tc+'cc,'+tc+')"></i></div></div>';
     const m=s.started?s.slope:null;const momCls=m==null?'flat':m>0.3?'up':m<-0.1?'down':'flat';const momHtml=m==null?'<span class="mom flat">—</span>':'<span class="mom '+momCls+'">'+(m>0?'▲ +':m<0?'▼ ':'')+m.toFixed(2)+'</span>';
-    return '<tr class="'+(medal&&rank===1?'top1':'')+'"><td>'+rkHtml+'</td><td><div class="who"><div class="av">'+esc(initials(s.name))+'</div><div><div class="nm">'+esc(s.name)+'</div><div class="sb">'+esc(s.targetRole||'Target role not set')+'</div></div></div></td><td><span class="deptbadge">'+esc(s.dept)+'</span></td><td><span class="yr">'+(s.year==null?'—':s.year)+'</span></td><td>'+scoreHtml+'</td><td>'+momHtml+'</td><td class="tnum">'+s.sessions+'</td><td><span class="tier '+TIER_CLASS[s.tier]+'"><span class="d"></span>'+s.tier+'</span></td></tr>';
+    return '<tr class="'+(medal&&rank===1?'top1':'')+'" data-student-id="'+esc(s.id)+'" style="cursor:pointer"><td>'+rkHtml+'</td><td><div class="who"><div class="av">'+esc(initials(s.name))+'</div><div><div class="nm">'+esc(s.name)+'</div><div class="sb">'+esc(s.targetRole||'Target role not set')+'</div></div></div></td><td><span class="deptbadge">'+esc(s.dept)+'</span></td><td><span class="yr">'+(s.year==null?'—':s.year)+'</span></td><td>'+scoreHtml+'</td><td>'+momHtml+'</td><td class="tnum">'+s.sessions+'</td><td><span class="tier '+TIER_CLASS[s.tier]+'"><span class="d"></span>'+s.tier+'</span></td></tr>';
   }).join('');
+  body.querySelectorAll('[data-student-id]').forEach(row=>row.onclick=()=>openStudent(row.dataset.studentId));
 }
+function openStudent(id){if(__sbEmbed&&window.parent&&window.parent!==window)window.parent.postMessage({__pvsb:'navigateStudent',enrollmentId:id},window.location.origin);}
 /* ---- filter wiring ---- */
 const deptPanel=document.getElementById('deptPanel');
 function buildDeptPanel(){

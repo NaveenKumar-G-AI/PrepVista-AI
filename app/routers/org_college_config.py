@@ -29,6 +29,58 @@ from app.routers.org_college_helpers import _log_action, _validate_uuid, _pagina
 
 router = APIRouter()
 
+_SEGMENT_COLUMNS = {
+    "department": ("college_departments", "department_name", "department_code"),
+    "year": ("college_years", "year_name", None),
+    "batch": ("college_batches", "batch_name", "batch_code"),
+}
+
+
+async def _ensure_segment_unique(
+    conn,
+    entity: str,
+    organization_id: str,
+    name: str,
+    code: str | None = None,
+    exclude_id: str | None = None,
+) -> None:
+    table, name_column, code_column = _SEGMENT_COLUMNS[entity]
+    clauses = [f"LOWER({name_column}) = LOWER($2)"]
+    params: list[Any] = [organization_id, name]
+    if code and code_column:
+        params.append(code)
+        clauses.append(f"LOWER({code_column}) = LOWER(${len(params)})")
+    if exclude_id:
+        params.append(exclude_id)
+        exclusion = f" AND id != ${len(params)}"
+    else:
+        exclusion = ""
+    exists = await conn.fetchval(
+        f"""SELECT EXISTS(
+                 SELECT 1 FROM {table}
+                 WHERE organization_id = $1
+                   AND ({' OR '.join(clauses)}){exclusion}
+             )""",
+        *params,
+    )
+    if exists:
+        raise HTTPException(409, f"A {entity} with this name or code already exists.")
+
+
+async def _validate_batch_year(conn, organization_id: str, year_id: str | None) -> None:
+    if not year_id:
+        return
+    belongs_to_org = await conn.fetchval(
+        """SELECT EXISTS(
+               SELECT 1 FROM college_years
+               WHERE id = $1 AND organization_id = $2
+           )""",
+        year_id,
+        organization_id,
+    )
+    if not belongs_to_org:
+        raise HTTPException(422, "Year does not belong to your organization.")
+
 @router.get("/departments")
 async def list_departments(admin: OrgAdminProfile = Depends(require_org_admin())):
     async with DatabaseConnection() as conn:
@@ -47,6 +99,7 @@ async def create_department(
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         async with conn.transaction():
+            await _ensure_segment_unique(conn, "department", org_id, body.name, body.code)
             row = await conn.fetchrow(
                 """INSERT INTO college_departments (organization_id, department_name, department_code, notes)
                    VALUES ($1,$2,$3,$4) RETURNING *""",
@@ -75,6 +128,9 @@ async def update_department(
         if not existing:
             raise HTTPException(404, "Department not found.")
         async with conn.transaction():
+            await _ensure_segment_unique(
+                conn, "department", org_id, body.name, body.code, dept_id
+            )
             await conn.execute(
                 "UPDATE college_departments SET department_name=$1, department_code=$2, notes=$3, updated_at=NOW() WHERE id=$4 AND organization_id=$5",
                 body.name, body.code, body.notes, dept_id, org_id,
@@ -94,9 +150,21 @@ async def delete_department(
     _validate_uuid(dept_id, "department ID")
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        count = await conn.fetchval(
-            "SELECT COUNT(*) FROM organization_students WHERE department_id = $1 AND status = 'active'",
+        exists = await conn.fetchval(
+            """SELECT EXISTS(
+                   SELECT 1 FROM college_departments
+                   WHERE id = $1 AND organization_id = $2
+               )""",
             dept_id,
+            org_id,
+        )
+        if not exists:
+            raise HTTPException(404, "Department not found.")
+        count = await conn.fetchval(
+            """SELECT COUNT(*) FROM organization_students
+               WHERE department_id = $1 AND organization_id = $2 AND status = 'active'""",
+            dept_id,
+            org_id,
         )
         if count > 0:
             raise HTTPException(400, f"Cannot delete: {count} active students in this department.")
@@ -133,6 +201,7 @@ async def create_year(
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         async with conn.transaction():
+            await _ensure_segment_unique(conn, "year", org_id, body.name)
             row = await conn.fetchrow(
                 "INSERT INTO college_years (organization_id, year_name, notes) VALUES ($1,$2,$3) RETURNING *",
                 org_id, body.name, body.notes,
@@ -159,6 +228,7 @@ async def update_year(
         if not existing:
             raise HTTPException(404, "Year not found.")
         async with conn.transaction():
+            await _ensure_segment_unique(conn, "year", org_id, body.name, exclude_id=year_id)
             await conn.execute(
                 "UPDATE college_years SET year_name=$1, notes=$2, updated_at=NOW() WHERE id=$3 AND organization_id=$4",
                 body.name, body.notes, year_id, org_id,
@@ -178,9 +248,21 @@ async def delete_year(
     _validate_uuid(year_id, "year ID")
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        count = await conn.fetchval(
-            "SELECT COUNT(*) FROM organization_students WHERE year_id = $1 AND status = 'active'",
+        exists = await conn.fetchval(
+            """SELECT EXISTS(
+                   SELECT 1 FROM college_years
+                   WHERE id = $1 AND organization_id = $2
+               )""",
             year_id,
+            org_id,
+        )
+        if not exists:
+            raise HTTPException(404, "Year not found.")
+        count = await conn.fetchval(
+            """SELECT COUNT(*) FROM organization_students
+               WHERE year_id = $1 AND organization_id = $2 AND status = 'active'""",
+            year_id,
+            org_id,
         )
         if count > 0:
             raise HTTPException(400, f"Cannot delete: {count} active students in this year.")
@@ -209,10 +291,23 @@ async def reorder_years(
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
     org_id = admin.organization_id
+    if not year_ids:
+        raise HTTPException(422, "At least one year is required for reordering.")
+    if len(set(year_ids)) != len(year_ids):
+        raise HTTPException(422, "Year order contains duplicate IDs.")
+    for year_id in year_ids:
+        _validate_uuid(year_id, "year ID")
     async with DatabaseConnection() as conn:
         async with conn.transaction():
-            for idx, y_id in enumerate(year_ids):
-                _validate_uuid(y_id, "year ID")
+            found = await conn.fetchval(
+                """SELECT COUNT(*) FROM college_years
+                   WHERE organization_id = $1 AND id = ANY($2::uuid[])""",
+                org_id,
+                year_ids,
+            )
+            if int(found or 0) != len(year_ids):
+                raise HTTPException(422, "One or more years do not belong to your organization.")
+            for idx, y_id in enumerate(year_ids, start=1):
                 await conn.execute(
                     "UPDATE college_years SET display_order = $1 WHERE id = $2 AND organization_id = $3",
                     idx, y_id, org_id,
@@ -245,6 +340,8 @@ async def create_batch(
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         async with conn.transaction():
+            await _validate_batch_year(conn, org_id, body.year_id)
+            await _ensure_segment_unique(conn, "batch", org_id, body.name, body.code)
             row = await conn.fetchrow(
                 """INSERT INTO college_batches (organization_id, batch_name, batch_code, year_id, notes)
                    VALUES ($1,$2,$3,$4,$5) RETURNING *""",
@@ -272,6 +369,10 @@ async def update_batch(
         if not existing:
             raise HTTPException(404, "Batch not found.")
         async with conn.transaction():
+            await _validate_batch_year(conn, org_id, body.year_id)
+            await _ensure_segment_unique(
+                conn, "batch", org_id, body.name, body.code, batch_id
+            )
             await conn.execute(
                 "UPDATE college_batches SET batch_name=$1, batch_code=$2, year_id=$3, notes=$4, updated_at=NOW() WHERE id=$5 AND organization_id=$6",
                 body.name, body.code, body.year_id, body.notes, batch_id, org_id,
@@ -291,9 +392,21 @@ async def delete_batch(
     _validate_uuid(batch_id, "batch ID")
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        count = await conn.fetchval(
-            "SELECT COUNT(*) FROM organization_students WHERE batch_id = $1 AND status = 'active'",
+        exists = await conn.fetchval(
+            """SELECT EXISTS(
+                   SELECT 1 FROM college_batches
+                   WHERE id = $1 AND organization_id = $2
+               )""",
             batch_id,
+            org_id,
+        )
+        if not exists:
+            raise HTTPException(404, "Batch not found.")
+        count = await conn.fetchval(
+            """SELECT COUNT(*) FROM organization_students
+               WHERE batch_id = $1 AND organization_id = $2 AND status = 'active'""",
+            batch_id,
+            org_id,
         )
         if count > 0:
             raise HTTPException(400, f"Cannot delete: {count} active students in this batch.")

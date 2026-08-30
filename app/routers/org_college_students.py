@@ -29,6 +29,63 @@ from app.routers.org_college_helpers import _paginate, _MAX_SEARCH_LEN, _validat
 
 router = APIRouter()
 
+_STUDENT_SORT_COLUMNS = {
+    "full_name": "LOWER(COALESCE(p.full_name, ''))",
+    "added_at": "os.added_at",
+    "department_name": "LOWER(COALESCE(cd.department_name, ''))",
+}
+
+
+async def _validate_student_segments(
+    conn,
+    organization_id: str,
+    *,
+    department_id: str | None,
+    year_id: str | None,
+    batch_id: str | None,
+) -> None:
+    """Ensure every enrollment segment belongs to the admin's organization.
+
+    The foreign keys only guarantee that a UUID exists globally. Without these
+    tenant checks an org admin could attach a student to another college's
+    department/year/batch by submitting its UUID directly.
+    """
+    if department_id:
+        valid_department = await conn.fetchval(
+            """SELECT EXISTS(
+                   SELECT 1 FROM college_departments
+                   WHERE id = $1 AND organization_id = $2
+               )""",
+            department_id,
+            organization_id,
+        )
+        if not valid_department:
+            raise HTTPException(422, "Department does not belong to your organization.")
+
+    if year_id:
+        valid_year = await conn.fetchval(
+            """SELECT EXISTS(
+                   SELECT 1 FROM college_years
+                   WHERE id = $1 AND organization_id = $2
+               )""",
+            year_id,
+            organization_id,
+        )
+        if not valid_year:
+            raise HTTPException(422, "Year does not belong to your organization.")
+
+    if batch_id:
+        batch = await conn.fetchrow(
+            """SELECT year_id FROM college_batches
+               WHERE id = $1 AND organization_id = $2""",
+            batch_id,
+            organization_id,
+        )
+        if not batch:
+            raise HTTPException(422, "Batch does not belong to your organization.")
+        if year_id and batch["year_id"] and str(batch["year_id"]) != str(year_id):
+            raise HTTPException(422, "Selected batch does not belong to the selected year.")
+
 @router.get("/students")
 async def list_students(
     search:        str | None = None,
@@ -36,6 +93,8 @@ async def list_students(
     year_id:       str | None = None,
     batch_id:      str | None = None,
     has_access:    bool | None = None,
+    sort_by:       str = "added_at",
+    sort_dir:      str = "desc",
     page:      int = 1,
     page_size: int = ORG_DEFAULT_PAGE_SIZE,
     admin: OrgAdminProfile = Depends(require_org_admin()),
@@ -44,6 +103,8 @@ async def list_students(
     org_id     = admin.organization_id
     # ✅ SEC: Cap search length before it reaches the DB.
     safe_search = (search or "")[:_MAX_SEARCH_LEN].strip() or None
+    order_column = _STUDENT_SORT_COLUMNS.get(sort_by, _STUDENT_SORT_COLUMNS["added_at"])
+    order_direction = "ASC" if sort_dir.lower() == "asc" else "DESC"
     async with DatabaseConnection() as conn:
         where  = ["os.organization_id = $1", "os.status != 'removed'"]
         params: list = [org_id]
@@ -76,7 +137,9 @@ async def list_students(
                 LEFT JOIN college_departments cd ON cd.id = os.department_id
                 LEFT JOIN college_years       cy ON cy.id = os.year_id
                 LEFT JOIN college_batches     cb ON cb.id = os.batch_id
-                WHERE {w} ORDER BY os.added_at DESC LIMIT ${idx+1} OFFSET ${idx+2}""",
+                WHERE {w}
+                ORDER BY {order_column} {order_direction}, os.id ASC
+                LIMIT ${idx+1} OFFSET ${idx+2}""",
             *params, ps, offset,
         )
     return {"students": [dict(r) for r in rows], "total": total, "page": page, "page_size": ps}
@@ -89,43 +152,85 @@ async def add_student(
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
-        org = await conn.fetchrow(
-            "SELECT seat_limit, seats_used FROM organizations WHERE id = $1", org_id
-        )
-        if org and org["seats_used"] >= org["seat_limit"]:
-            raise HTTPException(
-                400,
-                f"Seat limit reached ({org['seat_limit']}). Contact your platform admin to increase seats.",
-            )
-        profile = await conn.fetchrow(
-            "SELECT id FROM profiles WHERE LOWER(email) = LOWER($1)", body.email
-        )
-        if not profile:
-            raise HTTPException(
-                404, f"No PrepVista account found for {body.email}. Student must sign up first."
-            )
-        user_id  = str(profile["id"])
-        existing = await conn.fetchrow(
-            "SELECT id FROM organization_students WHERE organization_id = $1 AND user_id = $2",
-            org_id, user_id,
-        )
-        if existing:
-            raise HTTPException(400, "This student is already in your organization.")
-        access_at = datetime.now(timezone.utc) if body.grant_career_access else None
-        # ✅ FIXED: All 3 writes inside a transaction. Previously no transaction —
-        # seat count and plan could be left inconsistent on any mid-write failure.
         async with conn.transaction():
+            # Serialize enrollment against this organization's allocation. The
+            # database trigger is the only writer of organizations.seats_used.
+            org = await conn.fetchrow(
+                """SELECT seat_limit, seats_used FROM organizations
+                   WHERE id = $1 FOR UPDATE""",
+                org_id,
+            )
+            if not org:
+                raise HTTPException(404, "Organization not found.")
+            if int(org["seats_used"] or 0) >= int(org["seat_limit"] or 0):
+                raise HTTPException(
+                    400,
+                    f"Seat limit reached ({org['seat_limit']}). Contact your platform admin to increase seats.",
+                )
+
+            profile = await conn.fetchrow(
+                "SELECT id FROM profiles WHERE LOWER(email) = LOWER($1)", body.email
+            )
+            if not profile:
+                raise HTTPException(
+                    404, f"No PrepVista account found for {body.email}. Student must sign up first."
+                )
+            user_id = str(profile["id"])
+            existing = await conn.fetchrow(
+                """SELECT id, organization_id FROM organization_students
+                   WHERE user_id = $1 AND status != 'removed'
+                   ORDER BY added_at DESC LIMIT 1""",
+                user_id,
+            )
+            if existing:
+                if str(existing["organization_id"]) == str(org_id):
+                    raise HTTPException(409, "This student is already in your organization.")
+                raise HTTPException(409, "This student already belongs to another organization.")
+
+            if body.student_code:
+                code_in_use = await conn.fetchval(
+                    """SELECT EXISTS(
+                           SELECT 1 FROM organization_students
+                           WHERE organization_id = $1 AND student_code = $2
+                             AND user_id != $3
+                       )""",
+                    org_id,
+                    body.student_code,
+                    user_id,
+                )
+                if code_in_use:
+                    raise HTTPException(409, "Student code is already in use in your organization.")
+
+            await _validate_student_segments(
+                conn,
+                org_id,
+                department_id=body.department_id,
+                year_id=body.year_id,
+                batch_id=body.batch_id,
+            )
+            access_at = datetime.now(timezone.utc) if body.grant_career_access else None
             row = await conn.fetchrow(
                 """INSERT INTO organization_students
                    (organization_id, user_id, student_code, department_id, year_id, batch_id,
                     section, has_career_access, access_granted_at, access_granted_by, notes)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *""",
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                   ON CONFLICT (organization_id, user_id) DO UPDATE SET
+                     student_code = EXCLUDED.student_code,
+                     department_id = EXCLUDED.department_id,
+                     year_id = EXCLUDED.year_id,
+                     batch_id = EXCLUDED.batch_id,
+                     section = EXCLUDED.section,
+                     has_career_access = EXCLUDED.has_career_access,
+                     access_granted_at = EXCLUDED.access_granted_at,
+                     access_granted_by = EXCLUDED.access_granted_by,
+                     notes = EXCLUDED.notes,
+                     status = 'active',
+                     added_at = NOW(),
+                     updated_at = NOW()
+                   RETURNING *""",
                 org_id, user_id, body.student_code, body.department_id, body.year_id,
                 body.batch_id, body.section, body.grant_career_access, access_at,
                 admin.user_id if body.grant_career_access else None, body.notes,
-            )
-            await conn.execute(
-                "UPDATE organizations SET seats_used = seats_used + 1 WHERE id = $1", org_id
             )
             if body.grant_career_access:
                 await conn.execute(
@@ -159,7 +264,7 @@ async def get_student(
                LEFT JOIN college_departments cd ON cd.id = os.department_id
                LEFT JOIN college_years       cy ON cy.id = os.year_id
                LEFT JOIN college_batches     cb ON cb.id = os.batch_id
-               WHERE os.id = $1 AND os.organization_id = $2""",
+               WHERE os.id = $1 AND os.organization_id = $2 AND os.status != 'removed'""",
             student_id, admin.organization_id,
         )
         if not row:
@@ -177,18 +282,54 @@ async def update_student(
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         existing = await conn.fetchrow(
-            "SELECT id, user_id FROM organization_students WHERE id = $1 AND organization_id = $2",
+            """SELECT id, user_id, student_code, department_id, year_id, batch_id
+               FROM organization_students
+               WHERE id = $1 AND organization_id = $2 AND status != 'removed'""",
             student_id, org_id,
         )
         if not existing:
             raise HTTPException(404, "Student not found in your organization.")
         sets, params, idx = [], [], 0
+        provided_fields = body.model_fields_set
         for field in ["student_code", "department_id", "year_id", "batch_id", "section", "notes"]:
-            val = getattr(body, field, None)
-            if val is not None:
+            if field in provided_fields:
+                val = getattr(body, field)
                 idx += 1; sets.append(f"{field} = ${idx}"); params.append(val)
         if not sets:
             raise HTTPException(400, "No fields to update.")
+
+        effective_department = (
+            body.department_id if "department_id" in provided_fields
+            else (str(existing["department_id"]) if existing["department_id"] else None)
+        )
+        effective_year = (
+            body.year_id if "year_id" in provided_fields
+            else (str(existing["year_id"]) if existing["year_id"] else None)
+        )
+        effective_batch = (
+            body.batch_id if "batch_id" in provided_fields
+            else (str(existing["batch_id"]) if existing["batch_id"] else None)
+        )
+        await _validate_student_segments(
+            conn,
+            org_id,
+            department_id=effective_department,
+            year_id=effective_year,
+            batch_id=effective_batch,
+        )
+
+        if "student_code" in provided_fields and body.student_code:
+            code_in_use = await conn.fetchval(
+                """SELECT EXISTS(
+                       SELECT 1 FROM organization_students
+                       WHERE organization_id = $1 AND student_code = $2 AND id != $3
+                   )""",
+                org_id,
+                body.student_code,
+                student_id,
+            )
+            if code_in_use:
+                raise HTTPException(409, "Student code is already in use in your organization.")
         idx += 1; params.append(student_id)
         idx += 1; params.append(org_id)
         async with conn.transaction():
@@ -212,22 +353,16 @@ async def remove_student(
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         row = await conn.fetchrow(
-            "SELECT user_id, has_career_access FROM organization_students WHERE id = $1 AND organization_id = $2",
+            "SELECT user_id, has_career_access FROM organization_students WHERE id = $1 AND organization_id = $2 AND status != 'removed'",
             student_id, org_id,
         )
         if not row:
             raise HTTPException(404, "Student not found in your organization.")
         user_id = str(row["user_id"])
-        # ✅ FIXED: All 3 writes in a transaction. Previously no transaction —
-        # seats_used decrement or profiles revert could fail leaving data inconsistent.
         async with conn.transaction():
             await conn.execute(
                 "UPDATE organization_students SET status = 'removed', has_career_access = FALSE, updated_at = NOW() WHERE id = $1",
                 student_id,
-            )
-            await conn.execute(
-                "UPDATE organizations SET seats_used = GREATEST(seats_used - 1, 0) WHERE id = $1",
-                org_id,
             )
             if row["has_career_access"]:
                 await conn.execute(
@@ -367,18 +502,27 @@ async def bulk_upload_students(
         raise HTTPException(400, f"CSV exceeds {COLLEGE_CSV_MAX_ROWS} row limit.")
 
     async with DatabaseConnection() as conn:
-        org = await conn.fetchrow(
-            "SELECT seat_limit, seats_used FROM organizations WHERE id = $1", org_id
-        )
-        available = (org["seat_limit"] - org["seats_used"]) if org else 0
-
         # Pre-load segment maps: name → id (case-insensitive)
         depts = {r["department_name"].lower(): str(r["id"]) for r in await conn.fetch(
             "SELECT id, department_name FROM college_departments WHERE organization_id = $1", org_id)}
         yrs   = {r["year_name"].lower():       str(r["id"]) for r in await conn.fetch(
             "SELECT id, year_name FROM college_years WHERE organization_id = $1", org_id)}
-        bats  = {r["batch_name"].lower():      str(r["id"]) for r in await conn.fetch(
-            "SELECT id, batch_name FROM college_batches WHERE organization_id = $1", org_id)}
+        bats = {
+            r["batch_name"].lower(): r
+            for r in await conn.fetch(
+                """SELECT id, batch_name, year_id FROM college_batches
+                   WHERE organization_id = $1""",
+                org_id,
+            )
+        }
+        student_code_owners = {
+            r["student_code"]: str(r["user_id"])
+            for r in await conn.fetch(
+                """SELECT student_code, user_id FROM organization_students
+                   WHERE organization_id = $1 AND student_code IS NOT NULL""",
+                org_id,
+            )
+        }
 
         # ✅ N+1 FIX: Bulk fetch ALL profiles and enrolled users in 2 queries
         all_emails = [
@@ -394,15 +538,24 @@ async def bulk_upload_students(
             r["email"].lower(): str(r["id"]) for r in profile_rows
         }
         enrolled_rows = await conn.fetch(
-            """SELECT user_id FROM organization_students
-               WHERE organization_id = $1 AND user_id = ANY($2::uuid[])""",
-            org_id,
+            """SELECT user_id, organization_id FROM organization_students
+               WHERE user_id = ANY($1::uuid[]) AND status != 'removed'""",
             list(email_to_user_id.values()),
         )
-        already_enrolled: set[str] = {str(r["user_id"]) for r in enrolled_rows}
+        enrollment_orgs: dict[str, str] = {
+            str(r["user_id"]): str(r["organization_id"]) for r in enrolled_rows
+        }
 
         success, failed, granted = 0, [], 0
         async with conn.transaction():
+            org = await conn.fetchrow(
+                """SELECT seat_limit, seats_used FROM organizations
+                   WHERE id = $1 FOR UPDATE""",
+                org_id,
+            )
+            if not org:
+                raise HTTPException(404, "Organization not found.")
+            available = max(0, int(org["seat_limit"] or 0) - int(org["seats_used"] or 0))
             for i, row in enumerate(rows, 1):
                 email  = (row.get("email") or "").strip()
                 errors: list[str] = []
@@ -420,21 +573,35 @@ async def bulk_upload_students(
                     errors.append("Missing batch")
                 dept_id  = depts.get(dept_name)
                 year_id  = yrs.get(year_name)
-                batch_id = bats.get(batch_name)
+                batch = bats.get(batch_name)
+                batch_id = str(batch["id"]) if batch else None
                 if dept_name  and not dept_id:
                     errors.append(f"Department '{row.get('department', '')}' not found")
                 if year_name  and not year_id:
                     errors.append(f"Year '{row.get('year', '')}' not found")
                 if batch_name and not batch_id:
                     errors.append(f"Batch '{row.get('batch', '')}' not found")
+                if (
+                    batch and year_id and batch["year_id"]
+                    and str(batch["year_id"]) != str(year_id)
+                ):
+                    errors.append("Batch does not belong to the selected year")
                 if errors:
                     failed.append({"row": i, "email": email, "errors": errors}); continue
 
                 user_id = email_to_user_id.get(email.lower())
                 if not user_id:
                     failed.append({"row": i, "email": email, "errors": ["No PrepVista account found"]}); continue
-                if user_id in already_enrolled:
-                    failed.append({"row": i, "email": email, "errors": ["Already in organization"]}); continue
+                code_owner = student_code_owners.get(student_id_val)
+                if code_owner and code_owner != user_id:
+                    failed.append({"row": i, "email": email, "errors": ["Student ID is already in use"]}); continue
+                if user_id in enrollment_orgs:
+                    message = (
+                        "Already in organization"
+                        if enrollment_orgs[user_id] == str(org_id)
+                        else "Already belongs to another organization"
+                    )
+                    failed.append({"row": i, "email": email, "errors": [message]}); continue
                 if available <= 0:
                     failed.append({"row": i, "email": email, "errors": ["Seat limit reached"]}); continue
 
@@ -446,15 +613,25 @@ async def bulk_upload_students(
                     """INSERT INTO organization_students
                        (organization_id, user_id, student_code, department_id, year_id, batch_id,
                         section, has_career_access, access_granted_at, access_granted_by, notes)
-                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                       ON CONFLICT (organization_id, user_id) DO UPDATE SET
+                         student_code = EXCLUDED.student_code,
+                         department_id = EXCLUDED.department_id,
+                         year_id = EXCLUDED.year_id,
+                         batch_id = EXCLUDED.batch_id,
+                         section = EXCLUDED.section,
+                         has_career_access = EXCLUDED.has_career_access,
+                         access_granted_at = EXCLUDED.access_granted_at,
+                         access_granted_by = EXCLUDED.access_granted_by,
+                         notes = EXCLUDED.notes,
+                         status = 'active',
+                         added_at = NOW(),
+                         updated_at = NOW()""",
                     org_id, user_id, student_id_val or None,
                     dept_id, year_id, batch_id,
                     (row.get("section") or "").strip() or None,
                     grant, access_at, admin.user_id if grant else None,
                     (row.get("notes") or "").strip() or None,
-                )
-                await conn.execute(
-                    "UPDATE organizations SET seats_used = seats_used + 1 WHERE id = $1", org_id
                 )
                 if grant:
                     await conn.execute(
@@ -467,7 +644,8 @@ async def bulk_upload_students(
                         "UPDATE profiles SET org_student = TRUE, organization_id = $1 WHERE id = $2",
                         org_id, user_id,
                     )
-                already_enrolled.add(user_id)   # prevent duplicate rows in same CSV
+                enrollment_orgs[user_id] = str(org_id)  # prevent duplicates in the same CSV
+                student_code_owners[student_id_val] = user_id
                 success  += 1
                 available -= 1
 

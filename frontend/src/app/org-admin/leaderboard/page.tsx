@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 interface LeaderboardPayload {
@@ -21,6 +22,7 @@ interface LeaderboardPayload {
 }
 
 export default function LeaderboardPage() {
+  const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const dataRef = useRef<LeaderboardPayload | null>(null);
   const readyRef = useRef(false);
@@ -44,10 +46,17 @@ export default function LeaderboardPage() {
         (e.origin === 'null' || e.origin === window.location.origin)
         && e.source === iframeRef.current?.contentWindow
         && e?.data
-        && e.data.__pvsb === 'ready'
       ) {
-        readyRef.current = true;
-        trySend();
+        if (e.data.__pvsb === 'ready') {
+          readyRef.current = true;
+          trySend();
+          return;
+        }
+        if (
+          e.data.__pvsb === 'navigateStudent'
+          && typeof e.data.enrollmentId === 'string'
+          && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(e.data.enrollmentId)
+        ) router.push(`/org-admin/students/${e.data.enrollmentId}`);
       }
     };
     window.addEventListener('message', onMessage);
@@ -70,7 +79,7 @@ export default function LeaderboardPage() {
       alive = false;
       window.removeEventListener('message', onMessage);
     };
-  }, []);
+  }, [router]);
 
   if (error) {
     return (

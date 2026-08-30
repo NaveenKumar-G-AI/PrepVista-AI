@@ -394,7 +394,9 @@ async def _fetch_all_orgs_perf(conn) -> list:
         LEFT JOIN organization_students os
                ON os.organization_id = o.id AND os.status = 'active'
         LEFT JOIN interview_sessions isess
-               ON isess.user_id = os.user_id AND isess.state = 'FINISHED'
+               ON isess.user_id = os.user_id
+              AND isess.organization_id = os.organization_id
+              AND isess.state = 'FINISHED'
         WHERE o.category = 'college'
         GROUP BY o.id, o.name, o.org_code, o.status, o.plan,
                  o.seat_limit, o.seats_used, o.access_expiry
@@ -470,6 +472,7 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
         LEFT JOIN college_years       cy ON cy.id   = os.year_id
         LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
         LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
+                                             AND isess.organization_id = os.organization_id
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
         WHERE os.organization_id = $1 AND os.status = 'active'
         GROUP BY os.user_id, os.department_id, os.student_code,

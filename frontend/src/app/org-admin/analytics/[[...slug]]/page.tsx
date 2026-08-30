@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 interface CommandCentrePayload {
@@ -29,9 +30,12 @@ interface CommandCentrePayload {
   };
   depts: Array<{ code: string; name: string }>;
   students: unknown[];
+  initialTab?: 'command' | 'risk' | 'skills' | 'dept';
 }
 
 export default function AnalyticsCommandCentrePage() {
+  const pathname = usePathname();
+  const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const dataRef = useRef<CommandCentrePayload | null>(null);
   const readyRef = useRef(false);
@@ -63,6 +67,14 @@ export default function AnalyticsCommandCentrePage() {
         return;
       }
       if (
+        e.data.__pvcc === 'navigateStudent'
+        && typeof e.data.enrollmentId === 'string'
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(e.data.enrollmentId)
+      ) {
+        router.push(`/org-admin/students/${e.data.enrollmentId}`);
+        return;
+      }
+      if (
         e.data.__pvcc === 'download'
         && e.data.bytes instanceof ArrayBuffer
         && e.data.bytes.byteLength <= 100 * 1024 * 1024
@@ -87,7 +99,14 @@ export default function AnalyticsCommandCentrePage() {
       .getCommandCentre<CommandCentrePayload>()
       .then((d) => {
         if (!alive) return;
-        dataRef.current = d;
+        const slug = pathname.split('/').filter(Boolean).at(-1);
+        const initialTab: CommandCentrePayload['initialTab'] =
+          slug === 'performance' ? 'skills'
+            : slug === 'readiness' ? 'risk'
+              : slug === 'growth' ? 'command'
+                : slug === 'departments' ? 'dept'
+                  : 'command';
+        dataRef.current = { ...d, initialTab };
         setLoading(false);
         trySend();
       })
@@ -101,7 +120,7 @@ export default function AnalyticsCommandCentrePage() {
       alive = false;
       window.removeEventListener('message', onMessage);
     };
-  }, []);
+  }, [pathname, router]);
 
   if (error) {
     return (

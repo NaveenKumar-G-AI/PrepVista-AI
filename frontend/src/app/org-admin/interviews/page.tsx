@@ -594,7 +594,7 @@ export default function PlacementInterviewsPage() {
     let active = true;
     Promise.all([
       api.listPlacementDrives<{ items: Drive[] }>(),
-      api.listCollegeStudents<{ students: CollegeStudent[] }>("page_size=100"),
+      api.listAllCollegeStudents<CollegeStudent>(),
     ]).then(([driveResponse, studentResponse]) => {
       if (!active) return;
       setDrives(driveResponse.items ?? []);

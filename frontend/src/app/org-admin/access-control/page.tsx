@@ -13,6 +13,8 @@ interface AccessData {
   used_seats: number;
   available_seats: number;
   career_access_count: number;
+  students_without_access_total: number;
+  students_with_access_total: number;
   students_without_access: Array<{ id: string; student_code: string | null; email: string; full_name: string | null; department_name: string | null; year_name: string | null }>;
   students_with_access: Array<{ id: string; student_code: string | null; email: string; full_name: string | null; department_name: string | null; year_name: string | null; access_granted_at: string | null }>;
   recent_access_log: Array<{ id: string; action: string; student_email: string | null; created_at: string }>;
@@ -32,9 +34,23 @@ export default function AccessControlPage() {
   const [actionId, setActionId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setError('');
     try {
-      const res = await api.getCollegeAccessControl<AccessData>();
-      setData(res);
+      let first: AccessData | null = null;
+      const without: AccessData['students_without_access'] = [];
+      const withAccess: AccessData['students_with_access'] = [];
+      for (let page = 1; page <= 1000; page += 1) {
+        const res = await api.getCollegeAccessControl<AccessData>(`page=${page}&page_size=100`);
+        if (!first) first = res;
+        without.push(...(res.students_without_access ?? []));
+        withAccess.push(...(res.students_with_access ?? []));
+        if (
+          without.length >= res.students_without_access_total
+          && withAccess.length >= res.students_with_access_total
+        ) break;
+        if (!res.students_without_access.length && !res.students_with_access.length) break;
+      }
+      if (first) setData({ ...first, students_without_access: without, students_with_access: withAccess });
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed.'); }
     finally { setLoading(false); }
   }, []);
@@ -90,7 +106,7 @@ export default function AccessControlPage() {
           <div className="grid gap-6 lg:grid-cols-2 slide-up">
             {/* Without Access */}
             <div className="card !p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">Without Career Access ({data.students_without_access.length})</h3>
+              <h3 className="text-sm font-semibold text-white mb-3">Without Career Access ({data.students_without_access_total})</h3>
               {data.students_without_access.length === 0 ? (
                 <div className="text-sm text-slate-500 py-4 text-center">All students have access</div>
               ) : (
@@ -113,7 +129,7 @@ export default function AccessControlPage() {
 
             {/* With Access */}
             <div className="card !p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">With Career Access ({data.students_with_access.length})</h3>
+              <h3 className="text-sm font-semibold text-white mb-3">With Career Access ({data.students_with_access_total})</h3>
               {data.students_with_access.length === 0 ? (
                 <div className="text-sm text-slate-500 py-4 text-center">No students have career access yet</div>
               ) : (

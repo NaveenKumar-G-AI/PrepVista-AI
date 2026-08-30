@@ -5,6 +5,8 @@ from app.routers.org_college_analytics import (
     _cc_cohort_history,
     _cc_percentile_histories,
     _cc_session_forensics,
+    _cc_skill_snapshots,
+    _cc_skills,
     _cc_tier_for_sessions,
 )
 
@@ -44,6 +46,26 @@ def test_command_centre_tier_uses_per_session_score_change():
 
     assert _cc_tier_for_sessions(sessions) == ("Almost", False)
     assert _cc_tier_for_sessions([]) == ("At Risk", True)
+
+
+def test_command_centre_skills_never_fabricate_missing_rubrics():
+    empty = _cc_skills({})
+    assert empty
+    assert all(value is None for value in empty.values())
+
+    measured = _cc_skills({"technical_depth": 7.5, "final_score": 99})
+    assert measured["Technical Depth"] == 75
+    assert measured["Communication"] is None
+    assert "System Design" not in measured
+
+    first, latest = _cc_skill_snapshots(
+        [
+            {"rubric_scores": {"technical_depth": 6}},
+            {"rubric_scores": {"communication": 8}},
+        ]
+    )
+    assert first["Technical Depth"] == latest["Technical Depth"] == 60
+    assert first["Communication"] == latest["Communication"] == 80
 
 
 def test_command_centre_answer_anatomy_is_persisted_evidence():
@@ -167,3 +189,22 @@ def test_command_centre_uses_canonical_enrollment_timestamp_column():
 
     assert "os.added_at AS enrolled_at" in backend
     assert "os.created_at AS enrolled_at" not in backend
+
+
+def test_live_org_analytics_uses_stable_ids_and_tenant_scoped_sessions():
+    backend = (ROOT / "app" / "routers" / "org_college_analytics.py").read_text(
+        encoding="utf-8"
+    )
+    command_html = (
+        ROOT / "frontend" / "public" / "command-centre.html"
+    ).read_text(encoding="utf-8")
+    scoreboard_html = (
+        ROOT / "frontend" / "public" / "scoreboard.html"
+    ).read_text(encoding="utf-8")
+
+    assert '"id": str(r["enrollment_id"])' in backend
+    assert "AND organization_id = $2" in backend
+    assert "state.focus=Number(" not in command_html
+    assert "const SKILLS=['Technical Depth','Problem Solving','Communication','Behavioral Evidence','Professionalism & Fit','Conciseness']" in command_html
+    assert "v.answerSub" in command_html
+    assert "__pvsb:'navigateStudent'" in scoreboard_html

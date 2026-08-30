@@ -77,7 +77,6 @@ interface Issue {
 
 interface ListMessagesResponse { items: Message[]; total: number }
 interface ListIssuesResponse { items: Issue[]; total: number }
-interface ListStudentsResponse { students: Student[]; total: number }
 interface ListDepartmentsResponse { departments: Department[] }
 interface ListDrivesResponse { items: Drive[] }
 interface DraftResponse { subject: string; body: string }
@@ -182,7 +181,7 @@ export default function CommunicationsPage() {
       const [messageData, issueData, studentData, departmentData, driveData] = await Promise.all([
         api.listOrgMessages<ListMessagesResponse>(1, 50),
         api.listOrgCommunicationIssues<ListIssuesResponse>('', 1, 100),
-        api.listCollegeStudents<ListStudentsResponse>('page=1&page_size=100'),
+        api.listAllCollegeStudents<Student>(),
         api.listCollegeDepartments<ListDepartmentsResponse>(),
         api.listPlacementDrives<ListDrivesResponse>(),
       ]);

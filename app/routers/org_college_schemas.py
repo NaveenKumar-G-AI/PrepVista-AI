@@ -4,6 +4,8 @@ PrepVista AI - Org College Schemas
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, field_validator
 from app.routers.org_college_helpers import _MAX_EMAIL_LEN, _EMAIL_RE, _MAX_CODE_LEN, _MAX_NOTES_LEN, _MAX_NAME_LEN
 
@@ -37,8 +39,18 @@ class AddStudentRequest(BaseModel):
     @classmethod
     def _cap_code_fields(cls, v: object) -> object:
         if isinstance(v, str):
-            return v.strip()[:_MAX_CODE_LEN]
+            return v.strip()[:_MAX_CODE_LEN] or None
         return v
+
+    @field_validator("department_id", "year_id", "batch_id", mode="before")
+    @classmethod
+    def _validate_segment_ids(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        try:
+            return str(uuid.UUID(str(v).strip()))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValueError("Segment IDs must be valid UUIDs.") from exc
 
     @field_validator("notes", mode="before")
     @classmethod
@@ -60,8 +72,18 @@ class UpdateStudentRequest(BaseModel):
     @classmethod
     def _cap_code_fields(cls, v: object) -> object:
         if isinstance(v, str):
-            return v.strip()[:_MAX_CODE_LEN]
+            return v.strip()[:_MAX_CODE_LEN] or None
         return v
+
+    @field_validator("department_id", "year_id", "batch_id", mode="before")
+    @classmethod
+    def _validate_segment_ids(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        try:
+            return str(uuid.UUID(str(v).strip()))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValueError("Segment IDs must be valid UUIDs.") from exc
 
     @field_validator("notes", mode="before")
     @classmethod
@@ -88,7 +110,7 @@ class SegmentRequest(BaseModel):
     @classmethod
     def _cap_code(cls, v: object) -> object:
         if isinstance(v, str):
-            return v.strip()[:_MAX_CODE_LEN]
+            return v.strip()[:_MAX_CODE_LEN] or None
         return v
 
     @field_validator("notes", mode="before")
@@ -117,8 +139,18 @@ class BatchRequest(BaseModel):
     @classmethod
     def _cap_code(cls, v: object) -> object:
         if isinstance(v, str):
-            return v.strip()[:_MAX_CODE_LEN]
+            return v.strip()[:_MAX_CODE_LEN] or None
         return v
+
+    @field_validator("year_id", mode="before")
+    @classmethod
+    def _validate_year_id(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        try:
+            return str(uuid.UUID(str(v).strip()))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValueError("Year ID must be a valid UUID.") from exc
 
     @field_validator("notes", mode="before")
     @classmethod

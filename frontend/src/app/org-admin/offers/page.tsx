@@ -365,9 +365,9 @@ function OfferOperations({ onChanged }: { onChanged: () => Promise<void> }) {
   const loadResources = useCallback(async () => {
     const [seasonResponse, studentResponse, driveResponse, companyResponse] = await Promise.all([
       api.listPlacementSeasons<{ items: Season[] }>(),
-      api.listCollegeStudents<{ students: StudentOption[] }>('page_size=100'),
+      api.listAllCollegeStudents<StudentOption>(),
       api.listPlacementDrives<{ items: DriveOption[] }>(),
-      api.listRecruiterCompanies<{ items: CompanyOption[] }>({ page_size: 100 }),
+      api.listAllRecruiterCompanies<CompanyOption>(),
     ]);
     setSeasons(seasonResponse.items ?? []);
     setStudents(studentResponse.students ?? []);

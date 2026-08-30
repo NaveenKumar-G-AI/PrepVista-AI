@@ -1130,6 +1130,21 @@ class ApiClient {
   async getCommandCentre<T = unknown>() { return this.request<T>('/org/my/command-centre'); }
   async getLeaderboard<T = unknown>() { return this.request<T>('/org/my/leaderboard'); }
   async listCollegeStudents<T = unknown>(params = '') { return this.request<T>(`/org/my/students${params ? '?' + params : ''}`); }
+  async listAllCollegeStudents<T = unknown>(params = ''): Promise<{ students: T[]; total: number }> {
+    const query = new URLSearchParams(params);
+    query.set('page_size', '100');
+    const students: T[] = [];
+    let total = 0;
+    for (let page = 1; page <= 1000; page += 1) {
+      query.set('page', String(page));
+      const response = await this.request<{ students: T[]; total: number }>(`/org/my/students?${query.toString()}`);
+      const rows = Array.isArray(response.students) ? response.students : [];
+      students.push(...rows);
+      total = Number(response.total) || students.length;
+      if (students.length >= total || rows.length === 0) break;
+    }
+    return { students, total };
+  }
   async addCollegeStudent<T = unknown>(body: Record<string, unknown>) {
     return this.request<T>('/org/my/students', { method: 'POST', body });
   }
@@ -1195,7 +1210,7 @@ class ApiClient {
     return this.request<T>(`/org/my/batches/${id}`, { method: 'DELETE' });
   }
   async getCollegeAnalytics<T = unknown>() { return this.request<T>('/org/my/analytics'); }
-  async getCollegeAccessControl<T = unknown>() { return this.request<T>('/org/my/access-control'); }
+  async getCollegeAccessControl<T = unknown>(params = '') { return this.request<T>(`/org/my/access-control${params ? '?' + params : ''}`); }
   async getCollegeAccessLog<T = unknown>(params = '') { return this.request<T>(`/org/my/access-log${params ? '?' + params : ''}`); }
   async getCollegeBilling<T = unknown>() { return this.request<T>('/org/my/billing'); }
   async exportCollegeReports<T = unknown>(params = '') { return this.request<T>(`/org/my/reports/export${params ? '?' + params : ''}`); }
@@ -1313,6 +1328,23 @@ class ApiClient {
       Object.entries(params).map(([k, v]) => [k, String(v)])
     ).toString();
     return this.request<T>(`/org/my/companies${qs ? '?' + qs : ''}`);
+  }
+
+  async listAllRecruiterCompanies<T = unknown>(params: Record<string, string | boolean | number> = {}): Promise<{ items: T[]; total: number }> {
+    const items: T[] = [];
+    let total = 0;
+    for (let page = 1; page <= 1000; page += 1) {
+      const response = await this.listRecruiterCompanies<{ items: T[]; total: number }>({
+        ...params,
+        page,
+        page_size: 100,
+      });
+      const rows = Array.isArray(response.items) ? response.items : [];
+      items.push(...rows);
+      total = Number(response.total) || items.length;
+      if (items.length >= total || rows.length === 0) break;
+    }
+    return { items, total };
   }
 
   async createRecruiterCompany<T = unknown>(body: Record<string, unknown>): Promise<T> {
