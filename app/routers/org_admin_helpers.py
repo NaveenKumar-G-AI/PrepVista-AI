@@ -150,42 +150,45 @@ def _safe_round(value: Any, decimals: int = 1) -> float | None:
         return None
 
 
-def _readiness_tier(avg_score: float | None, total_sessions: int) -> str:
+def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
     """Classify a student into one of four readiness tiers (top-down, first match).
 
-    ready:        avg ≥ 75 AND sessions ≥ 3
-    almost_ready: avg ≥ 60 AND sessions ≥ 2
-    developing:   avg ≥ 40 OR  sessions ≥ 1
+    ``readiness_score`` is the latest finished-session score so platform-admin
+    and college-admin views expose the same classification.
+
+    ready:        score ≥ 75 AND sessions ≥ 3
+    almost_ready: score ≥ 60 AND sessions ≥ 2
+    developing:   score ≥ 40 after at least one session
     at_risk:      everything else
     """
-    if avg_score is None or total_sessions == 0:
+    if readiness_score is None or total_sessions == 0:
         return _TIER_AT_RISK
-    if avg_score >= 75.0 and total_sessions >= 3:
+    if readiness_score >= 75.0 and total_sessions >= 3:
         return _TIER_READY
-    if avg_score >= 60.0 and total_sessions >= 2:
+    if readiness_score >= 60.0 and total_sessions >= 2:
         return _TIER_ALMOST_READY
-    if avg_score >= 40.0 or total_sessions >= 1:
+    if readiness_score >= 40.0:
         return _TIER_DEVELOPING
     return _TIER_AT_RISK
 
 
 def _zero_offer_risk(
-    avg_score: float | None,
+    readiness_score: float | None,
     total_sessions: int,
     trend_slope: float | None,
 ) -> bool:
-    """Return True if student is at risk of zero placement offers (OR logic).
+    """Return the legacy-named internal intervention flag (OR logic).
 
     1. Zero sessions.
-    2. avg_score < 40 (hard floor).
-    3. avg_score < 50 with ≥ 3 sessions (not improving despite practice).
+    2. latest readiness score < 40 (hard floor).
+    3. latest readiness score < 50 with ≥ 3 sessions.
     4. trend_slope < −2.0 (actively declining).
     """
-    if total_sessions == 0 or avg_score is None:
+    if total_sessions == 0 or readiness_score is None:
         return True
-    if avg_score < _ZERO_OFFER_SCORE_HARD:
+    if readiness_score < _ZERO_OFFER_SCORE_HARD:
         return True
-    if total_sessions >= 3 and avg_score < _ZERO_OFFER_SCORE_SOFT:
+    if total_sessions >= 3 and readiness_score < _ZERO_OFFER_SCORE_SOFT:
         return True
     if trend_slope is not None and trend_slope < _ZERO_OFFER_SLOPE_FLOOR:
         return True
@@ -312,9 +315,10 @@ def _compute_org_perf_summary(
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(avg, sc, None):
+        if _zero_offer_risk(latest, sc, None):
             zero_risk_count += 1
         if avg is not None:
             scored_avgs.append(avg)
@@ -397,6 +401,7 @@ async def _fetch_all_orgs_perf(conn) -> list:
                ON isess.user_id = os.user_id
               AND isess.organization_id = os.organization_id
               AND isess.state = 'FINISHED'
+              AND isess.final_score IS NOT NULL
         WHERE o.category = 'college'
         GROUP BY o.id, o.name, o.org_code, o.status, o.plan,
                  o.seat_limit, o.seats_used, o.access_expiry
@@ -422,6 +427,7 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
             os.student_code,
             p.full_name,
             p.email,
+            p.graduation_year,
             cd.department_name,
             cy.year_name,
             cb.batch_name,
@@ -473,10 +479,12 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
         LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
         LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
                                              AND isess.organization_id = os.organization_id
+                                             AND isess.state = 'FINISHED'
+                                             AND isess.final_score IS NOT NULL
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
         WHERE os.organization_id = $1 AND os.status = 'active'
         GROUP BY os.user_id, os.department_id, os.student_code,
-                 p.full_name, p.email,
+                 p.full_name, p.email, p.graduation_year,
                  cd.department_name, cy.year_name, cb.batch_name
         ORDER BY p.full_name
         """,

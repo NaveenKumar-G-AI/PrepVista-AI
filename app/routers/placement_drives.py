@@ -30,6 +30,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.database.connection import DatabaseConnection
 from app.dependencies import OrgAdminProfile, require_org_admin
+from app.routers.org_college_helpers import (
+    _compute_slope,
+    _readiness_tier,
+    _zero_offer_risk,
+)
 
 router = APIRouter(prefix="/drives", tags=["placement-drives"])
 
@@ -153,6 +158,45 @@ def _summarize_cohort(students: list[dict], rule_tree: dict) -> dict:
         "category_breakdown":     breakdown,
         "eligible_student_ids":   eligible_ids,
         "not_eligible_student_ids": not_eligible_ids,
+    }
+
+
+def _tenant_performance(scores: list[float]) -> dict[str, Any]:
+    """Build drive-rule values from one organization's finished score history.
+
+    The profile and organization_students performance columns are intentionally
+    denormalized and can include a student's historical activity outside the
+    current enrollment. Drive eligibility must instead use the same
+    tenant-scoped, finished-and-scored sessions as the college analytics pages.
+    """
+    clean_scores = [float(score) for score in scores]
+    session_count = len(clean_scores)
+    latest_score = clean_scores[-1] if clean_scores else None
+    trend_slope = _compute_slope(clean_scores)
+
+    sessions_without_improvement = 0
+    latest_delta: float | None = None
+    previous: float | None = None
+    for score in clean_scores:
+        delta = 0.0 if previous is None else score - previous
+        latest_delta = delta
+        if delta > 0:
+            sessions_without_improvement = 0
+        else:
+            sessions_without_improvement += 1
+        previous = score
+
+    return {
+        "readiness_score": latest_score,
+        "readiness_tier": _readiness_tier(latest_score, session_count),
+        "is_zero_offer_risk": _zero_offer_risk(
+            latest_score,
+            session_count,
+            trend_slope,
+        ),
+        "total_sessions_completed": session_count,
+        "sessions_without_improvement": sessions_without_improvement,
+        "score_delta": latest_delta,
     }
 
 
@@ -493,14 +537,11 @@ async def compute_snapshot(
             AddRuleVersionRequest(rule_tree=rule_tree)
             rule_version = rule_row["version_number"]
 
-            students = await conn.fetch(
+            student_rows = await conn.fetch(
                 """SELECT
                      os.user_id AS id,
                      p.full_name AS name,
                      p.email,
-                     os.latest_overall_score::double precision AS readiness_score,
-                     os.readiness_tier,
-                     os.is_zero_offer_risk,
                      p.graduation_year,
                      cd.department_name AS department,
                      cd.department_code,
@@ -508,9 +549,6 @@ async def compute_snapshot(
                      cb.batch_name AS batch,
                      os.section,
                      os.student_code,
-                     os.total_sessions_completed,
-                     os.sessions_without_improvement,
-                     os.score_delta::double precision AS score_delta,
                      p.target_role
                    FROM organization_students os
                    JOIN profiles p ON p.id = os.user_id
@@ -521,7 +559,38 @@ async def compute_snapshot(
                 org_id,
             )
 
-            summary = _summarize_cohort([dict(student) for student in students], rule_tree)
+            session_rows = await conn.fetch(
+                """SELECT isess.user_id,
+                          isess.final_score::double precision AS final_score
+                   FROM interview_sessions isess
+                   JOIN organization_students os
+                     ON os.user_id = isess.user_id
+                    AND os.organization_id = isess.organization_id
+                    AND os.status = 'active'
+                   WHERE isess.organization_id = $1
+                     AND isess.state = 'FINISHED'
+                     AND isess.final_score IS NOT NULL
+                   ORDER BY isess.user_id,
+                            COALESCE(isess.finished_at, isess.created_at) ASC NULLS LAST,
+                            isess.created_at ASC NULLS LAST,
+                            isess.id ASC""",
+                org_id,
+            )
+            scores_by_user: dict[str, list[float]] = {}
+            for session in session_rows:
+                scores_by_user.setdefault(str(session["user_id"]), []).append(
+                    float(session["final_score"])
+                )
+
+            students: list[dict[str, Any]] = []
+            for row in student_rows:
+                student = dict(row)
+                student.update(
+                    _tenant_performance(scores_by_user.get(str(row["id"]), []))
+                )
+                students.append(student)
+
+            summary = _summarize_cohort(students, rule_tree)
 
             snap_row = await conn.fetchrow(
                 """INSERT INTO drive_eligibility_snapshots

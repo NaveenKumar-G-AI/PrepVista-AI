@@ -8,7 +8,8 @@ export function CommandCentreHero() {
 
   const isDataAvailable = studentsWithSessions > 0;
   
-  // Use "Placement Ready" count from readinessTierCounts if available
+  // Count students that meet the product's readiness tier rule. This is an
+  // interview-preparation signal, not an employment or offer prediction.
   const readyCount = readinessTierCounts?.ready || 0;
   
   return (
@@ -18,7 +19,7 @@ export function CommandCentreHero() {
           Readiness Index
         </div>
         <h2 className="text-[19px] font-normal text-primary mb-1">
-          Interview Ready Candidates
+          Readiness Threshold Met
         </h2>
         <div className="text-[56px] md:text-[92px] leading-none font-light tracking-[-0.02em] text-primary my-1">
           {isDataAvailable ? readyCount : '—'}
@@ -33,7 +34,7 @@ export function CommandCentreHero() {
           Cohort Performance
         </div>
         <div className="font-semibold text-[15px] text-primary mb-1">
-          Average Technical Score
+          Average Interview Score
         </div>
         <div className="text-[12px] text-secondary">
           Avg. Score:{' '}

@@ -76,9 +76,9 @@ _QUALITY_FLAG_NUMERIC: list[str] = [
 ]
 
 # ── Readiness tier labels ─────────────────────────────
-_TIER_READY        = "ready"         # avg ≥ 75 AND sessions ≥ 3
-_TIER_ALMOST_READY = "almost_ready"  # avg ≥ 60 AND sessions ≥ 2
-_TIER_DEVELOPING   = "developing"    # avg ≥ 40 OR  sessions ≥ 1
+_TIER_READY        = "ready"         # latest score ≥ 75 AND sessions ≥ 3
+_TIER_ALMOST_READY = "almost_ready"  # latest score ≥ 60 AND sessions ≥ 2
+_TIER_DEVELOPING   = "developing"    # latest score ≥ 40 after at least one session
 _TIER_AT_RISK      = "at_risk"       # everything else (0 sessions or very low score)
 
 # ── Numeric thresholds ────────────────────────────────
@@ -164,45 +164,52 @@ def _compute_slope(scores: list[float]) -> float | None:
     return round(numerator / denominator, 3)
 
 
-def _readiness_tier(avg_score: float | None, total_sessions: int) -> str:
+def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
     """Classify a student into one of four readiness tiers (top-down, first match).
 
-    ready:        avg_score ≥ 75  AND sessions ≥ 3  — placement-ready now
-    almost_ready: avg_score ≥ 60  AND sessions ≥ 2  — 1–2 sessions away
-    developing:   avg_score ≥ 40  OR  sessions ≥ 1  — active but not ready
+    ``readiness_score`` is the student's latest finished-session score. Average
+    score remains a separate historical metric and must not drive a different
+    tier on another screen.
+
+    ready:        score ≥ 75  AND sessions ≥ 3
+    almost_ready: score ≥ 60  AND sessions ≥ 2
+    developing:   score ≥ 40  after at least one session
     at_risk:      everything else (zero sessions or very low score)
     """
-    if avg_score is None or total_sessions == 0:
+    if readiness_score is None or total_sessions == 0:
         return _TIER_AT_RISK
-    if avg_score >= 75.0 and total_sessions >= 3:
+    if readiness_score >= 75.0 and total_sessions >= 3:
         return _TIER_READY
-    if avg_score >= 60.0 and total_sessions >= 2:
+    if readiness_score >= 60.0 and total_sessions >= 2:
         return _TIER_ALMOST_READY
-    if avg_score >= 40.0 or total_sessions >= 1:
+    if readiness_score >= 40.0:
         return _TIER_DEVELOPING
     return _TIER_AT_RISK
 
 
 def _zero_offer_risk(
-    avg_score: float | None,
+    readiness_score: float | None,
     total_sessions: int,
     trend_slope: float | None,
 ) -> bool:
-    """Return True if the student is at risk of receiving zero placement offers.
+    """Return the legacy-named internal intervention flag.
+
+    Despite the persisted ``is_zero_offer_risk`` field name, this deterministic
+    rule is a preparation signal, not a prediction of placement offers.
 
     Risk conditions (OR logic — any single condition triggers the flag):
       1. Zero sessions (never practiced at all).
-      2. avg_score < 40 — hard floor; performance fundamentally insufficient.
-      3. avg_score < 50 with ≥ 3 sessions — not improving despite sustained practice.
+      2. latest readiness score < 40.
+      3. latest readiness score < 50 with ≥ 3 sessions.
       4. trend_slope < −2.0 — actively declining ≥ 2 pts/session.
     """
     if total_sessions == 0:
         return True
-    if avg_score is None:
+    if readiness_score is None:
         return True
-    if avg_score < _ZERO_OFFER_SCORE_HARD:
+    if readiness_score < _ZERO_OFFER_SCORE_HARD:
         return True
-    if total_sessions >= 3 and avg_score < _ZERO_OFFER_SCORE_SOFT:
+    if total_sessions >= 3 and readiness_score < _ZERO_OFFER_SCORE_SOFT:
         return True
     if trend_slope is not None and trend_slope < _ZERO_OFFER_SLOPE_FLOOR:
         return True
@@ -499,6 +506,7 @@ async def _fetch_perf_aggregate(
             os.student_code,
             p.full_name,
             p.email,
+            p.graduation_year,
             cd.department_name,
             cy.year_name,
             cb.batch_name,
@@ -577,12 +585,14 @@ async def _fetch_perf_aggregate(
         LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
         LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
                                              AND isess.organization_id = os.organization_id
+                                             AND isess.state = 'FINISHED'
+                                             AND isess.final_score IS NOT NULL
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
         WHERE os.organization_id = $1
           AND os.status = 'active'
           {extra_clause}
         GROUP BY os.user_id, os.department_id, os.year_id, os.batch_id,
-                 os.student_code, p.full_name, p.email,
+                 os.student_code, p.full_name, p.email, p.graduation_year,
                  cd.department_name, cy.year_name, cb.batch_name
         ORDER BY p.full_name
         """,
@@ -615,6 +625,7 @@ async def _fetch_session_series(
         JOIN interview_sessions isess ON isess.user_id = os.user_id
                                      AND isess.organization_id = os.organization_id
                                      AND isess.state = 'FINISHED'
+                                     AND isess.final_score IS NOT NULL
         WHERE os.organization_id = $1
           AND os.status = 'active'
           {extra_clause}
@@ -656,7 +667,6 @@ def _compute_student_growth_map(series_rows: list[Any]) -> dict[str, dict]:
         latest  = scores[-1] if scores else None
         delta   = _safe_round(latest - first) if (first is not None and latest is not None) else None
         slope   = _compute_slope(scores)
-        avg     = _safe_round(_stats.mean(scores)) if scores else None
 
         # Per-category series: extract from JSONB rubric_scores column
         cat_series: dict[str, list[float]] = {cat: [] for cat in _RUBRIC_CATEGORIES}
@@ -686,7 +696,7 @@ def _compute_student_growth_map(series_rows: list[Any]) -> dict[str, dict]:
             "overall_delta":     delta,
             "trend_slope":       slope,
             "is_stuck":          _is_stuck(len(scores), slope),
-            "time_to_threshold": _time_to_threshold(avg, slope),
+            "time_to_threshold": _time_to_threshold(latest, slope),
             "category_series":   cat_series,
             "category_deltas":   cat_deltas,
             "category_slopes":   cat_slopes,
@@ -737,7 +747,7 @@ def _render_cohort_summary_export(
     Designed for NAAC/NIRF/management reporting. Each row contains:
       student count, session count, sessions/student, avg overall score,
       all 14 rubric category averages, tier distribution counts + ready %,
-      zero-offer risk count.
+      preparation-intervention count (legacy JSON field name retained).
 
     Pure Python-side computation from the perf_rows already in memory.
     Zero additional DB queries.
@@ -759,9 +769,9 @@ def _render_cohort_summary_export(
         zero_risk_count = 0
         for r in rows:
             sc  = int(r["session_count"] or 0)
-            avg = _safe_round(r["avg_score"])
-            tc[_readiness_tier(avg, sc)] = tc.get(_readiness_tier(avg, sc), 0) + 1
-            if _zero_offer_risk(avg, sc, None):
+            latest = _safe_round(r["latest_score"])
+            tc[_readiness_tier(latest, sc)] = tc.get(_readiness_tier(latest, sc), 0) + 1
+            if _zero_offer_risk(latest, sc, None):
                 zero_risk_count += 1
         cat_avgs = _cohort_category_averages([_extract_cat_scores(r) for r in rows])
         seg_avg  = _safe_round(_stats.mean(avg_list)) if avg_list else None
@@ -794,7 +804,7 @@ def _render_cohort_summary_export(
             "Segment Type", "Segment Name", "Student Count", "Total Sessions",
             "Sessions / Student", "Avg Overall Score",
             "Ready Count", "Almost Ready Count", "Developing Count", "At Risk Count",
-            "Zero Offer Risk Count", "Ready %",
+            "Intervention Flag Count", "Ready %",
             *cat_headers,
         ])
         for seg in segments:

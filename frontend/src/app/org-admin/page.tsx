@@ -2,7 +2,7 @@
 /**
  * PrepVista — College Admin Dashboard
  * Overview: enrollment stats, performance KPIs, readiness tier distribution,
- * weakest skill categories, zero-offer risk alert, and quick actions.
+ * weakest skill categories, intervention alert, and quick actions.
  *
  * Data source: GET /org/my/dashboard  (extended org_college.py)
  * Zero additional API calls — all new data comes from the single dashboard fetch.
@@ -22,7 +22,7 @@
  *     - Seat usage visual progress bar (green/amber/rose by utilisation %).
  *     - ReadinessMiniGrid: 4-tile traffic-light readiness tier distribution.
  *     - WeakestCategoriesWidget: 3 score progress bars for weakest rubric categories.
- *     - ZeroRiskAlert: dismissible rose alert when zero-offer risk students exist.
+ *     - ZeroRiskAlert: dismissible rose alert when intervention flags exist.
  *     - Low-engagement nudge: amber hero banner when < 30% of cohort has practiced.
  *     - Quick Actions extended from 4 → 6 (adds Performance, Growth, Readiness).
  *     - All state handled from the single existing API call. Zero extra round-trips.
@@ -251,7 +251,7 @@ const QUICK_ACTIONS = [
   {
     href: '/org-admin/analytics/readiness',
     label: 'Readiness Report',
-    desc: 'Placement tiers & zero-offer risk',
+    desc: 'Readiness tiers & intervention signals',
     Icon: SparklesIcon,
     iconBg: 'bg-rose-500/15',
     iconText: 'text-rose-400',
@@ -457,7 +457,7 @@ function WeakestCategoriesWidget({ categories }: { categories: WeakCategory[] })
 
 /**
  * Part 1 Integration — Placement Funnel Summary Widget.
- * Shows placed_count, total_submissions, companies_engaged, and placement_percentage.
+ * Shows verified placed_count, total_submissions, companies_engaged, and placement_percentage.
  * Returns null gracefully when placement_summary is absent (no data yet).
  * Uses the original Tailwind theme — no raw color variables from the HTML prototypes.
  */
@@ -720,7 +720,7 @@ function AIProviderStatusWidget() {
 }
 
 /**
- * Dismissible rose alert for zero-offer risk students.
+ * Dismissible rose alert for students matching the preparation intervention rule.
  * Returns null when count === 0 — never renders for healthy cohorts.
  * Dismiss is per-render (component state) so TPO sees it on each visit until they act.
  */
@@ -743,10 +743,10 @@ function ZeroRiskAlert({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-rose-300">
-          {count} student{count !== 1 ? 's' : ''} at risk of zero placement offers
+          {count} student{count !== 1 ? 's' : ''} currently match the preparation intervention rule
         </p>
         <p className="mt-0.5 text-xs text-rose-400/80">
-          These students need immediate coaching intervention.{' '}
+          Review their latest score, practice history, and trend before assigning support.{' '}
           <Link
             href="/org-admin/analytics/readiness"
             className="underline underline-offset-2 hover:text-rose-300"
@@ -757,7 +757,7 @@ function ZeroRiskAlert({
       </div>
       <button
         onClick={onDismiss}
-        aria-label="Dismiss zero-offer risk alert"
+        aria-label="Dismiss preparation intervention alert"
         className="shrink-0 rounded-full p-1 text-rose-400/60 hover:bg-rose-500/15 hover:text-rose-300 transition-colors"
       >
         ✕
@@ -898,7 +898,7 @@ export default function OrgAdminDashboard() {
               {total} students enrolled
               {' · '}
               {data?.career_access_students ?? 0} with career access
-              {readyCount > 0 && ` · ${readyCount} placement-ready`}.
+              {readyCount > 0 && ` · ${readyCount} in the Ready tier`}.
             </p>
           </div>
 

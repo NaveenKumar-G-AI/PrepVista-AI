@@ -10,7 +10,7 @@
  *       zeroOfferRiskCount, studentsWithSessions, readinessTierCounts.
  *     - Plan name badge shown in sidebar org header (next to orgCode).
  *     - Renewal warning chip: amber ≤ 60d, rose ≤ 30d, "expired" when daysToExpiry ≤ 0.
- *     - Zero-offer risk count badge on Analytics nav item (rose, hidden when 0).
+ *     - Preparation-intervention count badge on Analytics (rose, hidden when 0).
  *       Persistent across ALL pages — impossible for TPO to miss.
  *     - Analytics sub-nav (desktop): auto-expands when pathname is under
  *       /org-admin/analytics/* — shows Performance, Growth, Readiness sub-items.
@@ -477,12 +477,12 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
 
                             {item.label}
 
-                            {/* NEW: Zero-offer risk badge — Analytics nav item only.
+                            {/* Preparation-intervention badge — Analytics nav item only.
                                 Persistent across all pages. Hidden when count = 0.
                                 Gives TPO a persistent signal without navigating anywhere. */}
                             {isAnalyticsItem && zeroOfferRiskCount > 0 && (
                               <span
-                                aria-label={`${zeroOfferRiskCount} students at zero-offer risk`}
+                                aria-label={`${zeroOfferRiskCount} students with preparation intervention flags`}
                                 className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white"
                               >
                                 {zeroOfferRiskCount > 99 ? '99+' : zeroOfferRiskCount}
@@ -570,7 +570,7 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
                     {/* NEW: zero-risk badge on mobile Analytics tab */}
                     {item.href === '/org-admin/analytics' && zeroOfferRiskCount > 0 && (
                       <span
-                        aria-label={`${zeroOfferRiskCount} students at zero-offer risk`}
+                        aria-label={`${zeroOfferRiskCount} students with preparation intervention flags`}
                         className="absolute -right-0.5 -top-0.5 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-rose-500 px-0.5 text-[8px] font-bold text-white"
                       >
                         {zeroOfferRiskCount > 9 ? '9+' : zeroOfferRiskCount}

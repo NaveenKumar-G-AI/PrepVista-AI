@@ -66,7 +66,7 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
     Existing fields preserved verbatim. New performance_summary block adds:
       - cohort_avg_score, students_with_sessions
       - readiness_tier_counts (all 4 tiers)
-      - zero_offer_risk_count
+      - preparation-intervention count (legacy response key: zero_offer_risk_count)
       - weakest_3_categories (sorted by avg score ascending)
 
     All from one additional pre-aggregated query — page-load impact is minimal.
@@ -79,7 +79,7 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
     # leaking to college-admin scope via SELECT *.
     org, stats, seg_stats, recent, perf_rows = await _parallel(
         lambda conn: conn.fetchrow(
-            """SELECT id, name, category, plan, seat_limit, seats_used,
+            """SELECT id, name, org_code, category, plan, seat_limit, seats_used,
                       access_expiry, status, created_at
                FROM organizations WHERE id = $1""",
             org_id,
@@ -113,6 +113,8 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
                  COUNT(isess.id) FILTER (WHERE isess.state = 'FINISHED') AS session_count,
                  ROUND(AVG(isess.final_score)
                        FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_score,
+                 (ARRAY_AGG(isess.final_score ORDER BY isess.created_at DESC)
+                       FILTER (WHERE isess.state = 'FINISHED'))[1]  AS latest_score,
                  ROUND(AVG((isess.rubric_scores->>'communication')::numeric)
                        FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_communication,
                  ROUND(AVG((isess.rubric_scores->>'technical_depth')::numeric)
@@ -144,6 +146,8 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
                FROM organization_students os
                LEFT JOIN interview_sessions isess ON isess.user_id = os.user_id
                                                     AND isess.organization_id = os.organization_id
+                                                    AND isess.state = 'FINISHED'
+                                                    AND isess.final_score IS NOT NULL
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY os.user_id""",
             org_id,
@@ -160,9 +164,10 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(avg, sc, None):
+        if _zero_offer_risk(latest, sc, None):
             zero_risk_count += 1
         if avg is not None:
             scored_avgs.append(avg)
@@ -277,7 +282,7 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
 
     New fields appended (non-breaking):
       category_averages, weakest_categories, readiness_distribution,
-      zero_offer_risk_count, answer_flag_averages, cohort_avg_score,
+      preparation-intervention count, answer_flag_averages, cohort_avg_score,
       scored_students, viz_shapes (radar, traffic_light, department_comparison,
       diverging_bar, score_distribution).
     """
@@ -335,9 +340,10 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(avg, sc, None):   # slope not available here; growth endpoint has it
+        if _zero_offer_risk(latest, sc, None):   # slope not available here; growth endpoint has it
             zero_risk_count += 1
         if avg is not None:
             scored_avgs.append(avg)
@@ -442,8 +448,9 @@ async def analytics_performance(
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
-        risk = _zero_offer_risk(avg, sc, None)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
+        risk = _zero_offer_risk(latest, sc, None)
         pct  = _compute_percentile(float(avg), scored_avgs) if avg is not None else None
 
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
@@ -461,10 +468,12 @@ async def analytics_performance(
             "email":            r["email"],
             "student_code":     r["student_code"],
             "department_name":  r["department_name"],
+            "graduation_year":  r["graduation_year"],
             "year_name":        r["year_name"],
             "batch_name":       r["batch_name"],
             "session_count":    sc,
             "avg_score":        avg,
+            "latest_score":     latest,
             "best_score":       _safe_round(r["best_score"]),
             "readiness_tier":   tier,
             "zero_offer_risk":  risk,
@@ -531,10 +540,10 @@ async def analytics_growth(
 
     Returns:
       - Per-student: growth delta (first→latest), OLS slope, stuck flag,
-        zero-offer risk (slope-enhanced), time-to-threshold, category deltas
+        preparation-intervention flag (slope-enhanced), time-to-threshold, category deltas
         and category slopes for all 14 rubric categories.
       - Stuck student list (≥ 3 sessions, slope ≤ 0.5 pts/session).
-      - Zero-offer risk list with slope-informed flag.
+      - Preparation-intervention list with slope-informed flag.
       - Growth heatmap viz shape (student × category delta matrix).
       - Cohort monthly trend (overall + all 14 categories) for multi-line chart.
       - Calendar activity heatmap (sessions/day, last 365 days).
@@ -576,6 +585,7 @@ async def analytics_growth(
             JOIN interview_sessions isess ON isess.user_id = os.user_id
                                          AND isess.organization_id = os.organization_id
                                          AND isess.state = 'FINISHED'
+                                         AND isess.final_score IS NOT NULL
             WHERE os.organization_id = $1
               AND os.status          = 'active'
               {extra_clause}
@@ -596,6 +606,7 @@ async def analytics_growth(
             JOIN interview_sessions isess ON isess.user_id = os.user_id
                                          AND isess.organization_id = os.organization_id
                                          AND isess.state = 'FINISHED'
+                                         AND isess.final_score IS NOT NULL
             WHERE os.organization_id = $1
               AND os.status          = 'active'
               AND isess.created_at   >= NOW() - INTERVAL '365 days'
@@ -615,10 +626,10 @@ async def analytics_growth(
 
     for uid, g in growth_map.items():
         sessions  = len(g["scores"])
-        avg_score = _safe_round(_stats.mean(g["scores"])) if g["scores"] else None
         slope     = g["trend_slope"]
         is_stuck  = g["is_stuck"]
-        zero_risk = _zero_offer_risk(avg_score, sessions, slope)
+        latest_score = _safe_round(g["latest_score"])
+        zero_risk = _zero_offer_risk(latest_score, sessions, slope)
 
         entry = {
             "user_id":           uid,
@@ -711,10 +722,10 @@ async def analytics_readiness(
     batch_id:      str | None = None,
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
-    """Readiness grid and zero-offer risk list — the primary TPO decision surface.
+    """Readiness grid and preparation-intervention list for TPO review.
 
     Returns full tier breakdown (ready / almost_ready / developing / at_risk)
-    with the complete student list per tier, plus zero-offer risk list with
+    with the complete student list per tier, plus an intervention list with
     enough detail to drive a targeted training intervention email.
 
     One SQL query. All classification done in Python.
@@ -737,10 +748,11 @@ async def analytics_readiness(
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
-        risk = _zero_offer_risk(avg, sc, None)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
+        risk = _zero_offer_risk(latest, sc, None)
         pct  = _compute_percentile(float(avg), scored_avgs) if avg is not None else None
-        ttt  = _time_to_threshold(avg, None)   # slope not available without growth query
+        ttt  = _time_to_threshold(latest, None)   # slope not available without growth query
 
         entry = {
             "user_id":          str(r["user_id"]),
@@ -748,10 +760,12 @@ async def analytics_readiness(
             "email":            r["email"],
             "student_code":     r["student_code"],
             "department_name":  r["department_name"],
+            "graduation_year":  r["graduation_year"],
             "year_name":        r["year_name"],
             "batch_name":       r["batch_name"],
             "session_count":    sc,
             "avg_score":        avg,
+            "latest_score":     latest,
             "readiness_tier":   tier,
             "cohort_percentile":pct,
             "time_to_threshold":ttt,
@@ -801,7 +815,7 @@ async def student_performance(
       - All 14 rubric category averages, deltas, and per-category slopes.
       - Session history (chronological with per-session category breakdown).
       - Growth delta (first → latest), OLS trend slope, stuck flag.
-      - Readiness tier, cohort percentile, time-to-threshold, zero-offer risk.
+      - Readiness tier, cohort percentile, time-to-threshold, intervention flag.
 
     Two SQL queries: student session history + cohort avg for percentile.
     """
@@ -847,6 +861,7 @@ async def student_performance(
                WHERE isess.user_id = $1
                  AND isess.organization_id = $2
                  AND isess.state = 'FINISHED'
+                 AND isess.final_score IS NOT NULL
                ORDER BY isess.created_at ASC""",
             user_id,
             org_id,
@@ -859,6 +874,7 @@ async def student_performance(
                JOIN interview_sessions isess ON isess.user_id = os.user_id
                                             AND isess.organization_id = os.organization_id
                                             AND isess.state = 'FINISHED'
+                                            AND isess.final_score IS NOT NULL
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY os.user_id""",
             org_id,
@@ -902,9 +918,9 @@ async def student_performance(
     first  = _safe_round(overall_scores[0])  if overall_scores else None
     latest = _safe_round(overall_scores[-1]) if overall_scores else None
     delta  = _safe_round(latest - first) if (first is not None and latest is not None) else None
-    tier   = _readiness_tier(avg, len(overall_scores))
-    risk   = _zero_offer_risk(avg, len(overall_scores), slope)
-    ttt    = _time_to_threshold(avg, slope)
+    tier   = _readiness_tier(latest, len(overall_scores))
+    risk   = _zero_offer_risk(latest, len(overall_scores), slope)
+    ttt    = _time_to_threshold(latest, slope)
     stuck  = _is_stuck(len(overall_scores), slope)
 
     # Cohort percentile
@@ -1044,7 +1060,7 @@ async def export_student_reports(
     export_type=students (default — backward-compatible):
       One row per student. Original fields preserved in original column order.
       New columns appended: 14 rubric category averages, readiness tier,
-      growth delta, OLS trend slope, stuck flag, zero-offer risk flag,
+      growth delta, OLS trend slope, stuck flag, intervention flag,
       cohort percentile, first/latest scores, sessions count.
 
     export_type=cohort_summary:
@@ -1065,7 +1081,7 @@ async def export_student_reports(
 
         # ── Default: student-level export ─────────────────────────────────────
         # Build WHERE clause (same f-string pattern as list_students)
-        where  = ["os.organization_id = $1", "os.status != 'removed'"]
+        where  = ["os.organization_id = $1", "os.status = 'active'"]
         params: list = [org_id] + extra_params
         for part in (extra_clause.strip().lstrip("AND").strip().split(" AND ") if extra_clause else []):
             p = part.strip()
@@ -1153,6 +1169,8 @@ async def export_student_reports(
                     FROM interview_sessions isess
                     LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
                     WHERE isess.organization_id = $1
+                      AND isess.state = 'FINISHED'
+                      AND isess.final_score IS NOT NULL
                     GROUP BY isess.user_id
                 ) si ON si.user_id = os.user_id
                 WHERE {w} ORDER BY p.full_name""",
@@ -1179,7 +1197,7 @@ async def export_student_reports(
             "Total Interviews", "Avg Score", "Best Score", "Last Activity",
             # New columns (appended)
             "Sessions Count", "First Score", "Latest Score", "Growth Delta",
-            "Trend Slope (pts/session)", "Readiness Tier", "Zero Offer Risk",
+            "Trend Slope (pts/session)", "Readiness Tier", "Intervention Flag",
             "Is Stuck", "Cohort Percentile (%)", "Sessions Needed to Ready",
             # 14 category scores
             "Avg Communication", "Avg Technical Depth", "Avg Problem Solving",
@@ -1198,11 +1216,11 @@ async def export_student_reports(
             first  = _safe_round(r["first_score"])
             latest = _safe_round(r["latest_score"])
             delta  = _safe_round(latest - first) if (first is not None and latest is not None) else None
-            tier   = _readiness_tier(avg, sc)
-            risk   = _zero_offer_risk(avg, sc, slope)
+            tier   = _readiness_tier(latest, sc)
+            risk   = _zero_offer_risk(latest, sc, slope)
             stuck  = _is_stuck(sc, slope)
             pct    = _compute_percentile(float(avg), all_cohort_avgs) if avg is not None else None
-            ttt    = _time_to_threshold(avg, slope)
+            ttt    = _time_to_threshold(latest, slope)
             # ✅ SEC: _sanitize_csv_cell() on every user-controlled field
             writer.writerow([
                 _sanitize_csv_cell(r["full_name"]),
@@ -1290,11 +1308,11 @@ async def export_student_reports(
             "latest_score":     latest,
             "growth_delta":     delta,
             "trend_slope":      slope,
-            "readiness_tier":   _readiness_tier(avg, sc),
-            "zero_offer_risk":  _zero_offer_risk(avg, sc, slope),
+            "readiness_tier":   _readiness_tier(latest, sc),
+            "zero_offer_risk":  _zero_offer_risk(latest, sc, slope),
             "is_stuck":         _is_stuck(sc, slope),
             "cohort_percentile":_compute_percentile(float(avg), all_cohort_avgs) if avg is not None else None,
-            "time_to_threshold":_time_to_threshold(avg, slope),
+            "time_to_threshold":_time_to_threshold(latest, slope),
             "category_scores":  {cat: _safe_round(r[f"avg_{cat}"]) for cat in _RUBRIC_CATEGORIES},
             "avg_filler_ratio": _safe_round(r["avg_filler_ratio"], 3),
             "star_usage_count": int(r["star_usage_count"] or 0),
@@ -1320,7 +1338,7 @@ async def export_cohort_report(
     One row per department + one per batch. Each row contains:
       student count, session count, avg sessions/student, overall avg score,
       all 14 rubric category averages, readiness tier distribution (counts + %),
-      zero-offer risk count.
+      preparation-intervention count.
 
     One SQL query. All aggregation is Python-side from bulk-fetched data.
     """
@@ -1479,13 +1497,8 @@ def _cc_tier_for_sessions(sess: list) -> tuple[str, bool]:
     """Apply the shared college-analytics readiness and intervention rules."""
     if not sess:
         return "At Risk", True
-    first_score = float(sess[0]["final_score"] or 0)
     latest_score = float(sess[-1]["final_score"] or 0)
-    slope = (
-        (latest_score - first_score) / (len(sess) - 1)
-        if len(sess) > 1
-        else 0
-    )
+    slope = _compute_slope([float(row["final_score"]) for row in sess]) or 0.0
     key = _readiness_tier(latest_score, len(sess))
     tier = {
         _TIER_READY: "Ready",
@@ -1574,9 +1587,29 @@ def _cc_session_forensics(
     latest_turns = evals_by_session[str(latest["id"])]
 
     # sub: average of the four answer sub-scores across the latest scored session (0–10)
+    # The current evaluator persists each answer sub-score on a 0-2 scale, while
+    # older rows can legitimately contain the former 0-10 values (the database
+    # constraint intentionally permits both). Detect the scale once per session
+    # and expose one stable 0-10 dashboard contract without corrupting legacy data.
+    raw_subscores = [
+        float(t[col])
+        for t in latest_turns
+        for col in (
+            "relevance_score", "clarity_score",
+            "specificity_score", "structure_score",
+        )
+        if t[col] is not None
+    ]
+    current_two_point_scale = bool(raw_subscores) and max(raw_subscores) <= 2.0
+
     def _avg(col: str) -> float | None:
         vals = [float(t[col]) for t in latest_turns if t[col] is not None]
-        return round(sum(vals) / len(vals), 1) if vals else None
+        if not vals:
+            return None
+        value = sum(vals) / len(vals)
+        if current_two_point_scale:
+            value *= 5.0
+        return round(max(0.0, min(10.0, value)), 1)
 
     sub = {
         "Relevance": _avg("relevance_score"),
@@ -1688,8 +1721,6 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
         roster = await conn.fetch(
             """SELECT os.id AS enrollment_id, os.user_id, os.student_code,
                       os.department_id, os.year_id, os.batch_id, os.section,
-                      os.readiness_tier AS stored_readiness_tier,
-                      os.is_zero_offer_risk AS stored_zero_offer_risk,
                       os.target_score, os.added_at AS enrolled_at,
                       p.full_name, p.email,
                       cd.department_name, cd.department_code,
@@ -1768,12 +1799,10 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             first_score = round(f_final)
             latest_score = round(l_final)
             n_sess = len(sess)
-            slope = round(
-                (latest_score - first_score) / (n_sess - 1)
-                if n_sess > 1 else 0,
-                2,
-            )
-            stuck = n_sess >= 3 and slope <= 0.35
+            slope = _compute_slope(
+                [float(session["final_score"]) for session in sess]
+            ) or 0.0
+            stuck = _is_stuck(n_sess, slope)
             tier, at_risk = _cc_tier_for_sessions(sess)
             last_dt = last["created_at"]
             last_active = max(0, (now - last_dt).days) if last_dt else 90
@@ -1826,8 +1855,6 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             "stt": stt,
             "targetScore": target_score,
             "targetRole": target_role,
-            "storedReadinessTier": r["stored_readiness_tier"],
-            "storedZeroOfferRisk": bool(r["stored_zero_offer_risk"]),
             "pctHistory": percentile_history,
             "scoreHistory": [
                 {"at": session["created_at"], "score": round(float(session["final_score"] or 0), 1)}
@@ -1870,15 +1897,18 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
     }
 
 
-def _lb_year(year_name: Any) -> int | None:
-    """Numeric graduation year parsed from the org's college_years label (often a
-    year number like '2026'). None when absent or non-numeric (e.g. 'First Year')."""
+def _lb_year(year_name: Any) -> str | None:
+    """Return the configured college-year label without changing its meaning.
+
+    Organization admins may use graduation years (``2026``), ranges
+    (``2022-2026``), or academic labels (``First Year``). The leaderboard must
+    filter and display that same persisted label instead of silently dropping
+    every non-numeric value.
+    """
     if year_name is None:
         return None
-    try:
-        return int(str(year_name).strip())
-    except (TypeError, ValueError):
-        return None
+    value = str(year_name).strip()
+    return value or None
 
 
 @router.get("/leaderboard")
@@ -1898,7 +1928,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
                JOIN profiles p ON p.id = os.user_id
                LEFT JOIN college_departments cd ON cd.id = os.department_id
                LEFT JOIN college_years cy ON cy.id = os.year_id
-               WHERE os.organization_id = $1 AND os.status != 'removed'
+               WHERE os.organization_id = $1 AND os.status = 'active'
                ORDER BY p.full_name NULLS LAST""",
             org_id,
         )
@@ -1911,6 +1941,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
                    WHERE user_id = ANY($1::uuid[])
                      AND organization_id = $2
                      AND state = 'FINISHED'
+                     AND final_score IS NOT NULL
                    ORDER BY user_id, created_at ASC""",
                 user_ids,
                 org_id,
@@ -1922,7 +1953,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
 
     students: list[dict] = []
     depts_seen: dict[str, bool] = {}
-    years_seen: set[int] = set()
+    years_seen: set[str] = set()
 
     for r in roster:
         uid = str(r["user_id"])
@@ -1936,16 +1967,13 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
         name = ((r["full_name"] or "") or (r["email"] or "Student").split("@")[0]).strip() or "Student"
 
         if started:
-            first, last = sess[0], sess[-1]
-            first_value = float(first["final_score"] or 0)
+            last = sess[-1]
             latest_value = float(last["final_score"] or 0)
             latest_score = round(latest_value)
             n_sess = len(sess)
-            slope = round(
-                (latest_value - first_value) / (n_sess - 1)
-                if n_sess > 1 else 0,
-                2,
-            )
+            slope = _compute_slope(
+                [float(session["final_score"]) for session in sess]
+            ) or 0.0
             tier, _ = _cc_tier_for_sessions(sess)
             score: int | None = latest_score
             target_role = (last["target_role"] or "").strip() or None

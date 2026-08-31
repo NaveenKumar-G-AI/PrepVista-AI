@@ -17,8 +17,19 @@ import { api } from '@/lib/api';
 interface LeaderboardPayload {
   college: string;
   depts: Array<{ code: string; name: string }>;
-  years: number[];
-  students: unknown[];
+  years: string[];
+  students: Array<{
+    id: string;
+    name: string;
+    dept: string;
+    year: string | null;
+    sessions: number;
+    started: boolean;
+    score: number | null;
+    slope: number;
+    tier: 'Ready' | 'Almost' | 'Developing' | 'At Risk' | 'Not started';
+    targetRole: string | null;
+  }>;
 }
 
 export default function LeaderboardPage() {

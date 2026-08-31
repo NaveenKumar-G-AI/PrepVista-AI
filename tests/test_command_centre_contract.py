@@ -8,7 +8,9 @@ from app.routers.org_college_analytics import (
     _cc_skill_snapshots,
     _cc_skills,
     _cc_tier_for_sessions,
+    _lb_year,
 )
+from app.routers.org_college_helpers import _readiness_tier
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +50,21 @@ def test_command_centre_tier_uses_per_session_score_change():
     assert _cc_tier_for_sessions([]) == ("At Risk", True)
 
 
+def test_readiness_tier_uses_latest_score_with_minimum_evidence() -> None:
+    assert _readiness_tier(80, 1) == "developing"
+    assert _readiness_tier(80, 2) == "almost_ready"
+    assert _readiness_tier(80, 3) == "ready"
+    assert _readiness_tier(20, 1) == "at_risk"
+    assert _readiness_tier(None, 0) == "at_risk"
+
+
+def test_leaderboard_preserves_configured_year_labels():
+    assert _lb_year(2026) == "2026"
+    assert _lb_year("2022-2026") == "2022-2026"
+    assert _lb_year("First Year") == "First Year"
+    assert _lb_year("  ") is None
+
+
 def test_command_centre_skills_never_fabricate_missing_rubrics():
     empty = _cc_skills({})
     assert empty
@@ -78,10 +95,10 @@ def test_command_centre_answer_anatomy_is_persisted_evidence():
         "classification": "partial",
         "answer_status": "Answered",
         "score": 7.2,
-        "relevance_score": 7,
-        "clarity_score": 8,
-        "specificity_score": 6,
-        "structure_score": 7,
+        "relevance_score": 1.4,
+        "clarity_score": 1.6,
+        "specificity_score": 1.2,
+        "structure_score": 1.0,
         "answer_duration_seconds": 31,
         "question_text": "What did you build?",
         "raw_answer": "I built the API.",
@@ -97,6 +114,12 @@ def test_command_centre_answer_anatomy_is_persisted_evidence():
     )
 
     assert detail["hasTurnData"] is True
+    assert detail["sub"] == {
+        "Relevance": 7.0,
+        "Clarity": 8.0,
+        "Specificity": 6.0,
+        "Structure": 5.0,
+    }
     assert forensic["answers"] == [
         {
             "question": "What did you build?",
@@ -106,6 +129,42 @@ def test_command_centre_answer_anatomy_is_persisted_evidence():
             "bad": "No result was stated.",
         }
     ]
+
+
+def test_command_centre_answer_subscores_preserve_legacy_ten_point_rows():
+    now = datetime.now(timezone.utc)
+    sessions = [_session("legacy-session", 72, now)]
+    evaluation = {
+        "session_id": "legacy-session",
+        "turn_number": 1,
+        "rubric_category": "communication",
+        "classification": "partial",
+        "answer_status": "Answered",
+        "score": 7.2,
+        "relevance_score": 7,
+        "clarity_score": 8,
+        "specificity_score": 6,
+        "structure_score": 7,
+        "answer_duration_seconds": 31,
+        "question_text": "What did you build?",
+        "raw_answer": "I built the API.",
+        "normalized_answer": "I built the API.",
+        "repaired_answer": "",
+        "ideal_answer": "",
+        "what_worked": "",
+        "what_was_missing": "",
+    }
+
+    detail, _ = _cc_session_forensics(
+        sessions, {"legacy-session": [evaluation]}, [50]
+    )
+
+    assert detail["sub"] == {
+        "Relevance": 7.0,
+        "Clarity": 8.0,
+        "Specificity": 6.0,
+        "Structure": 7.0,
+    }
 
 
 def test_command_centre_weekly_history_counts_persisted_sessions():
@@ -179,7 +238,7 @@ def test_live_scoreboard_contains_no_generated_cohort_fallback():
         ROOT / "frontend" / "public" / "command-centre-sample.html"
     ).read_text(encoding="utf-8")
     assert 'sandbox="allow-scripts"' in page
-    assert "(latest_value - first_value) / (n_sess - 1)" in backend
+    assert "slope = _compute_slope(" in backend
 
 
 def test_command_centre_uses_canonical_enrollment_timestamp_column():
@@ -204,7 +263,13 @@ def test_live_org_analytics_uses_stable_ids_and_tenant_scoped_sessions():
 
     assert '"id": str(r["enrollment_id"])' in backend
     assert "AND organization_id = $2" in backend
+    assert "SELECT id, name, org_code, category" in backend
+    assert "WHERE os.organization_id = $1 AND os.status = 'active'" in backend
+    assert "AND final_score IS NOT NULL" in backend
+    assert '"graduation_year":  r["graduation_year"]' in backend
     assert "state.focus=Number(" not in command_html
+    assert "s.pctFirst=history.length?round(history[0])" in command_html
     assert "const SKILLS=['Technical Depth','Problem Solving','Communication','Behavioral Evidence','Professionalism & Fit','Conciseness']" in command_html
     assert "v.answerSub" in command_html
+    assert "String(s.year)===state.year" in scoreboard_html
     assert "__pvsb:'navigateStudent'" in scoreboard_html

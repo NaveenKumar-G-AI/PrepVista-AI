@@ -112,7 +112,7 @@ function adaptReadinessDistribution(raw: unknown): unknown {
     for (const e0 of cArr(tiersObj[key])) {
       const e = cObj(e0);
       const sc = cNum(e.session_count) ?? 0;
-      const score = cNum(e.avg_score);
+      const score = cNum(e.latest_score) ?? cNum(e.avg_score);
       const effTier = sc > 0 ? key : 'not_started';
       tierCount[effTier] = (tierCount[effTier] ?? 0) + 1;
       if (effTier === 'not_started') notStarted++;
@@ -173,15 +173,15 @@ function adaptRiskRoster(raw: unknown): unknown {
   for (const key of TIER_KEYS) {
     for (const e0 of cArr(tiersObj[key])) {
       const e = cObj(e0);
-      const zor = e.zero_offer_risk === true;
-      if (key !== 'at_risk' && !zor) continue; // only at-risk / zero-offer-risk students
+      const interventionFlag = e.zero_offer_risk === true;
+      if (key !== 'at_risk' && !interventionFlag) continue;
       const sc = cNum(e.session_count) ?? 0;
-      const score = cNum(e.avg_score);
+      const score = cNum(e.latest_score) ?? cNum(e.avg_score);
       const reasons: string[] = [];
       if (sc === 0) reasons.push('No interviews attempted yet');
-      else if (score !== null && score < 40) reasons.push('Average score below 40/100');
-      else if (score !== null && score < 60) reasons.push('Below the placement-ready score threshold');
-      if (sc > 0 && sc < 3) reasons.push('Too few practice sessions');
+      else if (score !== null && score < 40) reasons.push('Latest score below 40/100');
+      else if (score !== null && score < 60) reasons.push('Latest score below the Almost Ready threshold');
+      if (sc > 0 && sc < 3) reasons.push('Limited practice evidence');
       roster.push({
         user_id: String(e.user_id ?? ''),
         full_name: (e.name ?? '') as string,
@@ -191,8 +191,10 @@ function adaptRiskRoster(raw: unknown): unknown {
         delta: null,
         session_count: sc,
         readiness_tier: TIER_META[sc > 0 ? key : 'not_started'].label,
-        at_risk_of_zero_offers: zor,
-        risk_reasons: reasons.length ? reasons : ['Needs attention'],
+        // Legacy consumer key retained for compatibility. The value is the
+        // deterministic preparation-intervention flag, not an offer forecast.
+        at_risk_of_zero_offers: interventionFlag,
+        risk_reasons: reasons.length ? reasons : ['Preparation trend needs review'],
       });
     }
   }
@@ -1279,10 +1281,10 @@ class ApiClient {
 
   // ── Cohort Analytics ───────────────────────
   
-  private buildCohortQuery(params?: { department?: string; year?: number; days?: number }): string {
+  private buildCohortQuery(params?: { department?: string; year?: string; days?: number }): string {
     const search = new URLSearchParams();
     if (params?.department) search.append('department_id', params.department);
-    if (params?.year) search.append('year_id', params.year.toString());
+    if (params?.year) search.append('year_id', params.year);
     if (params?.days) search.append('days', params.days.toString());
     const query = search.toString();
     return query ? `?${query}` : '';
@@ -1292,32 +1294,32 @@ class ApiClient {
   // shape the analytics page consumes (see the adapters above). The backend
   // /readiness, /performance and /growth endpoints each feed more than one tab.
 
-  async getCohortDistribution<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
+  async getCohortDistribution<T = unknown>(params?: { department?: string; year?: string }): Promise<T> {
     const raw = await this.request<unknown>(`/org/my/analytics/readiness${this.buildCohortQuery(params)}`);
     return adaptReadinessDistribution(raw) as T;
   }
 
-  async getCohortRollups<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
+  async getCohortRollups<T = unknown>(params?: { department?: string; year?: string }): Promise<T> {
     const raw = await this.request<unknown>(`/org/my/analytics/performance${this.buildCohortQuery(params)}`);
     return adaptRollups(raw) as T;
   }
 
-  async getCohortDepartments<T = unknown>(params?: { year?: number }): Promise<T> {
+  async getCohortDepartments<T = unknown>(params?: { year?: string }): Promise<T> {
     const raw = await this.request<unknown>(`/org/my/analytics/performance${this.buildCohortQuery(params)}`);
     return adaptDepartments(raw) as T;
   }
 
-  async getCohortRiskRoster<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
+  async getCohortRiskRoster<T = unknown>(params?: { department?: string; year?: string }): Promise<T> {
     const raw = await this.request<unknown>(`/org/my/analytics/readiness${this.buildCohortQuery(params)}`);
     return adaptRiskRoster(raw) as T;
   }
 
-  async getCohortGrowthHeatmap<T = unknown>(params?: { department?: string; year?: number }): Promise<T> {
+  async getCohortGrowthHeatmap<T = unknown>(params?: { department?: string; year?: string }): Promise<T> {
     const raw = await this.request<unknown>(`/org/my/analytics/growth${this.buildCohortQuery(params)}`);
     return adaptGrowthHeatmap(raw) as T;
   }
 
-  async getCohortActivity<T = unknown>(params?: { department?: string; year?: number; days?: number }): Promise<T> {
+  async getCohortActivity<T = unknown>(params?: { department?: string; year?: string; days?: number }): Promise<T> {
     const raw = await this.request<unknown>(`/org/my/analytics/growth${this.buildCohortQuery(params)}`);
     return adaptActivity(raw) as T;
   }

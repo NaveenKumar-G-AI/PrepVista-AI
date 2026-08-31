@@ -3,7 +3,11 @@
 import pytest
 from pydantic import ValidationError
 
-from app.routers.placement_drives import AddRuleVersionRequest, _summarize_cohort
+from app.routers.placement_drives import (
+    AddRuleVersionRequest,
+    _summarize_cohort,
+    _tenant_performance,
+)
 
 
 def test_rule_rejects_fabricated_or_unpersisted_student_fields() -> None:
@@ -59,3 +63,29 @@ def test_eligibility_uses_real_values_and_missing_values_fail_closed() -> None:
     assert summary["not_eligible_count"] == 2
     assert summary["category_breakdown"]["SCORE"] == 1
     assert summary["category_breakdown"]["DEPARTMENT"] == 1
+
+
+def test_drive_performance_uses_latest_tenant_score_and_real_progression() -> None:
+    performance = _tenant_performance([30, 55, 50, 50])
+
+    assert performance == {
+        "readiness_score": 50.0,
+        "readiness_tier": "developing",
+        "is_zero_offer_risk": False,
+        "total_sessions_completed": 4,
+        "sessions_without_improvement": 2,
+        "score_delta": 0.0,
+    }
+
+
+def test_drive_performance_has_explicit_no_session_values() -> None:
+    performance = _tenant_performance([])
+
+    assert performance == {
+        "readiness_score": None,
+        "readiness_tier": "at_risk",
+        "is_zero_offer_risk": True,
+        "total_sessions_completed": 0,
+        "sessions_without_improvement": 0,
+        "score_delta": None,
+    }

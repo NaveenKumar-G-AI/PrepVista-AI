@@ -133,9 +133,10 @@ async def get_org_analytics_admin(
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(avg, sc, None):
+        if _zero_offer_risk(latest, sc, None):
             zero_risk_count += 1
         if avg is not None:
             scored_avgs.append(avg)
@@ -415,8 +416,9 @@ async def get_org_performance_admin(
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
-        risk = _zero_offer_risk(avg, sc, None)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
+        risk = _zero_offer_risk(latest, sc, None)
         pct  = (
             round(sum(1 for s in scored_avgs if s <= float(avg)) / len(scored_avgs) * 100, 1)
             if (avg is not None and scored_avgs)
@@ -444,8 +446,10 @@ async def get_org_performance_admin(
             "email":            r["email"],
             "student_code":     r["student_code"],
             "department_name":  r["department_name"],
+            "graduation_year":  r["graduation_year"],
             "session_count":    sc,
             "avg_score":        avg,
+            "latest_score":     latest,
             "readiness_tier":   tier,
             "zero_offer_risk":  risk,
             "cohort_percentile":pct,
@@ -527,7 +531,7 @@ async def get_org_readiness_admin(
     org_id: str,
     admin: UserProfile = Depends(require_main_admin()),
 ):
-    """Readiness grid and zero-offer risk list for one org — platform admin view.
+    """Readiness grid and preparation-intervention list for one org.
 
     Mirrors org_college.py /analytics/readiness shape exactly.
     One SQL query + Python classification.
@@ -550,8 +554,9 @@ async def get_org_readiness_admin(
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
-        tier = _readiness_tier(avg, sc)
-        risk = _zero_offer_risk(avg, sc, None)
+        latest = _safe_round(r["latest_score"])
+        tier = _readiness_tier(latest, sc)
+        risk = _zero_offer_risk(latest, sc, None)
         pct  = (
             round(sum(1 for s in scored_avgs if s <= float(avg)) / len(scored_avgs) * 100, 1)
             if (avg is not None and scored_avgs)
@@ -563,8 +568,10 @@ async def get_org_readiness_admin(
             "email":            r["email"],
             "student_code":     r["student_code"],
             "department_name":  r["department_name"],
+            "graduation_year":  r["graduation_year"],
             "session_count":    sc,
             "avg_score":        avg,
+            "latest_score":     latest,
             "readiness_tier":   tier,
             "cohort_percentile":pct,
             "zero_offer_risk":  risk,

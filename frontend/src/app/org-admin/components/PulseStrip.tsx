@@ -8,7 +8,7 @@ export function PulseStrip() {
 
   const isDataAvailable = studentsWithSessions > 0;
   
-  const offersPredicted = isDataAvailable && readinessTierCounts 
+  const readyOrAlmostReady = isDataAvailable && readinessTierCounts
     ? (readinessTierCounts.ready + readinessTierCounts.almost_ready) 
     : 0;
 
@@ -19,16 +19,16 @@ export function PulseStrip() {
           {isDataAvailable && cohortAvgScore !== null ? `${Math.round(cohortAvgScore)}%` : '—'}
         </div>
         <div className="text-[10px] uppercase tracking-[0.1em] text-secondary mt-1">
-          Avg. Technical Score
+          Avg. Interview Score
         </div>
       </div>
       
       <div className="flex-[1_1_140px] p-4 md:p-5 border-r border-b border-border">
         <div className="font-mono text-2xl font-semibold text-primary">
-          {isDataAvailable ? offersPredicted : '—'}
+          {isDataAvailable ? readyOrAlmostReady : '—'}
         </div>
         <div className="text-[10px] uppercase tracking-[0.1em] text-secondary mt-1">
-          Offers Predicted
+          Ready / Almost Ready
         </div>
       </div>
       
@@ -37,7 +37,7 @@ export function PulseStrip() {
           {isDataAvailable ? studentsWithSessions : '—'}
         </div>
         <div className="text-[10px] uppercase tracking-[0.1em] text-secondary mt-1">
-          Active Sessions
+          Assessed Students
         </div>
       </div>
       
@@ -46,7 +46,7 @@ export function PulseStrip() {
           {isDataAvailable ? zeroOfferRiskCount : '—'}
         </div>
         <div className={`text-[10px] uppercase tracking-[0.1em] mt-1 ${zeroOfferRiskCount > 0 ? 'text-rose-500/80' : 'text-secondary'}`}>
-          At-Risk Candidates
+          Intervention Flags
         </div>
       </div>
     </div>

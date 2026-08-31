@@ -2,7 +2,7 @@
 /**
  * PrepVista — College Admin (TPO): Placement Config  (Fix 9)
  *
- * Lets a TPO configure the placement targets used across their college:
+ * Lets a TPO record the placement priorities used by their team:
  *   - which company archetypes matter for their students,
  *   - the readiness score the college treats as "placement ready",
  *   - the competency pillars they want to emphasise,
@@ -126,7 +126,7 @@ export default function PlacementConfigPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Placement Config</h1>
           <p className="text-sm text-slate-400">
-            Set the company targets and readiness bar used across your college’s placement reports.
+            Record the company priorities and internal readiness benchmark used by your placement team.
             {updatedAt && !isDefault && (
               <span className="ml-1 text-slate-500">
                 Last updated {new Date(updatedAt).toLocaleDateString()}.
@@ -155,8 +155,8 @@ export default function PlacementConfigPage() {
           <h2 className="text-base font-semibold text-white">Target companies</h2>
         </div>
         <p className="text-xs text-slate-500 mb-4">
-          Choose the company archetypes your students are placed into. These drive the per-company
-          hiring-probability bars in their reports.
+          Record the company archetypes your placement team is prioritising. These preferences do not
+          change interview scores or imply a hiring probability.
         </p>
         <div className="flex flex-wrap gap-2">
           {companies.map(name => {
@@ -180,9 +180,10 @@ export default function PlacementConfigPage() {
 
       {/* Readiness threshold */}
       <div className="card !p-5 fade-in">
-        <h2 className="text-base font-semibold text-white mb-1">Placement-ready threshold</h2>
+        <h2 className="text-base font-semibold text-white mb-1">Internal readiness benchmark</h2>
         <p className="text-xs text-slate-500 mb-4">
-          The 0–100 readiness score at which a student counts as “placement ready” on your cohort dashboards.
+          A saved 0–100 planning benchmark for your team. Scored dashboards continue to show their
+          documented readiness tiers so historical comparisons remain consistent.
         </p>
         <div className="flex items-center gap-4">
           <input

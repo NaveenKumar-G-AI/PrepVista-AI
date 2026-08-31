@@ -212,28 +212,29 @@ const SAMPLE_PAYLOAD={
     {id:'sample-01',name:'Sample Student 01',dept:'CSE',year:2026,sessions:9,started:true,score:92,slope:2.0,tier:'Ready',targetRole:'Software Engineer'},
     {id:'sample-02',name:'Sample Student 02',dept:'ECE',year:2026,sessions:8,started:true,score:88,slope:1.4,tier:'Ready',targetRole:'Embedded Engineer'},
     {id:'sample-03',name:'Sample Student 03',dept:'ME',year:2026,sessions:8,started:true,score:84,slope:1.1,tier:'Ready',targetRole:'Design Engineer'},
-    {id:'sample-04',name:'Sample Student 04',dept:'CSE',year:2027,sessions:6,started:true,score:79,slope:1.8,tier:'Almost',targetRole:'Data Analyst'},
-    {id:'sample-05',name:'Sample Student 05',dept:'ECE',year:2027,sessions:5,started:true,score:75,slope:0.8,tier:'Almost',targetRole:'Network Engineer'},
+    {id:'sample-04',name:'Sample Student 04',dept:'CSE',year:2027,sessions:6,started:true,score:79,slope:1.8,tier:'Ready',targetRole:'Data Analyst'},
+    {id:'sample-05',name:'Sample Student 05',dept:'ECE',year:2027,sessions:5,started:true,score:75,slope:0.8,tier:'Ready',targetRole:'Network Engineer'},
     {id:'sample-06',name:'Sample Student 06',dept:'ME',year:2027,sessions:5,started:true,score:71,slope:0.5,tier:'Almost',targetRole:'Operations Engineer'},
-    {id:'sample-07',name:'Sample Student 07',dept:'CSE',year:2026,sessions:4,started:true,score:66,slope:1.2,tier:'Developing',targetRole:'QA Engineer'},
-    {id:'sample-08',name:'Sample Student 08',dept:'ECE',year:2026,sessions:4,started:true,score:61,slope:-0.2,tier:'Developing',targetRole:'Support Engineer'},
+    {id:'sample-07',name:'Sample Student 07',dept:'CSE',year:2026,sessions:4,started:true,score:66,slope:1.2,tier:'Almost',targetRole:'QA Engineer'},
+    {id:'sample-08',name:'Sample Student 08',dept:'ECE',year:2026,sessions:4,started:true,score:61,slope:-0.2,tier:'Almost',targetRole:'Support Engineer'},
     {id:'sample-09',name:'Sample Student 09',dept:'ME',year:2026,sessions:3,started:true,score:56,slope:0.3,tier:'Developing',targetRole:'Production Engineer'},
-    {id:'sample-10',name:'Sample Student 10',dept:'CSE',year:2027,sessions:2,started:true,score:47,slope:-1.5,tier:'At Risk',targetRole:null},
-    {id:'sample-11',name:'Sample Student 11',dept:'ECE',year:2027,sessions:1,started:true,score:40,slope:0,tier:'At Risk',targetRole:null},
+    {id:'sample-10',name:'Sample Student 10',dept:'CSE',year:2027,sessions:2,started:true,score:47,slope:-1.5,tier:'Developing',targetRole:null},
+    {id:'sample-11',name:'Sample Student 11',dept:'ECE',year:2027,sessions:1,started:true,score:40,slope:0,tier:'Developing',targetRole:null},
     {id:'sample-12',name:'Sample Student 12',dept:'ME',year:2027,sessions:0,started:false,score:null,slope:0,tier:'Not started',targetRole:null}
   ]
 };
 const state={depts:new Set(DEPTS.map(d=>d.code)),year:'all',tiers:new Set(['Ready','Almost','Developing','At Risk']),search:'',sortKey:'score',sortDir:-1};
 function passTier(s){if(s.started)return state.tiers.has(s.tier);return state.tiers.size===4;}
 function filtered(){const q=state.search.trim().toLowerCase();
-  return STUDENTS.filter(s=>state.depts.has(s.dept)&&(state.year==='all'||s.year===Number(state.year))&&passTier(s)&&(!q||s.name.toLowerCase().includes(q)||s.dept.toLowerCase().includes(q)));}
+  return STUDENTS.filter(s=>state.depts.has(s.dept)&&(state.year==='all'||String(s.year)===state.year)&&passTier(s)&&(!q||s.name.toLowerCase().includes(q)||s.dept.toLowerCase().includes(q)));}
 function rankList(list){const scored=list.filter(s=>s.started&&s.score!=null);const not=list.filter(s=>!(s.started&&s.score!=null));
-  const byScore=[...scored].sort((a,b)=>b.score-a.score);byScore.forEach((s,i)=>s._rank=i+1);not.forEach(s=>s._rank=null);return {scored:byScore,all:list};}
+  const byScore=[...scored].sort((a,b)=>(b.score-a.score)||a.name.localeCompare(b.name));let rank=0,previous=null;byScore.forEach((s,i)=>{if(previous===null||s.score!==previous)rank=i+1;s._rank=rank;previous=s.score;});not.forEach(s=>s._rank=null);return {scored:byScore,all:list};}
 function sortFor(list){const k=state.sortKey,dir=state.sortDir;
   return [...list].sort((a,b)=>{
     if(k==='name')return dir*a.name.localeCompare(b.name);
-    const av=(k==='score'?(a.score==null?-1:a.score):k==='slope'?(a.started?a.slope:-99):k==='sessions'?a.sessions:k==='year'?a.year:0);
-    const bv=(k==='score'?(b.score==null?-1:b.score):k==='slope'?(b.started?b.slope:-99):k==='sessions'?b.sessions:k==='year'?b.year:0);
+    if(k==='year')return dir*String(a.year||'').localeCompare(String(b.year||''),undefined,{numeric:true,sensitivity:'base'});
+    const av=(k==='score'?(a.score==null?-1:a.score):k==='slope'?(a.started?a.slope:-99):k==='sessions'?a.sessions:0);
+    const bv=(k==='score'?(b.score==null?-1:b.score):k==='slope'?(b.started?b.slope:-99):k==='sessions'?b.sessions:0);
     return dir*(av-bv);});}
 const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 function ech(id){const el=document.getElementById(id);if(!el)return null;if(el._chart)return el._chart;el._chart=echarts.init(el,null,{renderer:'canvas'});return el._chart;}
@@ -251,7 +252,7 @@ function render(){
     {l:'Placement-ready',v:readyN,s:scored.length?round(readyN/scored.length*100)+'% of scored':'—'}
   ].map(k=>'<div class="kpi"><div class="kl">'+k.l+'</div><div class="kv tnum">'+k.v+'</div><div class="ks">'+k.s+'</div></div>').join('');
   /* context line */
-  const ctx=[];if(state.depts.size<DEPTS.length)ctx.push(state.depts.size+' dept'+(state.depts.size>1?'s':''));if(state.year!=='all')ctx.push('Year '+state.year);if(state.tiers.size<4)ctx.push(state.tiers.size+' tier'+(state.tiers.size>1?'s':''));
+  const ctx=[];if(state.depts.size<DEPTS.length)ctx.push(state.depts.size+' dept'+(state.depts.size>1?'s':''));if(state.year!=='all')ctx.push(state.year);if(state.tiers.size<4)ctx.push(state.tiers.size+' tier'+(state.tiers.size>1?'s':''));
   document.getElementById('topCtx').textContent=ctx.length?('Filtered: '+ctx.join(' · ')):'Whole cohort';
   /* podium */
   renderPodium(scored.slice(0,3));
@@ -265,7 +266,7 @@ function render(){
 function renderPodium(top3){const order=[1,0,2];const cls=['p1','p2','p3'];const box=document.getElementById('podium');
   if(!top3.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">No scored students match these filters.</div>';return;}
   box.innerHTML=order.map(pos=>{const s=top3[pos];if(!s)return '<div></div>';const rankCls=pos===0?'p1':pos===1?'p2':'p3';const tc=TIER_COLOR[s.tier];
-    return '<div class="pcard '+rankCls+'" data-student-id="'+esc(s.id)+'" style="cursor:pointer">'+(pos===0?'<div class="crown">👑</div>':'')+'<div class="pmedal">'+(pos+1)+'</div><div class="pavatar">'+esc(initials(s.name))+'</div><div class="pname">'+esc(s.name)+'</div><div class="pmeta">'+esc(s.dept)+' · Year '+(s.year==null?'—':s.year)+'</div><div class="pscore tnum">'+s.score+'<small>/100</small></div><div class="ptier" style="color:'+tc+';background:'+tc+'22">'+s.tier+'</div></div>';
+    return '<div class="pcard '+rankCls+'" data-student-id="'+esc(s.id)+'" style="cursor:pointer">'+(s._rank===1?'<div class="crown">👑</div>':'')+'<div class="pmedal">'+s._rank+'</div><div class="pavatar">'+esc(initials(s.name))+'</div><div class="pname">'+esc(s.name)+'</div><div class="pmeta">'+esc(s.dept)+' · '+(s.year==null?'—':esc(s.year))+'</div><div class="pscore tnum">'+s.score+'<small>/100</small></div><div class="ptier" style="color:'+tc+';background:'+tc+'22">'+esc(s.tier)+'</div></div>';
   }).join('');
   box.querySelectorAll('[data-student-id]').forEach(el=>el.onclick=()=>openStudent(el.dataset.studentId));
 }
@@ -290,7 +291,7 @@ function renderTable(list,scoredN){const body=document.getElementById('lbBody');
     const tc=TIER_COLOR[s.tier];
     const scoreHtml=s.score==null?'<span style="color:var(--faint)">—</span>':'<div class="scorecell"><span class="v">'+s.score+'</span><div class="bar"><i style="width:'+s.score+'%;background:linear-gradient(90deg,'+tc+'cc,'+tc+')"></i></div></div>';
     const m=s.started?s.slope:null;const momCls=m==null?'flat':m>0.3?'up':m<-0.1?'down':'flat';const momHtml=m==null?'<span class="mom flat">—</span>':'<span class="mom '+momCls+'">'+(m>0?'▲ +':m<0?'▼ ':'')+m.toFixed(2)+'</span>';
-    return '<tr class="'+(medal&&rank===1?'top1':'')+'" data-student-id="'+esc(s.id)+'" style="cursor:pointer"><td>'+rkHtml+'</td><td><div class="who"><div class="av">'+esc(initials(s.name))+'</div><div><div class="nm">'+esc(s.name)+'</div><div class="sb">'+esc(s.targetRole||'Target role not set')+'</div></div></div></td><td><span class="deptbadge">'+esc(s.dept)+'</span></td><td><span class="yr">'+(s.year==null?'—':s.year)+'</span></td><td>'+scoreHtml+'</td><td>'+momHtml+'</td><td class="tnum">'+s.sessions+'</td><td><span class="tier '+TIER_CLASS[s.tier]+'"><span class="d"></span>'+s.tier+'</span></td></tr>';
+    return '<tr class="'+(medal&&rank===1?'top1':'')+'" data-student-id="'+esc(s.id)+'" style="cursor:pointer"><td>'+rkHtml+'</td><td><div class="who"><div class="av">'+esc(initials(s.name))+'</div><div><div class="nm">'+esc(s.name)+'</div><div class="sb">'+esc(s.targetRole||'Target role not set')+'</div></div></div></td><td><span class="deptbadge">'+esc(s.dept)+'</span></td><td><span class="yr">'+(s.year==null?'—':esc(s.year))+'</span></td><td>'+scoreHtml+'</td><td>'+momHtml+'</td><td class="tnum">'+s.sessions+'</td><td><span class="tier '+TIER_CLASS[s.tier]+'"><span class="d"></span>'+esc(s.tier)+'</span></td></tr>';
   }).join('');
   body.querySelectorAll('[data-student-id]').forEach(row=>row.onclick=()=>openStudent(row.dataset.studentId));
 }
@@ -308,7 +309,7 @@ deptPanel.onclick=e=>e.stopPropagation();
 document.addEventListener('click',()=>deptPanel.classList.remove('open'));
 const yearSeg=document.getElementById('yearSeg');
 function buildYearSeg(){
-  yearSeg.innerHTML='<button class="on" data-y="all">All years</button>'+YEARS.map(y=>'<button data-y="'+y+'">'+y+'</button>').join('');
+  yearSeg.innerHTML='<button class="on" data-y="all">All years</button>'+YEARS.map(y=>'<button data-y="'+esc(y)+'">'+esc(y)+'</button>').join('');
   yearSeg.querySelectorAll('button').forEach(b=>b.onclick=()=>{yearSeg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');state.year=b.dataset.y;render();});
 }
 buildYearSeg();
@@ -320,8 +321,8 @@ window.addEventListener('resize',()=>{['topChart','deptChart'].forEach(id=>{cons
 /* ── Real-data seam: parent (org-admin) injects live cohort via PVSB.load ── */
 window.PVSB={load:function(payload){try{
   if(payload&&Array.isArray(payload.depts))DEPTS=payload.depts;
-  if(payload&&Array.isArray(payload.years))YEARS=payload.years;
-  if(payload&&Array.isArray(payload.students))STUDENTS=payload.students;
+  if(payload&&Array.isArray(payload.years))YEARS=payload.years.map(y=>String(y));
+  if(payload&&Array.isArray(payload.students))STUDENTS=payload.students.map(s=>({...s,year:s.year==null?null:String(s.year)}));
   document.getElementById('collegeSub').textContent=(payload&&payload.college||'Your Institution')+' · placement-readiness rankings';
   state.depts=new Set(DEPTS.map(d=>d.code));state.year='all';state.tiers=new Set(['Ready','Almost','Developing','At Risk']);state.search='';state.sortKey='score';state.sortDir=-1;
   buildDeptPanel();buildYearSeg();updateDeptBtn();renderHead();render();
