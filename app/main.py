@@ -120,6 +120,9 @@ def _validate_runtime_environment(settings) -> None:
         "DATABASE_URL",
         "FRONTEND_URL",
         "BACKEND_URL",
+        "RAZORPAY_KEY_ID",
+        "RAZORPAY_KEY_SECRET",
+        "RAZORPAY_WEBHOOK_SECRET",
     ]
     missing = [name for name in required_names if not getattr(settings, name, "")]
     if settings.ENVIRONMENT == "production" and missing:
@@ -205,6 +208,8 @@ async def _bootstrap_runtime_services(app: FastAPI):
             app.state.db_ready = True
             app.state.db_init_error = None
             app.state.activity_refresh_task = asyncio.create_task(_run_user_activity_refresh_loop())
+            from app.services.report_schedules import run_report_schedule_loop
+            app.state.report_schedule_task = asyncio.create_task(run_report_schedule_loop())
             try:
                 async with DatabaseConnection() as conn:
                     await refresh_user_activity_stats(conn)
@@ -254,6 +259,7 @@ async def lifespan(app: FastAPI):
     app.state.db_ready = False
     app.state.db_init_error = None
     app.state.activity_refresh_task = None
+    app.state.report_schedule_task = None
     app.state.runtime_bootstrap_task = asyncio.create_task(_bootstrap_runtime_services(app))
     yield
     runtime_bootstrap_task = getattr(app.state, "runtime_bootstrap_task", None)
@@ -268,6 +274,13 @@ async def lifespan(app: FastAPI):
         activity_refresh_task.cancel()
         try:
             await activity_refresh_task
+        except asyncio.CancelledError:
+            pass
+    report_schedule_task = getattr(app.state, "report_schedule_task", None)
+    if report_schedule_task:
+        report_schedule_task.cancel()
+        try:
+            await report_schedule_task
         except asyncio.CancelledError:
             pass
     await close_db_pool()
@@ -462,7 +475,7 @@ def create_app() -> FastAPI:
     app.include_router(stt_ws.router, tags=["Speech-to-Text"])
 
     # ── Health Check ─────────────────────────────
-    @app.api_route("/", methods=["GET", "HEAD"])
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
     async def root_health():
         """Return a lightweight 200 at the root for platform probes."""
         db_ready = bool(getattr(app.state, "db_ready", False))

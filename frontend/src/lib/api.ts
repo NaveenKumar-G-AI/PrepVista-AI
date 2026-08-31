@@ -1048,7 +1048,15 @@ class ApiClient {
 
   // ── Billing (Razorpay) ────────────────────
   async createOrder<T = unknown>(plan: string) {
-    return this.request<T>('/billing/create-order', { method: 'POST', body: { plan } });
+    // Keep one key for the complete request lifecycle (including an auth-refresh
+    // retry inside request()) so the backend cannot create duplicate orders.
+    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : generateRequestId();
+    return this.request<T>('/billing/create-order', {
+      method: 'POST',
+      body: { plan, idempotency_key: idempotencyKey },
+    });
   }
   async verifyPayment<T = unknown>(orderId: string, paymentId: string, signature: string) {
     return this.request<T>('/billing/verify-payment', {

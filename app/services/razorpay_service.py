@@ -4,10 +4,12 @@ Handles order creation, payment verification, webhook processing, and plan activ
 Implements a strict payment state machine: created -> pending -> verified/failed/expired.
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 
 import razorpay
 import structlog
@@ -42,7 +44,34 @@ def _coerce_webhook_time(value) -> datetime | None:
         return None
 
 
-async def create_order(user_id: str, user_email: str, plan: str) -> dict:
+def _checkout_order_response(
+    *,
+    order_id: str,
+    amount_paise: int,
+    plan: str,
+    user_email: str,
+    key_id: str,
+    currency: str = "INR",
+) -> dict:
+    """Return the stable public order contract consumed by the checkout UI."""
+    return {
+        "order_id": order_id,
+        "amount": amount_paise,
+        "currency": currency,
+        "key_id": key_id,
+        "plan": plan,
+        "prefill": {"email": user_email},
+        "notes": {"plan": plan},
+    }
+
+
+async def create_order(
+    user_id: str,
+    user_email: str,
+    plan: str,
+    *,
+    idempotency_key: str | None = None,
+) -> dict:
     """
     Create a Razorpay order for a subscription plan.
     Returns order details for the frontend checkout.
@@ -51,9 +80,11 @@ async def create_order(user_id: str, user_email: str, plan: str) -> dict:
     if not plan_cfg or plan_cfg["price_paise"] == 0:
         raise HTTPException(status_code=400, detail="Cannot create order for free plan.")
 
-    amount_paise = plan_cfg["price_paise"]
+    amount_paise = int(plan_cfg["price_paise"])
     client = _get_client()
     settings = get_settings()
+    normalized_key = (idempotency_key or "").strip() or None
+    reservation_id = None
 
     async with DatabaseConnection() as conn:
         profile = await conn.fetchrow("SELECT plan FROM profiles WHERE id = $1", user_id)
@@ -64,47 +95,162 @@ async def create_order(user_id: str, user_email: str, plan: str) -> dict:
                 detail=f"You already own the {plan.title()} plan. Switch to it from your dashboard instead of purchasing again.",
             )
 
+        if normalized_key:
+            reservation = await conn.fetchrow(
+                """INSERT INTO payments
+                   (user_id, provider, plan, amount_paise, currency, status,
+                    idempotency_key, created_at)
+                   VALUES ($1, 'razorpay', $2, $3, 'INR', 'created', $4, NOW())
+                   ON CONFLICT (user_id, idempotency_key)
+                       WHERE idempotency_key IS NOT NULL
+                   DO NOTHING
+                   RETURNING id""",
+                user_id,
+                plan,
+                amount_paise,
+                normalized_key,
+            )
+            if reservation:
+                reservation_id = reservation["id"]
+            else:
+                existing = await conn.fetchrow(
+                    """SELECT razorpay_order_id, plan, amount_paise, currency, status
+                       FROM payments
+                       WHERE user_id = $1 AND idempotency_key = $2""",
+                    user_id,
+                    normalized_key,
+                )
+                if not existing:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Checkout request conflict. Please try again.",
+                    )
+                if existing["plan"] != plan or int(existing["amount_paise"]) != amount_paise:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This checkout request key was already used for a different purchase.",
+                    )
+                if existing["razorpay_order_id"] and existing["status"] in ("created", "pending"):
+                    logger.info(
+                        "razorpay_order_reused",
+                        order_id=existing["razorpay_order_id"],
+                        user_id=user_id,
+                        plan=plan,
+                    )
+                    return _checkout_order_response(
+                        order_id=existing["razorpay_order_id"],
+                        amount_paise=amount_paise,
+                        currency=existing["currency"],
+                        plan=plan,
+                        user_email=user_email,
+                        key_id=settings.RAZORPAY_KEY_ID,
+                    )
+                if not existing["razorpay_order_id"]:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Checkout is already being created. Please retry shortly.",
+                    )
+                raise HTTPException(
+                    status_code=409,
+                    detail="This checkout request is no longer reusable. Please start a new purchase.",
+                )
+
+    receipt_seed = normalized_key or secrets.token_urlsafe(18)
+    receipt_suffix = hashlib.sha256(receipt_seed.encode("utf-8")).hexdigest()[:16]
+    receipt = f"pv_{user_id[:8]}_{plan[:6]}_{receipt_suffix}"
+
     try:
-        order = client.order.create({
-            "amount": amount_paise,
-            "currency": "INR",
-            "receipt": f"pv_{user_id[:8]}_{plan}",
-            "notes": {
-                "user_id": user_id,
-                "user_email": user_email,
-                "plan": plan,
-                "product": "PrepVista",
+        # razorpay-python uses requests and is synchronous. Offload the network
+        # call so a slow gateway cannot block every request on the ASGI worker.
+        order = await asyncio.to_thread(
+            client.order.create,
+            {
+                "amount": amount_paise,
+                "currency": "INR",
+                "receipt": receipt,
+                "notes": {
+                    "user_id": user_id,
+                    "user_email": user_email,
+                    "plan": plan,
+                    "product": "PrepVista",
+                },
             },
-        })
+            timeout=20,
+        )
     except Exception as exc:
+        if reservation_id is not None:
+            async with DatabaseConnection() as conn:
+                await conn.execute(
+                    "DELETE FROM payments WHERE id = $1 AND razorpay_order_id IS NULL",
+                    reservation_id,
+                )
         logger.error("razorpay_order_creation_failed", error=str(exc), user_id=user_id)
         raise HTTPException(status_code=502, detail="Payment service is temporarily unavailable. Please try again.") from exc
 
-    order_id = order["id"]
+    order_id = str(order.get("id", "")).strip() if isinstance(order, dict) else ""
+    order_amount = order.get("amount") if isinstance(order, dict) else None
+    order_currency = order.get("currency") if isinstance(order, dict) else None
+    if (
+        not order_id
+        or order_amount != amount_paise
+        or str(order_currency or "").upper() != "INR"
+    ):
+        if reservation_id is not None:
+            async with DatabaseConnection() as conn:
+                await conn.execute(
+                    "DELETE FROM payments WHERE id = $1 AND razorpay_order_id IS NULL",
+                    reservation_id,
+                )
+        logger.error(
+            "razorpay_order_invalid_response",
+            user_id=user_id,
+            has_order_id=bool(order_id),
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Payment service returned an invalid order. Please try again.",
+        )
 
     async with DatabaseConnection() as conn:
-        await conn.execute(
-            """INSERT INTO payments
-               (user_id, provider, plan, amount_paise, currency, status,
-                razorpay_order_id, created_at)
-               VALUES ($1, 'razorpay', $2, $3, 'INR', 'created', $4, NOW())""",
-            user_id,
-            plan,
-            amount_paise,
-            order_id,
-        )
+        if reservation_id is not None:
+            result = await conn.execute(
+                """UPDATE payments
+                   SET razorpay_order_id = $1
+                   WHERE id = $2 AND razorpay_order_id IS NULL""",
+                order_id,
+                reservation_id,
+            )
+            if result != "UPDATE 1":
+                logger.error(
+                    "razorpay_order_reservation_lost",
+                    order_id=order_id,
+                    user_id=user_id,
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Checkout could not be saved. Please contact support before retrying.",
+                )
+        else:
+            await conn.execute(
+                """INSERT INTO payments
+                   (user_id, provider, plan, amount_paise, currency, status,
+                    razorpay_order_id, created_at)
+                   VALUES ($1, 'razorpay', $2, $3, 'INR', 'created', $4, NOW())""",
+                user_id,
+                plan,
+                amount_paise,
+                order_id,
+            )
 
     logger.info("razorpay_order_created", order_id=order_id, user_id=user_id, plan=plan, amount=amount_paise)
 
-    return {
-        "order_id": order_id,
-        "amount": amount_paise,
-        "currency": "INR",
-        "key_id": settings.RAZORPAY_KEY_ID,
-        "plan": plan,
-        "prefill": {"email": user_email},
-        "notes": {"plan": plan},
-    }
+    return _checkout_order_response(
+        order_id=order_id,
+        amount_paise=amount_paise,
+        plan=plan,
+        user_email=user_email,
+        key_id=settings.RAZORPAY_KEY_ID,
+    )
 
 
 async def verify_payment(
@@ -294,9 +440,8 @@ async def handle_webhook(raw_body: bytes | str, signature: str, event_id: str | 
         _get_client().utility.verify_webhook_signature(
             body_str,
             signature,
-            # Webhooks are signed with the dashboard webhook secret, which may
-            # differ from the API key secret. config populates this (falling
-            # back to the key secret only when no separate webhook secret is set).
+            # Webhooks are signed with the dedicated dashboard webhook secret,
+            # which is intentionally kept separate from the API key secret.
             settings.RAZORPAY_WEBHOOK_SECRET,
         )
     except Exception:
@@ -377,7 +522,8 @@ async def handle_webhook(raw_body: bytes | str, signature: str, event_id: str | 
         async with DatabaseConnection() as conn:
             async with conn.transaction():
                 payment_row = await conn.fetchrow(
-                    """SELECT user_id, plan, status, razorpay_payment_id, verified_at
+                    """SELECT user_id, plan, amount_paise, currency, status,
+                              razorpay_payment_id, verified_at
                        FROM payments
                        WHERE razorpay_order_id = $1 FOR UPDATE""",
                     order_id,
@@ -389,6 +535,16 @@ async def handle_webhook(raw_body: bytes | str, signature: str, event_id: str | 
                     raise RuntimeError("Webhook payment ID conflicts with the verified payment")
                 if payment_row["status"] in ("failed", "expired", "refunded"):
                     raise RuntimeError(f"Captured payment cannot transition from {payment_row['status']}")
+
+                try:
+                    captured_amount = int(payment_entity.get("amount"))
+                except (TypeError, ValueError):
+                    raise RuntimeError("Captured payment is missing a valid amount")
+                captured_currency = str(payment_entity.get("currency") or "").upper()
+                if captured_amount != int(payment_row["amount_paise"]):
+                    raise RuntimeError("Captured payment amount does not match its order")
+                if captured_currency != str(payment_row["currency"]).upper():
+                    raise RuntimeError("Captured payment currency does not match its order")
 
                 newly_verified = payment_row["status"] != "verified"
                 activated_at = (
@@ -509,7 +665,7 @@ async def handle_webhook(raw_body: bytes | str, signature: str, event_id: str | 
         async with DatabaseConnection() as conn:
             async with conn.transaction():
                 payment_row = await conn.fetchrow(
-                    """SELECT user_id, plan FROM payments
+                    """SELECT user_id, plan, razorpay_order_id FROM payments
                        WHERE razorpay_payment_id = $1 FOR UPDATE""",
                     payment_id,
                 )
@@ -521,7 +677,53 @@ async def handle_webhook(raw_body: bytes | str, signature: str, event_id: str | 
                        WHERE razorpay_payment_id = $1""",
                     payment_id,
                 )
-                await set_entitlement_status(conn, payment_row["user_id"], payment_row["plan"], "refunded")
+
+                # One entitlement row represents the latest access window for a
+                # plan. Refunding an older payment must not revoke a newer valid
+                # renewal, so rebuild the entitlement from the latest remaining
+                # verified payment before syncing the profile.
+                replacement = await conn.fetchrow(
+                    """SELECT razorpay_order_id,
+                              COALESCE(verified_at, created_at) AS activated_at
+                       FROM payments
+                       WHERE user_id = $1 AND plan = $2 AND status = 'verified'
+                       ORDER BY COALESCE(verified_at, created_at) DESC
+                       LIMIT 1""",
+                    payment_row["user_id"],
+                    payment_row["plan"],
+                )
+                if replacement:
+                    activated_at = replacement["activated_at"]
+                    # First restore the replacement window (including its exact
+                    # activation/expiry timestamps), then expire it if that
+                    # historical window has already elapsed.
+                    await set_entitlement_status(
+                        conn,
+                        payment_row["user_id"],
+                        payment_row["plan"],
+                        "active",
+                        source_order_id=replacement["razorpay_order_id"],
+                        activated_at=activated_at,
+                    )
+                    if (
+                        not activated_at
+                        or activated_at + timedelta(days=30) <= datetime.now(timezone.utc)
+                    ):
+                        await set_entitlement_status(
+                            conn,
+                            payment_row["user_id"],
+                            payment_row["plan"],
+                            "expired",
+                            source_order_id=replacement["razorpay_order_id"],
+                        )
+                else:
+                    await set_entitlement_status(
+                        conn,
+                        payment_row["user_id"],
+                        payment_row["plan"],
+                        "refunded",
+                        source_order_id=payment_row["razorpay_order_id"],
+                    )
                 await sync_profile_plan_state(conn, payment_row["user_id"])
             logger.info("refund_processed_plan_downgraded", payment_id=payment_id)
 

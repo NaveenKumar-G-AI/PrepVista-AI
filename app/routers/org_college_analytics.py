@@ -13,17 +13,18 @@ import re
 import statistics as _stats
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, EmailStr, field_validator
 
 from app.config import (
-    COLLEGE_STUDENT_PLAN, ORG_DEFAULT_PAGE_SIZE, ORG_MAX_PAGE_SIZE,
+    COLLEGE_STUDENT_PLAN, ORG_DEFAULT_PAGE_SIZE, ORG_MAX_PAGE_SIZE, get_settings,
 )
 from app.database.connection import DatabaseConnection
 from app.dependencies import OrgAdminProfile, require_org_admin
+from app.services.report_schedules import next_report_run
 from app.routers.org_college_helpers import (
     _build_answer_flag_aggregates, _build_dept_comparison, _build_radar_shape,
     _build_traffic_light, _build_diverging_bar, _build_score_distribution,
@@ -40,6 +41,14 @@ from app.routers.org_college_helpers import (
 )
 
 router = APIRouter()
+
+
+class ScheduleReportRequest(BaseModel):
+    frequency: Literal["weekly", "monthly"]
+    email: EmailStr
+    department_id: uuid.UUID | None = None
+    year_id: uuid.UUID | None = None
+    batch_id: uuid.UUID | None = None
 
 
 async def _parallel(*query_fns):
@@ -1319,6 +1328,144 @@ async def export_student_reports(
         })
 
     return {"students": students_out, "total": len(students_out)}
+
+
+@router.post("/reports/schedule", status_code=201)
+async def schedule_student_report(
+    body: ScheduleReportRequest,
+    admin: OrgAdminProfile = Depends(require_org_admin()),
+):
+    """Create or refresh a recurring CSV delivery for an active org admin."""
+    if admin.admin_role not in {"org_admin", "placement_officer"}:
+        raise HTTPException(
+            status_code=403,
+            detail="Only organization admins and placement officers can schedule reports.",
+        )
+    if not get_settings().RESEND_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Scheduled email delivery is not configured.",
+        )
+
+    org_id = admin.organization_id
+    recipient_email = str(body.email).strip().lower()
+    filter_values = {
+        "department_id": body.department_id,
+        "year_id": body.year_id,
+        "batch_id": body.batch_id,
+    }
+    filter_tables = {
+        "department_id": "college_departments",
+        "year_id": "college_years",
+        "batch_id": "college_batches",
+    }
+    next_run_at = next_report_run(body.frequency)
+    lock_key = "|".join(
+        [
+            str(org_id),
+            recipient_email,
+            body.frequency,
+            *(str(filter_values[name] or "") for name in filter_values),
+        ]
+    )
+
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            recipient_is_admin = await conn.fetchval(
+                """SELECT EXISTS (
+                       SELECT 1
+                       FROM organization_admins
+                       WHERE organization_id = $1
+                         AND LOWER(email) = $2
+                         AND status = 'active'
+                   )""",
+                org_id,
+                recipient_email,
+            )
+            if not recipient_is_admin:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Recipient must be an active administrator for this organization.",
+                )
+
+            for field_name, value in filter_values.items():
+                if value is None:
+                    continue
+                table_name = filter_tables[field_name]
+                belongs_to_org = await conn.fetchval(
+                    f"SELECT EXISTS (SELECT 1 FROM {table_name} WHERE id = $1 AND organization_id = $2)",
+                    value,
+                    org_id,
+                )
+                if not belongs_to_org:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Selected {field_name.removesuffix('_id')} is not part of this organization.",
+                    )
+
+            # Serializes identical schedules; the matching unique index is the
+            # final database-level guard against duplicates.
+            await conn.execute("SELECT pg_advisory_xact_lock(hashtext($1))", lock_key)
+            existing_id = await conn.fetchval(
+                """SELECT id
+                   FROM org_report_schedules
+                   WHERE organization_id = $1
+                     AND LOWER(recipient_email) = $2
+                     AND frequency = $3
+                     AND department_id IS NOT DISTINCT FROM $4
+                     AND year_id IS NOT DISTINCT FROM $5
+                     AND batch_id IS NOT DISTINCT FROM $6
+                     AND active = TRUE
+                   FOR UPDATE""",
+                org_id,
+                recipient_email,
+                body.frequency,
+                body.department_id,
+                body.year_id,
+                body.batch_id,
+            )
+            if existing_id:
+                schedule = await conn.fetchrow(
+                    """UPDATE org_report_schedules
+                       SET created_by_user_id = $2,
+                           next_run_at = $3,
+                           last_status = 'scheduled',
+                           last_error = NULL,
+                           lease_until = NULL,
+                           updated_at = NOW()
+                       WHERE id = $1
+                       RETURNING id, frequency, recipient_email, next_run_at, active""",
+                    existing_id,
+                    admin.user_id,
+                    next_run_at,
+                )
+            else:
+                schedule = await conn.fetchrow(
+                    """INSERT INTO org_report_schedules (
+                           organization_id, created_by_user_id, frequency,
+                           recipient_email, department_id, year_id, batch_id,
+                           active, next_run_at, last_status
+                       )
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, 'scheduled')
+                       RETURNING id, frequency, recipient_email, next_run_at, active""",
+                    org_id,
+                    admin.user_id,
+                    body.frequency,
+                    recipient_email,
+                    body.department_id,
+                    body.year_id,
+                    body.batch_id,
+                    next_run_at,
+                )
+
+    return {
+        "status": "scheduled",
+        "schedule_id": str(schedule["id"]),
+        "frequency": schedule["frequency"],
+        "recipient_email": schedule["recipient_email"],
+        "next_run_at": schedule["next_run_at"],
+        "active": bool(schedule["active"]),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════

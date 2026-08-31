@@ -342,8 +342,20 @@ class Settings(BaseSettings):
         if self.ENVIRONMENT == "production" and not self.GROQ_API_KEY and not self.OPENAI_API_KEY:
             raise ValueError("At least one LLM provider API key must be configured in production")
 
-        if bool(self.RAZORPAY_KEY_ID) ^ bool(self.RAZORPAY_KEY_SECRET):
-            raise ValueError("Both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set together")
+        razorpay_values = (
+            self.RAZORPAY_KEY_ID,
+            self.RAZORPAY_KEY_SECRET,
+            self.RAZORPAY_WEBHOOK_SECRET,
+        )
+        if any(razorpay_values) and not all(razorpay_values):
+            raise ValueError(
+                "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and "
+                "RAZORPAY_WEBHOOK_SECRET must be set together"
+            )
+        if self.ENVIRONMENT == "production" and not all(razorpay_values):
+            raise ValueError(
+                "Razorpay API and webhook credentials are required in production"
+            )
 
         if bool(self.UPSTASH_REDIS_URL) ^ bool(self.UPSTASH_REDIS_TOKEN):
             raise ValueError("Both UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN must be set together")
@@ -376,12 +388,6 @@ class Settings(BaseSettings):
                 "DEBUG must be False in production. "
                 "DEBUG=True exposes stack traces and internal state in HTTP responses."
             )
-
-        # ✅ SEC: Auto-fallback RAZORPAY_WEBHOOK_SECRET to RAZORPAY_KEY_SECRET when not
-        # explicitly set. Many Razorpay integrations use the key secret for webhook
-        # verification. This prevents a startup crash while keeping webhook verification active.
-        if self.RAZORPAY_KEY_ID and not self.RAZORPAY_WEBHOOK_SECRET:
-            self.RAZORPAY_WEBHOOK_SECRET = self.RAZORPAY_KEY_SECRET
 
         # ✅ ADDED: DB pool cross-validation — MIN > MAX causes asyncpg to raise a
         # cryptic error at the first DB call, not at startup. Catch it here so the

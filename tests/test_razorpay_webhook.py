@@ -35,6 +35,45 @@ class _RecordingUtility:
             raise Exception("signature mismatch")
 
 
+class _AsyncContext:
+    def __init__(self, value):
+        self.value = value
+
+    async def __aenter__(self):
+        return self.value
+
+    async def __aexit__(self, *_args):
+        return None
+
+
+class _WebhookConnection:
+    def __init__(self, *, payment_row, replacement=None):
+        self.payment_row = payment_row
+        self.replacement = replacement
+        self.executions = []
+
+    def transaction(self):
+        return _AsyncContext(self)
+
+    async def fetchval(self, query, *_args):
+        if "SELECT processed" in query:
+            return False
+        raise AssertionError(f"Unexpected fetchval query: {query}")
+
+    async def fetchrow(self, query, *_args):
+        if "WHERE razorpay_order_id = $1 FOR UPDATE" in query:
+            return self.payment_row
+        if "WHERE razorpay_payment_id = $1 FOR UPDATE" in query:
+            return self.payment_row
+        if "status = 'verified'" in query:
+            return self.replacement
+        raise AssertionError(f"Unexpected fetchrow query: {query}")
+
+    async def execute(self, query, *args):
+        self.executions.append((query, args))
+        return "UPDATE 1"
+
+
 def _patch(monkeypatch, utility):
     monkeypatch.setattr(
         razorpay_service,
@@ -141,3 +180,116 @@ def test_webhook_route_requests_retry_on_internal_failure(monkeypatch):
     )
     assert response.status_code == 503
     assert response.json()["detail"] == "Webhook processing failed; retry required."
+
+
+def test_captured_webhook_rejects_amount_mismatch(monkeypatch):
+    utility = _RecordingUtility()
+    _patch(monkeypatch, utility)
+    conn = _WebhookConnection(
+        payment_row={
+            "user_id": "user-1",
+            "plan": "pro",
+            "amount_paise": 29900,
+            "currency": "INR",
+            "status": "created",
+            "razorpay_payment_id": None,
+            "verified_at": None,
+        }
+    )
+    monkeypatch.setattr(
+        razorpay_service,
+        "DatabaseConnection",
+        lambda: _AsyncContext(conn),
+    )
+    payload = json.dumps(
+        {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_1",
+                        "order_id": "order_1",
+                        "amount": 1,
+                        "currency": "INR",
+                    }
+                }
+            },
+        }
+    ).encode("utf-8")
+
+    with pytest.raises(RuntimeError, match="amount does not match"):
+        asyncio.run(
+            razorpay_service.handle_webhook(
+                payload,
+                "valid-signature",
+                "evt_amount_mismatch",
+            )
+        )
+
+
+def test_refund_preserves_a_newer_valid_renewal(monkeypatch):
+    utility = _RecordingUtility()
+    _patch(monkeypatch, utility)
+    from datetime import datetime, timezone
+
+    conn = _WebhookConnection(
+        payment_row={
+            "user_id": "user-1",
+            "plan": "pro",
+            "razorpay_order_id": "order_old",
+        },
+        replacement={
+            "razorpay_order_id": "order_new",
+            "activated_at": datetime.now(timezone.utc),
+        },
+    )
+    monkeypatch.setattr(
+        razorpay_service,
+        "DatabaseConnection",
+        lambda: _AsyncContext(conn),
+    )
+    entitlement_updates = []
+
+    async def fake_set_entitlement(_conn, user_id, plan, status, **kwargs):
+        entitlement_updates.append((user_id, plan, status, kwargs))
+
+    async def fake_sync(*_args, **_kwargs):
+        return {}
+
+    monkeypatch.setattr(
+        razorpay_service,
+        "set_entitlement_status",
+        fake_set_entitlement,
+    )
+    monkeypatch.setattr(
+        razorpay_service,
+        "sync_profile_plan_state",
+        fake_sync,
+    )
+    payload = json.dumps(
+        {
+            "event": "refund.processed",
+            "payload": {"refund": {"entity": {"payment_id": "pay_old"}}},
+        }
+    ).encode("utf-8")
+
+    result = asyncio.run(
+        razorpay_service.handle_webhook(
+            payload,
+            "valid-signature",
+            "evt_refund_old",
+        )
+    )
+
+    assert result == {"status": "processed"}
+    assert entitlement_updates == [
+        (
+            "user-1",
+            "pro",
+            "active",
+            {
+                "source_order_id": "order_new",
+                "activated_at": conn.replacement["activated_at"],
+            },
+        )
+    ]

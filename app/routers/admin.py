@@ -27,9 +27,14 @@ from app.dependencies import UserProfile, get_current_user
 from app.services.launch_offer import (
     LAUNCH_OFFER_CONSUMED_STATUSES,
     LAUNCH_OFFER_WINDOW_DAYS,
+    LaunchOfferCapacityError,
+    LaunchOfferConflictError,
     TOTAL_LAUNCH_OFFER_SLOTS,
+    approve_launch_offer_grant,
+    reject_launch_offer_grant,
     reset_launch_offer_data,
 )
+from app.services.plan_access import sync_profile_plan_state
 from app.services.user_activity import refresh_user_activity_stats
 
 router = APIRouter()
@@ -598,3 +603,56 @@ async def reset_launch_offers(
         "deleted_grants": result["deleted_grants"],
         "settings_reset": result["settings_reset"],
     }
+
+
+@router.post("/launch-offers/{grant_id}/approve")
+async def approve_launch_offer(
+    grant_id: int,
+    admin: UserProfile = Depends(require_admin),
+):
+    """Approve one pending launch offer and activate its Pro entitlement."""
+    try:
+        async with DatabaseConnection() as conn:
+            async with conn.transaction():
+                result = await approve_launch_offer_grant(conn, grant_id, admin.email)
+                if not result:
+                    raise HTTPException(status_code=404, detail="Launch offer not found.")
+                await sync_profile_plan_state(conn, result["user_id"], "pro")
+    except (LaunchOfferConflictError, LaunchOfferCapacityError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    _OVERVIEW_CACHE.clear()
+    logger.info(
+        "admin_launch_offer_approved",
+        admin_email=admin.email,
+        grant_id=grant_id,
+        user_id=result["user_id"],
+        slot_number=result["slot_number"],
+    )
+    return result
+
+
+@router.post("/launch-offers/{grant_id}/reject")
+async def reject_launch_offer(
+    grant_id: int,
+    admin: UserProfile = Depends(require_admin),
+):
+    """Reject one pending launch offer."""
+    try:
+        async with DatabaseConnection() as conn:
+            async with conn.transaction():
+                result = await reject_launch_offer_grant(conn, grant_id, admin.email)
+                if not result:
+                    raise HTTPException(status_code=404, detail="Launch offer not found.")
+                await sync_profile_plan_state(conn, result["user_id"])
+    except LaunchOfferConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    _OVERVIEW_CACHE.clear()
+    logger.info(
+        "admin_launch_offer_rejected",
+        admin_email=admin.email,
+        grant_id=grant_id,
+        user_id=result["user_id"],
+    )
+    return result

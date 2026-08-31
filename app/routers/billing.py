@@ -51,12 +51,14 @@ class CreateOrderRequest(BaseModel):
     # Literal type enforces valid values at parse time (Pydantic v2 → HTTP 422
     # with field-level detail) and self-documents the API in OpenAPI schema.
     plan: Literal["pro", "career"]
-    # Optional idempotency key — prevents duplicate Razorpay orders on
-    # double-tap / network retry. The frontend generates a UUID per payment
-    # intent and passes it here. If the same key is submitted twice within
-    # Razorpay's idempotency window, the second call returns the same order.
-    # Pass None / omit for legacy callers — backward compatible.
-    idempotency_key: str | None = Field(default=None, max_length=64)
+    # Optional for backwards compatibility. The current frontend sends a UUID
+    # which the service persists to make browser/network retries safe.
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
+    )
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -85,11 +87,6 @@ async def create_razorpay_order(
         has_idempotency_key=bool(req.idempotency_key),
     )
 
-    # Pass idempotency_key to the service layer. razorpay_service.create_order
-    # should forward it as the Razorpay-Idempotency-Key header on the API call.
-    # If the service signature does not yet accept idempotency_key, it is passed
-    # as a keyword argument — Python ignores unknown kwargs gracefully if the
-    # function uses **kwargs, or the service can be updated to accept it.
     order_data = await create_order(
         user.id,
         user.email,
@@ -102,7 +99,7 @@ async def create_razorpay_order(
         user_id=user.id,
         email=user.email,
         plan=req.plan,
-        order_id=order_data.get("id") if isinstance(order_data, dict) else None,
+        order_id=order_data.get("order_id") if isinstance(order_data, dict) else None,
     )
 
     return order_data

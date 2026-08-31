@@ -1,5 +1,8 @@
 """Deployment-contract regression tests."""
 
+import pytest
+from pydantic import ValidationError
+
 from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
@@ -20,6 +23,9 @@ def _production_settings(**overrides) -> Settings:
         "SUPABASE_JWT_SECRET": "x" * 32,
         "DATABASE_URL": "postgresql://user:password@example.invalid:5432/db",
         "GROQ_API_KEY": "test-provider-key",
+        "RAZORPAY_KEY_ID": "rzp_test_public",
+        "RAZORPAY_KEY_SECRET": "test-api-secret",
+        "RAZORPAY_WEBHOOK_SECRET": "test-webhook-secret",
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)
@@ -63,6 +69,18 @@ def test_namespaced_debug_setting_ignores_generic_shell_variable(monkeypatch) ->
     settings = Settings(_env_file=None, **values)
 
     assert settings.DEBUG is False
+
+
+def test_production_settings_require_complete_payment_configuration() -> None:
+    with pytest.raises(ValidationError, match="webhook credentials are required"):
+        _production_settings(
+            RAZORPAY_KEY_ID="",
+            RAZORPAY_KEY_SECRET="",
+            RAZORPAY_WEBHOOK_SECRET="",
+        )
+
+    with pytest.raises(ValidationError, match="must be set together"):
+        _production_settings(RAZORPAY_WEBHOOK_SECRET="")
 
 
 def test_request_size_middleware_preserves_normal_json_and_rejects_actual_bytes() -> None:

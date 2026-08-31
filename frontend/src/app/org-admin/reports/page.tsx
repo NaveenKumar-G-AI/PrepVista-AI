@@ -908,7 +908,7 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-xl font-semibold text-white">Schedule Report</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Automated CSV delivery by email</p>
+                <p className="text-xs text-slate-400 mt-0.5">Automated CSV delivery to an active college-admin email</p>
               </div>
               <button type="button" onClick={() => setShowSchedule(false)} className="text-slate-400 hover:text-white">
                 <XIcon size={20} />
