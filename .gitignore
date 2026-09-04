@@ -25,3 +25,7 @@ frontend/.env.local
 frontend/.env.*
 !frontend/.env.local.example
 frontend/tsconfig.tsbuildinfo
+
+# Binary film assets (large mp4/webp - serve from CDN or landingpage server)
+frontend/public/films/
+landingpage/public/films/

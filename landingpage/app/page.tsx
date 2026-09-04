@@ -7,9 +7,6 @@ import {
   useState,
   type CSSProperties,
 } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
 import {
   Activity,
   ArrowRight,
@@ -686,7 +683,7 @@ function CommunicationRound({ onComplete }: { onComplete: (result: RoundResult) 
     }
     recognition.onend = () => setRecording(false)
     recognition.onerror = () => { setRecording(false); setVoiceMessage("Voice recognition stopped. Your typed response is still available.") }
-    recognitionRef.current = recognition as unknown as SpeechRecognitionLike
+    recognitionRef.current = recognition
     setRecording(true)
     setVoiceMessage("Listening… your browser is converting speech to text.")
     recognition.start()
@@ -883,8 +880,6 @@ function CareerEngine({ role, locked }: { role: Role; locked: boolean }) {
 }
 
 export default function Home() {
-  const { user, loading: authLoading } = useAuth()
-  const router = useRouter()
   const [audience, setAudience] = useState<Audience>("student")
   const [selectedRoleId, setSelectedRoleId] = useState<RoleId | null>("software")
   const [activeRound, setActiveRound] = useState<RoundKey | null>(null)
@@ -900,13 +895,6 @@ export default function Home() {
   const [chapter, setChapter] = useState("01 / YOUR FUTURE")
   const [voteNotice, setVoteNotice] = useState(false)
   const journeyRef = useRef<HTMLElement | null>(null)
-
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    if (!authLoading && user) {
-      router.replace("/dashboard")
-    }
-  }, [authLoading, user, router])
 
   const role = roles.find((item) => item.id === selectedRoleId) ?? roles[0]
   const copy = audienceCopy[audience]
@@ -991,7 +979,7 @@ export default function Home() {
           </nav>
           <div className="v4-nav-actions">
             <span className="v4-live-state"><i /> INTERACTIVE PROTOTYPE</span>
-            <Link href="/login"><Button className="v4-nav-signin">Sign In</Button></Link>
+            <Button className="v4-nav-signin" onClick={() => scrollToId("top")}>Sign In</Button>
             <Button className="v4-nav-cta" onClick={() => scrollToId("gauntlet")}>Try a live round <Play /></Button>
           </div>
         </header>
@@ -1572,4 +1560,3 @@ function InterviewRoundVisual() {
     </div>
   )
 }
-

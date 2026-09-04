@@ -9,7 +9,10 @@
 // This catches misconfigured deploys before the first user login.
 const _rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 const _isProductionBuild = process.env.NODE_ENV === 'production';
-if (_isProductionBuild) {
+// Skip validation during `next build` (static generation runs with NODE_ENV=production
+// but has no real runtime env yet). Only enforce when the server is actually serving requests.
+const _isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+if (_isProductionBuild && !_isBuildPhase) {
   let validProductionUrl = false;
   try {
     const parsed = new URL(_rawApiUrl);

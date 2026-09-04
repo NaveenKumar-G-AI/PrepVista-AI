@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 
@@ -3717,4 +3717,3 @@ body::before { opacity: 0.012; }
   font-size: clamp(.88rem, .84rem + .12vw, .98rem);
   line-height: 1.62;
 }
-
