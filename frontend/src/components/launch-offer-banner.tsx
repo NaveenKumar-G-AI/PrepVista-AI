@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { launchOfferVisible } from '@/lib/feature-flags';
 
 const OFFER_SEEN_KEY = 'pv_launch_offer_seen_v1';
 const FIRST_VIEW_ANIMATION_MS = 6500;
@@ -24,12 +25,13 @@ export function LaunchOfferBanner({
   const totalSlots = Math.max(1, Number(maxSlots || 100));
   const safeDuration = Math.max(1, Number(offerDurationDays || 7));
   const safeRemaining = remainingSlots == null ? null : Math.max(0, Number(remainingSlots));
+
   const shouldHide = safeRemaining !== null && safeRemaining <= 0;
 
   const offerText = `First ${totalSlots} users get free Pro access for ${safeDuration} days`;
 
   useEffect(() => {
-    if (shouldHide) {
+    if (!launchOfferVisible || shouldHide) {
       return;
     }
     if (typeof window === 'undefined') {
@@ -57,7 +59,7 @@ export function LaunchOfferBanner({
     };
   }, [shouldHide]);
 
-  if (shouldHide) {
+  if (!launchOfferVisible || shouldHide) {
     return null;
   }
 

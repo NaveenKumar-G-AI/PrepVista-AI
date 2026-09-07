@@ -14,6 +14,7 @@ import { MainSideRail } from '@/components/main-side-rail';
 import { PlanSelector } from '@/components/plan-selector';
 import { api, ApiLaunchOfferState, ApiReferralSummary } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { dashboardSocialProofVisible, launchOfferVisible } from '@/lib/feature-flags';
 import { getLowLimitNotice, getStartInterviewHref, isUnlimitedUsage, hasRemainingUsage, PlanUsage } from '@/lib/plan-usage';
 
 interface DashboardData {
@@ -243,9 +244,9 @@ export default function DashboardPage() {
   const launchOfferDurationDays = launchOffer?.offer_duration_days ?? publicMetrics?.launch_offer?.offer_duration_days ?? 7;
   const launchOfferMaxSlots = launchOffer?.max_slots ?? publicMetrics?.launch_offer?.max_slots ?? 100;
   const launchOfferRemainingSlots = launchOffer?.remaining_slots ?? publicMetrics?.launch_offer?.remaining_slots ?? 0;
-  const showPublicLaunchOfferStrip = launchOfferRemainingSlots > 0;
-  const isLaunchOfferActive = launchOffer?.status === 'approved' && launchOffer?.plan === 'pro';
-  const isLaunchOfferExpired = launchOffer?.status === 'expired' && launchOffer?.plan === 'pro';
+  const showPublicLaunchOfferStrip = launchOfferVisible && launchOfferRemainingSlots > 0;
+  const isLaunchOfferActive = launchOfferVisible && launchOffer?.status === 'approved' && launchOffer?.plan === 'pro';
+  const isLaunchOfferExpired = launchOfferVisible && launchOffer?.status === 'expired' && launchOffer?.plan === 'pro';
   const launchOfferExpiryLabel = formatDateTime(launchOffer?.expires_at);
 
   const heroUsageText = unlimited
@@ -309,7 +310,7 @@ export default function DashboardPage() {
                     : 'Stay in motion with one focused session today, then use analytics to improve the next one.'}
                 </p>
 
-                {publicMetrics?.dashboard_message ? (
+                {dashboardSocialProofVisible && publicMetrics?.dashboard_message ? (
                   <div className="mt-5 max-w-3xl rounded-2xl border border-white/14 bg-white/8 px-4 py-3 text-sm font-medium text-sky-100 shadow-[0_18px_40px_rgba(2,8,23,0.18)]">
                     {publicMetrics.dashboard_message}
                   </div>

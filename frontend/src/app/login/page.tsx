@@ -12,6 +12,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { BrandLogo } from '@/components/brand-logo';
 import { api, ApiPublicGrowth } from '@/lib/api';
+import { loginSocialProofVisible } from '@/lib/feature-flags';
 
 const LaunchOfferBanner = dynamic(
   () => import('@/components/launch-offer-banner').then(mod => mod.LaunchOfferBanner),
@@ -187,7 +188,7 @@ function LoginForm() {
               offerDurationDays={publicGrowth?.launch_offer?.offer_duration_days}
             />
           ) : null}
-          {publicGrowth?.login_message ? (
+          {loginSocialProofVisible && publicGrowth?.login_message ? (
             <div className="mt-4 rounded-2xl border border-blue-200/70 bg-blue-50/85 px-4 py-3 text-sm font-medium text-blue-800 shadow-[0_12px_36px_rgba(37,99,235,0.08)] dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
               {publicGrowth.login_message}
             </div>

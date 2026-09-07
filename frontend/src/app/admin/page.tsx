@@ -8,6 +8,7 @@ import { AuthHeader } from '@/components/auth-header';
 import { CreditCardIcon, FeedbackIcon, GiftIcon, ShieldIcon, UserIcon } from '@/components/icons';
 import { api, ApiAdminLaunchOfferItem, ApiAdminOverview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { launchOfferVisible } from '@/lib/feature-flags';
 
 type AdminSection = 'overview' | 'approvals' | 'users' | 'referrals' | 'feedback' | 'revenue' | 'grants' | 'support';
 
@@ -59,7 +60,7 @@ const ADMIN_SECTIONS: Array<{
   { id: 'overview', label: 'Overview', helper: 'Live platform counts', icon: ShieldIcon },
   { id: 'support', label: 'Support Chat', helper: 'Manage user threads', icon: FeedbackIcon },
   { id: 'grants', label: 'Access Grants', helper: 'Override user limits', icon: GiftIcon },
-  { id: 'users', label: 'Users', helper: 'Plans and offer status', icon: UserIcon },
+  { id: 'users', label: 'Users', helper: 'Plans and account status', icon: UserIcon },
   { id: 'revenue', label: 'Revenue', helper: 'Global LTV tracking', icon: CreditCardIcon },
   { id: 'referrals', label: 'Referrals', helper: 'Joined referral activity', icon: FeedbackIcon },
   { id: 'feedback', label: 'Feedback', helper: 'User product feedback', icon: FeedbackIcon },
@@ -104,7 +105,7 @@ function StatCard({
 /* ─────────────────── Overview Section ─────────────────── */
 function OverviewSection({ data }: { data: ApiAdminOverview | null }) {
   const remaining = data?.launch_offer.remaining_slots ?? 0;
-  const slotsAreOpen = remaining > 0;
+  const slotsAreOpen = launchOfferVisible && remaining > 0;
 
   return (
     <div className="space-y-8 fade-in">
@@ -674,7 +675,7 @@ function UsersSection({ data }: { data: ApiAdminOverview | null }) {
       // 2. Exact keyword match
       if (query === 'pro' && user.pro_status !== 'not_purchased') return true;
       if (query === 'career' && user.career_status !== 'not_purchased') return true;
-      if (query === 'launch offer' || query === 'launch') {
+      if (launchOfferVisible && (query === 'launch offer' || query === 'launch')) {
         if (user.launch_offer.status) return true;
       }
       if (query === 'free') return true; // Everyone has free
@@ -683,7 +684,7 @@ function UsersSection({ data }: { data: ApiAdminOverview | null }) {
       // 3. Partial keyword fallback
       if ('pro'.includes(query) && user.pro_status !== 'not_purchased') return true;
       if ('career'.includes(query) && user.career_status !== 'not_purchased') return true;
-      if ('launch offer'.includes(query) && user.launch_offer.status) return true;
+      if (launchOfferVisible && 'launch offer'.includes(query) && user.launch_offer.status) return true;
 
       return false;
     });
@@ -774,7 +775,7 @@ function UsersSection({ data }: { data: ApiAdminOverview | null }) {
             </div>
 
             {/* Launch Offer Row */}
-            {item.launch_offer.status && (
+            {launchOfferVisible && item.launch_offer.status && (
               <div className="border-t border-white/[0.06] px-6 py-3 bg-rose-500/10">
                  <div className="text-sm">
                    <span className="font-bold text-rose-400 tracking-wider">LAUNCH OFFER: {item.launch_offer.status.toUpperCase()}</span>
@@ -1082,7 +1083,7 @@ export default function AdminPage() {
           </div>
           <h1 className="text-3xl font-bold text-white">Admin Console</h1>
           <p className="mt-2 max-w-3xl text-slate-400">
-            Manage users, monitor launch-offer metrics, inspect referrals, and review feedback from one protected workspace.
+            Manage users, inspect referrals, monitor revenue, and review feedback from one protected workspace.
           </p>
         </div>
 
@@ -1115,7 +1116,7 @@ export default function AdminPage() {
         {/* ── Section content ── */}
         <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-xl lg:p-8">
           {activeSection === 'overview' && <OverviewSection data={data} />}
-          {activeSection === 'approvals' && (
+          {launchOfferVisible && activeSection === 'approvals' && (
             <ApprovalsSection
               data={data}
               workingId={workingId}
