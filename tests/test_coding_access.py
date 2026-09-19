@@ -23,6 +23,7 @@ def client(monkeypatch):
 
 def test_default_is_off():
     assert Settings.model_fields["CODING_WORKSPACE_ENABLED"].default is False
+    assert Settings.model_fields["CODING_ALL_STUDENTS_ENABLED"].default is False
     assert Settings.model_fields["CODING_PILOT_PROFILE_IDS"].default == ""
 
 
@@ -74,3 +75,21 @@ def test_anonymous_access_rejected_before_configuration(client, monkeypatch):
     app.dependency_overrides[get_current_user] = anonymous
     monkeypatch.setattr(coding, 'get_settings', unexpected_config)
     assert http.get('/coding/access').status_code == 401
+
+
+def test_all_students_can_practise_without_individual_enrollment(client):
+    http, settings, identity, _ = client
+    settings.CODING_WORKSPACE_ENABLED = True
+    settings.CODING_ALL_STUDENTS_ENABLED = True
+    settings.CODING_PILOT_PROFILE_IDS = ''
+    for profile in ('personal-student', 'organization-student'):
+        identity.id = profile
+        data = http.get('/coding/access').json()
+        assert data['enabled'] and data['student_profile_id'] == profile
+        assert data['interview_credits_consumed'] == 0
+        assert not any(data[key] for key in ('server_sync', 'ai_mentoring', 'readiness_updates', 'server_validation'))
+    settings.CODING_WORKSPACE_ENABLED = False
+    assert not http.get('/coding/access').json()['enabled']
+    settings.CODING_WORKSPACE_ENABLED = True
+    settings.CODING_ALL_STUDENTS_ENABLED = False
+    assert not http.get('/coding/access').json()['enabled']

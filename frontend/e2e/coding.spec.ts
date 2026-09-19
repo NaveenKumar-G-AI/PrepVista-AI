@@ -20,7 +20,7 @@ async function prepare(page: Page, enabled = true, authenticated = true, profile
   });
 }
 
-test('anonymous and non-pilot accounts cannot mount the coding editor', async ({ page }) => {
+test('anonymous and disabled accounts cannot mount the coding editor', async ({ page }) => {
   await prepare(page, false, false);
   await page.goto(`/coding/practice/${challenges[0].challengeId}`);
   await expect(page.getByRole('heading', { name: 'Sign in to practise coding' })).toBeVisible();
@@ -30,6 +30,27 @@ test('anonymous and non-pilot accounts cannot mount the coding editor', async ({
   await expect(page.getByText('It is not enabled for your account yet.', { exact: false })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Your JavaScript solution' })).toHaveCount(0);
 });
+
+for (const width of [390, 1440]) {
+  test(`students switch workspaces and recover their coding draft at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await prepare(page);
+    const challenge = challenges[0];
+    await page.goto(`/coding/practice/${challenge.challengeId}`);
+    const editor = page.getByRole('textbox', { name: 'Your JavaScript solution' });
+    await expect(editor).toBeEnabled();
+    await editor.fill('// Keep this draft when switching workspaces');
+    const switcher = page.getByRole('group', { name: 'Student workspaces' });
+    await expect(switcher.getByRole('link', { name: 'Coding', exact: true })).toHaveAttribute('aria-current', 'page');
+    await switcher.getByRole('link', { name: 'Interview', exact: true }).click();
+    await expect(page).toHaveURL(/\/interview\/setup$/);
+    await expect(switcher.getByRole('link', { name: 'Interview', exact: true })).toHaveAttribute('aria-current', 'page');
+    await switcher.getByRole('link', { name: 'Coding', exact: true }).click();
+    await expect(page).toHaveURL(/\/coding$/);
+    await page.getByRole('link', { name: challenge.title, exact: true }).click();
+    await expect(editor).toHaveValue('// Keep this draft when switching workspaces');
+  });
+}
 
 test('catalog, actual checks, stale results and tab recovery form one practice slice', async ({ page }) => {
   await prepare(page);

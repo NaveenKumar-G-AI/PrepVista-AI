@@ -23,6 +23,16 @@ def test_flags_reject_string_booleans_secrets_and_wildcard_pilots():
     assert 'UNIFIED_ASSIGNMENTS_ENABLED_REQUIRES_UNIFIED_READINESS_VISIBLE' in issues
 
 
+def test_all_student_rollout_requires_workspace_but_not_pilot_ids():
+    flags = {'DATABASE_MIGRATIONS_ON_STARTUP': False, 'CODING_WORKSPACE_ENABLED': True,
+             'CODING_ALL_STUDENTS_ENABLED': True, 'CODING_PILOT_PROFILE_IDS': ''}
+    assert preflight.flag_issues(flags) == []
+    flags['CODING_WORKSPACE_ENABLED'] = False
+    assert 'CODING_ALL_STUDENTS_ENABLED_REQUIRES_CODING_WORKSPACE_ENABLED' in preflight.flag_issues(flags)
+    flags.update(CODING_WORKSPACE_ENABLED=True, CODING_ALL_STUDENTS_ENABLED=False)
+    assert 'PILOT_PROFILES_REQUIRED' in preflight.flag_issues(flags)
+
+
 def test_local_mode_never_uses_ambient_application_database(monkeypatch):
     monkeypatch.setenv('DATABASE_URL', 'postgresql://private:secret@production/database')
     monkeypatch.setenv('UNIFIED_PREFLIGHT_DATABASE_URL', 'postgresql://private:secret@production/database')

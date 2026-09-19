@@ -35,9 +35,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "PrepVista"
     APP_VERSION: str = "1.0.0"
     INTERVIEW_ORCHESTRATOR_V2: bool = True
-    # Internal coding practice pilot. Both switches are required; no implicit
-    # admin, paid-plan or organization access, and no interview credit usage.
+    # Practice can be released to all signed-in students or an exact-ID pilot.
+    # Paid features and interview credits retain their separate controls.
     CODING_WORKSPACE_ENABLED: bool = False
+    CODING_ALL_STUDENTS_ENABLED: bool = False
     CODING_PILOT_PROFILE_IDS: str = ""
     CODING_SERVER_SYNC_ENABLED: bool = False
     CODING_GUEST_IMPORT_ENABLED: bool = False

@@ -17,13 +17,14 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION = re.compile(r'^\d{3,}_[a-z0-9_]+$')
 FLAGS = {
     'DATABASE_MIGRATIONS_ON_STARTUP',
-    'CODING_WORKSPACE_ENABLED', 'CODING_SERVER_SYNC_ENABLED', 'CODING_GUEST_IMPORT_ENABLED',
+    'CODING_WORKSPACE_ENABLED', 'CODING_ALL_STUDENTS_ENABLED', 'CODING_SERVER_SYNC_ENABLED', 'CODING_GUEST_IMPORT_ENABLED',
     'CODING_AI_ENABLED', 'UNIFIED_EVIDENCE_ENABLED', 'UNIFIED_READINESS_VISIBLE',
     'UNIFIED_TPO_VISIBLE', 'UNIFIED_ASSIGNMENTS_ENABLED',
     'CODING_TRUSTED_VALIDATION_ENABLED',
     'ARTIFACT_REVIEW_ENABLED',
 }
 DEPENDENCIES = {
+    'CODING_ALL_STUDENTS_ENABLED': ['CODING_WORKSPACE_ENABLED'],
     'CODING_SERVER_SYNC_ENABLED': ['CODING_WORKSPACE_ENABLED'],
     'CODING_GUEST_IMPORT_ENABLED': ['CODING_SERVER_SYNC_ENABLED'],
     'CODING_AI_ENABLED': ['CODING_SERVER_SYNC_ENABLED'],
@@ -99,7 +100,8 @@ def flag_issues(value):
         if not isinstance(raw, str): raise ValueError()
         ids = [item.strip() for item in raw.split(',') if item.strip()]
         if any(str(UUID(item)) != item for item in ids): raise ValueError()
-        if value.get('CODING_WORKSPACE_ENABLED') and not ids: issues.append('PILOT_PROFILES_REQUIRED')
+        if value.get('CODING_WORKSPACE_ENABLED') and not value.get('CODING_ALL_STUDENTS_ENABLED') and not ids:
+            issues.append('PILOT_PROFILES_REQUIRED')
     except (ValueError, AttributeError): issues.append('PILOT_PROFILES_INVALID')
     if value.get('ARTIFACT_REVIEW_ENABLED'):
         try:

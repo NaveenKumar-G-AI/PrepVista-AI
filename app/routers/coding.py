@@ -43,10 +43,11 @@ class CodingAccess(BaseModel):
 @router.get("/access", response_model=CodingAccess)
 async def coding_access(response: Response, user: UserProfile = Depends(get_current_user)):
     settings = get_settings()
-    # Empty or '*' allowlists grant nobody. Compare canonical profile IDs, never
-    # emails, client IDs, plan names or editable auth metadata.
+    # Broad access is an explicit server setting; pilot IDs remain exact matches.
+    # Authentication above is required in both modes.
     profiles = {value.strip() for value in settings.CODING_PILOT_PROFILE_IDS.split(",") if value.strip()}
-    enabled = settings.CODING_WORKSPACE_ENABLED and str(user.id) in profiles
+    all_students = getattr(settings, 'CODING_ALL_STUDENTS_ENABLED', False)
+    enabled = settings.CODING_WORKSPACE_ENABLED and (all_students or str(user.id) in profiles)
     sync = enabled and getattr(settings, 'CODING_SERVER_SYNC_ENABLED', False)
     from app.services.coding_validation import configured
     response.headers["Cache-Control"] = "private, no-store"

@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { BrandLogo } from '@/components/brand-logo';
-import { CodingNavLink } from '@/modules/coding/access';
+import { StudentWorkspaceSwitcher } from '@/modules/coding/access';
 
 import {
   ArrowLeftIcon,
@@ -242,7 +242,7 @@ export function AuthHeader({ backHref, backLabel = 'Back' }: AuthHeaderProps) {
               className="flex items-center gap-3"
               imageClassName="rounded-2xl object-contain shadow-[0_14px_28px_rgba(37,99,235,0.24)]"
               nameClassName="text-[15px] font-semibold tracking-[0.01em] text-primary"
-              subtitle="AI Interview Workspace"
+              subtitle="Your preparation workspace"
               subtitleClassName="text-[11px] uppercase tracking-[0.18em] text-tertiary"
             />
           </Link>
@@ -260,7 +260,6 @@ export function AuthHeader({ backHref, backLabel = 'Back' }: AuthHeaderProps) {
               </NavLink>
             );
           })}
-          {!user?.is_org_admin && <CodingNavLink />}
         </div>
 
         <div className="flex items-center justify-end gap-2 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -306,6 +305,7 @@ export function AuthHeader({ backHref, backLabel = 'Back' }: AuthHeaderProps) {
           </button>
         </div>
       </div>
+      <StudentWorkspaceSwitcher />
     </nav>
   );
 }

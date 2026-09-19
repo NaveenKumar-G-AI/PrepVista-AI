@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 
@@ -56,17 +57,23 @@ export function useCodingAccess() {
   return { user, loading: loading || (!!profileId && !current), access: current?.access, error: current?.error };
 }
 
-export function CodingNavLink() {
-  const { access } = useCodingAccess();
-  if (!access?.enabled) return null;
-  return <Link href="/coding" className="inline-flex min-h-11 items-center rounded-full px-4 py-2.5 text-sm font-medium text-secondary hover:bg-hover">Coding</Link>;
+export function StudentWorkspaceSwitcher() {
+  const { user, access } = useCodingAccess();
+  const pathname = usePathname();
+  if (!user || user.is_org_admin) return null;
+  const items = [{ href: '/interview/setup', label: 'Interview', active: pathname.startsWith('/interview/') }];
+  if (access?.enabled) items.push({ href: '/coding', label: 'Coding', active: pathname === '/coding' || pathname.startsWith('/coding/') });
+  return <div role="group" aria-label="Student workspaces" className="mx-auto mt-3 flex max-w-7xl flex-wrap gap-2">
+    {items.map(item => <Link key={item.href} href={item.href} aria-current={item.active ? 'page' : undefined}
+      className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border px-5 py-2 text-sm font-semibold sm:flex-none ${item.active ? 'border-blue-500/40 bg-blue-500/14 text-primary' : 'border-border-color text-secondary hover:bg-hover'}`}>{item.label}</Link>)}
+  </div>;
 }
 
 export function CodingGate({ children }: { children: ReactNode }) {
   const { user, loading, access, error } = useCodingAccess();
   if (loading) return <p role="status" className="p-6">Checking coding access…</p>;
   if (!user) return <section className="card p-6 space-y-4"><h1 className="text-2xl font-semibold">Sign in to practise coding</h1><p>Use your PrepVista account to continue.</p><Link href="/login" className="btn-primary inline-flex">Sign in</Link></section>;
-  if (!access?.enabled) return <section className="card p-6 space-y-4"><h1 className="text-2xl font-semibold">Coding practice</h1><p role="status">{error || 'Coding practice is being introduced to a small pilot group. It is not enabled for your account yet.'}</p><Link href={user.org_student ? '/student-dashboard' : '/dashboard'} className="btn-secondary inline-flex">Return to my dashboard</Link><Link className="underline block" href="/coding-recovery">Recover saved coding work</Link></section>;
+  if (!access?.enabled) return <section className="card p-6 space-y-4"><h1 className="text-2xl font-semibold">Coding practice</h1><p role="status">{error || 'It is not enabled for your account yet.'}</p><Link href={user.org_student ? '/student-dashboard' : '/dashboard'} className="btn-secondary inline-flex">Return to my dashboard</Link><Link className="underline block" href="/coding-recovery">Recover saved coding work</Link></section>;
   // Changing identity remounts every editor and terminates its worker. A late
   // access response for another profile can never mount that profile's work.
   return <section key={user.id}>{children}</section>;
