@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     CODING_AI_GLOBAL_CONCURRENCY: int = Field(default=10, ge=1, le=100)
     UNIFIED_READINESS_VISIBLE: bool = False
     UNIFIED_EVIDENCE_ENABLED: bool = False
+    UNIFIED_EVIDENCE_IN_PROCESS_ENABLED: bool = True
     UNIFIED_TPO_VISIBLE: bool = False
     UNIFIED_ASSIGNMENTS_ENABLED: bool = False
     ARTIFACT_REVIEW_ENABLED: bool = False

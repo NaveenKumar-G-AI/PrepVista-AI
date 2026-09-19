@@ -855,7 +855,7 @@ def test_projection_guard_does_not_block_ordinary_profile_updates(database):
 
 
 def test_worker_quarantines_corrupt_sources_without_losing_events(database, monkeypatch):
-    from scripts import process_unified_evidence as worker
+    from app.services import unified_evidence_worker as worker
     database.settings.UNIFIED_EVIDENCE_ENABLED = True
     monkeypatch.setattr(worker, 'DatabaseConnection', database.connect)
     monkeypatch.setattr(worker, 'get_settings', lambda: database.settings)
@@ -1191,7 +1191,7 @@ def test_recovery_rls_rejects_partial_queue_visibility(database):
 
 
 def test_worker_serializes_failure_backoff_and_rolls_back_partial_projection(database, monkeypatch):
-    from scripts import process_unified_evidence as worker
+    from app.services import unified_evidence_worker as worker
     monkeypatch.setattr(worker, 'DatabaseConnection', database.connect)
     async def fail_after_observation(conn, event_id):
         await process_event(conn, event_id)
