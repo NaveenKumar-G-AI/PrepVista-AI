@@ -1,0 +1,212 @@
+[
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/app/learn/page.tsx",
+    "destination": "frontend/src/modules/coding/app/learn/page.tsx",
+    "source_sha256": "e04302f4431fa0c07686d28ae582d4abd67879e56ea98c33b578bf287e9e0768"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/app/diagnostic/page.tsx",
+    "destination": "frontend/src/modules/coding/app/diagnostic/page.tsx",
+    "source_sha256": "234eec5df1a882c8dd8a992bbda38d5622e735559807b3439eecf0b11bc2ac21"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/app/projects/page.tsx",
+    "destination": "frontend/src/modules/coding/app/projects/page.tsx",
+    "source_sha256": "7ba812e8d479597a4205d071088a63683cce7e8de5aa0023c87374dbf813ff2c"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/app/incidents/page.tsx",
+    "destination": "frontend/src/modules/coding/app/incidents/page.tsx",
+    "source_sha256": "39fbf69c864e640518ee65da002c24676d320554293d63780c66920417587c4f"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/app/interview/page.tsx",
+    "destination": "frontend/src/modules/coding/app/interview/page.tsx",
+    "source_sha256": "4bb94a07a416cd302c1c02cf3bb28e92f1162ca3fe19458534ddcdf72700fecf"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/app/debug/page.tsx",
+    "destination": "frontend/src/modules/coding/app/debug/page.tsx",
+    "source_sha256": "70332442a70a6e2d76aaff6dd9ee07d24871ae7237fde6de790728fb08f2d406"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/components/role-path.tsx",
+    "destination": "frontend/src/modules/coding/components/role-path.tsx",
+    "source_sha256": "12d754468bde2a3222f61584640320b6fb236f174b7c7b66c1bd1a847d8d6ce2"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/lib/quality.ts",
+    "destination": "frontend/src/modules/coding/lib/quality.ts",
+    "source_sha256": "a2aebbea6eca3c2e1493dbf3ea66317c1fb588373a6d45e1aeec7cdea854980b"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/catalog/seed/data.ts",
+    "destination": "frontend/src/modules/coding/engines/catalog/seed/data.ts",
+    "source_sha256": "c0ee9e241cf38e2296fbde784b2382d4dc3919dd8a08bbfe596f225ba3255c63"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/components/ui.tsx",
+    "destination": "frontend/src/modules/coding/components/ui.tsx",
+    "source_sha256": "24bcf20e31223b4e1eaed3774342953c643646a95706b2c7c0bba186fa0c736d"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/data/notification-project.json",
+    "destination": "frontend/src/modules/coding/data/notification-project.json",
+    "source_sha256": "5fcfbdb7925a6e23ae6a400e54b801be70da823615bf6e1e714d7023941abd7d"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/components/editor.tsx",
+    "destination": "frontend/src/modules/coding/components/editor.tsx",
+    "source_sha256": "236aa3a220460a14743ac839f4f1dc6dca3b7c6ec3ccb516141d638eb2526d86"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/index.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/index.ts",
+    "source_sha256": "b50a2e8e1e7612638e0ff0e47bf611de3e5d2fc077f81a3ba47030a8e06b6f9a"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/incidents/actions.ts",
+    "destination": "frontend/src/modules/coding/engines/incidents/actions.ts",
+    "source_sha256": "349247f6327e7b1a9e359b9a97b05d5b96b373e407defba7c6ac1a6503d84b5d"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/incidents/types.ts",
+    "destination": "frontend/src/modules/coding/engines/incidents/types.ts",
+    "source_sha256": "9cd3698bb0e0c938801272955ed4ed43a88c7dd83b6e16a71b093862dc3aaf23"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/types.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/types.ts",
+    "source_sha256": "be76b122689d5a17ae2ecdef9bbdc579339be090d90fc3aae38bff00444ad6bf"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/parsers/js_adapter.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/parsers/js_adapter.ts",
+    "source_sha256": "9754fec7dcd893cb2010c15f17e282b77acd242551a690a885f89453b2e00c9c"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/analysis/structural.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/analysis/structural.ts",
+    "source_sha256": "440ba2ff9111304aed86bd0283c1deac9104f4e2fd657e24e20f97c2ef48122b"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/analysis/duplication.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/analysis/duplication.ts",
+    "source_sha256": "c00ccca3b1be119f5933ed322d3c68a7acfa3c787cdaa1b53a5733a516f1f3bd"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/analysis/magic_values.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/analysis/magic_values.ts",
+    "source_sha256": "941ff4b0683cf72b6d4a05cdc8b44f6b33ee75c2c879bf45ae7f5a88fc55d15f"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/analysis/naming.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/analysis/naming.ts",
+    "source_sha256": "1bff0c38d407a3c28df546dc8df6405ac307ee937a1cb1787cdda25ce866f77e"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/analysis/error_handling.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/analysis/error_handling.ts",
+    "source_sha256": "d1d5bcef9d8623a1475dc33b0c010f71f49344c083ddd94f14711f8f203f9d67"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/rules/engine.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/rules/engine.ts",
+    "source_sha256": "eb9643db43344f9922c159d56f26cecada8623e9356c64ef8f0a6ee6273b9399"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/config.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/config.ts",
+    "source_sha256": "f1da6fb66fa2bab2616729084b20d4e87a80bcab9888c6e8d3e08799c395224f"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/catalog/domain/types.ts",
+    "destination": "frontend/src/modules/coding/engines/catalog/domain/types.ts",
+    "source_sha256": "0245d5a8b326e2738d54b46b0e01dc0f5c331dfc89e30f43b3f3e95499bc8284"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/services.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/services.ts",
+    "source_sha256": "20c16c783074d5a9e53de9be214f3c55ac9a1af8364e1a956435b60635af2283"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/timeline.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/timeline.ts",
+    "source_sha256": "d75d6634fb41a91976bffb5fb1e02ed1a8220b94085ee4ded14431d5d1d34038"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/deployments.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/deployments.ts",
+    "source_sha256": "a2385716382648c6934fb3623e43aadd7af59cf79490666c28842a2cb2b4da65"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/alerts.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/alerts.ts",
+    "source_sha256": "0faf4a7d97a87a61af8d68704626361d351bc9032b427cc9e939f0f0c45f8025"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/logs.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/logs.ts",
+    "source_sha256": "d189851a74c59a13dd9dff91767a52a2e4a428e1acb4823768dfbd49fffbd895"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/traces.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/traces.ts",
+    "source_sha256": "d9a318f10ab694abd17d51b53aea74f79645a6679f04e10ae135c77daa91cc87"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/metrics.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/metrics.ts",
+    "source_sha256": "986f475e74b5a39509ca2954ada283f34c5ec53526dc28dc2e346e42a2b89b76"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/actions.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/actions.ts",
+    "source_sha256": "0f812218451691ad988f17e4a0904d216ef6936efd400668343f536f4495bb81"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/causesAndPrevention.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/causesAndPrevention.ts",
+    "source_sha256": "827812e592753f7dfccc580715c59681d00629000482d38bad3f1a86678ffab9"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/content/incidents/pf-2048/messages.ts",
+    "destination": "frontend/src/modules/coding/content/incidents/pf-2048/messages.ts",
+    "source_sha256": "15609cacda9794b00134becf3f19952dbb71084933025aea9f0e91921e35f103"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/incidents/stateMachine.ts",
+    "destination": "frontend/src/modules/coding/engines/incidents/stateMachine.ts",
+    "source_sha256": "6fda3df2021c430ae5ff0ef39fb95f453c6368df00efb07446160deea0234bab"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/parsers/ir.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/parsers/ir.ts",
+    "source_sha256": "2b40342aa47b93019a5442a7f25034ae34b50ba5d02d801ce41ab644c51590e6"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/parsers/types.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/parsers/types.ts",
+    "source_sha256": "a085cc1a37b095f069b8dafaa107ea89b729d52b6c420d638d452a71ea98aa72"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/rules/types.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/rules/types.ts",
+    "source_sha256": "04f50319052af59396db5e10a810c29ea6d25cba5b4ecec8b951f8c028d662c1"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/quality/rules/catalog.ts",
+    "destination": "frontend/src/modules/coding/engines/quality/rules/catalog.ts",
+    "source_sha256": "4cf4a71896789043cd30de86138620cca24f041b026e022df1a8383873580ada"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/engines/incidents/metricGen.ts",
+    "destination": "frontend/src/modules/coding/engines/incidents/metricGen.ts",
+    "source_sha256": "45348d5c5ad52b5817ca42e198c4a391bd052dc836ecd6fa98530e628951c3ba"
+  },
+  {
+    "source": "CodeForge-AI/codeforge-unified/src/ai/schemas.ts",
+    "destination": "frontend/src/modules/coding/ai-schemas.ts",
+    "source_sha256": "865d06633c3c764d71a6b9d484bab0c135356ae176ae710292d7ca00eee90848"
+  }
+]

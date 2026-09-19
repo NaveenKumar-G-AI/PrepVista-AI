@@ -29,6 +29,10 @@ from app.routers.training import router as training_router
 from app.routers.assessments import router as assessments_router
 from app.routers.ai_health import router as ai_health_router
 from app.routers.communications import router as communications_router
+from app.routers.coding import router as coding_router
+from app.routers.journey import router as journey_router
+from app.routers.journey_assignments import router as journey_assignments_router
+from app.routers.artifact_reviews import router as artifact_reviews_router
 from app.services.user_activity import refresh_user_activity_stats
 
 
@@ -440,6 +444,10 @@ def create_app() -> FastAPI:
 
     # ── Routers ──────────────────────────────────
     app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+    app.include_router(coding_router, prefix="/coding", tags=["Coding"])
+    app.include_router(journey_router, prefix="/journey", tags=["Student Journey"])
+    app.include_router(journey_assignments_router, prefix="/journey", tags=["Institutional Practice Assignments"])
+    app.include_router(artifact_reviews_router, prefix="/artifact-reviews", tags=["Consented Artifact Feedback"])
     app.include_router(interviews.router, prefix="/interviews", tags=["Interviews"])
     app.include_router(reports.router, prefix="/reports", tags=["Reports"])
     app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])

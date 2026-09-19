@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const initDone = useRef(false);
   const userRef = useRef<User | null>(null);
   const refreshingRef = useRef(false);
+  const authEpochRef = useRef(0);
   const router = useRouter();
 
   // Derived auth state for pages that need granular checks
@@ -77,17 +78,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Prevent duplicate concurrent refresh calls
     if (refreshingRef.current) return;
     refreshingRef.current = true;
+    const epoch = authEpochRef.current;
     try {
       api.loadTokens();
-      if (!api.getToken()) {
+      if (!await api.ensureAccessToken()) {
         setUser(null);
         setLoading(false);
         return;
       }
       const data = await api.getMe<User>();
+      if (epoch !== authEpochRef.current || !api.getToken()) return;
       userRef.current = data;
       setUser(data);
     } catch {
+      if (epoch !== authEpochRef.current) return;
+      userRef.current = null;
       setUser(null);
       api.clearTokens();
     } finally {
@@ -136,6 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Silently update tokens without triggering any re-render
             api.setTokens(session.access_token, session.refresh_token || '');
           } else if (event === 'SIGNED_OUT') {
+            authEpochRef.current++;
+            userRef.current = null;
             api.clearTokens();
             setUser(null);
             setLoading(false);
@@ -150,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleAuthenticationRequired = () => {
+      authEpochRef.current++;
       userRef.current = null;
       setUser(null);
       setLoading(false);
@@ -187,37 +195,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     setLoading(true);
-    const data = await api.login(email, password);
-    if (data.user?.id && data.user?.email) {
-      setUser(buildMinimalUser(data.user.id, data.user.email));
-    }
-    // Fetch full role data before navigating
-    await refreshUser();
-    // Route to the correct workspace based on role (use ref to avoid second API call)
-    if (userRef.current?.is_org_admin) {
-      router.push('/org-admin');
-    } else if (userRef.current?.org_student) {
-      router.push('/student-dashboard');
-    } else {
-      router.push('/dashboard');
-    }
+    try {
+      const data = await api.login(email, password);
+      if (data.user?.id && data.user?.email) {
+        setUser(buildMinimalUser(data.user.id, data.user.email));
+      }
+      // Fetch full role data before navigating
+      await refreshUser();
+      // Route to the correct workspace based on role (use ref to avoid second API call)
+      if (userRef.current?.is_org_admin) {
+        router.push('/org-admin');
+      } else if (userRef.current?.org_student) {
+        router.push('/student-dashboard');
+      } else {
+        router.push('/dashboard');
+      }
+    } finally { setLoading(false); }
   };
 
   const signup = async (email: string, password: string, fullName: string, verificationCode: string) => {
     setLoading(true);
-    const data = await api.signup(email, password, fullName, verificationCode);
-    if (data.user?.id && data.user?.email) {
-      setUser(buildMinimalUser(data.user.id, data.user.email));
-    }
-    await refreshUser();
-    // Route to the correct workspace based on role (use ref to avoid second API call)
-    if (userRef.current?.is_org_admin) {
-      router.push('/org-admin');
-    } else if (userRef.current?.org_student) {
-      router.push('/student-dashboard');
-    } else {
-      router.push('/dashboard');
-    }
+    try {
+      const data = await api.signup(email, password, fullName, verificationCode);
+      if (data.user?.id && data.user?.email) {
+        setUser(buildMinimalUser(data.user.id, data.user.email));
+      }
+      await refreshUser();
+      // Route to the correct workspace based on role (use ref to avoid second API call)
+      if (userRef.current?.is_org_admin) {
+        router.push('/org-admin');
+      } else if (userRef.current?.org_student) {
+        router.push('/student-dashboard');
+      } else {
+        router.push('/dashboard');
+      }
+    } finally { setLoading(false); }
   };
 
   const loginWithGoogle = async () => {
@@ -235,8 +247,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    authEpochRef.current++;
+    userRef.current = null;
     api.logout();
-    try { getSupabase().auth.signOut(); } catch { /* ok */ }
+    try { void getSupabase().auth.signOut().catch(() => {}); } catch { /* ok */ }
     setUser(null);
     setLoading(false);
     router.push('/');

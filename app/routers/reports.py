@@ -20,7 +20,7 @@ from app.services.evaluator import (
     build_pro_readiness_summary,
     get_score_interpretation,
 )
-from app.services.interview_summary import compute_interview_summary
+from app.services.interview_summary import compute_interview_summary, coerce_runtime_state
 from app.routers.interviews_helpers import _validate_session_id
 
 router = APIRouter()
@@ -242,6 +242,7 @@ async def get_report(
             "average_answer_time_seconds": average_answer_time_seconds,
             "summary": summary,
         },
+        "evidence_report": coerce_runtime_state(session_data.get("runtime_state")).get("evidence_report_v2"),
         "evaluations": evaluations,
         "user_plan": user.plan,
         "has_premium_access": has_premium_access,

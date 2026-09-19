@@ -14,9 +14,15 @@ import { PlanSelector } from '@/components/plan-selector';
 import { BoltIcon, CrownIcon, FileIcon, InfoIcon, LockIcon, MicIcon, ShieldIcon, TargetIcon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useArtifact } from '@/modules/coding/artifact-view';
+import { MissionContext } from '@/modules/coding/mission-context';
 import { getLowLimitNotice, getStartInterviewHref, getUsageHeadline, hasRemainingUsage, isUnlimitedUsage } from '@/lib/plan-usage';
 
 export default function InterviewSetupPage() {
+  const { user } = useAuth();
+  return <InterviewSetupForm key={user?.id || 'guest'} />;
+}
+function InterviewSetupForm() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -26,6 +32,21 @@ export default function InterviewSetupPage() {
   const [dragActive, setDragActive] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [difficultyMode, setDifficultyMode] = useState('auto');
+  const [interviewMode, setInterviewMode] = useState('standard');
+  const [targetRole, setTargetRole] = useState('');
+  const [targetCompany, setTargetCompany] = useState('');
+  const [department, setDepartment] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState(18);
+  const [categories, setCategories] = useState<string[]>([]);
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const [artifactId, setArtifactId] = useState<string | null>(null);
+  const artifact = useArtifact(artifactId);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('artifact_id');
+    if (id) { setArtifactId(id); setInterviewMode('project_defense'); }
+  }, []);
 
   useEffect(() => {
     if (authLoading) {
@@ -69,6 +90,10 @@ export default function InterviewSetupPage() {
     if (!file || loading) {
       return;
     }
+    if (artifactId && !artifact?.data) {
+      setError('Load or remove the selected coding artifact before starting.');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -76,8 +101,19 @@ export default function InterviewSetupPage() {
     try {
       const formData = new FormData();
       formData.append('resume', file);
+      formData.append('expected_owner_id', user?.id || '');
       formData.append('plan', activePlan);
       formData.append('difficulty_mode', difficultyMode);
+      formData.append('interview_mode', interviewMode);
+      formData.append('target_role', targetRole);
+      formData.append('target_company', targetCompany);
+      formData.append('department', department);
+      formData.append('job_description', jobDescription);
+      formData.append('duration', String(durationMinutes * 60));
+      formData.append('categories', categories.join(','));
+      if (artifactId && artifact?.data) formData.append('coding_artifact_id', artifactId);
+      const missionId = new URLSearchParams(window.location.search).get('mission_id');
+      if (missionId) formData.append('mission_id', missionId);
 
       const result = await api.setupInterview<{
         session_id: string;
@@ -90,6 +126,7 @@ export default function InterviewSetupPage() {
         proctoring_mode: string;
       }>(formData);
 
+      if (!active.current) return;
       sessionStorage.setItem('pv_interview_session', JSON.stringify({
         session_id: result.session_id,
         access_token: result.access_token,
@@ -103,6 +140,7 @@ export default function InterviewSetupPage() {
 
       router.push(`/interview/${result.session_id}`);
     } catch (err) {
+      if (!active.current) return;
       const message = err instanceof Error ? err.message : 'Failed to start interview. Please try again.';
       if (message.includes('quota_exceeded')) {
         router.push('/pricing');
@@ -125,6 +163,7 @@ export default function InterviewSetupPage() {
   return (
     <div className="min-h-screen surface-primary">
       <AuthHeader backHref="/dashboard" backLabel="Back to main" />
+      <div className="mx-auto max-w-6xl px-6 pt-6"><MissionContext/></div>
 
       <div className="mx-auto max-w-3xl px-6 py-10">
         <div className="mb-8 text-center fade-in">
@@ -158,6 +197,7 @@ export default function InterviewSetupPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 slide-up">
+          {artifactId && <section className="card p-5 space-y-3"><h2 className="text-lg font-semibold">Coding artifact for this interview</h2><p role="status">{artifact?.error || (artifact?.data ? `${artifact.data.content.challenge_id} · ${artifact.data.content.language}` : 'Loading saved artifact...')}</p>{artifact?.data && <><p>The interviewer will use up to 6,000 characters of this saved code and 2,000 characters of your explanation. Browser checks remain practice observations.</p><details><summary>Preview saved code</summary><pre className="overflow-auto whitespace-pre-wrap text-sm">{artifact.data.content.code.slice(0, 6000)}</pre></details></>}<button type="button" className="underline" onClick={() => setArtifactId(null)}>Remove artifact from this interview</button></section>}
           <div
             className={`card cursor-pointer p-8 text-center transition-all interactive-card ${
               !hasRemaining
@@ -268,6 +308,43 @@ export default function InterviewSetupPage() {
               </div>
             </div>
           </div>
+
+          <section className="card p-4 sm:p-5 space-y-4" aria-labelledby="interview-focus-title">
+            <h2 id="interview-focus-title" className="font-semibold text-lg">Shape your interview</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm space-y-2">Interview mode
+                <select className="input w-full min-h-11" value={interviewMode} onChange={event => {
+                  const mode = event.target.value;
+                  setInterviewMode(mode);
+                  setDurationMinutes(mode === 'quick' ? 9 : ['full', 'campus'].includes(mode) ? 30 : mode === 'project_defense' ? 20 : 18);
+                }}>
+                  {Object.entries({ quick: 'Quick', standard: 'Standard', full: 'Full placement', hr: 'HR', technical_hr: 'Technical + HR', project_defense: 'Project defense', behavioral: 'Behavioral', company_role: 'Company / role', pressure: 'Pressure', campus: 'Campus simulation', custom: 'Custom' }).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                </select>
+              </label>
+              <label className="text-sm space-y-2">Duration in minutes
+                <input className="input w-full min-h-11" type="number" min={3} max={interviewMode === 'quick' ? 10 : ['full', 'campus'].includes(interviewMode) ? 35 : 30} value={durationMinutes} onChange={event => setDurationMinutes(Number(event.target.value))} />
+              </label>
+              <label className="text-sm space-y-2">Target role
+                <input className="input w-full min-h-11" maxLength={120} placeholder="e.g. Backend Engineer" value={targetRole} onChange={event => setTargetRole(event.target.value)} />
+              </label>
+              <label className="text-sm space-y-2">Department
+                <input className="input w-full min-h-11" maxLength={120} placeholder="e.g. CSE, IT, AI & DS, ECE" value={department} onChange={event => setDepartment(event.target.value)} />
+              </label>
+              <label className="text-sm space-y-2 sm:col-span-2">Company (optional)
+                <input className="input w-full min-h-11" maxLength={120} value={targetCompany} onChange={event => setTargetCompany(event.target.value)} />
+              </label>
+            </div>
+            <label className="block text-sm space-y-2">Job description (optional)
+              <textarea className="input w-full min-h-24" maxLength={8000} value={jobDescription} onChange={event => setJobDescription(event.target.value)} />
+            </label>
+            {interviewMode === 'custom' && <fieldset className="space-y-2"><legend className="text-sm font-medium">Areas to practise</legend>
+              <div className="flex flex-wrap gap-3">{['PROJECT', 'TECHNICAL_BACKGROUND', 'TEAMWORK', 'BEHAVIORAL', 'AI_USAGE', 'COMPANY_AND_ROLE', 'FAILURE_AND_MISTAKES', 'PRESSURE_AND_STRESS'].map(family => <label key={family} className="text-sm flex items-center gap-2 min-h-11">
+                <input type="checkbox" checked={categories.includes(family)} onChange={event => setCategories(old => event.target.checked ? [...old, family] : old.filter(f => f !== family))} />{family.toLowerCase().replaceAll('_', ' ')}
+              </label>)}</div>
+            </fieldset>}
+            <p className="text-sm text-secondary">Your plan&apos;s question allowance still applies. Shorter sessions cover fewer areas. Company context is supplied by you and is not independently verified.</p>
+            <p className="text-sm text-secondary">Your resume and interview transcript are saved with your session for feedback. Review <Link href="/privacy" className="underline">privacy details</Link> before starting.</p>
+          </section>
 
           {error ? (
             <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">

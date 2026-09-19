@@ -25,3 +25,34 @@ frontend/.env.local
 frontend/.env.*
 !frontend/.env.local.example
 frontend/tsconfig.tsbuildinfo
+
+# CodeForge Phase 0 quarantine: keep authored source/configuration reviewable,
+# but prevent imported vendor, generated, archived, database-copy, and runtime
+# artifacts from entering the PrepVista repository accidentally.
+CodeForge-AI/node_modules/
+CodeForge-AI/dist/
+CodeForge-AI/dist-production/
+CodeForge-AI/parts-archive/
+CodeForge-AI/db/
+CodeForge-AI/**/db/
+CodeForge-AI/coverage/
+CodeForge-AI/.cache/
+CodeForge-AI/.tmp/
+CodeForge-AI/tmp/
+CodeForge-AI/*.log
+CodeForge-AI/*.tsbuildinfo
+CodeForge-AI/frontend/node_modules/
+CodeForge-AI/frontend/.next/
+CodeForge-AI/frontend/out/
+CodeForge-AI/frontend/coverage/
+CodeForge-AI/frontend/.env*
+!CodeForge-AI/frontend/.env.example
+# Local integration test tooling data (never production records).
+tools/integration-db/node_modules/
+services/coding-runner/node_modules/
+tools/integration-db/clusters/
+.pytest-coding-db-*/
+
+# Local test runs and preserved failed fixture startup data.
+.pytest-unified-*/
+clusters/

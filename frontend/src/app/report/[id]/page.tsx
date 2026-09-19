@@ -13,6 +13,7 @@ import { BrandLogo } from '@/components/brand-logo';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { IntelDashboard } from './_intel/dashboard';
+import { InterviewEvidenceReport, type EvidenceReport } from '@/components/interview-evidence-report';
 
 interface Evaluation {
   turn_number: number;
@@ -103,6 +104,7 @@ interface InterviewSummary {
 }
 
 interface ReportData {
+  evidence_report?: EvidenceReport | null;
   session: {
     id: string;
     plan: string;
@@ -304,6 +306,7 @@ export default function ReportPage() {
       </nav>
 
       <div className="max-w-3xl mx-auto px-6 py-10">
+        {data.evidence_report && <InterviewEvidenceReport report={data.evidence_report} sessionId={sessionId} />}
         <div className="text-center mb-10 fade-in">
           <p className="text-sm text-secondary mb-2">
             {session.plan.toUpperCase()} Interview - {new Date(session.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -313,16 +316,16 @@ export default function ReportPage() {
             style={{ background: `${scoreColor}15`, border: `3px solid ${scoreColor}` }}
           >
             <span className="text-4xl font-bold" style={{ color: scoreColor }}>
-              {Math.round(session.final_score)}
+              {data.evidence_report?.numeric_evaluation_status === 'unavailable' ? '—' : Math.round(session.final_score)}
             </span>
           </div>
           <p className="text-sm text-secondary">
-            out of 100 - {answeredQuestions} answered out of {expectedQuestions} planned questions
+            {data.evidence_report?.numeric_evaluation_status === 'unavailable' ? 'Numeric evaluation unavailable. Your answer evidence is preserved above.' : `out of 100 - ${answeredQuestions} answered out of ${expectedQuestions} planned questions`}
           </p>
           <p className="mt-2 text-sm text-secondary">
             Total time: {durationLabel}{averageAnswerTime ? ` | Avg response: ${averageAnswerTime}s` : ''}
           </p>
-          {data.interpretation ? (
+          {data.interpretation && !data.evidence_report ? (
             <p className="mt-3 text-sm text-secondary max-w-xl mx-auto">{data.interpretation}</p>
           ) : null}
 
@@ -371,7 +374,7 @@ export default function ReportPage() {
           </section>
         ) : null}
 
-        {has_premium_access ? (
+        {has_premium_access && !data.evidence_report ? (
           <section className="mb-6 slide-up">
             <h2 className="text-lg font-semibold text-primary mb-1">Interview Intelligence</h2>
             <p className="text-sm text-secondary mb-4">Premium analytics derived from this session&apos;s per-question evaluator data.</p>

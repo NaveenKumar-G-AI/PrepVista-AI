@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "role_id": "GENERAL_SWE",
+  "version": "general-swe-review-candidate-v1",
+  "review_status": "DRAFT",
+  "rules": [
+    { "capability": "reasoning", "required": true, "minimum_demonstrations": 2, "minimum_task_families": 2, "freshness_days": 90, "accepted_measurements": ["reasoning-review-candidate-v1"], "accepted_authorities": ["QUALIFIED_RUBRIC_REVIEW"] },
+    { "capability": "correctness", "required": true, "minimum_demonstrations": 2, "minimum_task_families": 2, "freshness_days": 90, "accepted_measurements": ["dedupe-vectors-server-v1", "search-insert-server-v1"], "accepted_authorities": ["ISOLATED_SERVER_TEST"], "accepted_execution_languages": ["javascript"] },
+    { "capability": "debugging", "required": true, "minimum_demonstrations": 2, "minimum_task_families": 2, "freshness_days": 90, "accepted_measurements": ["debugging-review-candidate-v1"], "accepted_authorities": ["QUALIFIED_RUBRIC_REVIEW"] },
+    { "capability": "ownership", "required": true, "minimum_demonstrations": 2, "minimum_task_families": 2, "freshness_days": 90, "accepted_measurements": ["ownership-review-candidate-v1"], "accepted_authorities": ["QUALIFIED_RUBRIC_REVIEW"] },
+    { "capability": "communication", "required": true, "minimum_demonstrations": 2, "minimum_task_families": 2, "freshness_days": 90, "accepted_measurements": ["communication-review-candidate-v1"], "accepted_authorities": ["QUALIFIED_RUBRIC_REVIEW"] },
+    { "capability": "interview", "required": true, "minimum_demonstrations": 2, "minimum_task_families": 2, "freshness_days": 90, "accepted_measurements": ["interview-review-candidate-v1"], "accepted_authorities": ["QUALIFIED_RUBRIC_REVIEW"] }
+  ]
+}

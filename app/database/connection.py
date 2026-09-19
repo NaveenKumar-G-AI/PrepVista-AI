@@ -38,6 +38,7 @@ import structlog
 from pathlib import Path
 
 from app.config import get_settings
+from app.database.migration_control import migration_lock
 
 logger = structlog.get_logger("prepvista.db")
 
@@ -256,17 +257,17 @@ async def init_db_pool(
     *,
     max_attempts: int = DB_POOL_INIT_ATTEMPTS,
     log_failures: bool = True,
+    run_migrations: bool | None = None,
 ):
     """Initialize the connection pool on app startup.
 
     Protected by _POOL_INIT_LOCK — safe to call from multiple startup hooks
     or during testing where the event loop may trigger startup twice.
 
-    On success, also bootstraps the analytics pool via init_analytics_pool().
-    That call is best-effort and never raises — analytics availability must
-    never block or fail B2C application startup. If it fails, get_analytics_db()
-    / AnalyticsConnection will raise AnalyticsDatabaseNotReadyError until a
-    later successful initialization.
+    None follows DATABASE_MIGRATIONS_ON_STARTUP. Dedicated workers explicitly
+    pass False; maintenance callers may explicitly opt in. A candidate pool is
+    not exposed to request handlers until initialization and migrations succeed.
+    The analytics pool remains dormant.
     """
     global _pool
 
@@ -278,12 +279,14 @@ async def init_db_pool(
             return
 
         settings    = get_settings()
+        should_migrate = settings.DATABASE_MIGRATIONS_ON_STARTUP if run_migrations is None else run_migrations
         last_error: Exception | None = None
         total_attempts = max(1, int(max_attempts))
 
         for attempt in range(1, total_attempts + 1):
+            candidate_pool = None
             try:
-                _pool = await asyncpg.create_pool(
+                candidate_pool = await asyncpg.create_pool(
                     dsn=settings.DATABASE_URL,
                     min_size=settings.DB_POOL_MIN_SIZE,
                     max_size=settings.DB_POOL_MAX_SIZE,
@@ -292,15 +295,14 @@ async def init_db_pool(
                     max_inactive_connection_lifetime=DB_POOL_MAX_INACTIVE_LIFETIME,
                     statement_cache_size=DB_POOL_STATEMENT_CACHE_SIZE,
                 )
-                logger.info(
-                    "db_pool_initialized",
-                    min_size=settings.DB_POOL_MIN_SIZE,
-                    max_size=settings.DB_POOL_MAX_SIZE,
-                    attempt=attempt,
-                )
+                if should_migrate:
+                    async with candidate_pool.acquire() as conn:
+                        await _run_migrations(conn)
 
-                async with _pool.acquire() as conn:
-                    await _run_migrations(conn)
+                _pool = candidate_pool
+                logger.info("db_pool_initialized", min_size=settings.DB_POOL_MIN_SIZE,
+                            max_size=settings.DB_POOL_MAX_SIZE, attempt=attempt,
+                            startup_migrations=should_migrate)
 
                 # NOTE: the separate analytics pool is intentionally NOT initialized.
                 # Nothing in the app acquires from it (org/college analytics use the
@@ -312,6 +314,13 @@ async def init_db_pool(
                 # case a future analytics worker genuinely needs an isolated pool.
                 return
 
+            except asyncio.CancelledError:
+                if candidate_pool is not None:
+                    try:
+                        await asyncio.wait_for(candidate_pool.close(), timeout=5)
+                    except BaseException:
+                        candidate_pool.terminate()
+                raise
             except Exception as exc:
                 last_error = exc
                 if log_failures:
@@ -325,10 +334,11 @@ async def init_db_pool(
 
                 # Guard the close so that a secondary exception during cleanup
                 # does not swallow the original error that caused the failure.
-                if _pool is not None:
+                if candidate_pool is not None:
                     try:
-                        await _pool.close()
+                        await asyncio.wait_for(candidate_pool.close(), timeout=5)
                     except Exception as close_exc:
+                        candidate_pool.terminate()
                         logger.warning(
                             "db_pool_close_during_retry_failed",
                             error=_describe_db_error(close_exc),
@@ -591,6 +601,12 @@ class AnalyticsConnection:
 # ---------------------------------------------------------------------------
 
 async def _run_migrations(conn: asyncpg.Connection):
+    """Serialize legacy startup migrations on a direct/session-pinned connection."""
+    async with migration_lock(conn):
+        await _run_migrations_locked(conn)
+
+
+async def _run_migrations_locked(conn: asyncpg.Connection):
     """Run numbered SQL migration files in order.
 
     Tracks applied versions in the schema_migrations table so each file is

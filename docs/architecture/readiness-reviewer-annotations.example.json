@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "policy_sha256": "efd39b980f87169d86ed43b739345f6efdf6e3a579f974300be7e5e1cdb7716a",
+  "annotations": [
+    {
+      "case_id": "empty-profile-author-fixture",
+      "input_sha256": "7afbd68209f746d9262bae30b5761538f77f39f28c619e3f4f04f44bc139fdaf",
+      "reviewer_reference": "synthetic-example-a",
+      "rubric_reference": "synthetic-example-rubric-v1",
+      "rows": {
+        "communication": "NOT_MEASURED"
+      },
+      "overall": "MORE_EVIDENCE_NEEDED"
+    },
+    {
+      "case_id": "empty-profile-author-fixture",
+      "input_sha256": "7afbd68209f746d9262bae30b5761538f77f39f28c619e3f4f04f44bc139fdaf",
+      "reviewer_reference": "synthetic-example-b",
+      "rubric_reference": "synthetic-example-rubric-v1",
+      "rows": {
+        "communication": "NOT_MEASURED"
+      },
+      "overall": "MORE_EVIDENCE_NEEDED"
+    }
+  ]
+}

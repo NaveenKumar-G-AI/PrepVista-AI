@@ -22,10 +22,12 @@ from fastapi import APIRouter
 
 from app.routers.interviews_session import router as session_router
 from app.routers.interviews_answer import router as answer_router
+from app.routers.interview_practice import router as practice_router
 
 router = APIRouter()
 router.include_router(session_router)
 router.include_router(answer_router)
+router.include_router(practice_router)
 
 # ── Re-export: Helpers & Constants ───────────────────────────────────────────
 from app.routers.interviews_helpers import (  # noqa: F401

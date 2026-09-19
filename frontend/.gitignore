@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local verification artifacts
+/.npm-cache/
+/test-results/
+/playwright-report/
+/public/coding-assets/runner-v1.js
+/public/coding-assets/runner-v1.NOTICES.txt
+/public/coding-assets/runner-v1.manifest.json

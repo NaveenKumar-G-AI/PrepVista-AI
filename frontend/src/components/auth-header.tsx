@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { BrandLogo } from '@/components/brand-logo';
+import { CodingNavLink } from '@/modules/coding/access';
 
 import {
   ArrowLeftIcon,
@@ -259,6 +260,7 @@ export function AuthHeader({ backHref, backLabel = 'Back' }: AuthHeaderProps) {
               </NavLink>
             );
           })}
+          {!user?.is_org_admin && <CodingNavLink />}
         </div>
 
         <div className="flex items-center justify-end gap-2 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

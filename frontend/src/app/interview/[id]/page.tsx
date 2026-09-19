@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { normalizeCapturedAnswer as normalizeLiveTranscript } from '@/lib/interview-transcript';
 import { ServerSttSession, serverSttSupported } from '@/lib/serverStt';
 
 import styles from './page.module.css';
@@ -50,6 +51,7 @@ interface StoredSessionData {
 }
 
 interface ContinueResponse {
+  progress?: { primary_questions: number; target_primary_questions: number; phase: string; question_type: string };
   action: 'continue';
   text: string;
   turn: number;
@@ -173,36 +175,7 @@ const SPEECH_PRONUNCIATION_RULES: Array<[RegExp, string]> = [
   [/\bCI\/CD\b/g, 'C I C D'],
 ];
 
-const LIVE_TRANSCRIPT_RULES: Array<[RegExp, string]> = [
-  [/\breact js\b/gi, 'React.js'],
-  [/\breact j s\b/gi, 'React.js'],
-  [/\bnext js\b/gi, 'Next.js'],
-  [/\bnode js\b/gi, 'Node.js'],
-  [/\btype script\b/gi, 'TypeScript'],
-  [/\bjava script\b/gi, 'JavaScript'],
-  [/\bfast api\b/gi, 'FastAPI'],
-  [/\bsuper base\b/gi, 'Supabase'],
-  [/\bsupa base\b/gi, 'Supabase'],
-  [/\bpost gress\b/gi, 'PostgreSQL'],
-  [/\bmy sequel\b/gi, 'MySQL'],
-  [/\bmongo db\b/gi, 'MongoDB'],
-  [/\bpie torch\b/gi, 'PyTorch'],
-  [/\btensor flow\b/gi, 'TensorFlow'],
-  [/\bopen ai\b/gi, 'OpenAI'],
-  [/\bchat gpt\b/gi, 'ChatGPT'],
-  [/\blang chain\b/gi, 'LangChain'],
-  [/\bllama three\b/gi, 'LLaMA 3'],
-  [/\bllama 3\b/gi, 'LLaMA 3'],
-  [/\bgrow q\b/gi, 'Groq'],
-  [/\bgrow queue\b/gi, 'Groq'],
-  [/\brest api\b/gi, 'REST API'],
-  [/\bci cd\b/gi, 'CI/CD'],
-  [/\bc i c d\b/gi, 'CI/CD'],
-  [/\ba w s\b/gi, 'AWS'],
-  [/\bg c p\b/gi, 'GCP'],
-  [/\bgit hub\b/gi, 'GitHub'],
-  [/\bfull stack\b/gi, 'full-stack'],
-];
+
 
 const REPEAT_REQUEST_PATTERNS = [
   /\brepeat please\b/i,
@@ -394,37 +367,6 @@ function getTimestamp() {
   return Date.now();
 }
 
-let _normCacheInput = '';
-let _normCacheOutput = '';
-
-function normalizeLiveTranscript(rawText: string) {
-  if (!rawText) {
-    return '';
-  }
-  // 1-entry cache: skip redundant regex work on the speech-recognition hot path
-  if (rawText === _normCacheInput) {
-    return _normCacheOutput;
-  }
-
-  let normalized = rawText.replace(/[\r\n]+/g, ' ');
-  normalized = normalized.replace(/\b(uh+|um+|umm+|er+|ah+)\b/gi, ' ');
-  normalized = normalized.replace(/\b(i mean|you know|like)\b/gi, ' ');
-  normalized = normalized.replace(/\b(\w+)(\s+\1\b)+/gi, '$1');
-
-  for (const [pattern, replacement] of LIVE_TRANSCRIPT_RULES) {
-    normalized = normalized.replace(pattern, replacement);
-  }
-
-  normalized = normalized.replace(/\bi\b/g, 'I');
-  normalized = normalized.replace(/\s+([,.!?])/g, '$1');
-  normalized = normalized.replace(/([,.!?])(?=[^\s])/g, '$1 ');
-  normalized = normalized.replace(/\s+/g, ' ');
-  const result = normalized.trim();
-  _normCacheInput = rawText;
-  _normCacheOutput = result;
-  return result;
-}
-
 function normalizeSpeechForVoice(rawText: string) {
   if (!rawText) {
     return '';
@@ -545,6 +487,7 @@ export default function LiveInterviewPage() {
   const [pageError, setPageError] = useState('');
   const [preStartOpen, setPreStartOpen] = useState(true);
   const [currentTurn, setCurrentTurn] = useState(0);
+  const [coverageProgress, setCoverageProgress] = useState<ContinueResponse['progress']>();
   const [maxTurns, setMaxTurns] = useState(0);
   const [resultData, setResultData] = useState<CompletedResponse | null>(null);
   const [waveformBars] = useState<number[]>(LIVE_WAVEFORM_BARS);
@@ -569,9 +512,16 @@ export default function LiveInterviewPage() {
   const lastAnswerActivityAtRef = useRef(0);
   const lastAudioActivityAtRef = useRef(0);
   const globalSecondsRef = useRef(0);
+  const serverElapsedRef = useRef(0);
+  const v2EnabledRef = useRef(false);
+  const expirySubmittedRef = useRef(false);
   const isSubmittingRef = useRef(false);
   const submitRetryCountRef = useRef(0);
   const pendingSubmitKeyRef = useRef('');
+  const pendingAnswerRef = useRef<{ text: string; key: string; end: boolean; turn: number } | null>(null);
+  const flushingCaptureRef = useRef(false);
+  const currentTurnRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const terminationPendingRef = useRef(false);
   const startTimeRef = useRef(0);
   const currentTranscriptRef = useRef('');
@@ -752,6 +702,9 @@ export default function LiveInterviewPage() {
     }
 
     recognition.onend = null;
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognitionRef.current = null;
     try {
       recognition.stop();
     } catch {
@@ -766,6 +719,7 @@ export default function LiveInterviewPage() {
 
     stopRecognition();
     recognitionRef.current = null;
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
 
     if (typeof window !== 'undefined') {
       window.speechSynthesis?.cancel();
@@ -1108,7 +1062,7 @@ export default function LiveInterviewPage() {
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      if (uiStateRef.current !== 'USER_LISTENING') {
+      if (uiStateRef.current !== 'USER_LISTENING' && !flushingCaptureRef.current) {
         return;
       }
 
@@ -1177,7 +1131,8 @@ export default function LiveInterviewPage() {
       return;
     }
     const activeSession = sessionDataRef.current;
-    const token = activeSession?.access_token || '';
+    const token = api.getToken() || '';
+    if (!activeSession) return;
     if (!token || !STT_BACKEND_URL || !serverSttSupported()) {
       setPageError('Audio capture is not available in this browser. Please try Chrome, Firefox, Edge, or Safari.');
       setUiState('ERROR');
@@ -1188,10 +1143,10 @@ export default function LiveInterviewPage() {
       sessionId,
       token,
       backendUrl: STT_BACKEND_URL,
-      turnNumber: currentTurn || 0,
+      turnNumber: currentTurnRef.current,
       language: 'en-IN',
       onTranscript: (full) => {
-        if (uiStateRef.current !== 'USER_LISTENING') return;
+        if (serverSttRef.current !== session || (uiStateRef.current !== 'USER_LISTENING' && !flushingCaptureRef.current)) return;
         accumulatedTranscriptRef.current = full;
         currentTranscriptRef.current = normalizeLiveTranscript(full);
         setLiveTranscript(currentTranscriptRef.current ? `"${currentTranscriptRef.current}"` : '');
@@ -1202,7 +1157,7 @@ export default function LiveInterviewPage() {
       onStatus: (status) => {
         if (uiStateRef.current !== 'USER_LISTENING') return;
         if (status === 'listening') {
-          noteAnswerActivity(true, 'Listening...');
+          setStatusText('Listening...');
         }
       },
       onError: (message) => {
@@ -1213,6 +1168,7 @@ export default function LiveInterviewPage() {
     });
     serverSttRef.current = session;
     session.start().catch(() => {
+      if (serverSttRef.current !== session) return;
       setPageError('Could not access the microphone. Please allow mic access and reload.');
       setUiState('ERROR');
       serverSttRef.current = null;
@@ -1370,8 +1326,12 @@ export default function LiveInterviewPage() {
   }
 
   useEffect(() => {
+    terminationPendingRef.current = false;
     return () => {
       speechSequenceRef.current += 1;
+      terminationPendingRef.current = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      stopServerStt();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -1438,13 +1398,49 @@ export default function LiveInterviewPage() {
     }
   }
 
-  async function submitToBackend(text: string, requestKey = createSubmissionKey(), attempt = 0) {
-    const activeSession = sessionDataRef.current;
-    if (!activeSession || isSubmittingRef.current || uiStateRef.current === 'FINISHED' || uiStateRef.current === 'TERMINATED') {
-      return;
-    }
+  async function flushCapturedAnswer(): Promise<string> {
+    clearSilenceTimers();
+    flushingCaptureRef.current = true;
+    try {
+      const server = serverSttRef.current;
+      if (server) {
+        try {
+          const text = await server.stop();
+          currentTranscriptRef.current = normalizeLiveTranscript(text);
+        } finally { if (serverSttRef.current === server) serverSttRef.current = null; }
+      } else {
+        const recognition = recognitionRef.current;
+        if (recognition) {
+          await new Promise<void>(resolve => {
+            const done = () => { clearTimeout(timer); resolve(); };
+            const timer = setTimeout(done, 1500);
+            recognition.onend = done;
+            try { recognition.stop(); } catch { done(); }
+          });
+          stopRecognition();
+        }
+      }
+      return normalizeLiveTranscript(currentTranscriptRef.current.trim());
+    } finally { flushingCaptureRef.current = false; }
+  }
 
-    const normalizedText = text.startsWith('[') ? text : normalizeLiveTranscript(text);
+  async function submitToBackend(text: string, requestKey = createSubmissionKey(), attempt = 0, endInterview = false) {
+    const activeSession = sessionDataRef.current;
+    if (!activeSession || isSubmittingRef.current || terminationPendingRef.current || uiStateRef.current === 'FINISHED' || uiStateRef.current === 'TERMINATED') return;
+    isSubmittingRef.current = true;
+    let normalizedText = text.startsWith('[') ? text : normalizeLiveTranscript(text);
+    if (attempt === 0 && pendingAnswerRef.current) {
+      ({ text: normalizedText, key: requestKey, end: endInterview } = pendingAnswerRef.current);
+    } else if (attempt === 0 && uiStateRef.current === 'USER_LISTENING') {
+      setStatusText('Finishing audio capture...');
+      try { normalizedText = (await flushCapturedAnswer()) || normalizedText; }
+      catch (error) {
+        isSubmittingRef.current = false;
+        setPageError(error instanceof Error ? error.message : 'Audio capture failed. Please retry your answer.');
+        startListeningLoop('Please repeat your answer; transcription was interrupted.', false);
+        return;
+      }
+    }
 
     // --- Repeat-request intercept (before any state mutation) ---
     // If the student is asking to repeat or clarify the question, re-speak it
@@ -1455,8 +1451,10 @@ export default function LiveInterviewPage() {
       normalizedText &&
       !normalizedText.startsWith('[') &&
       attempt === 0 &&
+      !endInterview &&
       isRepeatRequest(normalizedText)
     ) {
+      isSubmittingRef.current = false;
       setLiveTranscript('');
       accumulatedTranscriptRef.current = '';
       currentTranscriptRef.current = '';
@@ -1474,9 +1472,12 @@ export default function LiveInterviewPage() {
 
     isSubmittingRef.current = true;
     pendingSubmitKeyRef.current = requestKey;
+    const isNewAnswer = !pendingAnswerRef.current;
+    pendingAnswerRef.current = { text: normalizedText, key: requestKey, end: endInterview, turn: pendingAnswerRef.current?.turn ?? currentTurnRef.current };
+    try { sessionStorage.setItem(`pv_pending_answer:${sessionId}`, JSON.stringify(pendingAnswerRef.current)); } catch { /* storage unavailable */ }
     transitionTo('SUBMITTING');
 
-    if (normalizedText && !normalizedText.startsWith('[') && attempt === 0 && !isRepeatRequest(normalizedText)) {
+    if (normalizedText && !normalizedText.startsWith('[') && attempt === 0 && isNewAnswer && !isRepeatRequest(normalizedText)) {
       appendTranscript('user', normalizedText);
     }
 
@@ -1492,13 +1493,21 @@ export default function LiveInterviewPage() {
         elapsedSeconds,
         requestKey,
         answerDurationSeconds,
+        endInterview,
+        pendingAnswerRef.current.turn,
       );
 
+      if (terminationPendingRef.current) return;
       isSubmittingRef.current = false;
       pendingSubmitKeyRef.current = '';
+      pendingAnswerRef.current = null;
+      sessionStorage.removeItem(`pv_pending_answer:${sessionId}`);
       submitRetryCountRef.current = 0;
 
       if (response.action === 'continue') {
+        setCoverageProgress(response.progress);
+        v2EnabledRef.current = Boolean(response.progress);
+        currentTurnRef.current = response.turn;
         setCurrentTurn(response.turn);
         setMaxTurns(response.max_turns);
         appendTranscript('ai', response.text);
@@ -1521,50 +1530,24 @@ export default function LiveInterviewPage() {
 
       const status = (error as Error & { status?: number }).status;
 
-      // Don't retry on client errors (4xx) — the request itself is wrong
-      const isClientError = status !== undefined && status >= 400 && status < 500;
-      // Don't retry on quota exceeded or auth errors
-      const isNonRetryable = status === 402 || status === 401 || status === 403;
-
-      if (isNonRetryable || isClientError) {
-        pendingSubmitKeyRef.current = '';
-        setStatusText(error instanceof Error ? error.message : 'Submission failed.');
-        setTimerMessage('');
-        transitionTo('USER_LISTENING');
-        return;
-      }
-
-      // Retry with exponential backoff + random jitter for network/server errors (5xx, timeout, fetch fail).
-      // Jitter (0–300 ms random offset) is critical under 500 concurrent users:
-      // without it, every client that hit the same transient error retries at
-      // exactly t+500 ms, creating a thundering-herd that re-overwhelms the
-      // recovering server.  With jitter, retries spread across a 800 ms window.
-      if (attempt < MAX_SUBMIT_RETRIES) {
-        submitRetryCountRef.current = attempt + 1;
-        // A stable request-key hash spreads concurrent clients across the retry
-        // window without introducing an impure random call in the component.
-        const jitter = Array.from(requestKey).reduce(
-          (hash, character) => ((hash * 31) + character.charCodeAt(0)) % 300,
-          attempt * 97,
-        );
-        const delay = SUBMIT_BASE_DELAY_MS * Math.pow(2, attempt) + jitter; // 500–800, 1000–1300, 2000–2300
+      const retryable = status === undefined || status === 408 || status === 429 || status >= 500;
+      if (retryable && attempt < MAX_SUBMIT_RETRIES) {
+        const delay = status === 429 ? 5000 : SUBMIT_BASE_DELAY_MS * Math.pow(2, attempt);
         setStatusText(`Network slow. Retrying your answer (${attempt + 1}/${MAX_SUBMIT_RETRIES})...`);
-        setTimerMessage('Holding your answer and retrying now...');
-        window.setTimeout(() => {
-          void submitToBackend(normalizedText, requestKey, attempt + 1);
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          void submitToBackend(normalizedText, requestKey, attempt + 1, endInterview);
         }, delay);
         return;
       }
-
-      // All retries exhausted — restore transcript so user doesn't lose their answer
-      pendingSubmitKeyRef.current = '';
-      setStatusText('Response delayed. Restoring your answer now...');
-      setTimerMessage(error instanceof Error ? error.message : 'Network error. Your answer is preserved.');
       transitionTo('USER_LISTENING');
-      currentTranscriptRef.current = normalizedText;
-      accumulatedTranscriptRef.current = normalizedText;
-      setLiveTranscript(normalizedText ? `"${normalizedText}"` : '');
-      resetSilenceTimer();
+      currentTranscriptRef.current = normalizedText.startsWith('[') ? '' : normalizedText;
+      accumulatedTranscriptRef.current = currentTranscriptRef.current;
+      setLiveTranscript(currentTranscriptRef.current);
+      setStatusText('Your answer is preserved.');
+      setTimerMessage(error instanceof Error ? error.message : 'Submission failed. Press Submit Answer to retry.');
+      // Keep the same request key and payload. Do not start a silence timer:
+      // the server may already have accepted this turn despite the lost response.
     }
   }
 
@@ -1626,7 +1609,12 @@ export default function LiveInterviewPage() {
         return;
       }
 
-      syncElapsedClock();
+      const elapsed = syncElapsedClock();
+      const duration = sessionDataRef.current?.duration_seconds;
+      if (v2EnabledRef.current && duration && elapsed >= duration && !expirySubmittedRef.current && !isSubmittingRef.current && !terminationPendingRef.current) {
+        expirySubmittedRef.current = true;
+        void submitToBackend(currentTranscriptRef.current || '[USER_REQUESTED_END]', createSubmissionKey(), 0, true);
+      }
     }, 1000);
   }
 
@@ -1666,7 +1654,7 @@ export default function LiveInterviewPage() {
       return;
     }
 
-    startTimeRef.current = getTimestamp();
+    startTimeRef.current = getTimestamp() - serverElapsedRef.current * 1000;
     terminationPendingRef.current = false;
     
     
@@ -1677,7 +1665,13 @@ export default function LiveInterviewPage() {
     runGlobalClock();
     setStartupLoading(false);
 
-    void submitToBackend('');
+    if (pendingAnswerRef.current) {
+      void submitToBackend(pendingAnswerRef.current.text);
+    } else if (currentTurnRef.current > 0 && lastQuestionRef.current) {
+      speak(lastQuestionRef.current);
+    } else {
+      void submitToBackend('');
+    }
   }
 
   useEffect(() => {
@@ -1715,12 +1709,34 @@ export default function LiveInterviewPage() {
         return;
       }
 
-      deferState(() => {
+      void api.request<{ state: string; turn: number; max_turns: number; elapsed_seconds?: number; progress?: ContinueResponse['progress']; messages: { role: string; content: string; turn_number: number }[] }>(
+        `/interviews/${sessionId}/state`, { retries: 0 },
+      ).then(state => {
+        if (state.state !== 'ACTIVE') { router.replace(`/report/${sessionId}`); return; }
+        sessionDataRef.current = parsed;
         setSessionData(parsed);
-        setMaxTurns(parsed.max_turns || 0);
-        globalSecondsRef.current = 0;
+        currentTurnRef.current = state.turn;
+        setCurrentTurn(state.turn);
+        setCoverageProgress(state.progress);
+        v2EnabledRef.current = Boolean(state.progress);
+        serverElapsedRef.current = state.elapsed_seconds || 0;
+        setMaxTurns(state.max_turns);
+        const messages = state.messages.filter(message => message.role === 'assistant' || message.role === 'user');
+        const lastQuestion = messages.filter(message => message.role === 'assistant').at(-1);
+        lastQuestionRef.current = lastQuestion?.content || '';
+        setTranscriptLog(messages.map((message, index) => ({ id: `restored-${index}`, role: message.role === 'assistant' ? 'ai' : 'user', text: message.content })));
+        try {
+          const pending = JSON.parse(sessionStorage.getItem(`pv_pending_answer:${sessionId}`) || 'null');
+          if (pending && typeof pending.text === 'string' && typeof pending.key === 'string' && typeof pending.end === 'boolean' && Number.isInteger(pending.turn)) pendingAnswerRef.current = pending;
+        } catch { /* Ignore corrupt local retry state. */ }
+        globalSecondsRef.current = state.elapsed_seconds || 0;
         setClockLabel('00:00');
         setTimerUrgent(false);
+        setBooting(false);
+      }).catch(error => {
+        setPageError(error instanceof Error ? error.message : 'Could not restore your interview. Please reload to retry.');
+        setPreStartOpen(false);
+        setUiState('ERROR');
         setBooting(false);
       });
     } catch {
@@ -1864,73 +1880,22 @@ export default function LiveInterviewPage() {
   }, [transcriptLog]);
 
   const handleManualSubmit = () => {
+    setPageError('');
     const spokenText = normalizeLiveTranscript(currentTranscriptRef.current.trim());
     setTimerMessage('Answer captured. Moving to the next question...');
     void submitToBackend(spokenText || '[NO_ANSWER_TIMEOUT]');
   };
 
   const handleEndInterview = () => {
+    if (isSubmittingRef.current) return;
     setEndInterviewOpen(true);
   };
 
   const handleConfirmEndInterview = async () => {
     setEndInterviewOpen(false);
-
-    // Instantly kill all audio/mic — no waiting
-    stopAllMedia();
-
-    const farewellName = getClosingName(sessionDataRef.current?.candidate_name, user?.full_name);
-    const farewellMessage = `Thank you ${farewellName}. It was great to interview you. Your report is being prepared now.`;
-
-    setStatusText('Interview ended.');
-    setTimerMessage('Generating your report...');
-    appendTranscript('ai', farewellMessage);
-
-    // Speak farewell immediately (non-blocking)
-    speak(farewellMessage, () => {});
-
-    // Fire backend termination in parallel — don't wait for speech
-    const activeSession = sessionDataRef.current;
-    if (!activeSession) {
-      router.push('/dashboard');
-      return;
-    }
-
-    try {
-      const elapsedSeconds = Math.floor((getTimestamp() - startTimeRef.current) / 1000);
-
-      // Submit any captured text as the final answer first
-      const capturedText = normalizeLiveTranscript(currentTranscriptRef.current.trim());
-      if (capturedText) {
-        appendTranscript('user', capturedText);
-      }
-
-      // Use the answer endpoint with [USER_REQUESTED_END] so the backend
-      // properly finishes the session and generates the report
-      const response = await api.submitAnswer<SubmitResponse>(
-        activeSession.session_id,
-        '[USER_REQUESTED_END]',
-        activeSession.access_token,
-        elapsedSeconds,
-        createSubmissionKey(),
-      );
-
-      if (response.action === 'finish' || response.action === 'terminated') {
-        // Cancel any ongoing speech and redirect immediately
-        if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
-        finishInterviewLocally(response as CompletedResponse);
-      } else {
-        // Fallback: force navigate to report
-        if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
-        clearStoredInterviewSession();
-        router.push(`/report/${activeSession.session_id}`);
-      }
-    } catch {
-      // Even if the API call fails, navigate away — the session is done
-      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
-      clearStoredInterviewSession();
-      router.push(`/report/${activeSession.session_id}`);
-    }
+    // Submit the actual final answer and the end flag in one request. Only
+    // navigate after the server confirms the report was successfully created.
+    await submitToBackend(currentTranscriptRef.current.trim() || '[USER_REQUESTED_END]', createSubmissionKey(), 0, true);
   };
 
   const showLoading = booting || authLoading;
@@ -2078,7 +2043,7 @@ export default function LiveInterviewPage() {
               </div>
 
               <p className={styles.statusText}>{statusText}</p>
-              {maxTurns > 0 ? <div className={styles.questionMeta}>Question {currentTurn || 0} of {maxTurns}</div> : null}
+              {coverageProgress ? <div className={styles.questionMeta} aria-live="polite">{coverageProgress.phase === 'CLOSING' ? 'Closing' : `Interview area ${coverageProgress.primary_questions} of ${coverageProgress.target_primary_questions}`}</div> : maxTurns > 0 ? <div className={styles.questionMeta}>Question {currentTurn || 0} of {maxTurns}</div> : null}
               <div ref={liveTranscriptDivRef} className={styles.liveTranscript}></div>
               <p className={styles.timerMessage}>{timerMessage}</p>
               

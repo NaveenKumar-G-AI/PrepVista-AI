@@ -155,6 +155,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/org-admin/offers', label: 'Offers', icon: CreditCardIcon },
   { href: '/org-admin/access-control', label: 'Access Control', icon: KeyIcon },
   { href: '/org-admin/reports', label: 'Reports', icon: DownloadIcon },
+  { href: '/org-admin/readiness', label: 'Practice summary (pilot)', icon: ChartIcon },
+  { href: '/org-admin/assignments', label: 'Assignments (pilot)', icon: TargetIcon },
   { href: '/org-admin/billing', label: 'Billing', icon: CreditCardIcon },
   { href: '/org-admin/profile', label: 'Profile', icon: SettingsIcon },
 ];

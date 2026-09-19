@@ -68,6 +68,9 @@ async def submit_answer(
     settings = get_settings()
     max_answer_length = getattr(settings, "MAX_ANSWER_TEXT_LENGTH", 3000)
 
+    if len(req.user_text) > max_answer_length:
+        raise HTTPException(status_code=413, detail=f"Your answer exceeds {max_answer_length} characters. Please shorten it and retry.")
+
     # --- Pre-validate and normalize the answer text ---
     normalized_text, pre_validation_warning = _pre_validate_answer(
         req.user_text, max_answer_length
@@ -87,26 +90,19 @@ async def submit_answer(
     if normalized_text:
         _check_prompt_injection(normalized_text, source="answer_text", session_context=session_id)
 
-    # --- Fast path: idempotent cache check ---
-    cached = await _get_cached_client_response(
-        session_id=session_id,
-        access_token=req.access_token,
-        client_request_id=req.client_request_id,
-    )
-    if cached:
-        logger.debug("idempotent_cache_hit", session_id=session_id,
-                     client_request_id=req.client_request_id)
-        return cached
-
     # --- Core answer processing ---
     result = await process_answer(
         session_id=session_id,
         user_text=normalized_text,
         access_token=req.access_token,
+        client_request_id=req.client_request_id,
+        expected_turn=req.expected_turn,
+        end_interview=req.end_interview,
+        user_id=user.id,
     )
 
     if result.get("action") == "error":
-        raise HTTPException(status_code=400, detail=result.get("detail", "Answer processing failed."))
+        raise HTTPException(status_code=result.get("status", 400), detail=result.get("detail", "Answer processing failed."))
 
     question_for_eval = result.get("question_for_eval")
     turn_for_eval     = result.get("turn_for_eval")
@@ -252,7 +248,7 @@ async def _evaluate_and_store(
                 return  # Already evaluated — skip
 
             session = await conn.fetchrow(
-                "SELECT plan, resume_summary, question_plan FROM interview_sessions WHERE id = $1",
+                "SELECT plan, resume_summary, question_plan, runtime_state FROM interview_sessions WHERE id = $1",
                 session_id,
             )
             if not session:
@@ -261,6 +257,7 @@ async def _evaluate_and_store(
 
         # ---- Derive rubric category (no DB connection) --------------------
         plan = _normalize_plan(session["plan"])
+        v2 = bool(_safe_json_loads(session["runtime_state"], {}).get("orchestrator_v2"))
         resume_summary = session["resume_summary"] or "{}"
         question_plan = _safe_json_loads(session["question_plan"], [])
         if not isinstance(question_plan, list):
@@ -289,8 +286,9 @@ async def _evaluate_and_store(
                 plan=plan,
                 session_id=session_id,
                 turn_id=turn_number,
+                **({"strict_evidence": True} if v2 else {}),
             )
-        if not isinstance(eval_result, dict):
+        if not isinstance(eval_result, dict) or eval_result.get("evaluation_status") == "unavailable":
             logger.warning(
                 "invalid_eval_result_type",
                 session_id=session_id,
@@ -300,7 +298,13 @@ async def _evaluate_and_store(
             return
 
         # ---- Phase 3: write (new connection, double-insert guard) ---------
-        async with DatabaseConnection() as conn:
+        async with DatabaseConnection() as conn, conn.transaction():
+            if v2:
+                state = await conn.fetchval(
+                    "SELECT state FROM interview_sessions WHERE id = $1 FOR NO KEY UPDATE", session_id,
+                )
+                if state != "ACTIVE":
+                    return  # The completed report is an immutable snapshot.
             existing = await conn.fetchrow(
                 "SELECT id FROM question_evaluations WHERE session_id = $1 AND turn_number = $2",
                 session_id,

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import math
 from collections import defaultdict
 
 import structlog
@@ -181,6 +182,7 @@ async def evaluate_single_question(
     *,
     session_id: object = None,
     turn_id: object = None,
+    strict_evidence: bool = False,
 ) -> dict:
     """
     Evaluate a single question-answer pair using the rubric system.
@@ -209,6 +211,7 @@ async def evaluate_single_question(
         resume_summary=resume_summary,
         rubric_category=rubric_category,
         plan=plan,
+        strict_evidence=strict_evidence,
     )
     if isinstance(result, dict):
         # Preserve the TRUE raw transcript and surface the repaired one so the
@@ -216,7 +219,19 @@ async def evaluate_single_question(
         # the repaired text inside the core.
         result.setdefault("raw_answer", raw_answer)
         result["repaired_answer"] = repaired_answer
+        if strict_evidence:
+            result["ideal_answer"] = "Use only your actual facts: context, personal action, reasoning, result and learning. Add missing evidence before rewriting."
     return result
+
+
+def _validate_evidence_scores(result: dict, plan: str) -> None:
+    fields = ["specificity_score", "structure_score", "communication_score"]
+    fields += ["question_match_score", "technical_accuracy_score"] if plan == "pro" else ["relevance_score", "depth_score" if plan == "career" else "clarity_score"]
+    if not isinstance(result, dict) or any(
+        not isinstance(result.get(key), (int, float)) or isinstance(result.get(key), bool)
+        or not math.isfinite(result[key]) or not 0 <= result[key] <= 2 for key in fields
+    ):
+        raise ValueError("Incomplete or invalid evaluator score contract")
 
 
 async def _evaluate_question_core(
@@ -226,6 +241,7 @@ async def _evaluate_question_core(
     resume_summary: str,
     rubric_category: str,
     plan: str,
+    strict_evidence: bool = False,
 ) -> dict:
     """
     Core rubric evaluation. ``repaired_answer`` is the transcript-repaired text
@@ -323,6 +339,8 @@ async def _evaluate_question_core(
                 retry_delay=0.12,
                 allow_provider_fallback=False,
             )
+            if strict_evidence:
+                _validate_evidence_scores(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_free_result(
                     raw_answer=raw_answer,
@@ -340,6 +358,8 @@ async def _evaluate_question_core(
             )
         except Exception as exc:
             logger.warning("free_question_evaluation_failed", error=str(exc), question=question_text[:100])
+            if strict_evidence:
+                return {"evaluation_status": "unavailable"}
             return _fallback_free_evaluation(
                 question_text=question_text,
                 raw_answer=raw_answer,
@@ -367,6 +387,8 @@ async def _evaluate_question_core(
                 retry_delay=0.12,
                 allow_provider_fallback=False,
             )
+            if strict_evidence:
+                _validate_evidence_scores(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_pro_result(
                     raw_answer=raw_answer,
@@ -384,6 +406,8 @@ async def _evaluate_question_core(
             )
         except Exception as exc:
             logger.warning("pro_question_evaluation_failed", error=str(exc), question=question_text[:100])
+            if strict_evidence:
+                return {"evaluation_status": "unavailable"}
             return _fallback_pro_evaluation(
                 question_text=question_text,
                 raw_answer=raw_answer,
@@ -411,6 +435,8 @@ async def _evaluate_question_core(
                 retry_delay=0.12,
                 allow_provider_fallback=True,
             )
+            if strict_evidence:
+                _validate_evidence_scores(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_career_result(
                     raw_answer=raw_answer,
@@ -428,6 +454,8 @@ async def _evaluate_question_core(
             )
         except Exception as exc:
             logger.warning("career_question_evaluation_failed", error=str(exc), question=question_text[:100])
+            if strict_evidence:
+                return {"evaluation_status": "unavailable"}
             return _fallback_career_evaluation(
                 question_text=question_text,
                 raw_answer=raw_answer,

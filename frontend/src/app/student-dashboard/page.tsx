@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 
 import { BoltIcon, HistoryIcon, PlayIcon, SparklesIcon, TargetIcon } from '@/components/icons';
 import { StudentSideRail } from '@/components/student-side-rail';
+import { JourneyView } from '@/modules/coding/journey';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { hasRemainingUsage, isUnlimitedUsage, PlanUsage } from '@/lib/plan-usage';
@@ -150,6 +151,7 @@ export default function StudentDashboardPage() {
       />
 
       <div className="space-y-6">
+        <JourneyView compact />
         {error ? (
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-300">
             {error}

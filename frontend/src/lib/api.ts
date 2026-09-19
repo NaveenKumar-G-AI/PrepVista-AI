@@ -23,7 +23,7 @@ if (_isProductionBuild) {
     );
   }
 }
-const API_URL = _rawApiUrl || 'http://localhost:8000';
+const API_URL = (_rawApiUrl || 'http://localhost:8000').replace(/\/$/, '');
 export const AUTH_REQUIRED_EVENT = 'prepvista:auth-required';
 
 function notifyAuthenticationRequired(): boolean {
@@ -307,6 +307,9 @@ class ApiClient {
   private token: string | null = null;
   private refreshToken: string | null = null;
   private refreshInFlight: Promise<boolean> | null = null;
+  private authGeneration = 0;
+  private cacheGeneration = 0;
+  private storageListenerInstalled = false;
   private cache = new Map<string, CacheEntry>();
   // ✅ FIXED: Promise<any> → Promise<unknown>. 'any' was leaking implicit type unsafety
   // through the entire cache and deduplication layer into every caller.
@@ -320,6 +323,7 @@ class ApiClient {
    * @param options  Standard request options (method is always GET)
    */
   async cachedRequest<T = unknown>(path: string, staleMs = 30_000, options: ApiOptions = {}): Promise<T> {
+    const generation = this.cacheGeneration;
     const entry = this.cache.get(path) as CacheEntry<T> | undefined;
     const now = Date.now();
 
@@ -336,9 +340,9 @@ class ApiClient {
       // never checked, so background revalidations could accumulate without bound.
       if (!this.inFlightRequests.has(path) && this.inFlightRequests.size < ApiClient.MAX_INFLIGHT) {
         const promise = this.request<T>(path, options)
-          .then(fresh => { this.cache.set(path, { data: fresh, timestamp: Date.now(), lastAccessed: Date.now() }); })
+          .then(fresh => { if (generation === this.cacheGeneration) this.cache.set(path, { data: fresh, timestamp: Date.now(), lastAccessed: Date.now() }); return fresh; })
           .catch(() => { /* background revalidation failed, keep stale */ })
-          .finally(() => { this.inFlightRequests.delete(path); });
+          .finally(() => { if (this.inFlightRequests.get(path) === promise) this.inFlightRequests.delete(path); });
         this.inFlightRequests.set(path, promise);
       }
       return entry.data;
@@ -351,7 +355,7 @@ class ApiClient {
 
     const promise = this.request<T>(path, options)
       .then(data => {
-        this.cache.set(path, { data, timestamp: Date.now(), lastAccessed: Date.now() });
+        if (generation === this.cacheGeneration) this.cache.set(path, { data, timestamp: Date.now(), lastAccessed: Date.now() });
         if (this.cache.size > ApiClient.MAX_CACHE_ENTRIES) {
           // ✅ PERF: LRU eviction — find and remove the least-recently-accessed entry.
           // Previously used Map.keys().next().value which evicted the oldest-INSERTED
@@ -370,7 +374,7 @@ class ApiClient {
         return data;
       })
       .finally(() => {
-        this.inFlightRequests.delete(path);
+        if (this.inFlightRequests.get(path) === promise) this.inFlightRequests.delete(path);
       });
     
     this.inFlightRequests.set(path, promise);
@@ -379,6 +383,8 @@ class ApiClient {
 
   /** Invalidate cache entries matching a prefix (e.g., '/dashboard') */
   invalidateCache(pathPrefix?: string) {
+    this.cacheGeneration++;
+    this.inFlightRequests.clear();
     if (!pathPrefix) {
       this.cache.clear();
       return;
@@ -391,6 +397,7 @@ class ApiClient {
   }
 
   setTokens(access: string, refresh: string) {
+    if (access !== this.token) { this.authGeneration++; this.invalidateCache(); }
     this.token = access;
     this.refreshToken = refresh;
     if (typeof window !== 'undefined') {
@@ -430,12 +437,12 @@ class ApiClient {
       // The 'storage' event fires in all OTHER tabs when localStorage changes,
       // so we detect token removal and clear in-memory state immediately.
       // This closes the "forgot to close tabs" session hijack window.
+      if (this.storageListenerInstalled) return;
+      this.storageListenerInstalled = true;
       window.addEventListener('storage', (event: StorageEvent) => {
         if (event.key === 'pv_refresh_token' && event.newValue === null) {
           // Another tab cleared the refresh token — treat as logout
-          this.token = null;
-          this.refreshToken = null;
-          this.cache.clear();
+          this.clearTokens();
           // Navigate to login if on a protected page
           notifyAuthenticationRequired();
         }
@@ -444,12 +451,22 @@ class ApiClient {
   }
 
   clearTokens() {
+    this.authGeneration++;
+    this.invalidateCache();
     this.token = null;
     this.refreshToken = null;
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pv_access_token');
       localStorage.removeItem('pv_refresh_token');
       sessionStorage.removeItem('pv_refresh_token'); // legacy cleanup
+      // Coding drafts are tab-local recovery data, never guest imports. Clear
+      // only this namespace on logout/identity expiry, retaining other settings.
+      try {
+        for (let index = sessionStorage.length - 1; index >= 0; index--) {
+          const key = sessionStorage.key(index);
+          if (key?.startsWith('pv_coding_draft_v1:') || key?.startsWith('pv_coding_workspace_v1:')) sessionStorage.removeItem(key);
+        }
+      } catch { /* Storage may be unavailable; credential invalidation still wins. */ }
     }
   }
 
@@ -464,10 +481,16 @@ class ApiClient {
     return this.token;
   }
 
+  async ensureAccessToken(): Promise<string | null> {
+    if (!this.getToken() && this.refreshToken) await this.tryRefresh();
+    return this.getToken();
+  }
+
   async request<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
-    const { method = 'GET', body, headers = {}, isFormData = false, retries = 1, timeoutMs = 30000 } = options;
+    const { method = 'GET', body, headers = {}, isFormData = false, retries = method === 'GET' ? 1 : 0, timeoutMs = 30000 } = options;
 
     const requestHeaders: Record<string, string> = { ...headers };
+    if (!this.getToken() && this.refreshToken) await this.tryRefresh();
     const currentToken = this.getToken();
     // ✅ SEC: Validate JWT shape before injecting into Authorization header.
     // Prevents XSS-written arbitrary strings from becoming header injection vectors.
@@ -516,19 +539,13 @@ class ApiClient {
             if (!retryResp.ok) {
               if (retryResp.status === 401) {
                 this.clearTokens();
-                if (notifyAuthenticationRequired()) {
-                  // ✅ FIXED: return early after redirect — previously both the redirect
-                  // AND throw parseError fired, causing a redundant async parseError call
-                  // after navigation had already started. Confusing for future engineers.
-                  return undefined as unknown as T;
-                }
+                notifyAuthenticationRequired();
               }
               throw await this.parseError(retryResp);
             }
-            if (timeoutHandle !== null) {
-              globalThis.clearTimeout(timeoutHandle);
-            }
-            return retryResp.json() as Promise<T>;
+            const data = retryResp.status === 204 ? undefined as T : await retryResp.json() as T;
+            if (timeoutHandle !== null) globalThis.clearTimeout(timeoutHandle);
+            return data;
           }
         }
 
@@ -542,10 +559,9 @@ class ApiClient {
           throw await this.parseError(response);
         }
 
-        if (timeoutHandle !== null) {
-          globalThis.clearTimeout(timeoutHandle);
-        }
-        return response.json() as Promise<T>;
+        const data = response.status === 204 ? undefined as T : await response.json() as T;
+        if (timeoutHandle !== null) globalThis.clearTimeout(timeoutHandle);
+        return data;
       } catch (err) {
         if (timeoutHandle !== null) {
           globalThis.clearTimeout(timeoutHandle);
@@ -554,7 +570,9 @@ class ApiClient {
         if (lastError.name === 'AbortError') {
           lastError = new Error('Request timed out. Please try again.');
         }
-        if (attempt < retries && method === 'GET') {
+        const status = (lastError as Error & { status?: number }).status;
+        if (status !== undefined && status < 500 && status !== 408 && status !== 429) break;
+        if (attempt < retries) {
           // ✅ PERF: Jittered backoff — pure linear backoff (1000ms × attempt) causes
           // thundering herd: all 500 concurrent failures retry at the exact same ms.
           // Full-jitter formula: random delay in [0, base * 2^attempt] spreads the
@@ -584,14 +602,20 @@ class ApiClient {
   }
 
   private async _doRefresh(): Promise<boolean> {
+    const generation = this.authGeneration;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const resp = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: this.refreshToken }),
+        signal: controller.signal,
+        cache: 'no-store',
       });
       if (resp.ok) {
         const data = await resp.json() as AuthTokensResponse;
+        if (generation !== this.authGeneration) return false;
         this.setTokens(data.access_token, data.refresh_token);
         return true;
       }
@@ -603,8 +627,8 @@ class ApiClient {
       if (typeof console !== 'undefined') {
         console.warn('[ApiClient] Token refresh network error:', err instanceof Error ? err.message : String(err));
       }
-    }
-    this.clearTokens();
+    } finally { clearTimeout(timer); }
+    if (generation === this.authGeneration) this.clearTokens();
     return false;
   }
 
@@ -939,6 +963,8 @@ class ApiClient {
     durationActual?: number,
     clientRequestId?: string,
     answerDurationSeconds?: number,
+    endInterview = false,
+    expectedTurn?: number,
   ) {
     return this.request<T>(`/interviews/${sessionId}/answer`, {
       method: 'POST',
@@ -948,12 +974,14 @@ class ApiClient {
         duration_actual: durationActual,
         client_request_id: clientRequestId,
         answer_duration_seconds: answerDurationSeconds,
+        end_interview: endInterview,
+        expected_turn: expectedTurn,
       },
       // ✅ PERF: retries 0→1. A single network blip previously lost the answer
       // permanently. One retry with jittered backoff recovers from transient errors
       // without meaningfully delaying the interview flow for the student.
-      retries: 1,
-      timeoutMs: 20000,
+      retries: 0, // The interview UI owns retries with a stable idempotency key.
+      timeoutMs: 90000,
     });
   }
   async finishInterview<T = unknown>(sessionId: string, accessToken: string, durationActual?: number) {

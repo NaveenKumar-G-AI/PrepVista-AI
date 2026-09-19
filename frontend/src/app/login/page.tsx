@@ -65,7 +65,7 @@ function LoginForm() {
   useEffect(() => {
     if (queryError === 'google_failed') {
       const detail = queryErrorDescription
-        ? decodeURIComponent(queryErrorDescription)
+        ? queryErrorDescription
         : 'Google sign-in could not be completed. Please try again.';
       setError(detail);
       return;

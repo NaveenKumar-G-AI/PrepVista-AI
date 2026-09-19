@@ -34,6 +34,33 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "PrepVista"
     APP_VERSION: str = "1.0.0"
+    INTERVIEW_ORCHESTRATOR_V2: bool = True
+    # Internal coding practice pilot. Both switches are required; no implicit
+    # admin, paid-plan or organization access, and no interview credit usage.
+    CODING_WORKSPACE_ENABLED: bool = False
+    CODING_PILOT_PROFILE_IDS: str = ""
+    CODING_SERVER_SYNC_ENABLED: bool = False
+    CODING_GUEST_IMPORT_ENABLED: bool = False
+    CODING_AI_ENABLED: bool = False
+    CODING_AI_PROVIDER: str = Field(default="groq", min_length=1, max_length=40)
+    CODING_AI_MODEL: str = Field(default="llama-3.1-8b-instant", min_length=1, max_length=100)
+    CODING_AI_DAILY_LIMIT: int = Field(default=10, ge=1, le=100)
+    CODING_AI_GLOBAL_DAILY_LIMIT: int = Field(default=1000, ge=1, le=100000)
+    CODING_AI_GLOBAL_CONCURRENCY: int = Field(default=10, ge=1, le=100)
+    UNIFIED_READINESS_VISIBLE: bool = False
+    UNIFIED_EVIDENCE_ENABLED: bool = False
+    UNIFIED_TPO_VISIBLE: bool = False
+    UNIFIED_ASSIGNMENTS_ENABLED: bool = False
+    ARTIFACT_REVIEW_ENABLED: bool = False
+    ARTIFACT_REVIEWER_PROFILE_IDS: str = ''
+    CODING_TRUSTED_VALIDATION_ENABLED: bool = False
+    CODING_RUNNER_URL: str = ''
+    CODING_RUNNER_TOKEN: str = ''
+    CODING_RUNNER_IMAGE: str = ''
+    CODING_RUNNER_QUALIFICATION_ID: str = ''
+    CODING_VALIDATION_DAILY_LIMIT: int = Field(default=5, ge=1, le=100)
+    CODING_VALIDATION_GLOBAL_DAILY_LIMIT: int = Field(default=100, ge=1, le=10000)
+    CODING_VALIDATION_GLOBAL_CONCURRENCY: int = Field(default=2, ge=1, le=10)
     # Use an application-specific environment name. Generic DEBUG is commonly
     # injected by shells/build platforms with values such as "release", which
     # are not booleans and previously prevented the service from importing.
@@ -75,6 +102,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str = Field(..., description="Supabase service role key (server-only)")
     SUPABASE_JWT_SECRET: str = Field(..., description="JWT secret for verifying tokens")
     DATABASE_URL: str = Field(..., description="PostgreSQL connection string")
+    DATABASE_MIGRATIONS_ON_STARTUP: bool = Field(default=True, description="Legacy compatibility default. Set false for a release with separately reviewed/applied schema migrations.")
 
     # Razorpay
     RAZORPAY_KEY_ID: str = Field(default="", description="Razorpay Key ID")
@@ -106,6 +134,7 @@ class Settings(BaseSettings):
 
     # LLM Providers
     GROQ_API_KEY: str = Field(default="", description="Groq API key")
+    GEMINI_API_KEY: str = Field(default="", description="Gemini API key (server only)")
     GROQ_MODEL: str = "llama-3.1-8b-instant"
     GROQ_EVAL_MODEL: str = "llama-3.3-70b-versatile"
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API key (fallback)")

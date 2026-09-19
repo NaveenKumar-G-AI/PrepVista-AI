@@ -60,6 +60,8 @@ def _planned_turn_limit(plan: str, question_plan) -> int:
     normalized_plan = (plan or "free").lower().strip()
     planned_items = _coerce_question_plan(question_plan)
     if planned_items:
+        if planned_items[0].get("max_questions"):
+            return int(planned_items[0]["max_questions"])
         return len(planned_items)
     cfg = PLAN_CONFIG.get(normalized_plan, PLAN_CONFIG["free"])
     return int(cfg.get("max_turns") or 0)

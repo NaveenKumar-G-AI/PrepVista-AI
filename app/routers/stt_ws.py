@@ -31,6 +31,8 @@ worker. No cross-worker state here.
 
 from __future__ import annotations
 
+import re
+
 import structlog
 from fastapi import (
     APIRouter,
@@ -157,9 +159,16 @@ async def stt_websocket(websocket: WebSocket, session_id: str):
                 await websocket.send_json({"type": "error", "message": "Invalid control frame."})
                 continue
 
+            if not isinstance(control, dict):
+                await websocket.send_json({"type": "error", "turn_id": current_turn, "message": "Invalid control frame."})
+                continue
             ctype = control.get("type")
             if ctype == "turn_start":
-                _reset_turn(control.get("turn_id", 0))
+                turn_id = str(control.get("turn_id", "0"))
+                if not re.fullmatch(r"[0-9]{1,4}(?:-[0-9]{1,4})?", turn_id):
+                    await websocket.send_json({"type": "error", "turn_id": turn_id[:32], "message": "Invalid audio turn."})
+                    continue
+                _reset_turn(turn_id)
                 resume_context = control.get("resume_context") or resume_context
                 await websocket.send_json({"type": "turn_started", "turn_id": current_turn})
 
@@ -179,7 +188,7 @@ async def stt_websocket(websocket: WebSocket, session_id: str):
         logger.warning("stt_ws_error", error=str(exc), session_id=session_id)
         try:
             await websocket.send_json(
-                {"type": "error", "message": "Could not process audio, please try again."}
+                {"type": "error", "turn_id": current_turn, "message": "Could not process audio, please try again."}
             )
         except Exception:
             pass
@@ -196,7 +205,7 @@ async def _finalize_turn(
     full_audio = b"".join(buffer)
     if not full_audio:
         await websocket.send_json(
-            {"type": "error", "message": "Could not process audio, please try again."}
+            {"type": "error", "turn_id": turn_id, "message": "Could not process audio, please try again."}
         )
         return
 
@@ -210,7 +219,7 @@ async def _finalize_turn(
 
     if result["provider"] == "none":
         await websocket.send_json(
-            {"type": "error", "message": "Could not process audio, please try again."}
+            {"type": "error", "turn_id": turn_id, "message": "Could not process audio, please try again."}
         )
         return
 
@@ -224,7 +233,7 @@ async def _finalize_turn(
         {
             "type": "final",
             "turn_id": turn_id,
-            "final_transcript": result["transcript"],
+            "final_transcript": result["raw_transcript"],
             "raw_transcript": result["raw_transcript"],
             "confidence": result["confidence"],
             "audio_id": result["audio_id"],
@@ -251,6 +260,10 @@ async def stt_transcribe_rest(
     if not settings.STT_SERVER_ENABLED:
         raise HTTPException(status_code=503, detail="Server-side STT is not enabled.")
 
+    from app.routers.interviews_helpers import _validate_session_id
+    _validate_session_id(session_id)
+    if not re.fullmatch(r"[0-9]{1,4}(?:-[0-9]{1,4})?", turn_id):
+        raise HTTPException(status_code=422, detail="Invalid audio turn.")
     async with DatabaseConnection() as conn:
         row = await conn.fetchrow(
             "SELECT user_id FROM interview_sessions WHERE id = $1", session_id
@@ -258,7 +271,7 @@ async def stt_transcribe_rest(
     if not row or str(row["user_id"]) != str(user.id):
         raise HTTPException(status_code=404, detail="Interview session not found.")
 
-    audio_bytes = await audio.read()
+    audio_bytes = await audio.read(_MAX_TURN_BYTES + 1)
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Empty audio upload.")
     if len(audio_bytes) > _MAX_TURN_BYTES:
@@ -281,7 +294,7 @@ async def stt_transcribe_rest(
     )
 
     return {
-        "final_transcript": result["transcript"],
+        "final_transcript": result["raw_transcript"],
         "raw_transcript": result["raw_transcript"],
         "confidence": result["confidence"],
         "audio_id": result["audio_id"],

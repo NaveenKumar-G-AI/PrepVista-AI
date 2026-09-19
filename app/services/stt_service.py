@@ -61,6 +61,17 @@ def _normalize_language(language_hint: str | None) -> str:
     return language_hint.split("-")[0].strip().lower() or "en"
 
 
+def _audio_format(audio_bytes: bytes) -> tuple[str, str]:
+    """Use the actual container, including Safari's MP4 and Firefox's Ogg."""
+    if audio_bytes.startswith(b"OggS"):
+        return "ogg", "audio/ogg"
+    if audio_bytes[4:8] == b"ftyp":
+        return "mp4", "audio/mp4"
+    if audio_bytes.startswith(b"RIFF"):
+        return "wav", "audio/wav"
+    return "webm", "audio/webm"
+
+
 async def _transcribe_groq(audio_bytes: bytes, language: str) -> tuple[str, float] | None:
     """Groq Whisper. Returns (text, confidence) or None on failure."""
     settings = get_settings()
@@ -71,7 +82,7 @@ async def _transcribe_groq(audio_bytes: bytes, language: str) -> tuple[str, floa
         buf = io.BytesIO(audio_bytes)
         # The SDK accepts a (filename, fileobj) tuple; the extension hints format.
         resp = await client.audio.transcriptions.create(
-            file=("chunk.webm", buf),
+            file=(f"chunk.{_audio_format(audio_bytes)[0]}", buf),
             model=settings.GROQ_WHISPER_MODEL,
             language=language,
             response_format="verbose_json",
@@ -120,7 +131,7 @@ async def _transcribe_deepgram(audio_bytes: bytes, language: str) -> tuple[str, 
                 content=audio_bytes,
                 headers={
                     "Authorization": f"Token {settings.DEEPGRAM_API_KEY}",
-                    "Content-Type": "audio/webm",
+                    "Content-Type": _audio_format(audio_bytes)[1],
                 },
             )
         resp.raise_for_status()

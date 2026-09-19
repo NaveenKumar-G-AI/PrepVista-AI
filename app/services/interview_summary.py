@@ -1246,8 +1246,11 @@ def compute_interview_summary(
     """
     runtime        = coerce_runtime_state(runtime_state)
     planned_items  = coerce_question_plan_items(question_plan)
+    v2 = runtime.get("orchestrator_v2")
 
-    if planned_items:
+    if v2:
+        planned_questions = int(v2["blueprint"]["target_primary_questions"]) + int(v2["followups_used"])
+    elif planned_items:
         planned_questions = len(planned_items)
     else:
         plan_key  = str(plan or "free").lower().strip()
@@ -1269,6 +1272,9 @@ def compute_interview_summary(
         1 for ev in evaluations
         if isinstance(ev, dict) and _evaluation_is_answered(ev)
     )
+    if v2:
+        # A provider outage must not erase an answer already recorded atomically.
+        answered_questions = len(v2["evidence"])
 
     clarification_count = _safe_int(runtime.get("clarification_count"))
     timeout_count       = _safe_int(runtime.get("timeout_count"))

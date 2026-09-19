@@ -25,7 +25,7 @@ from app.config import (
 from app.database.connection import DatabaseConnection
 from app.dependencies import UserProfile, get_current_user
 from app.routers.interviews_helpers import (
-    _normalize_plan, _MAX_PDF_SIZE_BYTES, _SETUP_SEMAPHORE,
+    _normalize_plan, _MAX_PDF_SIZE_BYTES, _SETUP_SEMAPHORE, _require_session_owner,
     _check_prompt_injection, _compute_resume_fingerprint, _MIN_DURATION_SECONDS,
     _MAX_DURATION_SECONDS, _normalize_proctoring_mode, _normalize_candidate_name,
     _validate_session_id, _session_is_active, _safe_json_loads, _normalize_violation_text,
@@ -61,8 +61,17 @@ async def setup_interview(
     resume: UploadFile = File(...),
     plan: str = Form("free"),
     difficulty_mode: str = Form("auto"),
-    duration: int = Form(600),
+    duration: int | None = Form(None),
     proctoring_mode: str = Form("practice"),
+    interview_mode: str = Form("standard"),
+    target_role: str = Form("", max_length=120),
+    target_company: str = Form("", max_length=120),
+    job_description: str = Form("", max_length=8000),
+    department: str = Form("", max_length=120),
+    categories: str = Form("", max_length=1600),
+    coding_artifact_id: str = Form("", max_length=36),
+    mission_id: str = Form("", max_length=36),
+    expected_owner_id: str = Form("", max_length=36),
     user: UserProfile = Depends(get_current_user),
 ):
     """Set up a new interview session.
@@ -70,6 +79,19 @@ async def setup_interview(
     Validates the plan, difficulty mode, PDF upload, and resume content
     before creating a session and returning the session credentials.
     """
+    from app.services.interview_orchestrator import MODES
+    if expected_owner_id and expected_owner_id != str(user.id):
+        raise HTTPException(409, 'Your account changed. Start setup again under the intended account.')
+    from app.services.interview_catalog import FAMILIES, safe_question
+    if interview_mode not in MODES:
+        raise HTTPException(status_code=422, detail="Unknown interview mode.")
+    selected_categories = [c.strip() for c in categories.split(",") if c.strip()]
+    if any(c not in FAMILIES for c in selected_categories):
+        raise HTTPException(status_code=422, detail="Unknown interview category.")
+    if any(value and not safe_question(value) for value in [target_role, target_company, department]):
+        raise HTTPException(status_code=422, detail="Please provide professional role, company and department context.")
+    if job_description:
+        _check_prompt_injection(job_description, source="job_description")
     await rate_limit_user(user.id)
     await enforce_quota(user)
 
@@ -121,7 +143,7 @@ async def setup_interview(
         except ValueError:
             pass  # Malformed Content-Length — proceed and check actual size below
 
-    pdf_bytes = await resume.read()
+    pdf_bytes = await resume.read(_MAX_PDF_SIZE_BYTES + 1)
     if not pdf_bytes:
         raise HTTPException(status_code=400, detail="The uploaded resume file is empty.")
 
@@ -161,6 +183,42 @@ async def setup_interview(
     if not isinstance(resume_summary, dict):
         resume_summary = {}
 
+    if mission_id:
+        from uuid import UUID
+        from app.services.practice_missions import authorized_mission
+        from app.routers.coding import require_coding, require_sync
+        try:
+            mission_uuid = UUID(mission_id)
+        except ValueError:
+            raise HTTPException(422, 'Invalid mission ID.') from None
+        await require_coding(user)
+        await require_sync(user)
+        async with DatabaseConnection() as conn:
+            async with conn.transaction():
+                mission = await authorized_mission(conn, user.id, mission_uuid, 'INTERVIEW_FINISHED')
+                from app.services.coding_store import obj
+                required_artifact = obj(mission['objective']).get('artifact_id')
+                if required_artifact and coding_artifact_id != required_artifact:
+                    raise HTTPException(409, 'This mission requires its selected saved artifact.')
+        resume_summary['mission_id'] = str(mission_uuid)
+
+    if coding_artifact_id:
+        from uuid import UUID
+        from app.routers.coding import require_coding, require_sync, get_artifact
+        try:
+            artifact_id = UUID(coding_artifact_id)
+        except ValueError:
+            raise HTTPException(422, 'Invalid coding artifact ID.') from None
+        await require_coding(user)
+        await require_sync(user)
+        artifact = await get_artifact(artifact_id, user)
+        content = artifact['content']
+        resume_summary['coding_artifact'] = {
+            'id': artifact['id'], 'challenge_id': content['challenge_id'],
+            'language': content['language'], 'code': content['code'][:6000],
+            'explanation': content['explanation'][:2000], 'authority': artifact['authority'],
+        }
+
     # Compute a stable fingerprint of this exact PDF for cross-session question
     # de-duplication.  The fingerprint is persisted against the session so that
     # the interviewer service can detect when the same resume has been used in
@@ -168,7 +226,11 @@ async def setup_interview(
     resume_fingerprint = _compute_resume_fingerprint(pdf_bytes)
 
     # Clamp duration to a safe range
-    clamped_duration = max(_MIN_DURATION_SECONDS, min(_MAX_DURATION_SECONDS, int(duration)))
+    clamped_duration = max(_MIN_DURATION_SECONDS, min(_MAX_DURATION_SECONDS, int(duration or MODES[interview_mode][0])))
+    for key, value in {"target_role": target_role, "target_company": target_company,
+                       "job_description": job_description, "department": department}.items():
+        if value.strip():
+            resume_summary[key] = value.strip()
     normalized_proctoring_mode = _normalize_proctoring_mode(proctoring_mode)
 
     # Track that setup was initiated — allows us to measure how many sessions
@@ -192,8 +254,12 @@ async def setup_interview(
         resume_file_path=None,
         duration_seconds=clamped_duration,
         proctoring_mode=normalized_proctoring_mode,
+        interview_mode=interview_mode,
+        categories=selected_categories,
     )
 
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
     session_id = result["session_id"]
 
     logger.info(
@@ -266,6 +332,7 @@ async def setup_interview(
         # was built on — useful for debugging cross-session dedup and for
         # showing the student "session #N with this resume".
         "resume_fingerprint": resume_fingerprint,
+        "blueprint": result.get("blueprint"),
     }
 
 
@@ -281,6 +348,7 @@ async def end_interview(
     layer returns an error payload instead of crashing.
     """
     _validate_session_id(session_id)
+    await _require_session_owner(session_id, req.access_token, user.id)
     was_active = await _session_is_active(session_id, req.access_token)
     result = await finish_session(
         session_id=session_id,
@@ -315,6 +383,7 @@ async def terminate_interview(
 ):
     """Force-end the interview due to a hard client-side proctoring violation."""
     _validate_session_id(session_id)
+    await _require_session_owner(session_id, req.access_token, user.id)
     async with DatabaseConnection() as conn:
         session = await conn.fetchrow(
             """SELECT id, state, proctoring_violations
@@ -385,6 +454,7 @@ async def log_proctoring_violation(
     """
     # UUID format check and rate limit before any DB access
     _validate_session_id(session_id)
+    await _require_session_owner(session_id, req.access_token, user.id)
     await rate_limit_session(session_id)
 
     event = _build_proctoring_event(
@@ -467,3 +537,32 @@ async def log_proctoring_violation(
 # ---------------------------------------------------------------------------
 # Background evaluation task
 # ---------------------------------------------------------------------------
+
+
+@router.get("/{session_id}/state")
+async def get_interview_state(session_id: str, user: UserProfile = Depends(get_current_user)):
+    """Restore the current question after reload without creating another turn."""
+    _validate_session_id(session_id)
+    from app.services.interviewer_coverage import _planned_turn_limit
+    async with DatabaseConnection() as conn:
+        session = await conn.fetchrow(
+            "SELECT state, total_turns, plan, question_plan, runtime_state FROM interview_sessions WHERE id = $1 AND user_id = $2",
+            session_id, user.id,
+        )
+        if not session:
+            raise HTTPException(status_code=404, detail="Interview session not found.")
+        messages = await conn.fetch(
+            "SELECT role, content, turn_number FROM conversation_messages WHERE session_id = $1 ORDER BY turn_number, id",
+            session_id,
+        )
+    from app.services.interview_v2_session import public_progress
+    runtime = _safe_json_loads(session["runtime_state"], {})
+    v2 = runtime.get("orchestrator_v2", {})
+    elapsed = max(0, int((datetime.now(timezone.utc) - datetime.fromisoformat(v2["started_at"])).total_seconds())) if v2.get("started_at") else 0
+    return {
+        "elapsed_seconds": elapsed,
+        "progress": public_progress(runtime["orchestrator_v2"]) if runtime.get("orchestrator_v2") else None,
+        "state": session["state"], "turn": int(session["total_turns"] or 0),
+        "max_turns": _planned_turn_limit(session["plan"], _safe_json_loads(session["question_plan"], [])),
+        "messages": [dict(message) for message in messages if message["role"] in {"user", "assistant"}],
+    }

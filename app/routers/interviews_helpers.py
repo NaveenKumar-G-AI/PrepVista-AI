@@ -472,3 +472,13 @@ def _pre_validate_answer(user_text: str, max_length: int) -> tuple[str, str | No
 # ---------------------------------------------------------------------------
 # Request / response models
 # ---------------------------------------------------------------------------
+
+
+async def _require_session_owner(session_id: str, access_token: str, user_id: str) -> None:
+    async with DatabaseConnection() as conn:
+        owner = await conn.fetchval(
+            "SELECT user_id FROM interview_sessions WHERE id = $1 AND access_token = $2",
+            session_id, access_token,
+        )
+    if owner is None or str(owner) != str(user_id):
+        raise HTTPException(status_code=404, detail="Interview session not found.")
