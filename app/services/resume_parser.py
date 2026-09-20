@@ -529,10 +529,13 @@ def infer_resume_field_profile(summary: dict | None) -> dict:
 def enrich_resume_summary(summary: dict | None, resume_text: str = "") -> dict:
     """Preserve current structure while adding deterministic field signals."""
     base = dict(summary or {})
-    candidate_name = str(base.get("candidate_name") or "").strip()
-    if not candidate_name:
-        first_line = resume_text.splitlines()[0].strip() if resume_text.splitlines() else "Unknown"
-        base["candidate_name"] = first_line[:80]
+    extracted_name = str(base.get("candidate_name") or "").strip()
+    if resume_text:
+        # Identity must be copied from source text, never repaired by fuzzy matching.
+        pattern = r"(?<!\w)" + r"\s+".join(re.escape(part) for part in extracted_name.split()) + r"(?!\w)"
+        match = re.search(pattern, resume_text, re.I) if extracted_name else None
+        base["candidate_name"] = " ".join(match.group().split()) if match else None
+        base["candidate_name_source"] = "RESUME_TEXT_MATCH" if match else "UNKNOWN"
 
     base.setdefault("education", [])
     base.setdefault("skills", [])
@@ -555,9 +558,8 @@ def enrich_resume_summary(summary: dict | None, resume_text: str = "") -> dict:
 
 def _default_resume_summary(resume_text: str) -> dict:
     """Fallback resume summary when LLM extraction fails."""
-    first_line = resume_text.splitlines()[0].strip() if resume_text.splitlines() else "Unknown"
     return enrich_resume_summary({
-        "candidate_name": first_line[:80],
+        "candidate_name": None,
         "education": [],
         "skills": [],
         "projects": [],

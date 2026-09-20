@@ -154,29 +154,9 @@ def _safe_json_loads(value: Any, default: Any) -> Any:
 # String normalization helpers
 # ---------------------------------------------------------------------------
 
-def _normalize_candidate_name(value: Any) -> str:
-    """Normalize noisy extracted candidate names to a clean display form.
-
-    Handles letter-by-letter spaced names (e.g. 'R A H U L'), mixed-case
-    issues, and stray non-alphabetic characters.
-    """
-    cleaned = re.sub(r"[^A-Za-z\s.'\-]+", " ", str(value or ""))
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if not cleaned:
-        return "Candidate"
-    # Collapse space-separated single letters: "R A H U L" → "RAHUL"
-    if re.fullmatch(r"(?:[A-Za-z]\s+){1,}[A-Za-z]", cleaned):
-        cleaned = cleaned.replace(" ", "")
-    parts: list[str] = []
-    for part in cleaned.split():
-        if len(part) == 1:
-            parts.append(part.upper())
-        elif part.isupper() and len(part) > 1:
-            parts.append(part.capitalize())
-        else:
-            parts.append(part)
-    result = " ".join(parts)[:40].strip()
-    return result or "Candidate"
+def _normalize_candidate_name(value) -> str:
+    from app.services.candidate_identity import candidate_name
+    return candidate_name(value)
 
 
 def _normalize_plan(plan: str) -> str:

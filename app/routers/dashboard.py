@@ -156,6 +156,9 @@ async def get_dashboard(user: UserProfile = Depends(get_current_user)):
                 user.id,
             )
 
+        from app.services.report_truth import hydrate_session_scores
+        sessions = await hydrate_session_scores(conn, sessions)
+
         stats_row = await conn.fetchrow(
             """SELECT AVG(final_score)  AS avg_score,
                       MAX(final_score)  AS best_score,
@@ -225,7 +228,9 @@ async def get_dashboard(user: UserProfile = Depends(get_current_user)):
         {
             "id":          str(s["id"]),
             "plan":        s["plan"],
-            "final_score": float(s["final_score"]) if s["final_score"] else 0,
+            "final_score": float(s["final_score"]) if s["final_score"] is not None else None,
+            "evaluation_status": s.get("evaluation_status"),
+            "evaluation_coverage": s.get("evaluation_coverage"),
             "state":       s["state"],
             "total_turns": s["total_turns"],
             "duration":    s["duration_actual_seconds"],
@@ -424,6 +429,9 @@ async def get_session_history(
             offset,
         )
 
+        from app.services.report_truth import hydrate_session_scores
+        sessions = await hydrate_session_scores(conn, sessions)
+
     total_count = int(sessions[0]["total_all"]) if sessions else 0
 
     return {
@@ -431,8 +439,10 @@ async def get_session_history(
             {
                 "id":          str(s["id"]),
                 "plan":        s["plan"],
-                "score":       float(s["final_score"]) if s["final_score"] else None,
-                "state":       s["state"],
+                "score":       float(s["final_score"]) if s["final_score"] is not None else None,
+                "evaluation_status": s.get("evaluation_status"),
+            "evaluation_coverage": s.get("evaluation_coverage"),
+            "state":       s["state"],
                 "total_turns": s["total_turns"],
                 "duration":    s["duration_actual_seconds"],
                 "created_at":  str(s["created_at"]),

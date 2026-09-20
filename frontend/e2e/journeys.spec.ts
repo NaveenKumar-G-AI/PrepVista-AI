@@ -144,7 +144,7 @@ test('V2 report shows source evidence and saves a retry on mobile', async ({ pag
   });
   await page.goto(`/report/${sid}`);
   await expect(page.getByRole('heading', { name: 'What this interview showed' })).toBeVisible();
-  await expect(page.getByText('Numeric evaluation unavailable.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Evaluation unavailable. Your recorded answers are preserved.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Retry this answer' }).first().click();
   await page.getByLabel('Use only your actual experience').first().fill('I implemented cache invalidation and tested stale reads.');
   await page.getByRole('button', { name: 'Save and compare' }).first().click();

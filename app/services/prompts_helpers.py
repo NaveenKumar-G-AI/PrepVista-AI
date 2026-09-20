@@ -171,19 +171,9 @@ def _coerce_resume_summary(resume_summary) -> dict:
     return {}
 
 
-def _normalize_candidate_name(name: str) -> str:
-    """Clean noisy extracted names so greeting prompts stay natural."""
-    cleaned = " ".join(str(name or "").replace("\n", " ").split()).strip()
-    cleaned = "".join(character if character.isalpha() or character in {" ", "-", "'", "."} else " " for character in cleaned)
-    cleaned = " ".join(cleaned.split()).strip()
-    if not cleaned:
-        return "Candidate"
-    if len(cleaned.split()) >= 2 and all(len(part) == 1 and part.isalpha() for part in cleaned.split()):
-        cleaned = "".join(cleaned.split())
-    parts = []
-    for part in cleaned.split():
-        parts.append(part.capitalize() if part.isupper() else part)
-    return " ".join(parts)[:40] or "Candidate"
+def _normalize_candidate_name(value) -> str:
+    from app.services.candidate_identity import candidate_name
+    return candidate_name(value)
 
 
 def _build_resume_highlight_text(resume_summary, resume_text: str) -> str:

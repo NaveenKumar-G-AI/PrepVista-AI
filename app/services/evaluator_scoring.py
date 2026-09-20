@@ -1105,7 +1105,7 @@ def compute_final_score(
     """
     if not question_evaluations:
         return {
-            "final_score": 0,
+            "final_score": None,
             "category_scores": {},
             "total_questions": 0,
             "answered_questions": 0,
@@ -1156,7 +1156,9 @@ def compute_final_score(
         if resolved_expected_questions > 0
         else 1.0
     )
-    final_score = round(base_score * coverage_ratio)
+    # Evaluation coverage is separate from quality. Missing evaluation is not
+    # a failed answer, including when the provider or persistence failed.
+    final_score = base_score
 
     final_score = max(0, min(100, final_score))
 
@@ -1191,6 +1193,8 @@ def compute_final_score(
 
 def get_score_interpretation(score: int, plan: str | None = None) -> str:
     """Human-readable interpretation of the final score."""
+    if score is None:
+        return "Evaluation unavailable. Recorded answers are preserved; no performance score has been assigned."
     if plan == "free":
         if score >= 80:
             return "Strong start - your answers are clear and confident for beginner interviews."

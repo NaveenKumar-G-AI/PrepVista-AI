@@ -6,7 +6,7 @@ import re
 import structlog
 
 from app.services.interview_orchestrator import InterviewOrchestrator, CoverageTracker
-from app.services.interview_catalog import safe_question
+from app.services.interview_catalog import valid_question_wording
 from app.services.interview_summary import coerce_runtime_state
 from app.services.interviewer_constants import START_TOKENS, NO_ANSWER_TOKEN, SYSTEM_TIME_UP_TOKEN, EXIT_PHRASES
 from app.services.interviewer_templates import _is_repeat_request
@@ -75,7 +75,7 @@ async def process_v2(conn, session, user_text: str, end_interview: bool) -> dict
             except Exception:
                 wording = ""
                 logger.warning("interview_v2_wording_fallback", session_id=str(session["id"]))
-            if wording and safe_question(wording) and re.search(r"why|trade.?off|alternative|stale", wording, re.I) and not any(q["text"] == wording for q in state["questions"][:-1]):
+            if wording and valid_question_wording(wording, [q["text"] for q in state["questions"][:-1]]) and re.search(r"why|trade.?off|alternative|stale", wording, re.I) and not any(q["text"] == wording for q in state["questions"][:-1]):
                 question["text"] = wording
         await conn.execute("INSERT INTO conversation_messages (session_id, role, content, turn_number) VALUES ($1, 'assistant', $2, $3)", session["id"], question["text"], len(state["questions"]))
         runtime["question_retry_count"] = 0

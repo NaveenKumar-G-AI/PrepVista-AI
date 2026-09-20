@@ -275,29 +275,9 @@ def _trim_family_history(families: list[str], max_items: int = 16) -> list[str]:
     return cleaned[-max_items:]
 
 
-def _normalize_candidate_name(name: str) -> str:
-    """Normalize noisy extracted names so greetings sound natural instead of letter-by-letter."""
-    cleaned = clean_for_display(name or "") or ""
-    cleaned = re.sub(r"[^A-Za-z\s.'-]+", " ", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if not cleaned:
-        return "Candidate"
-
-    if re.fullmatch(r"(?:[A-Za-z]\s+){1,}[A-Za-z]", cleaned):
-        cleaned = cleaned.replace(" ", "")
-
-    words: list[str] = []
-    for word in cleaned.split():
-        if len(word) == 1:
-            words.append(word.upper())
-            continue
-        if word.isupper():
-            words.append(word.capitalize())
-            continue
-        words.append(word[0].upper() + word[1:])
-
-    normalized = " ".join(words).strip()
-    return normalized[:40] or "Candidate"
+def _normalize_candidate_name(value) -> str:
+    from app.services.candidate_identity import candidate_name
+    return candidate_name(value)
 
 
 def _resume_answer_terms(resume_summary: dict) -> set[str]:

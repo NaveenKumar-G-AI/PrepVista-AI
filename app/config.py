@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "PrepVista"
     APP_VERSION: str = "1.0.0"
     INTERVIEW_ORCHESTRATOR_V2: bool = True
+    INTERVIEW_EVALUATION_WORKER_ENABLED: bool = True
     # Practice can be released to all signed-in students or an exact-ID pilot.
     # Paid features and interview credits retain their separate controls.
     CODING_WORKSPACE_ENABLED: bool = False

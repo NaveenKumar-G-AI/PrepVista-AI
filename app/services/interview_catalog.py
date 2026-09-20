@@ -32,6 +32,17 @@ def safe_question(text: str) -> bool:
     )
 
 
+def valid_question_wording(text: str, prior_questions=(), *, allow_repeat=False) -> bool:
+    """Validate interview wording separately from generic input safety."""
+    if not safe_question(text) or len(text.split()) < 4:
+        return False
+    introduction = r"\b(?:tell me about yourself|introduce yourself|walk me through your background)\b"
+    if not allow_repeat and re.search(introduction, text, re.I) and any(re.search(introduction, q, re.I) for q in prior_questions):
+        return False
+    # Accept authored imperatives as well as interrogatives, but not narrative fragments.
+    return bool(re.search(r"(?:^|[.!?]\s+)(?:what|why|how|when|where|which|who|can you|could you|would you|do you|did you|have you|is there|tell me|describe|explain|walk me|give (?:me |an? )|name |share )", text.strip(), re.I))
+
+
 class QuestionDefinition(BaseModel):
     id: str
     version: int = 1

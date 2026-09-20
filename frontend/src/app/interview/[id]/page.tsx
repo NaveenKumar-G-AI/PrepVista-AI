@@ -346,21 +346,7 @@ function formatDurationSummary(totalSeconds?: number) {
 }
 
 function normalizeNameForSpeech(rawName: string | undefined | null) {
-  const base = (rawName || '').replace(/[^A-Za-z\s.'-]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!base) {
-    return '';
-  }
-
-  if (/^(?:[A-Za-z]\s+){1,}[A-Za-z]$/.test(base)) {
-    const joined = base.replace(/\s+/g, '');
-    return joined.charAt(0).toUpperCase() + joined.slice(1).toLowerCase();
-  }
-
-  return base
-    .split(' ')
-    .filter(Boolean)
-    .map(part => (part === part.toUpperCase() ? `${part.charAt(0)}${part.slice(1).toLowerCase()}` : part))
-    .join(' ');
+  return (rawName || '').replace(/\s+/g, ' ').trim();
 }
 
 function getTimestamp() {
@@ -447,8 +433,7 @@ function createSubmissionKey() {
 
 function getClosingName(candidateName: string | undefined, fullName: string | null | undefined) {
   const rawName = normalizeNameForSpeech(candidateName || fullName || 'there') || 'there';
-  const safeName = rawName.split(' ')[0];
-  return safeName || 'there';
+  return rawName;
 }
 
 export default function LiveInterviewPage() {

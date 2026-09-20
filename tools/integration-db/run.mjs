@@ -19,7 +19,7 @@ if (process.platform === 'win32') cluster.stop = async () => {
   if (!started || stopped) return;
   const pgCtl = resolve(toolDir, 'node_modules/@embedded-postgres/windows-x64/native/bin/pg_ctl.exe');
   await new Promise((done, reject) => {
-    const child = spawn(pgCtl, ['-D', databaseDir, '-m', 'fast', '-w', '-t', '15', 'stop'], { stdio: 'inherit', windowsHide: true });
+    const child = spawn(pgCtl, ['-D', databaseDir, '-m', 'fast', '-w', '-t', '45', 'stop'], { stdio: 'inherit', windowsHide: true });
     child.on('error', reject); child.on('exit', code => code === 0 ? done() : reject(new Error('Test PostgreSQL did not stop cleanly.')));
   });
   stopped = true;
@@ -27,7 +27,7 @@ if (process.platform === 'win32') cluster.stop = async () => {
 try {
   await cluster.initialise(); await cluster.start(); started = true; await cluster.createDatabase('prepvista_integration_test');
   const python = process.platform === 'win32' ? resolve(root, '.venv/Scripts/python.exe') : 'python';
-  const args = ['-m', 'pytest', '-q', 'tests/test_coding_database.py', `--basetemp=.pytest-coding-db-${randomUUID()}`];
+  const args = ['-m', 'pytest', '-q', 'tests/test_coding_database.py', `--basetemp=.pytest-coding-db-${randomUUID()}`, ...process.argv.slice(2)];
   process.exitCode = await new Promise((resolveCode, reject) => {
     const child = spawn(python, args, { cwd: root, stdio: 'inherit', windowsHide: true,
       env: { ...process.env, CODING_TEST_DATABASE_URL: `postgresql://postgres:${password}@127.0.0.1:55439/prepvista_integration_test` } });

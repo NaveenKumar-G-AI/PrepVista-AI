@@ -12,6 +12,7 @@ import json
 import structlog
 
 from app.config import PLAN_CONFIG
+from app.services.report_truth import build_report_truth
 
 from app.services.report_helpers import (
     _build_improved_answer,
@@ -51,7 +52,7 @@ logger = structlog.get_logger("prepvista.report_builder")
 # ---------------------------------------------------------------------------
 
 def _build_professional_fpdf_report(
-    score: float,
+    score: float | None,
     rubric_scores: dict,
     strengths: list[str],
     weaknesses: list[str],
@@ -65,6 +66,7 @@ def _build_professional_fpdf_report(
     session_summary: dict | None = None,
     pro_summary: dict | None = None,
     career_summary: dict | None = None,
+    candidate_name: str | None = None,
 ) -> bytes:
     from fpdf import FPDF
 
@@ -98,6 +100,11 @@ def _build_professional_fpdf_report(
 
     accent_rgb, score_bg_rgb = _score_palette(score)
     summary_text = _build_overall_summary(plan, score, strengths, weaknesses, evaluations)
+    if session_summary:
+        coverage = session_summary.get('evaluation_coverage')
+        summary_text = f"Evaluation coverage: {coverage if coverage is not None else 'unknown'}%. {session_summary.get('evaluated_questions', len(evaluations))} evaluated; {session_summary.get('answered_questions', 0)} answers recorded. " + summary_text
+        if session_summary.get('evaluation_status') == 'PARTIAL':
+            summary_text = 'Partial report. Conclusions describe evaluated answers only. ' + summary_text
     completed_label = _format_timestamp(finished_at or date)
     duration_label = _format_duration(duration_seconds)
     summary = session_summary if isinstance(session_summary, dict) else {}
@@ -167,6 +174,11 @@ def _build_professional_fpdf_report(
         "Industry-style interview feedback with answer review, coaching signals, and upgraded example responses.",
     )
 
+    if candidate_name:
+        pdf.set_xy(pdf.l_margin, 33)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(_text_max_w, 5, _safe_pdf_text(candidate_name))
+
     # Score badge — right-aligned inside the dark header
     _score_badge_y = 8
     _score_badge_h = 30
@@ -182,9 +194,9 @@ def _build_professional_fpdf_report(
     pdf.set_x(_score_box_x)
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_text_color(*accent_rgb)
-    pdf.cell(_SCORE_BOX_W, 12, f"{int(round(score))}/100", align="C", ln=1)
+    pdf.cell(_SCORE_BOX_W, 12, (f"{int(round(score))}/100" if score is not None else "Unavailable"), align="C", ln=1)
 
-    interp_short = "EXCELLENT" if score >= 80 else "SOLID" if score >= 60 else "DEVELOPING"
+    interp_short = "UNAVAILABLE" if score is None else "EXCELLENT" if score >= 80 else "SOLID" if score >= 60 else "DEVELOPING"
     pdf.set_x(_score_box_x)
     pdf.set_font("Helvetica", "B", 7)
     pdf.set_text_color(*accent_rgb)
@@ -265,7 +277,8 @@ def _build_professional_fpdf_report(
     )
 
     interpretation = (
-        "Excellent readiness" if score >= 80 else
+        "Evaluation unavailable" if score is None else
+        "Strong evaluated answers" if score >= 80 else
         "Solid progress with targeted coaching needed" if score >= 60 else
         "Development-focused session with clear next steps"
     )
@@ -276,7 +289,7 @@ def _build_professional_fpdf_report(
         pdf.l_margin, result_y,
         pdf.w - pdf.l_margin - pdf.r_margin,
         "Result Snapshot", interpretation,
-        f"Overall score: {int(round(score))}/100",
+        (f"Overall score: {int(round(score))}/100" if score is not None else "No performance score assigned"),
         fill_rgb=(248, 250, 252),
     )
     pdf.set_y(result_y + score_card_h + 3)
@@ -362,10 +375,15 @@ async def generate_pdf_report(
     session_summary: dict | None = None,
 ) -> bytes:
     """Generate a PDF report from session data and evaluations."""
-    score = float(session.get("final_score", 0) or 0)
-    rubric_scores = _coerce_json_object(session.get("rubric_scores"))
-    strengths = _coerce_list(session.get("strengths", []) or [])
-    weaknesses = _coerce_list(session.get("weaknesses", []) or [])
+    truth = build_report_truth(session, evaluations)
+    score = truth['aggregate']['final_score']
+    if session_summary:
+        truth['summary'].update(session_summary)
+    session_summary = truth['summary']
+    evaluations = truth['evaluations']
+    rubric_scores = truth["aggregate"]["category_scores"]
+    strengths = truth["aggregate"]["strengths"]
+    weaknesses = truth["aggregate"]["weaknesses"]
     plan = _safe_pdf_text(session.get("plan", "pro") or "pro").lower() or "pro"
     created = session.get("created_at")
     finished_at = session.get("finished_at")
@@ -412,6 +430,7 @@ async def generate_pdf_report(
             weaknesses=weaknesses,
             evaluations=safe_evaluations,
             email=user_email,
+            candidate_name=_coerce_json_object(session.get('resume_summary')).get('candidate_name'),
             date=date_label,
             plan=plan,
             duration_seconds=session.get("duration_actual_seconds"),
@@ -424,8 +443,8 @@ async def generate_pdf_report(
                 if isinstance(session.get("session_summary"), dict)
                 else None
             ),
-            pro_summary=session.get("pro_summary") if isinstance(session.get("pro_summary"), dict) else None,
-            career_summary=session.get("career_summary") if isinstance(session.get("career_summary"), dict) else None,
+            pro_summary=session.get("pro_summary") if isinstance(session.get("pro_summary"), dict) and truth["evaluation_status"] == "AVAILABLE" else None,
+            career_summary=session.get("career_summary") if isinstance(session.get("career_summary"), dict) and truth["evaluation_status"] == "AVAILABLE" else None,
         )
     except Exception as exc:
         logger.error(

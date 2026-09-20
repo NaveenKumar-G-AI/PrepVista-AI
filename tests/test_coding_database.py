@@ -52,6 +52,11 @@ def database(monkeypatch, request):
                 CREATE TABLE organizations(id UUID PRIMARY KEY, status TEXT DEFAULT 'active', name TEXT DEFAULT 'Test institution');
                 CREATE TABLE organization_students(user_id UUID REFERENCES profiles(id) ON DELETE CASCADE, organization_id UUID REFERENCES organizations(id),status TEXT);
                 CREATE TABLE interview_sessions(id UUID PRIMARY KEY,user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,state TEXT,runtime_state JSONB,finished_at TIMESTAMPTZ);''')
+            import re
+            initial = Path('app/database/migrations/001_initial_schema.sql').read_text(encoding='utf-8')
+            for name in ('conversation_messages', 'question_evaluations', 'skill_scores'):
+                ddl = re.search(r'CREATE TABLE IF NOT EXISTS ' + name + r' \([\s\S]+?\n\);', initial).group(0)
+                await conn.execute(ddl)
             await conn.execute(Path('app/database/migrations/037_interview_coaching_v2.sql').read_text())
             if not pre_integration:
                 await conn.execute(Path('app/database/migrations/038_unified_coding.sql').read_text())
@@ -73,6 +78,8 @@ def database(monkeypatch, request):
                 await conn.execute(Path('app/database/migrations/040_coding_validation.sql').read_text())
                 await conn.execute(Path('app/database/migrations/041_unified_evidence_recovery.sql').read_text())
                 await conn.execute(Path('app/database/migrations/042_artifact_review_consent.sql').read_text())
+                await conn.execute(Path('app/database/migrations/043_evaluation_rubric_categories.sql').read_text())
+                await conn.execute(Path('app/database/migrations/044_durable_interview_evaluation.sql').read_text())
             await conn.executemany('INSERT INTO profiles(id) VALUES($1)', [(u,) for u in users])
             await conn.executemany('INSERT INTO organizations(id) VALUES($1)', [(o,) for o in orgs])
             await conn.execute("INSERT INTO organization_students VALUES($1,$2,'active')", users[0], orgs[0])
@@ -903,7 +910,7 @@ def test_explicit_migration_plan_is_read_only_and_applies_actual_integration_bat
             result = await schema.apply_database(conn, local, sql, 'local-fixture', schema.VERSIONS[-1], plan['plan_sha256'])
             assert result['applied_versions'] == list(schema.VERSIONS) and not result['release_authorized']
             assert await conn.fetchval("SELECT to_regclass('coding_validation_jobs')") is not None
-            assert await conn.fetchval('SELECT count(*) FROM schema_migrations') == 42
+            assert await conn.fetchval('SELECT count(*) FROM schema_migrations') == 45
             refreshed = await schema.plan_database(conn, local, 'local-fixture', schema.VERSIONS[-1])
             assert refreshed['plan_ready'] and refreshed['pending_versions'] == []
             # A lost acknowledgement is resolved by rereading the ledger, not by
@@ -1425,3 +1432,236 @@ def test_review_history_pages_keep_old_consents_reachable_and_scope_cursors(data
     user.id = str(database.users[0])
     assert client.get('/artifact-reviews/inbox?before='+inbox['next_cursor']).status_code == 404
     assert client.get('/artifact-reviews/'+first['items'][0]['id']+'/artifact').status_code == 404
+
+
+@pytest.mark.parametrize('database', ['pre_integration'], indirect=True)
+def test_actual_evaluator_categories_fail_old_schema_and_migrate_without_losing_scores(database):
+    from app.services.evaluator_feedback import normalize_rubric_category
+    async def run():
+        async with database.connect() as conn:
+            sid = uuid4()
+            await conn.execute("INSERT INTO interview_sessions(id,user_id,state) VALUES($1,$2,'ACTIVE')", sid, database.users[0])
+            category = normalize_rubric_category('Tell me about yourself.', 'introduction', 'career')
+            sql = "INSERT INTO question_evaluations(session_id,turn_number,rubric_category,question_text,score) VALUES($1,$2,$3,'Fixture question',8)"
+            with pytest.raises(asyncpg.CheckViolationError):
+                await conn.execute(sql, sid, 1, category)
+            await conn.execute(sql, sid, 1, 'technical_depth')
+            migration = Path('app/database/migrations/043_evaluation_rubric_categories.sql').read_text()
+            await conn.execute(migration)
+            await conn.execute(migration)  # repeatable constraint expansion
+            for turn, category in enumerate(('introduction', 'project_ownership', 'behavioral', 'ai_tool_fluency'), 2):
+                await conn.execute(sql, sid, turn, category)
+                await conn.execute('INSERT INTO skill_scores(user_id,session_id,category,average_score,question_count) VALUES($1,$2,$3,8,1)', database.users[0], sid, category)
+            assert await conn.fetchval('SELECT count(*) FROM question_evaluations WHERE session_id=$1 AND score=8', sid) == 5
+            with pytest.raises(asyncpg.CheckViolationError):
+                await conn.execute(sql, sid, 9, 'invented_category')
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('available_count', [0, 7, 10])
+def test_durable_evaluation_recovers_saved_answers_and_refreshes_finished_report(database, monkeypatch, available_count):
+    from app.services import interview_evaluation_jobs as jobs
+    from app.routers import interviews_answer, reports
+    from app.services.report_truth import build_report_truth
+    from app.services.report_generator import generate_pdf_report
+    from pypdf import PdfReader
+    from io import BytesIO
+    monkeypatch.setattr(jobs, 'DatabaseConnection', database.connect)
+    monkeypatch.setattr(interviews_answer, 'DatabaseConnection', database.connect)
+    monkeypatch.setattr(reports, 'DatabaseConnection', database.connect)
+    from app.middleware import rate_limiter
+    async def no_limit(*args): pass
+    monkeypatch.setattr(rate_limiter, 'rate_limit_user', no_limit)
+    calls = []
+    async def evaluate(**kwargs):
+        calls.append(kwargs['turn_id'])
+        if kwargs['turn_id'] > available_count:
+            return {'evaluation_status': 'unavailable'}
+        return {'score': 8, 'classification': 'strong', 'communication_score': 8,
+                'raw_answer': kwargs['raw_answer'], 'relevance_score': 2, 'clarity_score': 2,
+                'specificity_score': 2, 'structure_score': 2}
+    monkeypatch.setattr(interviews_answer, 'evaluate_single_question', evaluate)
+    sid = uuid4()
+    async def run():
+        async with database.connect() as conn:
+            # Actual evaluation DDL and prerequisite migrations, with a minimal session fixture.
+            for migration in ('020_question_evaluations_unique_turn.sql', '021_transcript_repair_audit.sql'):
+                await conn.execute(Path('app/database/migrations/' + migration).read_text(encoding='utf-8'))
+            await conn.execute("""ALTER TABLE interview_sessions ADD plan TEXT DEFAULT 'pro', ADD resume_summary JSONB DEFAULT '{}',
+                ADD question_plan JSONB DEFAULT '[]', ADD final_score NUMERIC, ADD rubric_scores JSONB,
+                ADD strengths TEXT[], ADD weaknesses TEXT[], ADD total_turns INT DEFAULT 10,
+                ADD duration_actual_seconds INT DEFAULT 600""")
+            await conn.execute("INSERT INTO interview_sessions(id,user_id,state,runtime_state) VALUES($1,$2,'FINISHED','{}')", sid, database.users[0])
+            for turn in range(1, 11):
+                async with conn.transaction():
+                    await conn.execute("INSERT INTO conversation_messages(session_id,role,content,turn_number) VALUES($1,'assistant','How did you test the implementation?',$2)",sid,turn)
+                    await conn.execute("INSERT INTO conversation_messages(session_id,role,content,turn_number) VALUES($1,'user','I wrote regression tests and verified the results.',$2)",sid,turn)
+            assert await conn.fetchval('SELECT count(*) FROM interview_evaluation_jobs') == 10
+            # Rollback removes both answer and job, not an acknowledged orphan.
+            with pytest.raises(RuntimeError):
+                async with conn.transaction():
+                    await conn.execute("INSERT INTO conversation_messages(session_id,role,content,turn_number) VALUES($1,'user','rolled back',11)",sid)
+                    raise RuntimeError('rollback')
+            assert await conn.fetchval('SELECT count(*) FROM interview_evaluation_jobs') == 10
+        # Multiple workers race for one answer: one provider evaluation only.
+        results = await asyncio.gather(jobs.process_one(sid, 1), jobs.process_one(sid, 1))
+        assert sum(results) == 1
+        for turn in range(2, 11):
+            assert await jobs.process_one(sid, turn)
+        async with database.connect() as conn:
+            rows = await conn.fetch('SELECT * FROM question_evaluations ORDER BY turn_number')
+            assert len(rows) == available_count
+            assert len(calls) == len(set(calls)) == 10
+            assert all(row['evaluation_version'] == 'rubric-v2' for row in rows)
+            messages = await conn.fetch('SELECT * FROM conversation_messages')
+            states = await conn.fetch('SELECT state FROM interview_evaluation_jobs')
+            session = dict(await conn.fetchrow('SELECT * FROM interview_sessions WHERE id=$1',sid))
+            truth = build_report_truth(session, [dict(row) for row in rows], messages, states)
+            assert truth['summary']['answered_questions'] == 10
+            assert truth['summary']['evaluation_coverage'] == available_count * 10
+            assert truth['aggregate']['final_score'] == (80 if available_count else None)
+            assert session['final_score'] == (80 if available_count else None)
+            assert truth['report_state'] == ('READY' if available_count == 10 else 'GENERATING')
+            pdf = await generate_pdf_report(session, [dict(row) for row in rows], 'owner@example.invalid', session_summary=truth['summary'])
+            text = '\n'.join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+            assert ('80/100' in text) if available_count else ('Evaluation unavailable' in text and '0/100' not in text)
+            if available_count < 10:
+                await conn.execute("UPDATE interview_evaluation_jobs SET state='RUNNING',attempts=3,retry_after=NOW()-INTERVAL '1 minute',updated_at=NOW()-INTERVAL '10 minutes' WHERE state='PENDING'")
+        assert not await jobs.process_one(sid)
+        async with database.connect() as conn:
+            assert await conn.fetchval("SELECT count(*) FROM interview_evaluation_jobs WHERE state='FAILED'") == 10-available_count
+        with pytest.raises(HTTPException) as denied:
+            await reports.retry_evaluations(str(sid), SimpleNamespace(id=str(database.users[1])))
+        assert denied.value.status_code == 404
+        owner = SimpleNamespace(id=str(database.users[0]))
+        assert (await reports.retry_evaluations(str(sid), owner))['queued'] == 10-available_count
+        assert (await reports.retry_evaluations(str(sid), owner))['queued'] == 0
+
+    asyncio.run(run())
+
+
+def test_browser_role_cannot_mutate_plan_admin_flags_or_session_scores(database):
+    import re
+    async def run():
+        async with database.connect() as conn:
+            await conn.execute("""CREATE SCHEMA IF NOT EXISTS auth;
+                CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
+                $$ SELECT NULLIF(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+                DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN
+                    CREATE ROLE authenticated NOLOGIN; END IF; END $$;
+                ALTER TABLE profiles ADD plan TEXT DEFAULT 'free', ADD is_admin BOOLEAN DEFAULT false;
+                ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE interview_sessions ADD final_score NUMERIC;
+                ALTER TABLE interview_sessions ENABLE ROW LEVEL SECURITY;
+                GRANT USAGE ON SCHEMA auth TO authenticated;""")
+            await conn.execute(f'GRANT USAGE ON SCHEMA {database.schema} TO authenticated')
+            await conn.execute('GRANT SELECT, INSERT, UPDATE ON profiles,interview_sessions TO authenticated')
+            initial = Path('app/database/migrations/001_initial_schema.sql').read_text(encoding='utf-8')
+            for name in ('profiles_self_select','profiles_self_update','sessions_self_select','sessions_self_insert','sessions_self_update'):
+                await conn.execute(re.search(r'CREATE POLICY '+name+r'[^;]+;', initial).group())
+            sid = uuid4()
+            await conn.execute("INSERT INTO interview_sessions(id,user_id,state) VALUES($1,$2,'FINISHED')",sid,database.users[0])
+            async with conn.transaction():
+                await conn.execute('SET LOCAL ROLE authenticated')
+                await conn.execute("SELECT set_config('request.jwt.claim.sub',$1,true)",str(database.users[0]))
+                assert await conn.execute("UPDATE profiles SET is_admin=true,plan='career' WHERE id=$1",database.users[0]) == 'UPDATE 1'
+                assert await conn.execute('UPDATE interview_sessions SET final_score=100 WHERE id=$1',sid) == 'UPDATE 1'
+            await conn.execute("UPDATE profiles SET is_admin=false,plan='free'; UPDATE interview_sessions SET final_score=NULL")
+            migration = Path('app/database/migrations/045_protect_server_owned_records.sql').read_text(encoding='utf-8')
+            await conn.execute(migration)
+            await conn.execute(migration)
+            for sql,args in [("UPDATE profiles SET is_admin=true,plan='career' WHERE id=$1",[database.users[0]]),
+                             ('UPDATE interview_sessions SET final_score=100 WHERE id=$1',[sid]),
+                             ("INSERT INTO interview_sessions(id,user_id,state) VALUES($1,$2,'FINISHED')",[uuid4(),database.users[0]])]:
+                with pytest.raises(asyncpg.InsufficientPrivilegeError):
+                    async with conn.transaction():
+                        await conn.execute('SET LOCAL ROLE authenticated')
+                        await conn.execute("SELECT set_config('request.jwt.claim.sub',$1,true)",str(database.users[0]))
+                        await conn.execute(sql,*args)
+            async with conn.transaction():
+                await conn.execute('SET LOCAL ROLE authenticated')
+                await conn.execute("SELECT set_config('request.jwt.claim.sub',$1,true)",str(database.users[0]))
+                assert await conn.fetchval('SELECT count(*) FROM profiles') == 1
+                assert await conn.fetchval('SELECT plan FROM profiles') == 'free'
+            assert await conn.execute("UPDATE profiles SET full_name='Confirmed name' WHERE id=$1",database.users[0]) == 'UPDATE 1'
+            assert await conn.fetchval('SELECT final_score FROM interview_sessions WHERE id=$1',sid) is None
+    asyncio.run(run())
+
+
+def test_resume_pdf_through_real_interview_finish_evaluation_report_and_pdf(database, monkeypatch):
+    from contextlib import asynccontextmanager
+    from unittest.mock import AsyncMock
+    from fpdf import FPDF
+    from pypdf import PdfReader
+    from io import BytesIO
+    from app.services import resume_parser, interviewer_session, interview_evaluation_jobs
+    from app.services.interview_v2_session import process_v2
+    from app.services.interview_orchestrator import build_blueprint, InterviewOrchestrator
+    from app.routers import interviews_answer, reports
+    from app.services.report_generator import generate_pdf_report
+    full_schema = database.schema + '_lifecycle'
+    @asynccontextmanager
+    async def connect():
+        conn = await asyncpg.connect(URL, server_settings={'search_path': full_schema + ',public'})
+        try: yield conn
+        finally: await conn.close()
+    for module in (interviewer_session, interview_evaluation_jobs, interviews_answer, reports):
+        monkeypatch.setattr(module, 'DatabaseConnection', connect)
+    monkeypatch.setattr(resume_parser, 'call_llm_json', AsyncMock(return_value={
+        'candidate_name': 'naveenkumar g', 'skills': ['Python','Redis'], 'target_role': 'Backend Engineer',
+        'projects': [{'name':'API cache','description':'I built and tested invalidation.'}]}))
+    async def evaluate(**kwargs):
+        return {'score':8, 'classification':'strong', 'communication_score':8, 'raw_answer':kwargs['raw_answer']}
+    monkeypatch.setattr(interviews_answer, 'evaluate_single_question', evaluate)
+    # Entitlement reconciliation is covered separately; no external billing in this fixture.
+    from app.services import plan_access, history_retention
+    monkeypatch.setattr(plan_access, 'sync_profile_plan_state', AsyncMock(return_value={'highest_owned_plan':'pro'}))
+    monkeypatch.setattr(history_retention, 'enforce_history_retention', AsyncMock())
+    async def run():
+        async with database.connect() as conn:
+            await conn.execute(f'CREATE SCHEMA {full_schema}')
+            await conn.execute("""CREATE SCHEMA IF NOT EXISTS auth;
+                CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
+                $$ SELECT NULLIF(current_setting('request.jwt.claim.sub',true),'')::uuid $$;""")
+        async with connect() as conn:
+            for name in ('001_initial_schema.sql','003_interview_runtime.sql','020_question_evaluations_unique_turn.sql',
+                         '021_transcript_repair_audit.sql','023_audio_audit_trail.sql','036_interview_answer_receipts.sql',
+                         '037_interview_coaching_v2.sql','043_evaluation_rubric_categories.sql','044_durable_interview_evaluation.sql'):
+                await conn.execute(Path('app/database/migrations',name).read_text(encoding='utf-8'))
+            pdf=FPDF(); pdf.add_page(); pdf.set_font('Helvetica',size=11)
+            pdf.multi_cell(180,6,'NAVEENKUMAR G\nBackend Engineer\nSkills: Python, Redis, PostgreSQL.\n'+
+                'Project: API cache. I implemented invalidation, wrote regression tests, compared latency before and after, and measured the results. '*6)
+            content=bytes(pdf.output())
+            resume_parser.validate_resume_upload(content,'resume.pdf','application/pdf')
+            text=resume_parser.extract_text_from_resume(content,'resume.pdf','application/pdf')
+            profile=await resume_parser.parse_resume_structured(text)
+            assert profile['candidate_name']=='NAVEENKUMAR G'
+            state=InterviewOrchestrator.create(build_blueprint(profile,max_questions=14),profile)
+            sid=uuid4(); uid=uuid4()
+            await conn.execute("INSERT INTO profiles(id,email,plan,full_name) VALUES($1,'fixture@example.invalid','pro','NAVEENKUMAR G')",uid)
+            await conn.execute("""INSERT INTO interview_sessions(id,user_id,plan,state,resume_text,resume_summary,access_token,runtime_state)
+                VALUES($1,$2,'pro','ACTIVE',$3,$4,'fixture-token',$5)""",sid,uid,text,json.dumps(profile),json.dumps({'orchestrator_v2':state}))
+            async def step(answer):
+                async with conn.transaction():
+                    session=await conn.fetchrow('SELECT * FROM interview_sessions WHERE id=$1 FOR NO KEY UPDATE',sid)
+                    return await process_v2(conn,session,answer,False)
+            await step('[START_INTERVIEW]')
+            for _ in range(10):
+                response=await step('I implemented the cache because reads were repeated. I compared latency before and after and tested invalidation. The tests passed.')
+            assert response['action']=='finish'
+            assert await conn.fetchval('SELECT count(*) FROM interview_evaluation_jobs WHERE session_id=$1',sid)==10
+        finished=await interviewer_session.finish_session(str(sid),'fixture-token',600)
+        assert finished['final_score'] is None
+        for _ in range(10): assert await interview_evaluation_jobs.process_one(sid)
+        user=SimpleNamespace(id=str(uid),email='fixture@example.invalid',plan='pro',effective_plan='pro',premium_override=True)
+        report=await reports.get_report(str(sid),user)
+        assert report['session']['candidate_name']=='NAVEENKUMAR G'
+        assert report['session']['final_score']==80 and report['report_state']=='READY'
+        assert report['summary']['answered_questions']==report['summary']['evaluated_questions']==10
+        async with connect() as conn:
+            session=dict(await conn.fetchrow('SELECT * FROM interview_sessions WHERE id=$1',sid))
+            evaluations=[dict(row) for row in await conn.fetch('SELECT * FROM question_evaluations WHERE session_id=$1 ORDER BY turn_number',sid)]
+        result=await generate_pdf_report(session,evaluations,user.email,session_summary=report['summary'])
+        rendered='\n'.join(page.extract_text() for page in PdfReader(BytesIO(result)).pages)
+        assert 'NAVEENKUMAR G' in rendered and '80/100' in rendered
+    asyncio.run(run())

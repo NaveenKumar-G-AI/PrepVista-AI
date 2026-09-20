@@ -36,6 +36,7 @@ from app.services.interviewer import create_session, finish_session, process_ans
 from app.services.quota import enforce_quota
 from app.services.resume_parser import extract_text_from_pdf, parse_resume_structured, validate_pdf_upload
 from app.routers.interviews_schemas import AnswerRequest
+from app.services.interview_evaluation_jobs import dispatch as _dispatch_evaluation
 
 router = APIRouter()
 logger = structlog.get_logger("prepvista.interviews")
@@ -136,22 +137,10 @@ async def submit_answer(
         was_active = await _session_is_active(session_id, req.access_token)
 
         if should_evaluate:
-            try:
-                await _evaluate_and_store(
-                    session_id=session_id,
-                    turn_number=int(turn_for_eval),
-                    question_text=str(question_for_eval),
-                    raw_answer=normalized_text,
-                    answer_duration_seconds=req.answer_duration_seconds,
-                    answer_word_count=answer_word_count,
-                )
-            except Exception as exc:
-                logger.error(
-                    "final_eval_failed",
-                    session_id=session_id,
-                    turn=turn_for_eval,
-                    error=str(exc),
-                )
+            background_tasks.add_task(
+                _dispatch_evaluation, session_id=session_id, turn_number=int(turn_for_eval),
+                answer_duration_seconds=req.answer_duration_seconds,
+            )
 
         final_result = await finish_session(
             session_id=session_id,
@@ -188,7 +177,7 @@ async def submit_answer(
     # --- Mid-interview → background evaluation ---
     if should_evaluate:
         background_tasks.add_task(
-            _evaluate_and_store,
+            _dispatch_evaluation,
             session_id=session_id,
             turn_number=int(turn_for_eval),
             question_text=str(question_for_eval),
@@ -214,7 +203,7 @@ async def _evaluate_and_store(
     raw_answer: str,
     answer_duration_seconds: int | None = None,
     answer_word_count: int | None = None,
-) -> None:
+) -> str | None:
     """Run per-question AI evaluation and persist the result.
 
     Structured in three DB-separated phases so the connection is never
@@ -281,12 +270,12 @@ async def _evaluate_and_store(
             eval_result = await evaluate_single_question(
                 question_text=question_text,
                 raw_answer=raw_answer,
-                resume_summary=str(resume_summary),
+                resume_summary=json.dumps(resume_summary) if isinstance(resume_summary, dict) else str(resume_summary),
                 rubric_category=rubric_category,
                 plan=plan,
                 session_id=session_id,
                 turn_id=turn_number,
-                **({"strict_evidence": True} if v2 else {}),
+                strict_evidence=True,
             )
         if not isinstance(eval_result, dict) or eval_result.get("evaluation_status") == "unavailable":
             logger.warning(
@@ -295,7 +284,7 @@ async def _evaluate_and_store(
                 turn=turn_number,
                 category=rubric_category,
             )
-            return
+            return "EVALUATION_PROVIDER_OR_SCHEMA_FAILED"
 
         # ---- Phase 3: write (new connection, double-insert guard) ---------
         async with DatabaseConnection() as conn, conn.transaction():
@@ -303,8 +292,8 @@ async def _evaluate_and_store(
                 state = await conn.fetchval(
                     "SELECT state FROM interview_sessions WHERE id = $1 FOR NO KEY UPDATE", session_id,
                 )
-                if state != "ACTIVE":
-                    return  # The completed report is an immutable snapshot.
+                if state not in {"ACTIVE", "FINISHED"}:
+                    return "EVALUATION_SESSION_UNAVAILABLE"
             existing = await conn.fetchrow(
                 "SELECT id FROM question_evaluations WHERE session_id = $1 AND turn_number = $2",
                 session_id,
@@ -361,6 +350,9 @@ async def _evaluate_and_store(
                 eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
             )
 
+            await conn.execute("UPDATE question_evaluations SET evaluation_version='rubric-v2',prompt_version='per-question-v1',provider_model=$3 WHERE session_id=$1 AND turn_number=$2",
+                session_id, turn_number, get_settings().GROQ_EVAL_MODEL or get_settings().GROQ_MODEL)
+
         logger.info(
             "question_evaluated",
             session_id=session_id,
@@ -373,8 +365,8 @@ async def _evaluate_and_store(
 
     except Exception as exc:
         logger.error(
-            "background_eval_failed",
+            "EVALUATION_PERSIST_FAILED",
             session_id=session_id,
             turn=turn_number,
-            error=str(exc),
+            error_code="EVALUATION_PERSIST_OR_PROVIDER_FAILED", error_type=type(exc).__name__,
         )

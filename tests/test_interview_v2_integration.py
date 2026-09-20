@@ -53,12 +53,14 @@ class Database:
             return deepcopy(self.session)
         if "FROM profiles" in sql:
             return {"plan": "pro", "email": "test@example.invalid"}
+        if "interview_evaluation_jobs" in sql:
+            return []
         raise AssertionError(sql)
 
     async def fetch(self, sql, *args):
         if "conversation_messages" in sql:
             return deepcopy(self.messages)
-        if "question_evaluations" in sql or "interview_audio_turns" in sql:
+        if "question_evaluations" in sql or "interview_audio_turns" in sql or "interview_evaluation_jobs" in sql:
             return []
         raise AssertionError(sql)
 
@@ -181,7 +183,7 @@ def test_free_practice_history_obeys_existing_history_limit(monkeypatch):
     assert result["sessions"] == []
 
 
-def test_late_background_evaluation_cannot_change_completed_report(monkeypatch):
+def test_late_evaluation_is_persisted_for_completed_report_recovery(monkeypatch):
     from app.routers import interviews_answer
     class EvaluationDatabase:
         execute = AsyncMock()
@@ -203,7 +205,8 @@ def test_late_background_evaluation_cannot_change_completed_report(monkeypatch):
     monkeypatch.setattr(interviews_answer, "DatabaseConnection", connect)
     monkeypatch.setattr(interviews_answer, "evaluate_single_question", AsyncMock(return_value={"score": 8}))
     asyncio.run(interviews_answer._evaluate_and_store(SID, 1, "What did you build?", ANSWER))
-    db.execute.assert_not_awaited()
+    assert db.execute.await_count == 2
+    assert "INSERT INTO question_evaluations" in db.execute.call_args_list[0].args[0]
 
 
 @pytest.mark.parametrize("plan", ["free", "pro", "career"])

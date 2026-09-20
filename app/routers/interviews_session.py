@@ -182,6 +182,10 @@ async def setup_interview(
 
     if not isinstance(resume_summary, dict):
         resume_summary = {}
+    if not resume_summary.get("candidate_name"):
+        resume_summary["candidate_name"] = getattr(user, "full_name", None)
+        resume_summary["candidate_name_source"] = "PROFILE" if resume_summary["candidate_name"] else "UNKNOWN"
+
 
     if mission_id:
         from uuid import UUID

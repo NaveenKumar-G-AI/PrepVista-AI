@@ -1005,7 +1005,8 @@ class ApiClient {
 
 
   // ── Reports ───────────────────────────────
-  async getReport<T = unknown>(sessionId: string) { return this.cachedRequest<T>(`/reports/${sessionId}`, 60_000); }
+  async getReport<T = unknown>(sessionId: string) { return this.request<T>(`/reports/${sessionId}`); }
+  async retryReportEvaluations(sessionId: string) { return this.request<{ queued: number }>(`/reports/${sessionId}/retry-evaluations`, { method: 'POST' }); }
   async downloadPDF(sessionId: string): Promise<Blob> {
     const downloadTimeoutMs = 120000;
     const normalizeDownloadError = (err: unknown): Error => {

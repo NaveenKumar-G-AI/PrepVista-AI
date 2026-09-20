@@ -468,8 +468,8 @@ class TestFinalScoreComputation:
 
     def test_no_division_by_zero_with_empty_evaluations(self):
         result = compute_final_score([], plan="free", expected_questions=5)
-        assert result["final_score"] == 0.0, \
-            "Empty evaluations must produce a score of 0 without crashing"
+        assert result["final_score"] is None, \
+            "Empty evaluations must be unavailable, never a fabricated zero"
         assert result["completion_rate"] == 0.0
 
     def test_short_precise_answer_not_penalized_vs_long_vague(self):

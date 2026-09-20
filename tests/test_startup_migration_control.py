@@ -94,7 +94,7 @@ def test_transaction_lock_cannot_be_claimed_in_autocommit():
 
 def test_unified_apply_scope_matches_current_inventory_and_ignores_ambient_dsn(monkeypatch):
     local, sql = schema.local_plan_inputs()
-    assert set(sql) == set(schema.VERSIONS) and len(local) == 42
+    assert set(sql) == set(schema.VERSIONS) and len(local) == 45
     monkeypatch.delenv('UNIFIED_MIGRATION_DATABASE_URL', raising=False)
     monkeypatch.setenv('DATABASE_URL', 'postgresql://private:secret@production/live')
     with pytest.raises(schema.MigrationPlanError, match='EXPLICIT_MIGRATION_DATABASE_URL_REQUIRED'):

@@ -55,7 +55,7 @@ interface DashboardData {
   recent_sessions?: Array<{
     id: string;
     plan: string;
-    final_score: number;
+    final_score: number | null;
     state: string;
     total_turns: number;
     duration: number | null;

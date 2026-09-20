@@ -216,6 +216,9 @@ async def _bootstrap_runtime_services(app: FastAPI):
             app.state.report_schedule_task = asyncio.create_task(run_report_schedule_loop())
             from app.services.unified_evidence_worker import run_in_process
             settings = get_settings()
+            from app.services.interview_evaluation_jobs import run as run_evaluation_jobs
+            if getattr(settings, 'INTERVIEW_EVALUATION_WORKER_ENABLED', False):
+                app.state.interview_evaluation_task = asyncio.create_task(run_evaluation_jobs())
             if settings.UNIFIED_EVIDENCE_ENABLED and settings.UNIFIED_EVIDENCE_IN_PROCESS_ENABLED:
                 app.state.unified_evidence_task = asyncio.create_task(run_in_process())
             try:
@@ -269,6 +272,7 @@ async def lifespan(app: FastAPI):
     app.state.activity_refresh_task = None
     app.state.report_schedule_task = None
     app.state.unified_evidence_task = None
+    app.state.interview_evaluation_task = None
     app.state.runtime_bootstrap_task = asyncio.create_task(_bootstrap_runtime_services(app))
     yield
     runtime_bootstrap_task = getattr(app.state, "runtime_bootstrap_task", None)
@@ -297,6 +301,13 @@ async def lifespan(app: FastAPI):
         unified_evidence_task.cancel()
         try:
             await unified_evidence_task
+        except asyncio.CancelledError:
+            pass
+    evaluation_task = getattr(app.state, "interview_evaluation_task", None)
+    if evaluation_task:
+        evaluation_task.cancel()
+        try:
+            await evaluation_task
         except asyncio.CancelledError:
             pass
     await close_db_pool()

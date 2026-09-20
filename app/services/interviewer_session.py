@@ -1266,142 +1266,21 @@ async def _ensure_pending_evaluations(
     question_plan,
     strict_evidence: bool = False,
 ) -> None:
-    """Backfill any missing question evaluations before final scoring.
+    """Compatibility adapter: queue saved answers without any provider call.
 
-    Reads conversation messages and existing evaluations inside the supplied
-    connection, then closes it before calling the LLM so the connection is
-    not held open during potentially slow AI calls.  Each INSERT uses
-    ON CONFLICT DO NOTHING to safely handle concurrent finish calls.
+    The caller's transaction owns these rows. Evaluation belongs to the leased
+    worker; a session connection must never wait on a model response.
     """
-    from app.services.evaluator import evaluate_single_question, normalize_rubric_category
-
-    existing_turn_rows = await conn.fetch(
-        "SELECT turn_number FROM question_evaluations WHERE session_id = $1",
-        session_id,
-    )
-    evaluated_turns = {int(row["turn_number"] or 0) for row in existing_turn_rows}
-
-    message_rows = await conn.fetch(
-        """SELECT role, content, turn_number
-           FROM conversation_messages
-           WHERE session_id = $1
-           ORDER BY turn_number ASC, id ASC""",
-        session_id,
-    )
-
-    question_by_turn: dict[int, str] = {}
-    answer_by_turn: dict[int, str] = {}
-    for row in message_rows:
-        turn_number = int(row["turn_number"] or 0)
-        if turn_number <= 0:
-            continue
-        content = str(row["content"] or "")
-        if row["role"] == "assistant" and turn_number not in question_by_turn:
-            question_by_turn[turn_number] = content
-        elif row["role"] == "user" and turn_number not in answer_by_turn:
-            answer_by_turn[turn_number] = content
-
-    # Collect turns that still need evaluation (outside DB connection)
-    pending: list[tuple[int, str, str, str]] = []
-    for turn_number, question_text in sorted(question_by_turn.items()):
-        if turn_number in evaluated_turns:
-            continue
-
-        rubric_category = "technical_depth"
-        for item in _coerce_question_plan(question_plan):
-            if int(item.get("turn", 0) or 0) == turn_number:
-                rubric_category = str(item.get("category") or "technical_depth")
-                break
-        rubric_category = normalize_rubric_category(question_text, rubric_category, plan)
-        raw_answer = answer_by_turn.get(turn_number, "")
-        if strict_evidence and not raw_answer.strip():
-            continue
-        pending.append((turn_number, question_text, rubric_category, raw_answer))
-
-    if not pending:
-        return
-
-    # ✅ PERF: Evaluate all pending turns in parallel instead of sequentially.
-    # Previously: evaluate turn 1 → await → evaluate turn 2 → await → ...
-    # A 10-turn session waited for 10 LLM calls in series at finish time.
-    # With asyncio.gather(), all pending evaluations fire simultaneously.
-    # Typical improvement: 10 × 800ms serial → 1 × 900ms parallel = ~90% faster.
-    # ON CONFLICT DO NOTHING on each INSERT keeps concurrent finish calls safe.
-
-    async def _eval_and_write(turn_number: int, question_text: str, rubric_category: str, raw_answer: str) -> None:
-        try:
-            eval_result = await evaluate_single_question(
-                question_text=question_text,
-                raw_answer=raw_answer,
-                resume_summary=_safe_json_dumps(resume_summary) if isinstance(resume_summary, dict) else str(resume_summary or "{}"),
-                rubric_category=rubric_category,
-                plan=plan,
-                session_id=session_id,
-                turn_id=turn_number,
-                **({"strict_evidence": True} if strict_evidence else {}),
-            )
-            if not isinstance(eval_result, dict) or eval_result.get("evaluation_status") == "unavailable":
-                return
-            async with DatabaseConnection() as write_conn:
-                await write_conn.execute(
-                    """INSERT INTO question_evaluations
-                       (session_id, turn_number, rubric_category, question_text,
-                        raw_answer, normalized_answer, classification, score,
-                        scoring_rationale, missing_elements, ideal_answer,
-                        communication_score, communication_notes, relevance_score,
-                        clarity_score, specificity_score, structure_score,
-                        answer_status, content_understanding, depth_quality,
-                        communication_clarity, what_worked, what_was_missing,
-                        how_to_improve, answer_blueprint, corrected_intent,
-                        answer_duration_seconds, repaired_answer)
-                       VALUES
-                       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-                        $12,$13,$14,$15,$16,$17,$18,$19,$20,
-                        $21,$22,$23,$24,$25,$26,$27,$28)
-                       ON CONFLICT (session_id, turn_number) DO NOTHING""",
-                    session_id,
-                    turn_number,
-                    rubric_category,
-                    question_text,
-                    eval_result.get("raw_answer", raw_answer),
-                    eval_result.get("normalized_answer", raw_answer),
-                    eval_result.get("classification", ""),
-                    eval_result.get("score", 0),
-                    eval_result.get("scoring_rationale", eval_result.get("why_score", "")),
-                    eval_result.get("missing_elements", []),
-                    eval_result.get("ideal_answer", eval_result.get("better_answer", "")),
-                    eval_result.get("communication_score", 0),
-                    eval_result.get("communication_notes", ""),
-                    eval_result.get("relevance_score", eval_result.get("question_match_score", 0)),
-                    eval_result.get("clarity_score", eval_result.get("depth_score", 0)),
-                    eval_result.get("specificity_score", 0),
-                    eval_result.get("structure_score", 0),
-                    eval_result.get("answer_status", ""),
-                    eval_result.get("content_understanding", eval_result.get("content_quality", eval_result.get("technical_understanding", ""))),
-                    eval_result.get("depth_quality", ""),
-                    eval_result.get("communication_clarity", eval_result.get("communication_quality", "")),
-                    eval_result.get("what_worked", ""),
-                    eval_result.get("what_was_missing", ""),
-                    eval_result.get("how_to_improve", ""),
-                    eval_result.get("answer_blueprint", ""),
-                    eval_result.get("corrected_intent", ""),
-                    None,
-                    eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
-                )
-        except Exception as exc:
-            logger.warning(
-                "pending_eval_failed",
-                session_id=session_id,
-                turn=turn_number,
-                error=str(exc),
-            )
-
-    # Fire all evaluations simultaneously — gather waits for the slowest one.
-    # return_exceptions=True ensures one LLM failure does not cancel the others.
-    await asyncio.gather(
-        *[_eval_and_write(t, q, r, a) for t, q, r, a in pending],
-        return_exceptions=True,
-    )
+    from app.services.report_truth import is_recorded_answer
+    rows = await conn.fetch("""SELECT m.id,m.role,m.content,m.turn_number
+        FROM conversation_messages m WHERE m.session_id=$1 AND m.role='user'
+        AND NOT EXISTS(SELECT 1 FROM question_evaluations e WHERE e.session_id=m.session_id AND e.turn_number=m.turn_number)
+        ORDER BY m.turn_number,m.id LIMIT 100""", session_id)
+    for row in rows:
+        if is_recorded_answer(row):
+            await conn.execute("""INSERT INTO interview_evaluation_jobs(session_id,turn_number,source_message_id)
+                VALUES($1,$2,$3) ON CONFLICT(session_id,turn_number) DO NOTHING""",
+                session_id,row['turn_number'],row['id'])
 
 
 async def finish_session(session_id: str, access_token: str, duration_actual: int | None = None) -> dict:
@@ -1458,14 +1337,9 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
                 )
                 return {"error": "Session already finished."}  # original shape preserved
 
-            await _ensure_pending_evaluations(
-                conn,
-                session_id=str(session_id),
-                plan=str(session["plan"]),
-                resume_summary=_coerce_resume_summary_dict(session["resume_summary"] or {}),
-                question_plan=session["question_plan"] or [],
-                strict_evidence=bool(coerce_runtime_state(session["runtime_state"]).get("orchestrator_v2")),
-            )
+            # Accepted answers enqueue durable evaluations in their transaction.
+            # Never hold the session lock while waiting on a provider. Reports
+            # derive coverage and refresh as queued work commits.
 
             eval_rows = await conn.fetch(
                 """SELECT turn_number, rubric_category, score, communication_score, classification,
@@ -1487,25 +1361,12 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
             else:
                 effective_duration = 0
 
-            summary = compute_interview_summary(
-                plan=str(session["plan"]),
-                question_plan=session["question_plan"] or [],
-                total_turns=int(session["total_turns"] or 0),
-                evaluations=evaluations,
-                duration_seconds=effective_duration,
-                runtime_state=session["runtime_state"],
-            )
-            result = compute_final_score(
-                evaluations,
-                plan=session["plan"],
-                expected_questions=len(evaluations) if coerce_runtime_state(session["runtime_state"]).get("orchestrator_v2") else summary["planned_questions"] or len(evaluations) or 0,
-            )
-            interpretation = get_score_interpretation(result["final_score"], session["plan"])
-            if summary["completion_rate"] < 100 and summary["planned_questions"]:
-                interpretation = (
-                    f"{interpretation} This result reflects {summary['closed_questions']} of "
-                    f"{summary['planned_questions']} planned questions completed."
-                )
+            from app.services.report_truth import build_report_truth
+            messages = await conn.fetch("SELECT role,content,turn_number FROM conversation_messages WHERE session_id=$1", session_id)
+            truth = build_report_truth({**dict(session), 'duration_actual_seconds': effective_duration}, evaluations, messages)
+            summary = truth['summary']
+            result = truth['aggregate']
+            interpretation = truth['interpretation']
             runtime_state = coerce_runtime_state(session["runtime_state"] or {})
             runtime_state["question_state"] = summary["question_state"]
             runtime_state["final_summary"] = summary
@@ -1516,9 +1377,9 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
                 if state_v2["anchors"] and not state_v2["anchors"][-1]["closed_reason"]:
                     state_v2["anchors"][-1]["closed_reason"] = "EARLY_FINISH"
                 runtime_state["evidence_report_v2"] = evidence_report(state_v2)
-                runtime_state["evidence_report_v2"]["numeric_evaluation_status"] = "available" if evaluations else "unavailable"
+                runtime_state["evidence_report_v2"]["numeric_evaluation_status"] = truth["evaluation_status"].lower()
                 runtime_state["evidence_report_v2"]["evaluated_answers"] = len(evaluations)
-                interpretation = "Numeric evaluation unavailable; your answer evidence is preserved." if not evaluations else "This score summarizes evaluated answers only. Use the evidence report to identify what to practise; it does not predict hiring."
+                interpretation = truth["interpretation"]
                 runtime_state["finish_result_v2"] = {
                     "final_score": result["final_score"], "interpretation": interpretation,
                     "category_scores": result["category_scores"], "strengths": result["strengths"],
@@ -1528,7 +1389,7 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
                     "summary": summary, "evidence_report": runtime_state["evidence_report_v2"],
                     "neural_feedback": build_interview_neural_feedback(
                         plan=str(session["plan"]), question_evaluations=evaluations,
-                        strengths=result["strengths"], weaknesses=result["weaknesses"], final_score=float(result["final_score"])),
+                        strengths=result["strengths"], weaknesses=result["weaknesses"], final_score=float(result["final_score"])) if result["final_score"] is not None else {},
                     "strongest_category": result["strongest_category"], "weakest_category": result["weakest_category"],
                     "report_url": f"/report/{session_id}",
                 }
@@ -1593,7 +1454,7 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
         strengths=result["strengths"],
         weaknesses=result["weaknesses"],
         final_score=float(result["final_score"]),
-    )
+    ) if result["final_score"] is not None else {}
 
     return {
         "final_score":        result["final_score"],

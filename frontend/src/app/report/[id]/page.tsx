@@ -104,11 +104,15 @@ interface InterviewSummary {
 }
 
 interface ReportData {
+  report_state?: 'GENERATING' | 'PARTIAL' | 'READY';
+  evaluation_status?: 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+  pending_evaluations?: number;
+  failed_evaluations?: number;
   evidence_report?: EvidenceReport | null;
   session: {
     id: string;
     plan: string;
-    final_score: number;
+    final_score: number | null;
     total_turns: number;
     created_at: string;
     finished_at?: string | null;
@@ -191,6 +195,8 @@ export default function ReportPage() {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
   const [downloadSuccess, setDownloadSuccess] = useState('');
+  const [retrying, setRetrying] = useState(false);
+  const [retryMessage, setRetryMessage] = useState('');
 
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -207,11 +213,31 @@ export default function ReportPage() {
       return;
     }
 
-    api.getReport<ReportData>(sessionId)
-      .then(report => setData(report))
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load report.'))
-      .finally(() => setLoading(false));
-  }, [authLoading, router, sessionId, user]);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let polls = 0;
+    const load = async () => {
+      try {
+        const report = await api.getReport<ReportData>(sessionId);
+        if (cancelled) return;
+        setData(report);
+        if (report.report_state === 'GENERATING' && polls++ < 36) timer = setTimeout(load, 5000);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load report.');
+      } finally { if (!cancelled) setLoading(false); }
+    };
+    void load();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [authLoading, router, sessionId, user, retryMessage]);
+
+  const retryEvaluations = async () => {
+    setRetrying(true);
+    try {
+      const result = await api.retryReportEvaluations(sessionId);
+      setRetryMessage(result.queued ? `${result.queued} saved answers queued for evaluation.` : 'Evaluation is already queued, or the retry cooldown is active. Refresh this report shortly.');
+    } catch (err) { setRetryMessage(err instanceof Error ? err.message : 'Could not retry. Please try again.'); }
+    finally { setRetrying(false); }
+  };
 
   if (loading || authLoading) {
     return (
@@ -242,7 +268,8 @@ export default function ReportPage() {
   const isCareerSession = session.plan === 'career';
   const showProReview = isProSession && has_premium_access;
   const showCareerReview = isCareerSession && has_premium_access;
-  const scoreColor = session.final_score >= 70 ? '#22c55e' : session.final_score >= 50 ? '#eab308' : '#ef4444';
+  const scoreAvailable = session.final_score != null && evaluations.length > 0 && data.evidence_report?.numeric_evaluation_status !== 'unavailable';
+  const scoreColor = !scoreAvailable ? '#64748b' : session.final_score! >= 70 ? '#22c55e' : session.final_score! >= 50 ? '#eab308' : '#ef4444';
   const summary = session.summary ?? data.summary;
   const expectedQuestions = summary?.planned_questions ?? session.expected_questions ?? data.expected_questions ?? evaluations.length;
   const answeredQuestions = summary?.answered_questions ?? session.answered_questions ?? data.answered_questions ?? evaluations.filter(item => item.classification !== 'silent').length;
@@ -316,16 +343,24 @@ export default function ReportPage() {
             style={{ background: `${scoreColor}15`, border: `3px solid ${scoreColor}` }}
           >
             <span className="text-4xl font-bold" style={{ color: scoreColor }}>
-              {data.evidence_report?.numeric_evaluation_status === 'unavailable' ? '—' : Math.round(session.final_score)}
+              {!scoreAvailable ? '—' : Math.round(session.final_score ?? 0)}
             </span>
           </div>
           <p className="text-sm text-secondary">
-            {data.evidence_report?.numeric_evaluation_status === 'unavailable' ? 'Numeric evaluation unavailable. Your answer evidence is preserved above.' : `out of 100 - ${answeredQuestions} answered out of ${expectedQuestions} planned questions`}
+            {!scoreAvailable ? 'Evaluation unavailable. Your recorded answers are preserved.' : `out of 100 - ${answeredQuestions} answered out of ${expectedQuestions} planned questions`}
           </p>
           <p className="mt-2 text-sm text-secondary">
             Total time: {durationLabel}{averageAnswerTime ? ` | Avg response: ${averageAnswerTime}s` : ''}
           </p>
-          {data.interpretation && !data.evidence_report ? (
+          <p className="mt-2 text-sm text-secondary">{answeredQuestions} answers recorded; {evaluations.length} evaluated. Evaluation coverage: {answeredQuestions ? `${Math.round(100 * evaluations.length / answeredQuestions)}%` : 'Not available'}.</p>
+          {data.evaluation_status && data.evaluation_status !== 'AVAILABLE' && (
+          <section className="card p-4 mb-6" aria-live="polite">
+            <p>{data.report_state === 'GENERATING' ? 'Evaluating saved answers. This report updates automatically for three minutes.' : 'Some saved answers have no evaluation yet. This does not mean a zero score.'}</p>
+            <button type="button" className="btn-secondary mt-3" disabled={retrying || data.report_state === 'GENERATING'} onClick={retryEvaluations}>{retrying ? 'Queuing...' : 'Retry missing evaluations'}</button>
+            {retryMessage && <p className="mt-2">{retryMessage}</p>}
+          </section>
+        )}
+        {data.interpretation ? (
             <p className="mt-3 text-sm text-secondary max-w-xl mx-auto">{data.interpretation}</p>
           ) : null}
 
@@ -374,11 +409,11 @@ export default function ReportPage() {
           </section>
         ) : null}
 
-        {has_premium_access && !data.evidence_report ? (
+        {has_premium_access && !data.evidence_report && session.final_score !== null && evaluations.length > 0 && data.evaluation_status === 'AVAILABLE' ? (
           <section className="mb-6 slide-up">
             <h2 className="text-lg font-semibold text-primary mb-1">Interview Intelligence</h2>
             <p className="text-sm text-secondary mb-4">Premium analytics derived from this session&apos;s per-question evaluator data.</p>
-            <IntelDashboard report={data} />
+            <IntelDashboard report={{ ...data, session: { ...session, final_score: session.final_score } }} />
           </section>
         ) : null}
 
@@ -395,7 +430,7 @@ export default function ReportPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-secondary">Complete more interviews to see strengths.</p>
+              <p className="text-sm text-secondary">No evaluated strengths are available yet.</p>
             )}
           </div>
 
@@ -411,7 +446,7 @@ export default function ReportPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-secondary">Great job! Keep practicing.</p>
+              <p className="text-sm text-secondary">No improvement feedback is available yet.</p>
             )}
           </div>
         </div>

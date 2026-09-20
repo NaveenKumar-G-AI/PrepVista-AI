@@ -14,7 +14,7 @@ import re
 from app.database.migration_control import transaction_migration_lock
 from scripts.unified_release_preflight import ROOT, inventory, compare_ledger
 
-VERSIONS = ('038_unified_coding', '039_unified_assignments', '040_coding_validation', '041_unified_evidence_recovery', '042_artifact_review_consent')
+VERSIONS = ('038_unified_coding', '039_unified_assignments', '040_coding_validation', '041_unified_evidence_recovery', '042_artifact_review_consent', '043_evaluation_rubric_categories', '044_durable_interview_evaluation', '045_protect_server_owned_records')
 DIRECTORY = ROOT / 'app/database/migrations'
 TARGET = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$')
 

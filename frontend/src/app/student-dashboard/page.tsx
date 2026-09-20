@@ -31,7 +31,7 @@ interface StudentDashboardData {
   recent_sessions?: Array<{
     id: string;
     plan: string;
-    final_score: number;
+    final_score: number | null;
     state: string;
     total_turns: number;
     duration: number | null;
@@ -299,7 +299,7 @@ export default function StudentDashboardPage() {
                 >
                   <div>
                     <div className="text-sm font-medium text-primary">
-                      {session.state === 'FINISHED' ? `Score: ${session.final_score}/100` : 'In Progress'}
+                      {session.state === 'FINISHED' ? session.final_score === null ? 'Evaluation unavailable' : `Score: ${session.final_score}/100` : 'In Progress'}
                     </div>
                     <div className="mt-0.5 text-xs text-secondary">
                       {formatDateTime(session.created_at)}
