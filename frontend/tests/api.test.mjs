@@ -49,3 +49,23 @@ test('refresh completing after logout cannot restore the old login', async () =>
   await assert.rejects(request);
   assert.equal(api.getToken(), null);
 });
+
+test('refresh outage never replays the expired access token or erases recoverable credentials', async () => {
+  const calls = [];
+  let recovered = false;
+  const api = setup(async (url, options) => {
+    calls.push(url);
+    if (url.endsWith('/auth/refresh')) return recovered
+      ? response({ access_token: 'x.y.z', refresh_token: 'new-refresh' })
+      : response({ detail: 'Temporary auth outage' }, 503);
+    return options.headers.Authorization === 'Bearer x.y.z'
+      ? response({ id: 'owner' }) : response({ detail: 'Expired' }, 401);
+  });
+  api.setTokens('a.b.c', 'valid-refresh');
+  await assert.rejects(api.request('/auth/me'), error => error.status === 503);
+  assert.equal(calls.length, 2);
+  assert.equal(api.getToken(), 'a.b.c');
+  recovered = true;
+  assert.equal((await api.request('/auth/me')).id, 'owner');
+  assert.equal(api.getToken(), 'x.y.z');
+});

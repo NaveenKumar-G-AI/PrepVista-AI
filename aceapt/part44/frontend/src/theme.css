@@ -1,0 +1,73 @@
+/* ACEAPT Feature 44 - "Ascent" design language.
+   A goal is a summit; the gap is the distance still to climb; a
+   milestone is a camp along the route. Every visual choice below
+   reinforces that one idea instead of decorating around it. */
+
+:root {
+  /* --- surface --- */
+  --bg-void: #11171a;
+  --bg-surface: #1a2226;
+  --bg-surface-raised: #222c30;
+  --border-subtle: #2c3a3e;
+  --border-strong: #3c4d52;
+
+  /* --- ink --- */
+  --ink-primary: #ece7dd;
+  --ink-muted: #93a4a6;
+  --ink-faint: #5b6c6e;
+
+  /* --- accents: gold = target/summit, teal = current/progress,
+     rust = attention/risk. Used deliberately sparingly. --- */
+  --accent-summit: #c9a24b;
+  --accent-summit-soft: rgba(201, 162, 75, 0.16);
+  --accent-current: #4fa391;
+  --accent-current-soft: rgba(79, 163, 145, 0.16);
+  --accent-risk: #c2694b;
+  --accent-risk-soft: rgba(194, 105, 75, 0.18);
+
+  /* --- type --- */
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-void);
+  background-image: radial-gradient(circle at 15% 0%, #17222580 0%, transparent 45%);
+  color: var(--ink-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--accent-summit-soft);
+}

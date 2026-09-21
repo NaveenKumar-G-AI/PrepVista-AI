@@ -1,0 +1,18 @@
+{
+  "name": "@aceapt/feature21-diagnosis-engine",
+  "version": "0.1.0",
+  "description": "ACEAPT OS — Feature 21: Autonomous Student Diagnosis & Next-Best-Action Intelligence Engine",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/orchestrator.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "demo": "ts-node src/demo.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.14.0"
+  }
+}

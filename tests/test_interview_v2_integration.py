@@ -213,11 +213,11 @@ def test_late_evaluation_is_persisted_for_completed_report_recovery(monkeypatch)
 def test_provider_failure_is_unavailable_without_score(monkeypatch, plan):
     monkeypatch.setattr(evaluator_scoring, "call_llm_json", AsyncMock(side_effect=RuntimeError("offline")))
     result = asyncio.run(evaluator_scoring._evaluate_question_core("What did you build?", ANSWER, ANSWER, "{}", "ownership", plan, strict_evidence=True))
-    assert result == {"evaluation_status": "unavailable"}
+    assert result == {"evaluation_status": "unavailable", "error_code": "EVALUATION_PROVIDER_FAILED"}
 
 
 @pytest.mark.parametrize("result", [{}, {"score": 0}, {"specificity_score": float("nan")}])
 def test_malformed_provider_json_is_not_a_zero_score(monkeypatch, result):
     monkeypatch.setattr(evaluator_scoring, "call_llm_json", AsyncMock(return_value=result))
     evaluated = asyncio.run(evaluator_scoring._evaluate_question_core("What did you build?", ANSWER, ANSWER, "{}", "ownership", "pro", strict_evidence=True))
-    assert evaluated == {"evaluation_status": "unavailable"}
+    assert evaluated == {"evaluation_status": "unavailable", "error_code": "EVALUATION_INVALID_SCHEMA"}

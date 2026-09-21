@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeForge — Coding Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #10131a;
+    --panel: #171b24;
+    --panel-2: #1d222d;
+    --border: #2a3040;
+    --border-soft: #232838;
+    --text: #e7e9ee;
+    --text-dim: #9aa1b4;
+    --text-faint: #666e82;
+    --teal: #6fe9d4;
+    --teal-dim: #2c4a47;
+    --amber: #f2ab63;
+    --amber-dim: #4a3a29;
+    --red: #f18b8b;
+    --red-dim: #4a2b2b;
+    --radius: 10px;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { padding: 0; min-height: 100vh; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; margin: 0; }
+  button { font-family: var(--font-display); cursor: pointer; }
+  code, .mono { font-family: var(--font-mono); }
+  a { color: var(--teal); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .app { max-width: 1180px; margin: 0 auto; padding: 20px 24px 64px; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 14px 0 22px; border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .wordmark { display: flex; align-items: baseline; gap: 8px; }
+  .wordmark .mark { font-size: 19px; letter-spacing: 0.01em; }
+  .wordmark .tag { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .pill {
+    font-size: 12px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border);
+    color: var(--text-dim); font-family: var(--font-mono); white-space: nowrap;
+  }
+  .mode-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); }
+  .mode-toggle select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px; font-size: 12px; font-family: var(--font-mono);
+  }
+
+  .layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); gap: 20px; align-items: start; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 15px; margin-bottom: 12px; }
+  .card h2 .sub { color: var(--text-faint); font-weight: 400; font-family: var(--font-body); font-size: 13px; margin-left: 6px; }
+
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .badge { font-size: 11px; padding: 4px 10px; border-radius: 6px; font-family: var(--font-mono); letter-spacing: 0.02em; }
+  .badge.task { background: var(--amber-dim); color: var(--amber); }
+  .badge.diff { background: var(--teal-dim); color: var(--teal); }
+  .badge.lang { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .challenge-title { font-size: 19px; margin-bottom: 10px; }
+  .challenge-desc { white-space: pre-line; color: var(--text-dim); font-size: 14px; line-height: 1.65; margin-bottom: 14px; }
+  .constraints { font-size: 13px; color: var(--text-faint); }
+  .constraints ul { margin: 4px 0 0; padding-left: 18px; }
+
+  .evidence-strip { display: flex; flex-direction: column; gap: 10px; }
+  .signal-row { display: grid; grid-template-columns: 96px 1fr 60px; gap: 10px; align-items: center; }
+  .signal-label { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
+  .signal-track { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; border: 1px solid var(--border-soft); }
+  .signal-fill { height: 100%; border-radius: 3px; }
+  .signal-fill.high { background: var(--teal); width: 100%; }
+  .signal-fill.medium { background: var(--amber); width: 60%; }
+  .signal-fill.low { background: var(--text-faint); width: 25%; }
+  .signal-value { font-size: 11px; font-family: var(--font-mono); text-align: right; color: var(--text-dim); }
+  .evidence-score { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 6px; padding-top: 14px; border-top: 1px solid var(--border-soft); }
+  .evidence-score .num { font-family: var(--font-mono); font-size: 22px; color: var(--teal); }
+  .evidence-score .lbl { font-size: 12px; color: var(--text-faint); }
+  .rationale { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-dim); line-height: 1.7; margin-top: 8px; }
+
+  .editor-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 16px; font-size: 13px; font-weight: 500;
+  }
+  .btn:hover { border-color: var(--text-faint); }
+  .btn.primary { background: var(--teal); color: #0a1f1c; border-color: var(--teal); }
+  .btn.primary:hover { opacity: 0.9; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; }
+
+  .editor-wrap { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel-2); }
+  .gutter {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: var(--text-faint);
+    padding: 12px 10px; text-align: right; user-select: none; background: var(--panel); border-right: 1px solid var(--border-soft);
+    white-space: pre;
+  }
+  textarea#editor {
+    flex: 1; background: transparent; color: var(--text); border: none; outline: none;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.6; padding: 12px; resize: vertical;
+    min-height: 260px; tab-size: 4;
+  }
+
+  .results-status { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+  .results-status.pass { background: var(--teal-dim); color: var(--teal); }
+  .results-status.fail { background: var(--amber-dim); color: var(--amber); }
+  .results-status.idle { background: var(--panel-2); color: var(--text-faint); border: 1px solid var(--border-soft); }
+  .results-status .count { font-family: var(--font-mono); font-weight: 500; }
+
+  .test-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .test-chip {
+    width: 30px; height: 24px; display: flex; align-items: center; justify-content: center;
+    border-radius: 5px; font-size: 10px; font-family: var(--font-mono); border: 1px solid var(--border);
+    color: var(--text-faint); position: relative;
+  }
+  .test-chip.pass { background: var(--teal-dim); color: var(--teal); border-color: transparent; }
+  .test-chip.fail { background: var(--red-dim); color: var(--red); border-color: transparent; }
+
+  .mistake-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .mistake-chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--red-dim); color: var(--red); font-family: var(--font-mono); }
+
+  .failure-summary { font-size: 13.5px; color: var(--text-dim); line-height: 1.6; margin-top: 8px; }
+
+  .hint-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .hint-item { font-size: 13px; padding: 10px 12px; background: var(--panel-2); border-radius: 7px; border-left: 2px solid var(--amber); color: var(--text-dim); }
+  .hint-item .lvl { font-family: var(--font-mono); color: var(--amber); font-size: 11px; margin-right: 8px; }
+
+  .ai-note { font-size: 12.5px; color: var(--text-faint); padding: 10px 12px; background: var(--panel-2); border-radius: 7px; margin-top: 10px; }
+  .ai-note.pending { border-left: 2px solid var(--text-faint); }
+  .ai-note.ready { border-left: 2px solid var(--teal); color: var(--text-dim); }
+
+  .history-strip { display: flex; gap: 8px; flex-wrap: wrap; }
+  .history-chip { font-size: 11px; font-family: var(--font-mono); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); color: var(--text-dim); }
+  .history-chip.passed { border-color: var(--teal-dim); color: var(--teal); }
+  .history-chip.failed { border-color: var(--red-dim); color: var(--red); }
+  .empty-history { font-size: 12.5px; color: var(--text-faint); }
+
+  .settings-note { font-size: 12px; color: var(--text-faint); margin-top: 10px; line-height: 1.6; }
+  .live-input { display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+  .live-input input {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px;
+    padding: 6px 9px; font-family: var(--font-mono); font-size: 12px; width: 220px;
+  }
+  .conn-status { font-size: 11px; font-family: var(--font-mono); padding: 2px 8px; border-radius: 5px; }
+  .conn-status.ok { background: var(--teal-dim); color: var(--teal); }
+  .conn-status.err { background: var(--red-dim); color: var(--red); }
+  .conn-status.unknown { background: var(--panel-2); color: var(--text-faint); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .btn, .signal-fill, .card { transition: opacity 120ms ease, border-color 120ms ease; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="wordmark">
+      <h1 class="mark">CodeForge</h1>
+      <span class="tag">Coding Workspace</span>
+    </div>
+    <div class="topbar-right">
+      <span class="pill" id="student-pill">student &middot; AI/ML Engineer track</span>
+      <label class="mode-toggle">
+        Language
+        <select id="language-select" aria-label="Language">
+          <option value="python">Python</option>
+          <option value="java">Java</option>
+        </select>
+      </label>
+      <span class="pill" id="conn-pill">Mock data</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div>
+      <section class="card" aria-labelledby="challenge-title">
+        <div class="badges">
+          <span class="badge task" id="badge-task">DEBUGGING</span>
+          <span class="badge diff" id="badge-diff">INTERMEDIATE</span>
+          <span class="badge lang" id="badge-lang">python</span>
+        </div>
+        <h2 id="challenge-title" class="challenge-title">Loading challenge&hellip;</h2>
+        <p class="challenge-desc" id="challenge-desc"></p>
+        <div class="constraints" id="constraints-wrap" hidden>
+          <strong style="color:var(--text-dim);font-size:12.5px;">Constraints</strong>
+          <ul id="constraints-list"></ul>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="why-heading">
+        <h2 id="why-heading">Why this challenge?</h2>
+        <div class="evidence-strip" id="evidence-strip"></div>
+        <div class="evidence-score">
+          <span class="num" id="evidence-score">&mdash;</span>
+          <span class="lbl">selection score</span>
+        </div>
+        <p class="rationale" id="evidence-rationale"></p>
+      </section>
+
+      <section class="card">
+        <h2>Session progress <span class="sub">this session's attempts</span></h2>
+        <div class="history-strip" id="history-strip">
+          <span class="empty-history">No attempts yet &mdash; run or submit to start building history.</span>
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <section class="card">
+        <div class="editor-toolbar">
+          <h2 style="margin:0;">Your solution</h2>
+          <div class="btn-row">
+            <button class="btn" id="btn-hint" type="button">Get a hint</button>
+            <button class="btn" id="btn-run" type="button">Run</button>
+            <button class="btn primary" id="btn-submit" type="button">Submit</button>
+          </div>
+        </div>
+        <label for="editor" class="sr-only">Your solution code</label>
+        <div class="editor-wrap">
+          <div class="gutter" id="gutter" aria-hidden="true">1</div>
+          <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        </div>
+        <div class="hint-list" id="hint-list"></div>
+      </section>
+
+      <section class="card" aria-live="polite" aria-atomic="true">
+        <h2>Results</h2>
+        <div class="results-status idle" id="results-status">
+          <span>Not run yet.</span>
+        </div>
+        <div class="test-grid" id="test-grid"></div>
+        <div class="mistake-chips" id="mistake-chips"></div>
+        <p class="failure-summary" id="failure-summary"></p>
+        <div class="ai-note" id="ai-note" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>Connect a live backend</h2>
+        <p class="settings-note">This page ships with real, previously-computed results from an actual run of the engine (see the fine print below) so it's fully interactive with no server required. Point it at a running <code>src/api/server.ts</code> instance to execute arbitrary code for real.</p>
+        <div class="live-input">
+          <input type="checkbox" id="use-live" aria-label="Use live API">
+          <label for="use-live" style="font-size:12.5px;color:var(--text-dim);">Use live API at</label>
+          <input type="text" id="api-base" value="http://localhost:8787" aria-label="API base URL">
+          <span class="conn-status unknown" id="conn-status">not checked</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <p style="font-size:11.5px;color:var(--text-faint);margin-top:8px;line-height:1.7;">
+    Mock-mode numbers (score 0.823, 8/10 tests, BOUNDARY_ERROR + OFF_BY_ONE) are copied verbatim from an actual run of
+    <code>src/service/codeforgeService.ts</code> against the real seed data &mdash; not invented for this page. Editing the
+    code in mock mode will say so plainly rather than fabricate a new result; only the two known snapshots (original /
+    corrected) reflect genuine execution here without a live backend.
+  </p>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MOCK = {
+    challenge: {
+      challengeId: "debug-duplicate-feature-vectors",
+      title: "Fix: Deduplicating Feature Vectors",
+      description: "ROLE: AI/ML Engineer\nOBJECTIVE: Get this data-prep helper working correctly before it ships in the training pipeline.\nSCENARIO: Feature vectors are read from an upstream pipeline before batching. Duplicate rows waste compute and can quietly bias a model toward over-represented examples. A teammate wrote a first pass at removing duplicates, but it's failing some of the test suite.\nTASK: Fix dedupe_vectors(vectors) so it returns the unique vectors, preserving first-seen order.\nCONSTRAINTS: Do not change the function name or its signature. Do not reorder unique vectors.\nEXPECTED BEHAVIOR: For input vectors (each a list of numbers), return a new list containing each distinct vector once, in the order it first appeared.",
+      difficultyLabel: "INTERMEDIATE",
+      taskType: "DEBUGGING",
+      constraints: ["Preserve first-seen order.", "Do not use additional imports."],
+      starterCode: {
+        python: "def dedupe_vectors(vectors):\n    seen = set()\n    result = []\n    for i in range(len(vectors) - 1):\n        key = tuple(vectors[i])\n        if key not in seen:\n            seen.add(key)\n            result.append(vectors[i])\n    result.append(vectors[-1])\n    return result\n",
+        java: "class Solution {\n    public static List<List<Integer>> dedupe_vectors(List<List<Object>> vectors) {\n        Set<String> seen = new HashSet<>();\n        List<List<Integer>> result = new ArrayList<>();\n        for (int i = 0; i < vectors.size() - 1; i++) {\n            List<Integer> intVec = toIntList(vectors.get(i));\n            String key = intVec.toString();\n            if (!seen.contains(key)) {\n                seen.add(key);\n                result.add(intVec);\n            }\n        }\n        result.add(toIntList(vectors.get(vectors.size() - 1)));\n        return result;\n    }\n\n    private static List<Integer> toIntList(List<Object> v) {\n        List<Integer> r = new ArrayList<>();\n        for (Object o : v) r.add(((Double) o).intValue());\n        return r;\n    }\n}\n"
+      }
+    },
+    reason: {
+      primaryGap: "Hash Maps & Sets", secondaryGap: "Debugging",
+      roleRelevance: "HIGH", difficultyFit: "MEDIUM", recentExposure: "LOW", taskDiversity: "HIGH",
+      score: 0.8233333333333333,
+      rationale: "Targets Hash Maps & Sets, the current priority gap. Framed directly in the student's target role. Closest available difficulty match for where the student is right now. Little to no recent exposure to this skill/task combination \u2014 evidence will be fresh. A different task type than the immediately preceding challenge, avoiding repetitive drilling."
+    },
+    fixedCode: {
+      python: "def dedupe_vectors(vectors):\n    seen = set()\n    result = []\n    for v in vectors:\n        key = tuple(v)\n        if key not in seen:\n            seen.add(key)\n            result.append(v)\n    return result\n"
+    },
+    hint: { level: 1, text: "Look closely at how the loop's range relates to the length of the input list \u2014 does it visit every index?" },
+    resultsByLanguage: {
+      python: {
+        buggy: {
+          passed: false, testsPassed: 8, testsTotal: 10,
+          failureSummary: "Your implementation handles 8 of 10 test cases, but 2 cases spanning multiple categories still are failing.",
+          mistakeCategories: ["BOUNDARY_ERROR", "OFF_BY_ONE"],
+          testOutcomes: {p1:true,p2:true,p3:true,p4:false,h1:true,h2:true,h3:false,h4:true,h5:true,h6:true}
+        },
+        fixed: {
+          passed: true, testsPassed: 10, testsTotal: 10,
+          failureSummary: "All validation cases passed.",
+          mistakeCategories: [],
+          testOutcomes: {p1:true,p2:true,p3:true,p4:true,h1:true,h2:true,h3:true,h4:true,h5:true,h6:true}
+        }
+      }
+    }
+  };
+  var ALL_TEST_IDS = ["p1","p2","p3","p4","h1","h2","h3","h4","h5","h6"];
+
+  var state = {
+    language: "python",
+    code: MOCK.challenge.starterCode.python,
+    hintsShown: [],
+    history: [],
+    live: false,
+    apiBase: "http://localhost:8787",
+    attemptId: null
+  };
+
+  var el = {};
+  ["challenge-title","challenge-desc","constraints-wrap","constraints-list","badge-task","badge-diff","badge-lang",
+   "evidence-strip","evidence-score","evidence-rationale","editor","gutter","btn-run","btn-submit","btn-hint",
+   "results-status","test-grid","mistake-chips","failure-summary","ai-note","hint-list","history-strip",
+   "language-select","conn-pill","use-live","api-base","conn-status"].forEach(function (id) {
+    el[id] = document.getElementById(id);
+  });
+
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function tierClass(tier) {
+    return tier === "HIGH" ? "high" : tier === "MEDIUM" ? "medium" : "low";
+  }
+
+  function renderChallenge() {
+    el["challenge-title"].textContent = MOCK.challenge.title;
+    el["challenge-desc"].textContent = MOCK.challenge.description;
+    el["badge-task"].textContent = MOCK.challenge.taskType;
+    el["badge-diff"].textContent = MOCK.challenge.difficultyLabel;
+    el["badge-lang"].textContent = state.language;
+    if (MOCK.challenge.constraints && MOCK.challenge.constraints.length) {
+      el["constraints-wrap"].hidden = false;
+      el["constraints-list"].innerHTML = MOCK.challenge.constraints.map(function (c) { return "<li>" + esc(c) + "</li>"; }).join("");
+    }
+  }
+
+  function renderEvidence() {
+    var r = MOCK.reason;
+    var freshnessDisplay = r.recentExposure === "LOW" ? "HIGH" : r.recentExposure === "HIGH" ? "LOW" : "MEDIUM";
+    var items = [
+      {label: "Gap", tier: "HIGH", value: r.primaryGap},
+      {label: "Role fit", tier: r.roleRelevance, value: r.roleRelevance},
+      {label: "Difficulty", tier: r.difficultyFit, value: r.difficultyFit},
+      {label: "Freshness", tier: freshnessDisplay, value: r.recentExposure + " exposure"},
+      {label: "Diversity", tier: r.taskDiversity, value: r.taskDiversity}
+    ];
+    el["evidence-strip"].innerHTML = items.map(function (it) {
+      return '<div class="signal-row">' +
+        '<span class="signal-label">' + esc(it.label) + '</span>' +
+        '<span class="signal-track"><span class="signal-fill ' + tierClass(it.tier) + '"></span></span>' +
+        '<span class="signal-value">' + esc(it.value.length > 10 ? it.tier : it.value) + '</span>' +
+        '</div>';
+    }).join("");
+    el["evidence-score"].textContent = r.score.toFixed(3);
+    el["evidence-rationale"].textContent = r.rationale;
+  }
+
+  function updateGutter() {
+    var lines = el.editor.value.split("\n").length;
+    var out = [];
+    for (var i = 1; i <= lines; i++) out.push(i);
+    el.gutter.textContent = out.join("\n");
+  }
+
+  function renderResultsIdle() {
+    el["results-status"].className = "results-status idle";
+    el["results-status"].innerHTML = "<span>Not run yet.</span>";
+    el["test-grid"].innerHTML = "";
+    el["mistake-chips"].innerHTML = "";
+    el["failure-summary"].textContent = "";
+    el["ai-note"].hidden = true;
+  }
+
+  function renderResult(result, isSubmit) {
+    var statusEl = el["results-status"];
+    statusEl.className = "results-status " + (result.passed ? "pass" : "fail");
+    statusEl.innerHTML = "<span class=\"count\">" + result.testsPassed + "/" + result.testsTotal + "</span>" +
+      "<span>" + (result.passed ? "All tests passed" : "tests passed" + (isSubmit ? "" : " (public tests only \u2014 Submit checks hidden tests too)")) + "</span>";
+
+    el["test-grid"].innerHTML = ALL_TEST_IDS.map(function (id) {
+      var isHidden = id.charAt(0) === "h";
+      if (!isSubmit && isHidden) {
+        return '<span class="test-chip" title="Hidden test \u2014 Submit to check">&bull;</span>';
+      }
+      var outcome = result.testOutcomes ? result.testOutcomes[id] : undefined;
+      if (outcome === undefined) return '<span class="test-chip" title="not run">&middot;</span>';
+      return '<span class="test-chip ' + (outcome ? "pass" : "fail") + '" title="' + id + (isHidden ? " (hidden)" : "") + '">' + (outcome ? "&#10003;" : "&#10005;") + '</span>';
+    }).join("");
+
+    el["mistake-chips"].innerHTML = (result.mistakeCategories || []).map(function (m) {
+      return '<span class="mistake-chip">' + esc(m) + '</span>';
+    }).join("");
+
+    el["failure-summary"].textContent = result.failureSummary || "";
+
+    if (isSubmit) {
+      el["ai-note"].hidden = false;
+      el["ai-note"].className = "ai-note pending";
+      el["ai-note"].textContent = "AI coaching: PENDING \u2014 no live provider configured (this is the correct, honest state with no API key set). The result above is already final and does not depend on it.";
+    } else {
+      el["ai-note"].hidden = true;
+    }
+  }
+
+  function currentSnapshotKey() {
+    if (state.language !== "python") return null;
+    if (state.code === MOCK.challenge.starterCode.python) return "buggy";
+    if (state.code === MOCK.fixedCode.python) return "fixed";
+    return null;
+  }
+
+  function pushHistory(challengeTitle, result) {
+    state.history.unshift({ title: challengeTitle, passed: result.passed, hints: state.hintsShown.length });
+    var wrap = el["history-strip"];
+    if (state.history.length === 1) wrap.innerHTML = "";
+    var chip = document.createElement("span");
+    chip.className = "history-chip " + (result.passed ? "passed" : "failed");
+    chip.textContent = (result.passed ? "\u2713 " : "\u2717 ") + challengeTitle.slice(0, 28) + (state.hintsShown.length ? " \u00b7 " + state.hintsShown.length + " hint" + (state.hintsShown.length > 1 ? "s" : "") : "");
+    wrap.prepend(chip);
+  }
+
+  function callLive(path, options) {
+    return fetch(state.apiBase + path, options).then(function (res) {
+      if (!res.ok) {
+        return res.json().catch(function () { return {}; }).then(function (body) {
+          throw new Error(body.error || ("HTTP " + res.status));
+        });
+      }
+      return res.json();
+    });
+  }
+
+  function onRun() {
+    if (state.live) {
+      callLive("/api/challenges/" + MOCK.challenge.challengeId + "/run", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ code: state.code, language: state.language })
+      }).then(function (r) {
+        var outcomes = {};
+        r.testResults.forEach(function (t) { outcomes[t.testId] = t.passed; });
+        el["conn-status"].className = "conn-status ok";
+        el["conn-status"].textContent = "connected";
+        renderResult({ passed: r.testsPassed === r.testsTotal, testsPassed: r.testsPassed, testsTotal: r.testsTotal, testOutcomes: outcomes, mistakeCategories: [], failureSummary: "" }, false);
+      }).catch(showConnError);
+      return;
+    }
+    var key = currentSnapshotKey();
+    if (!key) {
+      renderMockLimitation();
+      return;
+    }
+    var snap = MOCK.resultsByLanguage.python[key];
+    var publicOnly = { p1: snap.testOutcomes.p1, p2: snap.testOutcomes.p2, p3: snap.testOutcomes.p3, p4: snap.testOutcomes.p4 };
+    var passedCount = Object.keys(publicOnly).filter(function (k) { return publicOnly[k]; }).length;
+    renderResult({ passed: passedCount === 4, testsPassed: passedCount, testsTotal: 4, testOutcomes: snap.testOutcomes, mistakeCategories: [], failureSummary: "" }, false);
+  }
+
+  function onSubmit() {
+    if (state.live) {
+      var startP = state.attemptId ? Promise.resolve({ attemptId: state.attemptId }) : callLive("/api/attempts/start", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ studentId: "browser_demo_student", challengeId: MOCK.challenge.challengeId, language: state.language })
+      });
+      startP.then(function (started) {
+        state.attemptId = started.attemptId;
+        return callLive("/api/attempts/" + state.attemptId + "/submit", {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ code: state.code })
+        });
+      }).then(function (r) {
+        var outcomes = {};
+        (r.attempt.deterministicEvaluation.testResults || []).forEach(function (t) { outcomes[t.testId] = t.passed; });
+        el["conn-status"].className = "conn-status ok";
+        el["conn-status"].textContent = "connected";
+        renderResult({ passed: r.passed, testsPassed: r.testsPassed, testsTotal: r.testsTotal, testOutcomes: outcomes, mistakeCategories: r.mistakeCategories, failureSummary: r.failureSummary }, true);
+        pushHistory(MOCK.challenge.title, r);
+        state.attemptId = null;
+      }).catch(showConnError);
+      return;
+    }
+    var key = currentSnapshotKey();
+    if (!key) {
+      renderMockLimitation();
+      return;
+    }
+    var snap = MOCK.resultsByLanguage.python[key];
+    renderResult(snap, true);
+    pushHistory(MOCK.challenge.title, snap);
+  }
+
+  function renderMockLimitation() {
+    el["results-status"].className = "results-status idle";
+    el["results-status"].innerHTML = "<span>Mock mode shows real pre-computed results only for the original starter code or the corrected reference solution, not arbitrary edits (see the note below the workspace). Connect a live API to execute anything you type.</span>";
+    el["test-grid"].innerHTML = "";
+    el["mistake-chips"].innerHTML = "";
+    el["failure-summary"].textContent = "";
+    el["ai-note"].hidden = true;
+  }
+
+  function onHint() {
+    if (state.hintsShown.indexOf(1) === -1) {
+      state.hintsShown.push(1);
+      var item = document.createElement("div");
+      item.className = "hint-item";
+      item.innerHTML = '<span class="lvl">HINT ' + MOCK.hint.level + '</span>' + esc(MOCK.hint.text);
+      el["hint-list"].appendChild(item);
+    }
+  }
+
+  function showConnError(e) {
+    el["conn-status"].className = "conn-status err";
+    el["conn-status"].textContent = "error: " + (e && e.message ? e.message : "request failed");
+  }
+
+  function wireEvents() {
+    el.editor.addEventListener("input", function () {
+      state.code = el.editor.value;
+      updateGutter();
+    });
+    el.editor.addEventListener("keydown", function (e) {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        var s = el.editor.selectionStart, en = el.editor.selectionEnd;
+        el.editor.value = el.editor.value.slice(0, s) + "    " + el.editor.value.slice(en);
+        el.editor.selectionStart = el.editor.selectionEnd = s + 4;
+        state.code = el.editor.value;
+        updateGutter();
+      }
+    });
+    el["btn-run"].addEventListener("click", onRun);
+    el["btn-submit"].addEventListener("click", onSubmit);
+    el["btn-hint"].addEventListener("click", onHint);
+
+    el["language-select"].addEventListener("change", function () {
+      state.language = el["language-select"].value;
+      var code = MOCK.challenge.starterCode[state.language];
+      el.editor.value = code || "// starter code not available for this language in mock mode";
+      state.code = el.editor.value;
+      updateGutter();
+      renderChallenge();
+      renderResultsIdle();
+    });
+
+    el["use-live"].addEventListener("change", function () {
+      state.live = el["use-live"].checked;
+      el["conn-pill"].textContent = state.live ? "Live API" : "Mock data";
+      el["conn-status"].className = "conn-status unknown";
+      el["conn-status"].textContent = "not checked";
+      renderResultsIdle();
+    });
+
+    el["api-base"].addEventListener("change", function () {
+      state.apiBase = el["api-base"].value.replace(/\/$/, "");
+    });
+  }
+
+  function init() {
+    renderChallenge();
+    renderEvidence();
+    el.editor.value = state.code;
+    updateGutter();
+    renderResultsIdle();
+    wireEvents();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

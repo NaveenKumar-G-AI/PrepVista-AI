@@ -1,0 +1,1029 @@
+[
+  {
+    "id": "arith_001",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "percentages",
+    "difficulty": "EASY",
+    "prompt": "What is 24% of 150?",
+    "options": [
+      {
+        "id": "A",
+        "text": "30"
+      },
+      {
+        "id": "B",
+        "text": "36"
+      },
+      {
+        "id": "C",
+        "text": "40"
+      },
+      {
+        "id": "D",
+        "text": "45"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "24% of 150 = (24/100) x 150 = 36.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_002",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "averages",
+    "difficulty": "EASY",
+    "prompt": "Find the average of 12, 18, 24, 30, 36.",
+    "options": [
+      {
+        "id": "A",
+        "text": "20"
+      },
+      {
+        "id": "B",
+        "text": "26"
+      },
+      {
+        "id": "C",
+        "text": "24"
+      },
+      {
+        "id": "D",
+        "text": "30"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Sum = 120, count = 5, average = 120/5 = 24.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "averages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_003",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "ratio-proportion",
+    "difficulty": "EASY",
+    "prompt": "Rs. 720 is divided between A and B in the ratio 5:4. How much does B get?",
+    "options": [
+      {
+        "id": "A",
+        "text": "400"
+      },
+      {
+        "id": "B",
+        "text": "320"
+      },
+      {
+        "id": "C",
+        "text": "360"
+      },
+      {
+        "id": "D",
+        "text": "300"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Total parts = 5+4 = 9. B's share = (4/9) x 720 = 320.",
+    "expectedTimeSeconds": 50,
+    "health": "HEALTHY",
+    "tags": [
+      "ratio",
+      "proportion"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_004",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "profit-loss",
+    "difficulty": "MEDIUM",
+    "prompt": "A shopkeeper buys a table for Rs. 800 and sells it for Rs. 960. Find the profit percentage.",
+    "options": [
+      {
+        "id": "A",
+        "text": "15%"
+      },
+      {
+        "id": "B",
+        "text": "20%"
+      },
+      {
+        "id": "C",
+        "text": "25%"
+      },
+      {
+        "id": "D",
+        "text": "18%"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Profit = 960 - 800 = 160. Profit% = (160/800) x 100 = 20%.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "profit-loss",
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_005",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "percentages",
+    "difficulty": "MEDIUM",
+    "prompt": "A city's population increased from 25,000 to 30,000. What is the percentage increase?",
+    "options": [
+      {
+        "id": "A",
+        "text": "16%"
+      },
+      {
+        "id": "B",
+        "text": "22%"
+      },
+      {
+        "id": "C",
+        "text": "20%"
+      },
+      {
+        "id": "D",
+        "text": "30%"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Increase = 5,000. % increase = (5000/25000) x 100 = 20%.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_006",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "time-speed-distance",
+    "difficulty": "MEDIUM",
+    "prompt": "A car travels 180 km in 3 hours. What is its average speed in km/h?",
+    "options": [
+      {
+        "id": "A",
+        "text": "50"
+      },
+      {
+        "id": "B",
+        "text": "55"
+      },
+      {
+        "id": "C",
+        "text": "60"
+      },
+      {
+        "id": "D",
+        "text": "65"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Speed = Distance / Time = 180 / 3 = 60 km/h.",
+    "expectedTimeSeconds": 70,
+    "health": "HEALTHY",
+    "tags": [
+      "time-speed-distance"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_007",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "percentages",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "The price of an item is first increased by 20% and then decreased by 10%. What is the overall percentage change?",
+    "options": [
+      {
+        "id": "A",
+        "text": "+10%"
+      },
+      {
+        "id": "B",
+        "text": "+12%"
+      },
+      {
+        "id": "C",
+        "text": "+8%"
+      },
+      {
+        "id": "D",
+        "text": "+6%"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Net multiplier = 1.20 x 0.90 = 1.08, an overall increase of 8% (successive % changes do not simply add).",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "percentages",
+      "successive-change"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_008",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "simple-interest",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "A sum of Rs. 5,000 earns simple interest of Rs. 1,200 in 4 years. What is the annual rate of interest?",
+    "options": [
+      {
+        "id": "A",
+        "text": "5%"
+      },
+      {
+        "id": "B",
+        "text": "6%"
+      },
+      {
+        "id": "C",
+        "text": "8%"
+      },
+      {
+        "id": "D",
+        "text": "7%"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "SI = P x R x T / 100, so R = (SI x 100) / (P x T) = (1200 x 100) / (5000 x 4) = 6%.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "simple-interest"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_009",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "averages",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "The average age of 8 people is 25 years. A new person joins and the average becomes 26 years. What is the new person's age?",
+    "options": [
+      {
+        "id": "A",
+        "text": "28"
+      },
+      {
+        "id": "B",
+        "text": "30"
+      },
+      {
+        "id": "C",
+        "text": "32"
+      },
+      {
+        "id": "D",
+        "text": "34"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Old total = 25x8 = 200. New total = 26x9 = 234. New person's age = 234 - 200 = 34.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "averages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_010",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "compound-interest",
+    "difficulty": "HARD",
+    "prompt": "Find the compound interest on Rs. 10,000 for 2 years at 10% per annum, compounded annually.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Rs. 2,000"
+      },
+      {
+        "id": "B",
+        "text": "Rs. 2,200"
+      },
+      {
+        "id": "C",
+        "text": "Rs. 2,500"
+      },
+      {
+        "id": "D",
+        "text": "Rs. 2,100"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Amount = 10000 x (1.10)^2 = 12,100. Compound Interest = 12,100 - 10,000 = Rs. 2,100.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "compound-interest"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_011",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "time-and-work",
+    "difficulty": "HARD",
+    "prompt": "A can complete a piece of work in 12 days and B can complete it in 24 days. Working together, how many days will they take?",
+    "options": [
+      {
+        "id": "A",
+        "text": "6"
+      },
+      {
+        "id": "B",
+        "text": "10"
+      },
+      {
+        "id": "C",
+        "text": "9"
+      },
+      {
+        "id": "D",
+        "text": "8"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "A's rate = 1/12/day, B's rate = 1/24/day. Combined = 1/12 + 1/24 = 3/24 = 1/8, so together they take 8 days.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "time-and-work"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_012",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "relative-speed",
+    "difficulty": "HARD",
+    "prompt": "Two trains, 125 m and 100 m long, run in opposite directions on parallel tracks at 45 km/h and 36 km/h respectively. How many seconds will they take to cross each other completely?",
+    "options": [
+      {
+        "id": "A",
+        "text": "8 seconds"
+      },
+      {
+        "id": "B",
+        "text": "12 seconds"
+      },
+      {
+        "id": "C",
+        "text": "15 seconds"
+      },
+      {
+        "id": "D",
+        "text": "10 seconds"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Relative speed (opposite directions) = 45+36 = 81 km/h = 81 x 5/18 = 22.5 m/s. Total length = 225 m. Time = 225/22.5 = 10 s.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "relative-speed",
+      "trains"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_001",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "linear-equations",
+    "difficulty": "EASY",
+    "prompt": "Solve for x: 3x + 5 = 20",
+    "options": [
+      {
+        "id": "A",
+        "text": "4"
+      },
+      {
+        "id": "B",
+        "text": "5"
+      },
+      {
+        "id": "C",
+        "text": "6"
+      },
+      {
+        "id": "D",
+        "text": "3"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "3x = 20 - 5 = 15, so x = 5.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "linear-equations"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_002",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "algebraic-expressions",
+    "difficulty": "EASY",
+    "prompt": "If x = 4, what is the value of 2x^2 + 3?",
+    "options": [
+      {
+        "id": "A",
+        "text": "19"
+      },
+      {
+        "id": "B",
+        "text": "29"
+      },
+      {
+        "id": "C",
+        "text": "35"
+      },
+      {
+        "id": "D",
+        "text": "40"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "2(4)^2 + 3 = 2(16) + 3 = 32 + 3 = 35.",
+    "expectedTimeSeconds": 50,
+    "health": "HEALTHY",
+    "tags": [
+      "algebraic-expressions"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_003",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "age-problems",
+    "difficulty": "MEDIUM",
+    "prompt": "Rahul is twice as old as his son. If the son is 15 years old, what is Rahul's age?",
+    "options": [
+      {
+        "id": "A",
+        "text": "25"
+      },
+      {
+        "id": "B",
+        "text": "28"
+      },
+      {
+        "id": "C",
+        "text": "32"
+      },
+      {
+        "id": "D",
+        "text": "30"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Rahul's age = 2 x 15 = 30 years.",
+    "expectedTimeSeconds": 70,
+    "health": "HEALTHY",
+    "tags": [
+      "age-problems"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_004",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "linear-equations",
+    "difficulty": "MEDIUM",
+    "prompt": "A number increased by 12 equals thrice the number decreased by 6. Find the number.",
+    "options": [
+      {
+        "id": "A",
+        "text": "6"
+      },
+      {
+        "id": "B",
+        "text": "12"
+      },
+      {
+        "id": "C",
+        "text": "15"
+      },
+      {
+        "id": "D",
+        "text": "9"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "x + 12 = 3x - 6  ->  18 = 2x  ->  x = 9.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "linear-equations",
+      "word-problem"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_005",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "simultaneous-equations",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "If x + y = 15 and x - y = 5, what is the value of x?",
+    "options": [
+      {
+        "id": "A",
+        "text": "5"
+      },
+      {
+        "id": "B",
+        "text": "7"
+      },
+      {
+        "id": "C",
+        "text": "12"
+      },
+      {
+        "id": "D",
+        "text": "10"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Adding the two equations: 2x = 20, so x = 10 (and y = 5).",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "simultaneous-equations"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_006",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "age-problems",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "The ages of P and Q are in the ratio 3:4. If the sum of their ages is 35 years, what is Q's age?",
+    "options": [
+      {
+        "id": "A",
+        "text": "15"
+      },
+      {
+        "id": "B",
+        "text": "18"
+      },
+      {
+        "id": "C",
+        "text": "21"
+      },
+      {
+        "id": "D",
+        "text": "20"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Total parts = 3+4 = 7. Q's age = (4/7) x 35 = 20 years.",
+    "expectedTimeSeconds": 105,
+    "health": "HEALTHY",
+    "tags": [
+      "age-problems",
+      "ratio"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_007",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "quadratic-equations",
+    "difficulty": "HARD",
+    "prompt": "If x^2 - 7x + 12 = 0, what is the sum of the two roots of the equation?",
+    "options": [
+      {
+        "id": "A",
+        "text": "12"
+      },
+      {
+        "id": "B",
+        "text": "5"
+      },
+      {
+        "id": "C",
+        "text": "-7"
+      },
+      {
+        "id": "D",
+        "text": "7"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Factoring: x^2-7x+12 = (x-3)(x-4) = 0, so the roots are 3 and 4, and their sum is 7. (Also confirmed by -b/a = 7.)",
+    "expectedTimeSeconds": 140,
+    "health": "HEALTHY",
+    "tags": [
+      "quadratic-equations"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_008",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "linear-equations",
+    "difficulty": "HARD",
+    "prompt": "A boat travels downstream at a speed of (x+4) km/h and covers 36 km in 2 hours. What is the value of x?",
+    "options": [
+      {
+        "id": "A",
+        "text": "12"
+      },
+      {
+        "id": "B",
+        "text": "16"
+      },
+      {
+        "id": "C",
+        "text": "10"
+      },
+      {
+        "id": "D",
+        "text": "14"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "(x+4) x 2 = 36  ->  x+4 = 18  ->  x = 14.",
+    "expectedTimeSeconds": 140,
+    "health": "HEALTHY",
+    "tags": [
+      "linear-equations",
+      "word-problem"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_001",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "EASY",
+    "prompt": "What is the next number in the series: 4, 8, 12, 16, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "18"
+      },
+      {
+        "id": "B",
+        "text": "20"
+      },
+      {
+        "id": "C",
+        "text": "22"
+      },
+      {
+        "id": "D",
+        "text": "24"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Each term increases by 4: 4, 8, 12, 16, 20.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_002",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "EASY",
+    "prompt": "What is the next number in the series: 3, 6, 12, 24, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "36"
+      },
+      {
+        "id": "B",
+        "text": "42"
+      },
+      {
+        "id": "C",
+        "text": "48"
+      },
+      {
+        "id": "D",
+        "text": "60"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term doubles the previous one: 3, 6, 12, 24, 48.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_003",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "EASY",
+    "prompt": "What is the next number in the series: 2, 5, 8, 11, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "13"
+      },
+      {
+        "id": "B",
+        "text": "14"
+      },
+      {
+        "id": "C",
+        "text": "15"
+      },
+      {
+        "id": "D",
+        "text": "16"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Each term increases by 3: 2, 5, 8, 11, 14.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_004",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM",
+    "prompt": "What is the next number in the series: 5, 15, 45, 135, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "270"
+      },
+      {
+        "id": "B",
+        "text": "360"
+      },
+      {
+        "id": "C",
+        "text": "405"
+      },
+      {
+        "id": "D",
+        "text": "450"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term is multiplied by 3: 5, 15, 45, 135, 405.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_005",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM",
+    "prompt": "Find the missing number: 7, 14, ?, 28, 35",
+    "options": [
+      {
+        "id": "A",
+        "text": "20"
+      },
+      {
+        "id": "B",
+        "text": "21"
+      },
+      {
+        "id": "C",
+        "text": "22"
+      },
+      {
+        "id": "D",
+        "text": "24"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The series increases by 7 each time: 7, 14, 21, 28, 35.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_006",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "letter-series",
+    "difficulty": "MEDIUM",
+    "prompt": "What comes next in the series: B, D, F, H, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "G"
+      },
+      {
+        "id": "B",
+        "text": "I"
+      },
+      {
+        "id": "C",
+        "text": "J"
+      },
+      {
+        "id": "D",
+        "text": "K"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "One letter is skipped each time (B_D_F_H_J): B, D, F, H, J.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "letter-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_007",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "What is the next number in the series: 1, 2, 4, 7, 11, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "15"
+      },
+      {
+        "id": "B",
+        "text": "16"
+      },
+      {
+        "id": "C",
+        "text": "17"
+      },
+      {
+        "id": "D",
+        "text": "18"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The differences between terms increase by 1 each time (1,2,3,4), so the next difference is 5: 11+5 = 16.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_008",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "What is the next number in the series: 2, 3, 5, 8, 13, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "18"
+      },
+      {
+        "id": "B",
+        "text": "20"
+      },
+      {
+        "id": "C",
+        "text": "21"
+      },
+      {
+        "id": "D",
+        "text": "23"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term is the sum of the two preceding terms (a Fibonacci-style pattern): 8+13 = 21.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_009",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "HARD",
+    "prompt": "What is the next number in the series: 2, 6, 12, 20, 30, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "36"
+      },
+      {
+        "id": "B",
+        "text": "40"
+      },
+      {
+        "id": "C",
+        "text": "42"
+      },
+      {
+        "id": "D",
+        "text": "45"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term equals n x (n+1): 1x2, 2x3, 3x4, 4x5, 5x6, 6x7 = 42.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_010",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "HARD",
+    "prompt": "What is the next number in the series: 2, 5, 11, 23, 47, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "90"
+      },
+      {
+        "id": "B",
+        "text": "94"
+      },
+      {
+        "id": "C",
+        "text": "96"
+      },
+      {
+        "id": "D",
+        "text": "95"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Each term is double the previous term plus 1: 47 x 2 + 1 = 95.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  }
+]

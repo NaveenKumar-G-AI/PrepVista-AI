@@ -1,0 +1,108 @@
+.workspace {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  padding: 24px;
+  box-sizing: border-box;
+  color: var(--hl-text-primary);
+}
+
+@media (max-width: 860px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.editorPane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.problemHeader h1 {
+  font-family: var(--hl-font-voice);
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+
+.problemHeader p {
+  font-family: var(--hl-font-ui);
+  font-size: 13px;
+  color: var(--hl-text-secondary);
+  margin: 0;
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+.codeEditor {
+  flex: 1;
+  min-height: 320px;
+  background: var(--hl-surface);
+  border: 1px solid var(--hl-border);
+  border-radius: var(--hl-radius);
+  color: var(--hl-text-primary);
+  font-family: var(--hl-font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 16px;
+  resize: vertical;
+  outline: none;
+}
+
+.codeEditor:focus-visible {
+  border-color: var(--hl-lamp);
+}
+
+.demoControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: var(--hl-surface);
+  border: 1px dashed var(--hl-border);
+  border-radius: var(--hl-radius-sm);
+  padding: 12px 14px;
+}
+
+.demoLabel {
+  font-family: var(--hl-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hl-text-tertiary);
+}
+
+.demoSelect {
+  background: var(--hl-surface-raised);
+  color: var(--hl-text-primary);
+  border: 1px solid var(--hl-border);
+  border-radius: var(--hl-radius-sm);
+  font-family: var(--hl-font-ui);
+  font-size: 12.5px;
+  padding: 6px 8px;
+}
+
+.runButton {
+  appearance: none;
+  border: none;
+  border-radius: var(--hl-radius-sm);
+  background: var(--hl-surface-raised);
+  color: var(--hl-text-primary);
+  border: 1px solid var(--hl-border);
+  font-family: var(--hl-font-ui);
+  font-weight: 500;
+  font-size: 12.5px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.runButton:hover {
+  border-color: var(--hl-lamp);
+  color: var(--hl-lamp);
+}
+
+.hintPane {
+  min-width: 0;
+}

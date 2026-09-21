@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --font-display: "Newsreader", ui-serif, Georgia, serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-paper-50 text-ink-950 antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Visible keyboard focus everywhere — never sacrificed for aesthetics. */
+:focus-visible {
+  outline: 2px solid #3454d1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: #d7e0fb;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* "Ink moment" screens — Welcome, Summary reveal, Diagnostic transition.
+   Reserved for three beats in the whole flow; everything else stays in the light workspace. */
+.ink-surface {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(52, 84, 209, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(201, 122, 61, 0.18), transparent 55%),
+    #0b1220;
+  color: #f7f8fb;
+}
+
+/* Diagnostic-intro specifically: this screen is about *measured* capability, not self-report,
+   so the warm "measure" copper leads instead of the "signal" blue — same surface, inverted
+   emphasis, on purpose. */
+.ink-surface-measure {
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(201, 122, 61, 0.32), transparent 60%),
+    radial-gradient(900px 500px at 0% 10%, rgba(52, 84, 209, 0.16), transparent 55%),
+    #0b1220;
+  color: #f7f8fb;
+}
+
+.text-balance {
+  text-wrap: balance;
+}

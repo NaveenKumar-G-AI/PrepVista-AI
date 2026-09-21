@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CodeForge — Quality Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #0F1210;
+    --paper: #ECE7D8;
+    --paper-dim: #DCD6C2;
+    --paper-line: #C9C1A6;
+    --ink: #23261F;
+    --ink-soft: #5B5A4E;
+    --red: #A73B2B;
+    --amber: #92651A;
+    --slate: #3C5B66;
+    --green: #3F6B45;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--desk);
+    background-image: radial-gradient(ellipse at top, #1A1E19 0%, #0F1210 60%);
+    font-family: var(--sans);
+    color: var(--paper);
+    min-height: 100vh;
+    padding: 48px 20px 80px;
+  }
+  .toolbar {
+    max-width: 760px;
+    margin: 0 auto 28px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .toolbar h1 {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7D8A78;
+    margin: 0 auto 0 0;
+    font-weight: 500;
+  }
+  button, textarea {
+    font-family: var(--mono);
+  }
+  .btn {
+    background: transparent;
+    color: #B9C4B4;
+    border: 1px solid #3A4038;
+    padding: 7px 14px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  .btn:hover { border-color: #6B7A63; color: #ECE7D8; }
+  .paste-panel {
+    max-width: 760px;
+    margin: 0 auto 24px;
+    display: none;
+  }
+  .paste-panel.open { display: block; }
+  .paste-panel textarea {
+    width: 100%;
+    height: 120px;
+    background: #12140F;
+    color: #B9C4B4;
+    border: 1px solid #3A4038;
+    border-radius: 3px;
+    padding: 10px;
+    font-size: 12px;
+    resize: vertical;
+  }
+
+  /* --- the printout --- */
+  .sheet {
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 2px 2px 10px 10px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.7), 0 2px 0 rgba(255,255,255,0.04) inset;
+    position: relative;
+    overflow: hidden;
+  }
+  .sheet::before {
+    /* torn/perforated top edge */
+    content: "";
+    display: block;
+    height: 10px;
+    background-image: radial-gradient(circle at 8px 0px, transparent 5px, var(--desk) 5.5px);
+    background-size: 16px 10px;
+    background-position: -4px 0;
+  }
+  .sheet-inner { padding: 8px 40px 36px; }
+
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 16px;
+    margin-bottom: 22px;
+  }
+  .masthead .brand {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .masthead .lang {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+
+  .grade-row {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    margin-bottom: 4px;
+  }
+  .grade-number {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 64px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .grade-number small { font-size: 24px; font-weight: 500; color: var(--ink-soft); }
+  .grade-label {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    transform: rotate(-2deg);
+  }
+  .grade-EXCELLENT, .grade-GOOD { color: var(--green); }
+  .grade-FAIR, .grade-NEEDS_IMPROVEMENT { color: var(--amber); }
+  .grade-POOR, .grade-ANALYSIS_FAILED { color: var(--red); }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 28px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after { content: ""; flex: 1; height: 1px; background: var(--paper-line); }
+
+  table.dims { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+  table.dims td { padding: 5px 0; border-bottom: 1px dotted var(--paper-line); }
+  table.dims td.name { color: var(--ink); }
+  table.dims td.n { text-align: right; font-weight: 600; width: 50px; }
+  table.dims td.bar { width: 45%; }
+  .bar-track { height: 6px; background: var(--paper-dim); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--ink); }
+
+  ul.strengths { list-style: none; padding: 0; margin: 0; font-size: 14px; line-height: 1.9; }
+  ul.strengths li::before { content: "✓ "; color: var(--green); font-weight: 700; }
+
+  .finding {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dotted var(--paper-line);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .finding:last-child { border-bottom: none; }
+  .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 2px 6px;
+    border-radius: 2px;
+    height: fit-content;
+    white-space: nowrap;
+    margin-top: 1px;
+  }
+  .tag-CRITICAL, .tag-HIGH { background: var(--red); color: var(--paper); }
+  .tag-MEDIUM { background: var(--amber); color: var(--paper); }
+  .tag-LOW, .tag-INFO { background: var(--slate); color: var(--paper); }
+  .finding .body b { display: block; }
+  .finding .meta { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
+  .finding .loc { font-family: var(--mono); color: var(--ink-soft); font-size: 11.5px; }
+
+  .callout {
+    margin-top: 28px;
+    padding: 14px 16px;
+    border: 1.5px solid var(--red);
+    border-radius: 3px;
+    position: relative;
+    background: rgba(167,59,43,0.05);
+  }
+  .callout .stamp {
+    position: absolute;
+    top: -11px;
+    left: 14px;
+    background: var(--paper);
+    padding: 0 8px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--red);
+    font-weight: 700;
+  }
+  .callout .why { color: var(--ink-soft); font-size: 12.5px; margin-top: 6px; }
+
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 30px;
+    padding-top: 14px;
+    border-top: 1px solid var(--paper-line);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-soft);
+  }
+  .empty-note { color: var(--ink-soft); font-size: 13px; font-style: italic; }
+</style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <h1>CodeForge · Quality Report — Reference Viewer</h1>
+    <button class="btn" id="loadSampleBtn">Load sample report</button>
+    <button class="btn" id="togglePasteBtn">Paste report JSON…</button>
+  </div>
+
+  <div class="paste-panel" id="pastePanel">
+    <textarea id="jsonInput" placeholder="Paste a QualityReport JSON here (e.g. the response body from POST /api/quality/analyze)"></textarea>
+    <div style="margin-top:8px;"><button class="btn" id="renderPastedBtn">Render</button></div>
+  </div>
+
+  <div id="sheetHost"></div>
+
+  <script>
+    // Real output captured from an actual analyzeSubmission() run against messy sample
+    // Python (see demo/sample_report.json for the un-minified version, and scripts/demo.ts
+    // for the source that produced it). Nothing on this page is hand-authored report data.
+    const SAMPLE_REPORT = {"submissionId": "sample-bad-py", "language": "python", "analysisVersion": "1.0.0", "ruleSetVersion": "1.0.0", "sourceHash": "184b17881fe9b62a3111dfaf09cfa5996e33aaf2c6c05996875453290dd85820", "overallScore": 89, "overallLabel": "GOOD", "dimensionScores": [{"dimension": "READABILITY", "score": 90, "contributions": [{"findingId": "deep_nesting_1", "ruleId": "DEEP_NESTING", "pointsDeducted": 1.6}, {"findingId": "deep_nesting_2", "ruleId": "DEEP_NESTING", "pointsDeducted": 1.6}, {"findingId": "poor_naming_11", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_12", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_13", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_14", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_15", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_16", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_17", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_18", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_19", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_20", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_21", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_22", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_23", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_24", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_25", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}, {"findingId": "poor_naming_26", "ruleId": "POOR_NAMING", "pointsDeducted": 0.4}]}, {"dimension": "MAINTAINABILITY", "score": 90, "contributions": [{"findingId": "excessive_parameters_3", "ruleId": "EXCESSIVE_PARAMETERS", "pointsDeducted": 0.9}, {"findingId": "excessive_parameters_4", "ruleId": "EXCESSIVE_PARAMETERS", "pointsDeducted": 0.9}, {"findingId": "magic_number_5", "ruleId": "MAGIC_NUMBER", "pointsDeducted": 1.3}, {"findingId": "duplicated_logic_6", "ruleId": "DUPLICATED_LOGIC", "pointsDeducted": 2.4}, {"findingId": "unused_import_7", "ruleId": "UNUSED_IMPORT", "pointsDeducted": 2.1}, {"findingId": "unused_import_8", "ruleId": "UNUSED_IMPORT", "pointsDeducted": 2.1}]}, {"dimension": "STRUCTURAL_QUALITY", "score": 91, "contributions": [{"findingId": "deep_nesting_1", "ruleId": "DEEP_NESTING", "pointsDeducted": 3.2}, {"findingId": "deep_nesting_2", "ruleId": "DEEP_NESTING", "pointsDeducted": 3.2}, {"findingId": "excessive_parameters_3", "ruleId": "EXCESSIVE_PARAMETERS", "pointsDeducted": 1.5}, {"findingId": "excessive_parameters_4", "ruleId": "EXCESSIVE_PARAMETERS", "pointsDeducted": 1.5}]}, {"dimension": "SIMPLICITY", "score": 92, "contributions": [{"findingId": "deep_nesting_1", "ruleId": "DEEP_NESTING", "pointsDeducted": 3.2}, {"findingId": "deep_nesting_2", "ruleId": "DEEP_NESTING", "pointsDeducted": 3.2}, {"findingId": "excessive_parameters_3", "ruleId": "EXCESSIVE_PARAMETERS", "pointsDeducted": 0.6}, {"findingId": "excessive_parameters_4", "ruleId": "EXCESSIVE_PARAMETERS", "pointsDeducted": 0.6}]}, {"dimension": "CONSISTENCY", "score": 99, "contributions": [{"findingId": "magic_number_5", "ruleId": "MAGIC_NUMBER", "pointsDeducted": 0.8}]}, {"dimension": "DUPLICATION", "score": 94, "contributions": [{"findingId": "duplicated_logic_6", "ruleId": "DUPLICATED_LOGIC", "pointsDeducted": 5.6}]}, {"dimension": "NAMING", "score": 73, "contributions": [{"findingId": "poor_naming_11", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_12", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_13", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_14", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_15", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_16", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_17", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_18", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_19", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_20", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_21", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_22", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_23", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_24", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_25", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}, {"findingId": "poor_naming_26", "ruleId": "POOR_NAMING", "pointsDeducted": 1.7}]}, {"dimension": "ROBUSTNESS", "score": 91, "contributions": [{"findingId": "swallowed_exception_9", "ruleId": "SWALLOWED_EXCEPTION", "pointsDeducted": 4.5}, {"findingId": "swallowed_exception_10", "ruleId": "SWALLOWED_EXCEPTION", "pointsDeducted": 4.5}]}, {"dimension": "ERROR_HANDLING", "score": 79, "contributions": [{"findingId": "swallowed_exception_9", "ruleId": "SWALLOWED_EXCEPTION", "pointsDeducted": 10.5}, {"findingId": "swallowed_exception_10", "ruleId": "SWALLOWED_EXCEPTION", "pointsDeducted": 10.5}]}, {"dimension": "ENGINEERING_PRACTICES", "score": 100, "contributions": []}], "findings": [{"findingId": "deep_nesting_1", "ruleId": "DEEP_NESTING", "ruleVersion": "1.0.0", "dimensions": {"STRUCTURAL_QUALITY": 0.4, "SIMPLICITY": 0.4, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "DEEP_NESTING", "severity": "MEDIUM", "confidence": "HIGH", "title": "Function \"do_stuff\" has deeply nested control flow", "description": "Nesting reaches depth 5 inside \"do_stuff\".", "impact": "Deep nesting makes it hard to hold all the surrounding conditions in mind while reading the innermost logic.", "sourceLocation": {"startLine": 5, "endLine": 15}, "evidence": ["maxNestingDepth=5"], "suggestedAction": "Use guard clauses or early returns to flatten the outer conditions, or extract the inner block into a helper function."}, {"findingId": "deep_nesting_2", "ruleId": "DEEP_NESTING", "ruleVersion": "1.0.0", "dimensions": {"STRUCTURAL_QUALITY": 0.4, "SIMPLICITY": 0.4, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "DEEP_NESTING", "severity": "MEDIUM", "confidence": "HIGH", "title": "Function \"do_other_stuff\" has deeply nested control flow", "description": "Nesting reaches depth 5 inside \"do_other_stuff\".", "impact": "Deep nesting makes it hard to hold all the surrounding conditions in mind while reading the innermost logic.", "sourceLocation": {"startLine": 17, "endLine": 27}, "evidence": ["maxNestingDepth=5"], "suggestedAction": "Use guard clauses or early returns to flatten the outer conditions, or extract the inner block into a helper function."}, {"findingId": "excessive_parameters_3", "ruleId": "EXCESSIVE_PARAMETERS", "ruleVersion": "1.0.0", "dimensions": {"STRUCTURAL_QUALITY": 0.5, "SIMPLICITY": 0.2, "MAINTAINABILITY": 0.3}, "origin": "DETERMINISTIC", "category": "EXCESSIVE_PARAMETERS", "severity": "LOW", "confidence": "HIGH", "title": "Function \"do_stuff\" takes 7 parameters", "description": "\"do_stuff\" has 7 parameters, above the 5 generally considered easy to call correctly.", "impact": "Call sites with many positional parameters are error-prone and hard to read without checking the signature.", "sourceLocation": {"startLine": 5, "endLine": 15}, "evidence": ["paramCount=7"], "suggestedAction": "Consider whether some parameters are always passed together and could be grouped \u2014 though that depends on context."}, {"findingId": "excessive_parameters_4", "ruleId": "EXCESSIVE_PARAMETERS", "ruleVersion": "1.0.0", "dimensions": {"STRUCTURAL_QUALITY": 0.5, "SIMPLICITY": 0.2, "MAINTAINABILITY": 0.3}, "origin": "DETERMINISTIC", "category": "EXCESSIVE_PARAMETERS", "severity": "LOW", "confidence": "HIGH", "title": "Function \"do_other_stuff\" takes 7 parameters", "description": "\"do_other_stuff\" has 7 parameters, above the 5 generally considered easy to call correctly.", "impact": "Call sites with many positional parameters are error-prone and hard to read without checking the signature.", "sourceLocation": {"startLine": 17, "endLine": 27}, "evidence": ["paramCount=7"], "suggestedAction": "Consider whether some parameters are always passed together and could be grouped \u2014 though that depends on context."}, {"findingId": "magic_number_5", "ruleId": "MAGIC_NUMBER", "ruleVersion": "1.0.0", "dimensions": {"MAINTAINABILITY": 0.6, "CONSISTENCY": 0.4}, "origin": "DETERMINISTIC", "category": "MAGIC_NUMBER", "severity": "LOW", "confidence": "MEDIUM", "title": "Unexplained number literal 7", "description": "The number value 7 appears 2 time(s) without an explaining name.", "impact": "A named constant documents intent and gives future readers \u2014 including the author \u2014 one place to change the value.", "sourceLocation": {"startLine": 12, "endLine": 12, "startCol": 36, "endCol": 37}, "evidence": ["occurrences=2"], "suggestedAction": "Extract 7 into a named constant that explains what it represents."}, {"findingId": "duplicated_logic_6", "ruleId": "DUPLICATED_LOGIC", "ruleVersion": "1.0.0", "dimensions": {"DUPLICATION": 0.7, "MAINTAINABILITY": 0.3}, "origin": "DETERMINISTIC", "category": "DUPLICATED_LOGIC", "severity": "MEDIUM", "confidence": "HIGH", "title": "\"do_stuff\" and \"do_other_stuff\" share identical structure", "description": "These two functions have the same control-flow structure once identifier names are ignored.", "impact": "Duplicated logic means every future fix or behavior change has to be made in more than one place, and it is easy to update one copy and forget the other.", "sourceLocation": {"startLine": 5, "endLine": 15}, "evidence": ["location_a=L5-15", "location_b=L17-27", "similarity=1.00"], "suggestedAction": "Extract the shared structure into a single function that both call sites use."}, {"findingId": "unused_import_7", "ruleId": "UNUSED_IMPORT", "ruleVersion": "1.0.0", "dimensions": {"MAINTAINABILITY": 1}, "origin": "DETERMINISTIC", "category": "UNUSED_IMPORT", "severity": "LOW", "confidence": "MEDIUM", "title": "Import \"os\" appears to be unused", "description": "\"os\" is imported but never referenced elsewhere in the file, based on name matching.", "impact": "Unused imports add noise and can hide a missing dependency or a leftover from refactoring.", "sourceLocation": {"startLine": 2, "endLine": 2, "startCol": 0, "endCol": 9}, "evidence": ["name=os"], "suggestedAction": "Remove the unused import if \"os\" is not referenced dynamically elsewhere."}, {"findingId": "unused_import_8", "ruleId": "UNUSED_IMPORT", "ruleVersion": "1.0.0", "dimensions": {"MAINTAINABILITY": 1}, "origin": "DETERMINISTIC", "category": "UNUSED_IMPORT", "severity": "LOW", "confidence": "MEDIUM", "title": "Import \"json\" appears to be unused", "description": "\"json\" is imported but never referenced elsewhere in the file, based on name matching.", "impact": "Unused imports add noise and can hide a missing dependency or a leftover from refactoring.", "sourceLocation": {"startLine": 3, "endLine": 3, "startCol": 0, "endCol": 11}, "evidence": ["name=json"], "suggestedAction": "Remove the unused import if \"json\" is not referenced dynamically elsewhere."}, {"findingId": "swallowed_exception_9", "ruleId": "SWALLOWED_EXCEPTION", "ruleVersion": "1.0.0", "dimensions": {"ERROR_HANDLING": 0.7, "ROBUSTNESS": 0.3}, "origin": "DETERMINISTIC", "category": "SWALLOWED_EXCEPTION", "severity": "HIGH", "confidence": "HIGH", "title": "Bare except clause silently discards all errors", "description": "An except/catch block (catching all exception types) has an empty or trivial body, so failures pass silently.", "impact": "Swallowed exceptions hide real failures, making bugs far harder to diagnose later since there is no trace that anything went wrong.", "sourceLocation": {"startLine": 13, "endLine": 14, "startCol": 20, "endCol": 28}, "evidence": ["exceptionType=ANY", "isBare=true"], "suggestedAction": "Handle the specific exception type you expect, and at minimum log it \u2014 do not let failures disappear silently."}, {"findingId": "swallowed_exception_10", "ruleId": "SWALLOWED_EXCEPTION", "ruleVersion": "1.0.0", "dimensions": {"ERROR_HANDLING": 0.7, "ROBUSTNESS": 0.3}, "origin": "DETERMINISTIC", "category": "SWALLOWED_EXCEPTION", "severity": "HIGH", "confidence": "HIGH", "title": "Bare except clause silently discards all errors", "description": "An except/catch block (catching all exception types) has an empty or trivial body, so failures pass silently.", "impact": "Swallowed exceptions hide real failures, making bugs far harder to diagnose later since there is no trace that anything went wrong.", "sourceLocation": {"startLine": 25, "endLine": 26, "startCol": 20, "endCol": 28}, "evidence": ["exceptionType=ANY", "isBare=true"], "suggestedAction": "Handle the specific exception type you expect, and at minimum log it \u2014 do not let failures disappear silently."}, {"findingId": "poor_naming_11", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"a\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 5, "endLine": 5, "startCol": 13, "endCol": 14}, "evidence": ["name=a"], "suggestedAction": "Rename \"a\" to describe what it represents or does."}, {"findingId": "poor_naming_12", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"b\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 5, "endLine": 5, "startCol": 16, "endCol": 17}, "evidence": ["name=b"], "suggestedAction": "Rename \"b\" to describe what it represents or does."}, {"findingId": "poor_naming_13", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"c\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 5, "endLine": 5, "startCol": 19, "endCol": 20}, "evidence": ["name=c"], "suggestedAction": "Rename \"c\" to describe what it represents or does."}, {"findingId": "poor_naming_14", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"d\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 5, "endLine": 5, "startCol": 22, "endCol": 23}, "evidence": ["name=d"], "suggestedAction": "Rename \"d\" to describe what it represents or does."}, {"findingId": "poor_naming_15", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"e\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 5, "endLine": 5, "startCol": 25, "endCol": 26}, "evidence": ["name=e"], "suggestedAction": "Rename \"e\" to describe what it represents or does."}, {"findingId": "poor_naming_16", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"f\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 5, "endLine": 5, "startCol": 28, "endCol": 29}, "evidence": ["name=f"], "suggestedAction": "Rename \"f\" to describe what it represents or does."}, {"findingId": "poor_naming_17", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"g\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 5, "endLine": 5, "startCol": 31, "endCol": 32}, "evidence": ["name=g"], "suggestedAction": "Rename \"g\" to describe what it represents or does."}, {"findingId": "poor_naming_18", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"x\" may not communicate its purpose", "description": "Variable name is a single character outside a conventional loop context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 6, "endLine": 6, "startCol": 4, "endCol": 9}, "evidence": ["name=x"], "suggestedAction": "Rename \"x\" to describe what it represents or does."}, {"findingId": "poor_naming_19", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"p\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 17, "endLine": 17, "startCol": 19, "endCol": 20}, "evidence": ["name=p"], "suggestedAction": "Rename \"p\" to describe what it represents or does."}, {"findingId": "poor_naming_20", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"q\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 17, "endLine": 17, "startCol": 22, "endCol": 23}, "evidence": ["name=q"], "suggestedAction": "Rename \"q\" to describe what it represents or does."}, {"findingId": "poor_naming_21", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"r\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 17, "endLine": 17, "startCol": 25, "endCol": 26}, "evidence": ["name=r"], "suggestedAction": "Rename \"r\" to describe what it represents or does."}, {"findingId": "poor_naming_22", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"s\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 17, "endLine": 17, "startCol": 28, "endCol": 29}, "evidence": ["name=s"], "suggestedAction": "Rename \"s\" to describe what it represents or does."}, {"findingId": "poor_naming_23", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"t\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 17, "endLine": 17, "startCol": 31, "endCol": 32}, "evidence": ["name=t"], "suggestedAction": "Rename \"t\" to describe what it represents or does."}, {"findingId": "poor_naming_24", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"u\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 17, "endLine": 17, "startCol": 34, "endCol": 35}, "evidence": ["name=u"], "suggestedAction": "Rename \"u\" to describe what it represents or does."}, {"findingId": "poor_naming_25", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"v\" may not communicate its purpose", "description": "Parameter name is a single character outside a conventional loop-index context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 17, "endLine": 17, "startCol": 37, "endCol": 38}, "evidence": ["name=v"], "suggestedAction": "Rename \"v\" to describe what it represents or does."}, {"findingId": "poor_naming_26", "ruleId": "POOR_NAMING", "ruleVersion": "1.0.0", "dimensions": {"NAMING": 0.8, "READABILITY": 0.2}, "origin": "DETERMINISTIC", "category": "POOR_NAMING", "severity": "LOW", "confidence": "MEDIUM", "title": "Identifier \"y\" may not communicate its purpose", "description": "Variable name is a single character outside a conventional loop context.", "impact": "Unclear names force readers to trace usage to understand intent that a better name could have conveyed immediately.", "sourceLocation": {"startLine": 18, "endLine": 18, "startCol": 4, "endCol": 9}, "evidence": ["name=y"], "suggestedAction": "Rename \"y\" to describe what it represents or does."}], "positiveSignals": [], "mostImportantImprovement": {"title": "Handle the specific exception type you expect, and at minimum log it \u2014 do not let failures disappear silently.", "why": "Swallowed exceptions hide real failures, making bugs far harder to diagnose later since there is no trace that anything went wrong."}, "aiInterpretation": {"summary": "The most notable issues are: bare except clause silently discards all errors; bare except clause silently discards all errors; function \"do_stuff\" has deeply nested control flow.", "semanticFindings": [], "recommendations": ["Handle the specific exception type you expect, and at minimum log it \u2014 do not let failures disappear silently.", "Handle the specific exception type you expect, and at minimum log it \u2014 do not let failures disappear silently.", "Use guard clauses or early returns to flatten the outer conditions, or extract the inner block into a helper function."], "confidence": "MEDIUM"}, "aiStatus": "OK", "comparison": null, "confidenceSummary": {"high": 7, "medium": 19, "low": 0, "unknown": 0}, "generatedAt": "2026-08-18T10:31:25.547Z", "cacheHit": false};
+
+    const $ = (sel) => document.querySelector(sel);
+
+    function el(tag, className, children) {
+      const e = document.createElement(tag);
+      if (className) e.className = className;
+      if (children != null) {
+        (Array.isArray(children) ? children : [children]).forEach((c) => {
+          if (c == null) return;
+          e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+        });
+      }
+      return e;
+    }
+
+    function render(report) {
+      const host = $('#sheetHost');
+      host.innerHTML = '';
+
+      const sheet = el('div', 'sheet');
+      const inner = el('div', 'sheet-inner');
+      sheet.appendChild(inner);
+
+      // masthead
+      inner.appendChild(el('div', 'masthead', [
+        el('div', 'brand', 'CodeForge — Code Quality Analysis'),
+        el('div', 'lang', [`${report.language}`, document.createElement('br'), `submission ${report.submissionId}`]),
+      ]));
+
+      // grade
+      const gradeNum = el('div', 'grade-number', [report.overallScore != null ? String(report.overallScore) : '—', el('small', null, ' / 100')]);
+      inner.appendChild(el('div', 'grade-row', [gradeNum, el('div', `grade-label grade-${report.overallLabel}`, report.overallLabel)]));
+      inner.appendChild(el('div', 'empty-note', `analysis v${report.analysisVersion} · rules v${report.ruleSetVersion}${report.cacheHit ? ' · served from cache' : ''}`));
+
+      // dimensions
+      if (report.dimensionScores && report.dimensionScores.length) {
+        inner.appendChild(el('div', 'section-label', 'Dimensions'));
+        const table = el('table', 'dims');
+        report.dimensionScores.forEach((d) => {
+          const bar = el('div', 'bar-track', el('div', 'bar-fill'));
+          bar.firstChild.style.width = Math.max(0, Math.min(100, d.score)) + '%';
+          const row = el('tr', null, [
+            el('td', 'name', d.dimension.replace(/_/g, ' ')),
+            el('td', 'bar', bar),
+            el('td', 'n', String(d.score)),
+          ]);
+          table.appendChild(row);
+        });
+        inner.appendChild(table);
+      }
+
+      // strengths
+      if (report.positiveSignals && report.positiveSignals.length) {
+        inner.appendChild(el('div', 'section-label', 'Strengths'));
+        const ul = el('ul', 'strengths');
+        report.positiveSignals.forEach((s) => ul.appendChild(el('li', null, s.title)));
+        inner.appendChild(ul);
+      }
+
+      // findings
+      inner.appendChild(el('div', 'section-label', `Findings (${report.findings ? report.findings.length : 0})`));
+      if (!report.findings || report.findings.length === 0) {
+        inner.appendChild(el('div', 'empty-note', 'No findings — nothing crossed an evidence or confidence threshold worth reporting.'));
+      } else {
+        report.findings.forEach((f) => {
+          const loc = f.sourceLocation ? el('span', 'loc', ` L${f.sourceLocation.startLine}–${f.sourceLocation.endLine}`) : null;
+          const body = el('div', 'body', [
+            el('b', null, [f.title, loc]),
+            el('span', null, f.description),
+            el('div', 'meta', `${f.ruleId} · confidence ${f.confidence.toLowerCase()}`),
+          ]);
+          inner.appendChild(el('div', 'finding', [el('span', `tag tag-${f.severity}`, f.severity), body]));
+        });
+      }
+
+      // most important improvement
+      if (report.mostImportantImprovement) {
+        inner.appendChild(el('div', 'callout', [
+          el('span', 'stamp', 'Most important improvement'),
+          el('div', null, report.mostImportantImprovement.title),
+          el('div', 'why', report.mostImportantImprovement.why),
+        ]));
+      }
+
+      // AI summary
+      if (report.aiInterpretation) {
+        inner.appendChild(el('div', 'section-label', `AI interpretation (${report.aiStatus.toLowerCase()})`));
+        inner.appendChild(el('div', 'empty-note', report.aiInterpretation.summary));
+      }
+
+      // comparison
+      if (report.comparison) {
+        inner.appendChild(el('div', 'section-label', 'vs. previous submission'));
+        const delta = report.comparison.delta;
+        inner.appendChild(el('div', 'empty-note',
+          `${report.comparison.previousScore} → ${report.comparison.currentScore}  (${delta > 0 ? '+' : ''}${delta})`));
+      }
+
+      inner.appendChild(el('div', 'footer-row', [
+        el('span', null, `confidence: ${report.confidenceSummary.high}H / ${report.confidenceSummary.medium}M / ${report.confidenceSummary.low}L / ${report.confidenceSummary.unknown}U`),
+        el('span', null, new Date(report.generatedAt).toISOString()),
+      ]));
+
+      host.appendChild(sheet);
+    }
+
+    $('#loadSampleBtn').addEventListener('click', () => render(SAMPLE_REPORT));
+    $('#togglePasteBtn').addEventListener('click', () => $('#pastePanel').classList.toggle('open'));
+    $('#renderPastedBtn').addEventListener('click', () => {
+      try {
+        render(JSON.parse($('#jsonInput').value));
+      } catch (e) {
+        alert('That is not valid JSON: ' + e.message);
+      }
+    });
+
+    render(SAMPLE_REPORT);
+  </script>
+</body>
+</html>

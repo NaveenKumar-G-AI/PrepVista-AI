@@ -20,7 +20,7 @@
  *   NEW CAPABILITIES:
  *     - Cohort avg score stat card + hero KPI pill (color-coded by score range).
  *     - Seat usage visual progress bar (green/amber/rose by utilisation %).
- *     - ReadinessMiniGrid: 4-tile traffic-light readiness tier distribution.
+ *     - ReadinessMiniGrid: Measured and unmeasured readiness tier distribution.
  *     - WeakestCategoriesWidget: 3 score progress bars for weakest rubric categories.
  *     - ZeroRiskAlert: dismissible rose alert when intervention flags exist.
  *     - Low-engagement nudge: amber hero banner when < 30% of cohort has practiced.
@@ -55,6 +55,7 @@ interface ReadinessTierCounts {
   almost_ready: number;
   developing: number;
   at_risk: number;
+  not_measured?: number;
 }
 
 /** New block returned by the extended org_college.py dashboard endpoint.
@@ -203,6 +204,7 @@ const TIER_CONFIG: Record<
   ready: { label: 'Placement Ready', bar: 'bg-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
   almost_ready: { label: 'Almost Ready', bar: 'bg-blue-500', text: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
   developing: { label: 'Developing', bar: 'bg-amber-500', text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  not_measured: { label: 'Not measured', bar: 'bg-slate-500', text: 'text-slate-300', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
   at_risk: { label: 'At Risk', bar: 'bg-rose-500', text: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
 };
 
@@ -341,8 +343,8 @@ function SeatUsageBar({ used, limit }: { used: number; limit: number }) {
 }
 
 /**
- * 4-tile traffic-light readiness distribution grid.
- * One tile per tier: ready / almost_ready / developing / at_risk.
+ * Measured and unmeasured readiness distribution grid.
+ * One tile per tier: ready / almost_ready / developing / at_risk / not_measured.
  * Each tile shows count, label, proportional bar, and percentage.
  * Renders an empty-state card when total === 0 (no session data yet).
  */
@@ -353,23 +355,23 @@ function ReadinessMiniGrid({
   counts: ReadinessTierCounts;
   total: number;
 }) {
-  const tiers = ['ready', 'almost_ready', 'developing', 'at_risk'] as const;
+  const tiers = ['ready', 'almost_ready', 'developing', 'at_risk', 'not_measured'] as const;
 
   return (
     <div className="card !p-6">
       <h3 className="mb-1 text-sm font-semibold text-white">Readiness Distribution</h3>
       <p className="mb-4 text-xs text-slate-500">
         {total > 0
-          ? `${total} students classified across 4 placement tiers`
+          ? `${total} students; unmeasured evidence is shown separately`
           : 'Appears once students complete their first interview'}
       </p>
 
       {total > 0 ? (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {tiers.map(tier => {
               const cfg = TIER_CONFIG[tier];
-              const count = counts[tier];
+              const count = counts[tier] ?? 0;
               const pct = Math.round((count / total) * 100);
               return (
                 <div
@@ -851,7 +853,8 @@ export default function OrgAdminDashboard() {
     ? (perf.readiness_tier_counts.ready +
       perf.readiness_tier_counts.almost_ready +
       perf.readiness_tier_counts.developing +
-      perf.readiness_tier_counts.at_risk)
+      perf.readiness_tier_counts.at_risk +
+      (perf.readiness_tier_counts.not_measured ?? 0))
     : 0;
 
   // Low-engagement nudge: < 30% of enrolled students have practiced

@@ -1,0 +1,45 @@
+{
+  "version": "v1.0",
+  "dimensionWeights": {
+    "concept": 0.20,
+    "execution": 0.20,
+    "transfer": 0.25,
+    "retention": 0.15,
+    "timed": 0.10,
+    "consistency": 0.10
+  },
+  "transferWeights": {
+    "direct": 0.20,
+    "variation": 0.30,
+    "novel": 0.50
+  },
+  "thresholds": {
+    "learningToImproving": { "trendMin": 0.05 },
+    "provisional": { "conceptMin": 0.75, "executionMin": 0.75, "minPracticeEvidence": 3 },
+    "verified": { "transferMin": 0.75, "minTransferEvidence": 3, "minNoveltyLevel": "SLIGHTLY_VARIANT" },
+    "stable": { "consistencyMin": 0.70, "retentionMin": 0.70, "minVerificationAttempts": 3, "minDelayedEvidence": 1 },
+    "atRisk": { "dropFromSnapshot": 0.15 },
+    "regressed": { "dropFromSnapshot": 0.28 }
+  },
+  "consistency": {
+    "windowSize": 4,
+    "maxAcceptableStdDev": 0.12
+  },
+  "retention": {
+    "riskSlopePerDay": -0.006,
+    "minDelayedPointsForTrend": 2
+  },
+  "recency": {
+    "halfLife": 3
+  },
+  "review": {
+    "stableIntervalDays": 21,
+    "verifiedIntervalDays": 10,
+    "provisionalIntervalDays": 3,
+    "atRiskIntervalDays": 1,
+    "maxQueueSizePerStudent": 5
+  },
+  "exposure": {
+    "memorizationRiskAfterExactRepeats": 2
+  }
+}

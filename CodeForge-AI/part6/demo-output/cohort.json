@@ -1,0 +1,42 @@
+{
+  "cohortId": "cohort_2026_cse",
+  "studentCount": 3,
+  "skillCoverage": [
+    {
+      "skillName": "Dynamic Programming",
+      "percentAtTarget": 0
+    },
+    {
+      "skillName": "Recursion",
+      "percentAtTarget": 0
+    },
+    {
+      "skillName": "Searching",
+      "percentAtTarget": 0
+    },
+    {
+      "skillName": "Sorting",
+      "percentAtTarget": 0
+    },
+    {
+      "skillName": "Arrays",
+      "percentAtTarget": 33
+    },
+    {
+      "skillName": "Debugging",
+      "percentAtTarget": 33
+    },
+    {
+      "skillName": "Hash Maps",
+      "percentAtTarget": 33
+    },
+    {
+      "skillName": "Python",
+      "percentAtTarget": 33
+    },
+    {
+      "skillName": "Queues",
+      "percentAtTarget": 33
+    }
+  ]
+}

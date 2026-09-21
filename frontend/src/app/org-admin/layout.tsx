@@ -59,6 +59,7 @@ interface ReadinessTierCounts {
   almost_ready: number;
   developing: number;
   at_risk: number;
+  not_measured?: number;
 }
 
 interface CollegeDashboardResponse {

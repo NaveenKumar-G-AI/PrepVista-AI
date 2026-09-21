@@ -1,0 +1,135 @@
+/*
+  Design plan (see frontend-design skill for the full brief this follows):
+
+  Subject: a decision-training tool for exam-takers under time pressure and
+  uncertainty. The visual language borrows from two things students already
+  know: the exam answer sheet (paper, precise, a little formal) and an
+  instrument panel (timers, readouts, calibration). It should feel exact and
+  a little serious, never playful-SaaS.
+
+  Color (4-6 named hex values):
+    --f58-ink        #14171F  deep ink-navy, the "chrome" background for
+                               timers/instrument strips — not pure black
+    --f58-paper      #EFEDE6  cool, greyed paper for question/content
+                               surfaces — deliberately cooler than the
+                               common warm-cream default
+    --f58-paper-dim  #E4E1D6  a slightly deeper paper tone for recessed areas
+    --f58-brass      #C68A3D  the one accent color, used only for time
+                               pressure / risk / negative marking — a brass,
+                               clock-dial amber rather than a terracotta or
+                               traffic-light tone
+    --f58-resolved   #3B5A5D  muted slate-teal for "evidence gathered /
+                               settled" states — quiet, not a bright green
+    --f58-line       #D8D4C8  hairline rule color on paper surfaces
+    --f58-line-dark  #2A2E38  hairline rule color on ink surfaces
+
+  Type:
+    Display  "Fraunces"        — scenario titles / section headers only,
+                                  used sparingly, not as a giant hero
+    Body/UI  "IBM Plex Sans"   — everything else
+    Numeric  "IBM Plex Mono"   — timers, seconds, percentages, scores only;
+                                  tabular figures so digits stay aligned as
+                                  they change, like an instrument readout
+
+  Layout: left-aligned throughout; small border radius (2-4px) rather than
+  soft SaaS rounding; hairline borders instead of soft drop shadows; each
+  component gets its own shape rather than a shared card template, since a
+  scenario, an insight, and a report are different kinds of object.
+*/
+
+:root {
+  --f58-ink: #14171f;
+  --f58-ink-2: #1c202b;
+  --f58-paper: #efede6;
+  --f58-paper-dim: #e4e1d6;
+  --f58-brass: #c68a3d;
+  --f58-brass-dim: #a97230;
+  --f58-resolved: #3b5a5d;
+  --f58-resolved-dim: #2c4446;
+  --f58-danger: #a23b3b;
+  --f58-line: #d8d4c8;
+  --f58-line-dark: #2a2e38;
+  --f58-text: #1b1d24;
+  --f58-text-soft: #55584f;
+  --f58-text-on-ink: #eceadf;
+  --f58-text-on-ink-soft: #9a9d8f;
+
+  --f58-font-display: 'Fraunces', Georgia, serif;
+  --f58-font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+  --f58-font-mono: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+
+  --f58-radius: 3px;
+}
+
+.f58-root {
+  font-family: var(--f58-font-body);
+  color: var(--f58-text);
+  line-height: 1.45;
+}
+
+.f58-root * {
+  box-sizing: border-box;
+}
+
+.f58-title {
+  font-family: var(--f58-font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.f58-numeral {
+  font-family: var(--f58-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.f58-btn {
+  font-family: var(--f58-font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.55em 1em;
+  border-radius: var(--f58-radius);
+  border: 1px solid var(--f58-line);
+  background: var(--f58-paper);
+  color: var(--f58-text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.f58-btn:hover {
+  border-color: var(--f58-text-soft);
+}
+
+.f58-btn:focus-visible {
+  outline: 2px solid var(--f58-brass);
+  outline-offset: 2px;
+}
+
+.f58-btn[aria-pressed='true'],
+.f58-btn.f58-btn--active {
+  background: var(--f58-ink);
+  border-color: var(--f58-ink);
+  color: var(--f58-text-on-ink);
+}
+
+.f58-btn--primary {
+  background: var(--f58-ink);
+  border-color: var(--f58-ink);
+  color: var(--f58-text-on-ink);
+}
+
+.f58-btn--primary:hover {
+  background: var(--f58-ink-2);
+}
+
+.f58-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f58-root * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

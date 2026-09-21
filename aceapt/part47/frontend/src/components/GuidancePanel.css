@@ -1,0 +1,31 @@
+.guidance-panel {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.guidance-panel__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.guidance-panel__message {
+  color: var(--amber-ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.guidance-panel__tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--amber-ink);
+  opacity: 0.75;
+  align-self: flex-start;
+}

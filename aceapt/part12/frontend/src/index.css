@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+}
+
+::selection {
+  @apply bg-tealSoft text-teal;
+}
+
+/* Small utility for the calibration-meter tick overlay used across the app */
+.tick-overlay {
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(20% - 1px),
+    rgba(242, 244, 242, 0.9) calc(20% - 1px),
+    rgba(242, 244, 242, 0.9) 20%
+  );
+}

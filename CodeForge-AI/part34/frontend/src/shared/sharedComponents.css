@@ -1,0 +1,124 @@
+/* ============================================================================
+   Styles for EvidenceBadge and SkillCoverageRail. Kept in one file since
+   these two components are always used together and share the same color
+   logic (verified=emerald, partially_verified=amber, uncertain/unassessed
+   =neutral graphite — see tokens.css for the reasoning).
+   ============================================================================ */
+
+.ti-evidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ti-space-2);
+  font-family: var(--ti-font-display);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: var(--ti-space-1) var(--ti-space-3);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.ti-evidence-badge--sm {
+  font-size: 0.6875rem;
+  padding: 2px var(--ti-space-2);
+}
+
+.ti-evidence-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.ti-evidence-badge--verified {
+  color: var(--ti-verified);
+  background: var(--ti-verified-soft);
+}
+.ti-evidence-badge--verified .ti-evidence-badge__dot {
+  background: var(--ti-verified);
+}
+
+.ti-evidence-badge--partially_verified {
+  color: var(--ti-attention);
+  background: var(--ti-attention-soft);
+}
+.ti-evidence-badge--partially_verified .ti-evidence-badge__dot {
+  background: var(--ti-attention);
+}
+
+.ti-evidence-badge--uncertain,
+.ti-evidence-badge--unassessed {
+  color: var(--ti-graphite);
+  background: var(--ti-uncertain-soft);
+}
+.ti-evidence-badge--uncertain .ti-evidence-badge__dot,
+.ti-evidence-badge--unassessed .ti-evidence-badge__dot {
+  background: var(--ti-graphite-soft);
+}
+
+/* ---- Coverage rail --------------------------------------------------------- */
+
+.ti-coverage-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+}
+
+.ti-coverage-rail--vertical {
+  flex-direction: column;
+  gap: var(--ti-space-3);
+}
+
+.ti-coverage-rail--horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--ti-space-4);
+}
+
+.ti-coverage-rail__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ti-space-2);
+  font-family: var(--ti-font-body);
+  font-size: 0.8125rem;
+  color: var(--ti-graphite);
+  transition: color 0.15s ease;
+}
+
+.ti-coverage-rail__item--current {
+  color: var(--ti-ink);
+  font-weight: 600;
+}
+
+.ti-coverage-rail__mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--ti-border);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.ti-coverage-rail__item--current .ti-coverage-rail__mark {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px var(--ti-focus-soft);
+}
+
+.ti-coverage-rail__mark--verified {
+  background: var(--ti-verified);
+  border-color: var(--ti-verified);
+}
+.ti-coverage-rail__mark--partially_verified {
+  background: var(--ti-attention);
+  border-color: var(--ti-attention);
+}
+.ti-coverage-rail__mark--uncertain {
+  background: var(--ti-uncertain-soft);
+  border-color: var(--ti-graphite-soft);
+}
+.ti-coverage-rail__mark--unassessed {
+  background: transparent;
+  border-color: var(--ti-border);
+  border-style: dashed;
+}

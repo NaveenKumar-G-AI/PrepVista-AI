@@ -1,0 +1,270 @@
+[
+  {
+    "source": "part11/src/app/layout.tsx",
+    "destination": "src/app/layout.tsx"
+  },
+  {
+    "source": "part11/package.json",
+    "destination": "package.json"
+  },
+  {
+    "source": "part311/src/domain/types.ts",
+    "destination": "src/engines/challenges/domain/types.ts"
+  },
+  {
+    "source": "part311/src/data/seedChallenges.ts",
+    "destination": "src/engines/challenges/data/seedChallenges.ts"
+  },
+  {
+    "source": "part311/src/engine/hintService.ts",
+    "destination": "src/engines/challenges/engine/hintService.ts"
+  },
+  {
+    "source": "part311/src/execution/deepEqual.ts",
+    "destination": "src/engines/challenges/execution/deepEqual.ts"
+  },
+  {
+    "source": "part311/src/engine/challengeSelector.ts",
+    "destination": "src/engines/challenges/engine/challengeSelector.ts"
+  },
+  {
+    "source": "part311/src/engine/difficultyPolicy.ts",
+    "destination": "src/engines/challenges/engine/difficultyPolicy.ts"
+  },
+  {
+    "source": "part311/src/engine/mistakeClassifier.ts",
+    "destination": "src/engines/challenges/engine/mistakeClassifier.ts"
+  },
+  {
+    "source": "part311/src/engine/skillGapAnalyzer.ts",
+    "destination": "src/engines/challenges/engine/skillGapAnalyzer.ts"
+  },
+  {
+    "source": "part1/src/domain/types.ts",
+    "destination": "src/engines/catalog/domain/types.ts"
+  },
+  {
+    "source": "part1/src/seed/data.ts",
+    "destination": "src/engines/catalog/seed/data.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/actions.ts",
+    "destination": "src/engines/incidents/actions.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/escalation.ts",
+    "destination": "src/engines/incidents/escalation.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/evidence.ts",
+    "destination": "src/engines/incidents/evidence.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/masteryAdapter.ts",
+    "destination": "src/engines/incidents/masteryAdapter.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/metricGen.ts",
+    "destination": "src/engines/incidents/metricGen.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/postmortemValidation.ts",
+    "destination": "src/engines/incidents/postmortemValidation.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/scoring.ts",
+    "destination": "src/engines/incidents/scoring.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/stateMachine.ts",
+    "destination": "src/engines/incidents/stateMachine.ts"
+  },
+  {
+    "source": "part11/src/lib/engine/types.ts",
+    "destination": "src/engines/incidents/types.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/actions.ts",
+    "destination": "src/content/incidents/pf-2048/actions.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/alerts.ts",
+    "destination": "src/content/incidents/pf-2048/alerts.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/causesAndPrevention.ts",
+    "destination": "src/content/incidents/pf-2048/causesAndPrevention.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/deployments.ts",
+    "destination": "src/content/incidents/pf-2048/deployments.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/index.ts",
+    "destination": "src/content/incidents/pf-2048/index.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/logs.ts",
+    "destination": "src/content/incidents/pf-2048/logs.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/messages.ts",
+    "destination": "src/content/incidents/pf-2048/messages.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/metrics.ts",
+    "destination": "src/content/incidents/pf-2048/metrics.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/services.ts",
+    "destination": "src/content/incidents/pf-2048/services.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/timeline.ts",
+    "destination": "src/content/incidents/pf-2048/timeline.ts"
+  },
+  {
+    "source": "part11/src/content/incidents/pf-2048/traces.ts",
+    "destination": "src/content/incidents/pf-2048/traces.ts"
+  },
+  {
+    "source": "part10/sample-project.notification-service.json",
+    "destination": "src/data/notification-project.json"
+  },
+  {
+    "source": "part5/src/mastery/estimators.ts",
+    "destination": "src/engines/mastery/mastery/estimators.ts"
+  },
+  {
+    "source": "part5/src/config/index.ts",
+    "destination": "src/engines/mastery/config/index.ts"
+  },
+  {
+    "source": "part5/src/types.ts",
+    "destination": "src/engines/mastery/types.ts"
+  },
+  {
+    "source": "part29/server/src/engine/comparability.ts",
+    "destination": "src/engines/growth/comparability.ts"
+  },
+  {
+    "source": "part29/server/src/engine/confidence.ts",
+    "destination": "src/engines/growth/confidence.ts"
+  },
+  {
+    "source": "part29/server/src/engine/growth.ts",
+    "destination": "src/engines/growth/growth.ts"
+  },
+  {
+    "source": "part29/server/src/engine/index.ts",
+    "destination": "src/engines/growth/index.ts"
+  },
+  {
+    "source": "part29/server/src/engine/milestones.ts",
+    "destination": "src/engines/growth/milestones.ts"
+  },
+  {
+    "source": "part29/server/src/engine/regression.ts",
+    "destination": "src/engines/growth/regression.ts"
+  },
+  {
+    "source": "part29/server/src/engine/trends.ts",
+    "destination": "src/engines/growth/trends.ts"
+  },
+  {
+    "source": "part29/server/src/engine/types.ts",
+    "destination": "src/engines/growth/types.ts"
+  },
+  {
+    "source": "part18/src/analysis/complexity_integration.ts",
+    "destination": "src/engines/quality/analysis/complexity_integration.ts"
+  },
+  {
+    "source": "part18/src/analysis/context_policy.ts",
+    "destination": "src/engines/quality/analysis/context_policy.ts"
+  },
+  {
+    "source": "part18/src/analysis/duplication.ts",
+    "destination": "src/engines/quality/analysis/duplication.ts"
+  },
+  {
+    "source": "part18/src/analysis/error_handling.ts",
+    "destination": "src/engines/quality/analysis/error_handling.ts"
+  },
+  {
+    "source": "part18/src/analysis/magic_values.ts",
+    "destination": "src/engines/quality/analysis/magic_values.ts"
+  },
+  {
+    "source": "part18/src/analysis/naming.ts",
+    "destination": "src/engines/quality/analysis/naming.ts"
+  },
+  {
+    "source": "part18/src/analysis/positive_signals.ts",
+    "destination": "src/engines/quality/analysis/positive_signals.ts"
+  },
+  {
+    "source": "part18/src/analysis/structural.ts",
+    "destination": "src/engines/quality/analysis/structural.ts"
+  },
+  {
+    "source": "part18/src/rules/catalog.ts",
+    "destination": "src/engines/quality/rules/catalog.ts"
+  },
+  {
+    "source": "part18/src/rules/engine.ts",
+    "destination": "src/engines/quality/rules/engine.ts"
+  },
+  {
+    "source": "part18/src/rules/types.ts",
+    "destination": "src/engines/quality/rules/types.ts"
+  },
+  {
+    "source": "part18/src/scoring/engine.ts",
+    "destination": "src/engines/quality/scoring/engine.ts"
+  },
+  {
+    "source": "part18/src/types.ts",
+    "destination": "src/engines/quality/types.ts"
+  },
+  {
+    "source": "part18/src/config.ts",
+    "destination": "src/engines/quality/config.ts"
+  },
+  {
+    "source": "part18/src/parsers/js_adapter.ts",
+    "destination": "src/engines/quality/parsers/js_adapter.ts"
+  },
+  {
+    "source": "part18/src/parsers/ir.ts",
+    "destination": "src/engines/quality/parsers/ir.ts"
+  },
+  {
+    "source": "part18/src/parsers/types.ts",
+    "destination": "src/engines/quality/parsers/types.ts"
+  },
+  {
+    "source": "part311/src/domain/skillTaxonomy.ts",
+    "destination": "src/engines/challenges/domain/skillTaxonomy.ts"
+  },
+  {
+    "source": "part5/src/db/seed.ts",
+    "destination": "src/data/adaptive-challenges.ts",
+    "note": "Copied authored skills, prerequisites, challenges and tests; omitted database and demo students."
+  },
+  {
+    "source": "part2/codeforge-diagnostic-view.jsx",
+    "destination": "src/data/diagnostics.ts",
+    "note": "Copied authored diagnostic task data only."
+  },
+  {
+    "source": "part7/src/scripts/seed.ts",
+    "destination": "src/data/assessment-tasks.ts",
+    "note": "Extracted authored exercise objects only."
+  },
+  {
+    "source": "part7/src/scripts/solutions.ts",
+    "destination": "src/data/assessment-solutions.ts",
+    "note": "Copied correct reference programs as strings only."
+  }
+]

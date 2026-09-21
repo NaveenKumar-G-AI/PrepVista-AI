@@ -1,0 +1,124 @@
+// ACEAPT AI — Feature 1 (Onboarding) persistence schema — PRODUCTION REFERENCE, NOT LIVE.
+//
+// This is the intended production data model, written as a Prisma schema because that's the
+// most precise, versionable way to document column names, types, and relations. It is not
+// wired up in this build: `prisma generate` needs to download a query engine binary from
+// binaries.prisma.sh at install time, and that host isn't reachable from the sandboxed
+// environment this prototype was verified in, so it couldn't be tested end-to-end honestly.
+//
+// The feature you can actually run ships with a hand-written better-sqlite3 repository
+// (src/lib/db.ts) that creates the identical table shape on first run — same column names,
+// same JSON-string convention for array fields, same self-perceived/measured split. Every
+// query lives behind src/lib/onboarding/service.ts, so migrating to this Prisma schema on
+// Postgres later means rewriting that one file's internals, not anything upstream of it.
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Student {
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+
+  context OnboardingContext?
+  events  OnboardingEvent[]
+}
+
+// One row per student. Column-per-field (rather than one big JSON blob) so the future
+// Diagnostic/Skill Intelligence/Tutor features can query and index on individual fields
+// instead of parsing a blob — see FUTURE CONTRACT note at the bottom of this file.
+model OnboardingContext {
+  id        String  @id @default(uuid())
+  studentId String  @unique
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Section 7 — Preparation goal
+  preparationGoal      String?
+  preparationGoalOther String?
+
+  // Section 8 — Objective (primary required once set; secondary is a JSON string array)
+  primaryObjective    String?
+  secondaryObjectives String  @default("[]")
+
+  // Section 9 — Timeline
+  timelineCategory String?
+  targetDate       DateTime?
+  daysAvailable    Int?
+
+  // Section 10 — Current experience (self-reported only — see selfPerceived* below)
+  experienceLevel String?
+
+  // Section 11 — Previous preparation
+  previousPreparation  String?
+  previousDifficulties String  @default("[]")
+
+  // Section 12 — Confidence map. Explicitly SELF-PERCEIVED. The Diagnostic Engine (Feature 2)
+  // owns a separate `measuredCapability*` set of fields — see FUTURE CONTRACT below. These two
+  // are never written by the same code path, by design (see docs/self-perception-gap.md logic
+  // encoded in src/lib/onboarding/types.ts).
+  selfPerceivedQuantitative  String?
+  selfPerceivedLogical       String?
+  selfPerceivedVerbal        String?
+  selfPerceivedTimePressure  String?
+
+  // Section 13/14 — Availability
+  dailyAvailability        String?
+  dailyAvailabilityMinutes Int?
+  preferredStudyTime       String?
+
+  // Section 15/16 — Assistance & difficulty preference
+  preferredAssistanceModes    String  @default("[]")
+  initialDifficultyPreference String?
+
+  // Section 17 — Pain points
+  primaryPainPoint    String?
+  secondaryPainPoints String  @default("[]")
+
+  // Section 18 — Target score
+  targetScore String?
+
+  // Section 22/24 — Lifecycle + AI summary cache (never regenerate needlessly — section 39)
+  onboardingStatus      String    @default("NOT_STARTED")
+  onboardingStartedAt   DateTime?
+  onboardingCompletedAt DateTime?
+  lastEditedAt          DateTime?
+  contextVersion        Int       @default(1)
+
+  aiSummary            String?
+  aiSummarySource      String? // "ai" | "deterministic"
+  aiSummaryModel       String?
+  aiSummaryGeneratedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ---------------------------------------------------------------------------------------
+  // FUTURE CONTRACT (not implemented by Feature 1 — see section 26/29 of the product spec).
+  // These columns exist now, pre-declared and always NULL, so the Diagnostic Engine (Feature 2)
+  // can be added as a pure additive migration (new writer, zero changes to this feature's
+  // reader code). Feature 1 NEVER writes to these — see src/lib/onboarding/service.ts.
+  // ---------------------------------------------------------------------------------------
+  measuredQuantitative   Float?
+  measuredLogical        Float?
+  measuredVerbal         Float?
+  measuredTimePressure   Float?
+  measuredAt             DateTime?
+  sourceDiagnosticId     String?
+}
+
+model OnboardingEvent {
+  id        String   @id @default(uuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  eventType String
+  metadata  String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+  @@index([eventType])
+}

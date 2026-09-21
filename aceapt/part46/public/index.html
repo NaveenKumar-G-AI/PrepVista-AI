@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ACEAPT · Socratic Mode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,600;1,8..60,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="error-banner" class="error-banner" role="alert" hidden></div>
+
+  <main class="notebook" id="workspace" aria-busy="false">
+    <aside class="margin-rail" aria-label="Session overview">
+      <div class="rail-heading">
+        <span class="rail-kicker">Socratic Mode</span>
+        <h1 id="skill-label">Percentages</h1>
+      </div>
+
+      <details class="rail-goal" open>
+        <summary>Goal</summary>
+        <p id="goal-text">Identify the base value in a percentage change.</p>
+      </details>
+
+      <div class="rail-progress">
+        <span class="rail-label">Understanding</span>
+        <div id="progress-dots" class="progress-dots" aria-hidden="true"></div>
+        <p id="progress-caption" class="rail-caption">Just getting started</p>
+      </div>
+
+      <div class="rail-ledger">
+        <span class="rail-label">This session</span>
+        <ol id="ledger" class="ledger" aria-label="Steps taken so far"></ol>
+      </div>
+
+      <button id="new-session-button" class="link-button rail-new-session" type="button">Start a different problem</button>
+    </aside>
+
+    <section class="page" aria-label="Current exchange">
+      <p id="previous-response" class="previous-response" hidden></p>
+
+      <div class="coach">
+        <p class="coach-label">Coach</p>
+        <p id="coach-message" class="coach-message" aria-live="polite"></p>
+        <button id="why-toggle" class="footnote-marker" type="button" aria-expanded="false" hidden>why this question?</button>
+        <p id="why-text" class="why-text" hidden></p>
+      </div>
+
+      <form id="response-form" class="response-form">
+        <label for="response-input" class="sr-only">Your reasoning</label>
+        <textarea id="response-input" name="response" rows="3" placeholder="Type your thinking here…" autocomplete="off"></textarea>
+        <div class="response-form-row">
+          <span id="step-caption" class="step-caption"></span>
+          <button type="submit" class="primary-button" id="submit-button">Send</button>
+        </div>
+      </form>
+
+      <div id="control-row" class="control-row" role="group" aria-label="Ask for help">
+        <button type="button" class="text-action" data-action="hint">Need a hint</button>
+        <button type="button" class="text-action" data-action="explain">Explain directly</button>
+        <button type="button" class="text-action" data-action="simplify">Try a simpler example</button>
+        <button type="button" class="text-action" data-action="independent">I want to solve independently</button>
+      </div>
+
+      <section id="completion-panel" class="completion-panel" hidden aria-live="polite">
+        <p class="completion-kicker" id="completion-kicker">Socratic session complete</p>
+        <h2 id="completion-skill"></h2>
+        <div class="completion-columns">
+          <div>
+            <h3>You demonstrated</h3>
+            <ul id="completion-demonstrated"></ul>
+          </div>
+          <div id="completion-developing-wrap">
+            <h3>Still developing</h3>
+            <ul id="completion-developing"></ul>
+          </div>
+        </div>
+        <p id="completion-verification" class="completion-verification"></p>
+        <button id="completion-new-button" class="primary-button" type="button">Start a new problem</button>
+      </section>
+    </section>
+  </main>
+
+  <div id="live-region" class="sr-only" aria-live="polite"></div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

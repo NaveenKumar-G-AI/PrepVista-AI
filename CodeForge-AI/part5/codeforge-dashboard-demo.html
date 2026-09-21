@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeForge — Mastery Readout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0A0F1C; --panel:#121A2C; --panel-raised:#1A2440; --line:#2A3555;
+    --text:#EDF1FA; --text-muted:#8A93B0; --text-dim:#5B6480;
+    --amber:#F5A94D; --amber-dim:#4A3A20; --cyan:#6FE3D6; --cyan-dim:#1D3A38;
+    --pass:#5FD98A; --pass-dim:#1B3B29; --fail:#EE7285; --fail-dim:#3D1F26;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(111,227,214,0.07), transparent),
+      radial-gradient(ellipse 700px 500px at 90% 10%, rgba(245,169,77,0.06), transparent),
+      var(--ink);
+    color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif;
+    line-height:1.5;
+    padding:0 0 64px;
+    min-height:100vh;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .wrap{max-width:920px; margin:0 auto; padding:0 24px;}
+
+  /* ---------- Header ---------- */
+  header.topbar{
+    border-bottom:1px solid var(--line);
+    padding:28px 0 22px;
+    margin-bottom:32px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  }
+  .prompt-line{
+    font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--cyan);
+    letter-spacing:0.02em; margin-bottom:10px; opacity:0.9;
+  }
+  .prompt-line .caret{display:inline-block; width:8px; height:14px; background:var(--cyan); margin-left:2px; vertical-align:-2px; animation:blink 1.1s step-end infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  h1.student-name{font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:28px; margin:0 0 6px; letter-spacing:-0.01em;}
+  .student-meta{color:var(--text-muted); font-size:14.5px;}
+  .student-meta .sep{color:var(--text-dim); margin:0 8px;}
+  .tag{
+    display:inline-block; font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600;
+    letter-spacing:0.05em; text-transform:uppercase; padding:3px 8px; border-radius:4px;
+    border:1px solid var(--line); color:var(--text-muted);
+  }
+
+  /* ---------- Section headers ---------- */
+  .section-eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:600; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--text-dim); margin:0 0 14px; display:flex; align-items:center; gap:10px;
+  }
+  .section-eyebrow::after{content:''; flex:1; height:1px; background:var(--line);}
+  section{margin-bottom:44px;}
+
+  /* ---------- Hero recommendation ---------- */
+  .rec-card{
+    background:linear-gradient(150deg, var(--panel-raised), var(--panel));
+    border:1px solid var(--amber-dim); border-left:3px solid var(--amber);
+    border-radius:var(--radius); padding:24px 26px; position:relative; overflow:hidden;
+  }
+  .rec-card::before{
+    content:'>>'; position:absolute; top:22px; right:26px; font-family:'IBM Plex Mono',monospace;
+    font-size:34px; color:var(--amber); opacity:0.12; font-weight:700;
+  }
+  .rec-top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px;}
+  .rec-challenge{font-family:'IBM Plex Mono', monospace; font-size:21px; font-weight:600; color:var(--text);}
+  .rec-challenge .skill-of{color:var(--text-muted); font-weight:400; font-size:15px;}
+  .badge-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .badge{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600; letter-spacing:0.04em;
+    padding:4px 9px; border-radius:5px; text-transform:uppercase; white-space:nowrap;
+  }
+  .badge.gap{background:var(--amber-dim); color:var(--amber); border:1px solid rgba(245,169,77,0.35);}
+  .badge.intervention{background:rgba(111,227,214,0.1); color:var(--cyan); border:1px solid rgba(111,227,214,0.3);}
+  .badge.diff{background:rgba(255,255,255,0.05); color:var(--text-muted); border:1px solid var(--line);}
+  .rec-objective{font-size:15.5px; color:var(--text); margin:4px 0 10px; font-weight:500;}
+  .rec-reason{font-size:14px; color:var(--text-muted); line-height:1.65; max-width:70ch;}
+  .rec-reason b{color:var(--text); font-weight:600;}
+
+  /* ---------- Mastery map ---------- */
+  .bucket-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:14px;}
+  .bucket{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px;}
+  .bucket-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px;}
+  .bucket-title{font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase;}
+  .bucket-count{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-dim);}
+  .bucket.strong .bucket-title{color:var(--pass);}
+  .bucket.developing .bucket-title{color:var(--cyan);}
+  .bucket.needs .bucket-title{color:var(--fail);}
+  .bucket.improving .bucket-title{color:var(--amber);}
+  .bucket.unknown .bucket-title{color:var(--text-dim);}
+  .skill-row{padding:9px 0; border-top:1px solid rgba(255,255,255,0.04);}
+  .skill-row:first-child{border-top:none;}
+  .skill-name-line{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; margin-bottom:6px;}
+  .skill-name-line .score{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-muted);}
+  .instrument{display:flex; gap:2px;}
+  .seg{flex:1; height:5px; background:rgba(255,255,255,0.06); border-radius:1px;}
+  .seg.on{background:var(--cyan);}
+  .bucket.strong .seg.on{background:var(--pass);}
+  .bucket.needs .seg.on{background:var(--fail);}
+  .trend-chip{font-family:'IBM Plex Mono',monospace; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px; vertical-align:1px;}
+  .trend-chip.improving{background:var(--pass-dim); color:var(--pass);}
+  .empty-note{color:var(--text-dim); font-size:13px; font-style:normal; padding:4px 0;}
+  .ghost-skills{display:flex; flex-wrap:wrap; gap:6px;}
+  .ghost-tag{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-dim); border:1px dashed var(--line); border-radius:5px; padding:3px 8px;}
+
+  /* ---------- Evidence ledger (signature element) ---------- */
+  .ledger{position:relative; padding-left:26px;}
+  .ledger::before{content:''; position:absolute; left:8px; top:6px; bottom:6px; width:1px; background:var(--line);}
+  .ledger-entry{
+    position:relative; padding:12px 0 12px 16px; border-bottom:1px solid rgba(255,255,255,0.04);
+    opacity:0; transform:translateY(6px); animation:rise 0.5s ease forwards;
+  }
+  .ledger-entry:last-child{border-bottom:none;}
+  .ledger-entry::before{
+    content:''; position:absolute; left:-26px; top:16px; width:9px; height:9px; border-radius:50%;
+    background:var(--panel); border:2px solid var(--text-dim);
+  }
+  .ledger-entry.pass::before{border-color:var(--pass); background:var(--pass);}
+  .ledger-entry.fail::before{border-color:var(--fail); background:var(--fail);}
+  .ledger-entry.info::before{border-color:var(--amber); background:var(--amber);}
+  @keyframes rise{to{opacity:1; transform:translateY(0);}}
+  @media (prefers-reduced-motion: reduce){ .ledger-entry{animation:none; opacity:1; transform:none;} .prompt-line .caret{animation:none;} }
+
+  .ledger-head-line{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:4px;}
+  .ledger-step{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-dim);}
+  .ledger-title{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14.5px;}
+  .ledger-result{font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:1px 7px; border-radius:4px;}
+  .ledger-entry.pass .ledger-result{background:var(--pass-dim); color:var(--pass);}
+  .ledger-entry.fail .ledger-result{background:var(--fail-dim); color:var(--fail);}
+  .ledger-entry.info .ledger-result{background:var(--amber-dim); color:var(--amber);}
+  .ledger-lang{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-dim);}
+  .ledger-narrative{font-size:13.5px; color:var(--text-muted); line-height:1.6; max-width:66ch; margin-top:5px;}
+  .ledger-deltas{margin-top:8px; display:flex; flex-wrap:wrap; gap:8px;}
+  .delta-chip{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; background:rgba(255,255,255,0.03);
+    border:1px solid var(--line); border-radius:5px; padding:3px 8px; color:var(--text-muted);
+  }
+  .delta-chip b{color:var(--text); font-weight:600;}
+  .ledger-diag{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-dim); margin-top:2px;}
+
+  /* ---------- Recommendation trail ---------- */
+  .rec-trail{display:flex; flex-direction:column; gap:10px;}
+  .rec-trail-item{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 16px;}
+  .rec-trail-top{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline; margin-bottom:4px;}
+  .rec-trail-obj{font-size:13.5px; font-weight:500;}
+  .rec-trail-meta{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--text-dim);}
+
+  footer{padding-top:24px; border-top:1px solid var(--line); margin-top:12px;}
+  footer p{color:var(--text-dim); font-size:12.5px; font-family:'IBM Plex Mono', monospace;}
+
+  @media (max-width:600px){
+    .wrap{padding:0 16px;}
+    h1.student-name{font-size:22px;}
+    .rec-card::before{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="prompt-line">student@codeforge:~$ mastery --readout<span class="caret"></span></div>
+    <h1 class="student-name" id="student-name">—</h1>
+    <div class="student-meta">
+      <span id="student-role">—</span><span class="sep">·</span><span id="student-goal">—</span><span class="sep">·</span><span class="tag" id="student-stats-tag">—</span>
+    </div>
+  </header>
+
+  <section id="recommendation-section">
+    <div class="section-eyebrow">Recommended next</div>
+    <div class="rec-card" id="rec-card"></div>
+  </section>
+
+  <section id="mastery-section">
+    <div class="section-eyebrow">Mastery map</div>
+    <div class="bucket-grid" id="bucket-grid"></div>
+  </section>
+
+  <section id="ledger-section">
+    <div class="section-eyebrow">Evidence ledger — this session</div>
+    <div class="ledger" id="ledger"></div>
+  </section>
+
+  <section id="trail-section">
+    <div class="section-eyebrow">Recommendation trail</div>
+    <div class="rec-trail" id="rec-trail"></div>
+  </section>
+
+  <footer>
+    <p id="footer-stats">—</p>
+  </footer>
+
+</div>
+
+<script>
+const DASHBOARD_DATA = {
+  "generatedAt": "2026-08-16T01:41:51.964Z",
+  "student": {
+    "displayName": "Demo Student",
+    "targetRole": "ML Engineer",
+    "goal": "ROLE_PREPARATION"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "title": "Word Frequency Counter",
+      "action": "Submit python solution to \"Word Frequency Counter\"",
+      "challengeTitle": "Word Frequency Counter",
+      "language": "python",
+      "passed": false,
+      "testsPassed": 0,
+      "testsTotal": 3,
+      "mistakeCategory": "SYNTAX_ERROR",
+      "languageIssue": true,
+      "narrative": "First Python submission has a syntax error. This should be diagnosed as a LANGUAGE issue, not an algorithmic one.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Python Collections",
+          "masteryScore": 0,
+          "masteryState": "UNKNOWN",
+          "confidenceScore": 0,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 0
+        }
+      ]
+    },
+    {
+      "step": 2,
+      "title": "Word Frequency Counter",
+      "action": "Submit python solution to \"Word Frequency Counter\"",
+      "challengeTitle": "Word Frequency Counter",
+      "language": "python",
+      "passed": true,
+      "testsPassed": 3,
+      "testsTotal": 3,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "Corrected submission. Real independent evidence is now recorded for Python Collections.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Python Collections",
+          "masteryScore": 100,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 39,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        }
+      ]
+    },
+    {
+      "step": 3,
+      "title": "Binary Search",
+      "action": "Submit javascript solution to \"Binary Search\"",
+      "challengeTitle": "Binary Search",
+      "language": "javascript",
+      "passed": true,
+      "testsPassed": 5,
+      "testsTotal": 5,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "Standard binary search, submitted correctly on the first try.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Searching",
+          "masteryScore": 55,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 39,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        }
+      ]
+    },
+    {
+      "step": 4,
+      "title": "Search in Rotated Sorted Array",
+      "action": "Submit javascript solution to \"Search in Rotated Sorted Array\"",
+      "challengeTitle": "Search in Rotated Sorted Array",
+      "language": "javascript",
+      "passed": false,
+      "testsPassed": 1,
+      "testsTotal": 4,
+      "mistakeCategory": "LOGIC_ERROR",
+      "languageIssue": false,
+      "narrative": "The exact same (unmodified) binary search is applied to a rotated array — the classic transfer failure: strong on the standard form, but the technique was not adapted to the new context.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Searching",
+          "masteryScore": 55,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 52.9,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 2
+        }
+      ]
+    },
+    {
+      "step": 5,
+      "title": "Recommendation generated",
+      "action": "GET /api/recommendations/next",
+      "narrative": "The engine now has both a real TRANSFER_GAP signal (Searching: standard vs. novel) and an unattempted-skill signal to weigh — the recommendation below reflects whichever the engine's real ranking judged higher-priority.",
+      "recommendation": {
+        "skillName": "Two Sum",
+        "gapType": "PREREQUISITE_GAP",
+        "interventionType": "PREREQUISITE_REVIEW",
+        "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+        "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+        "rankingScore": 0.817
+      }
+    },
+    {
+      "step": 6,
+      "title": "Implement Queue Using Two Stacks",
+      "action": "Submit javascript solution to \"Implement Queue Using Two Stacks\"",
+      "challengeTitle": "Implement Queue Using Two Stacks",
+      "language": "javascript",
+      "passed": false,
+      "testsPassed": 2,
+      "testsTotal": 3,
+      "mistakeCategory": "STATE_MANAGEMENT_ERROR",
+      "languageIssue": false,
+      "narrative": "A genuine state-management bug: passes a straightforward push/pop sequence but breaks once pushes and pops are interleaved, because it re-transfers stack contents on every pop instead of only when the output stack is empty.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Queues",
+          "masteryScore": 66.7,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 14,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        },
+        {
+          "skillName": "Stacks",
+          "masteryScore": 66.7,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 14,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        }
+      ]
+    },
+    {
+      "step": 7,
+      "title": "Recommendation generated",
+      "action": "GET /api/recommendations/next",
+      "narrative": "With a real STATE_MANAGEMENT_ERROR pattern now on record for Queues, the engine should propose a debugging-flavored, targeted next step.",
+      "recommendation": {
+        "skillName": "Climbing Stairs",
+        "gapType": "INSUFFICIENT_EVIDENCE",
+        "interventionType": "EXPLORATION",
+        "learningObjective": "Establish an initial evidence base for Recursion.",
+        "reason": "This skill has little or no evidence yet — probing it now avoids only ever practicing already-known gaps. You have no recorded attempts on Recursion yet, so this exploratory assessment will establish a real evidence baseline instead of guessing.",
+        "rankingScore": 0.583
+      }
+    },
+    {
+      "step": 8,
+      "title": "Implement Queue Using Two Stacks",
+      "action": "Submit javascript solution to \"Implement Queue Using Two Stacks\"",
+      "challengeTitle": "Implement Queue Using Two Stacks",
+      "language": "javascript",
+      "passed": true,
+      "testsPassed": 3,
+      "testsTotal": 3,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "Corrected implementation (only transfers when the output stack is empty). This is a genuine retry after real, specific feedback — not a fresh random problem.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Queues",
+          "masteryScore": 83.3,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 44.8,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 2
+        },
+        {
+          "skillName": "Stacks",
+          "masteryScore": 83.3,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 44.8,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 2
+        }
+      ]
+    },
+    {
+      "step": 9,
+      "title": "Recommendation generated",
+      "action": "GET /api/recommendations/next",
+      "narrative": "Queues evidence has now genuinely improved. Checking whether Graph Algorithms (which lists Queues as a prerequisite) is judged ready.",
+      "recommendation": {
+        "skillName": "Two Sum",
+        "gapType": "PREREQUISITE_GAP",
+        "interventionType": "PREREQUISITE_REVIEW",
+        "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+        "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+        "rankingScore": 0.775
+      }
+    },
+    {
+      "step": 10,
+      "title": "BFS Traversal Order",
+      "action": "Submit javascript solution to \"BFS Traversal Order\"",
+      "challengeTitle": "BFS Traversal Order",
+      "language": "javascript",
+      "passed": true,
+      "testsPassed": 3,
+      "testsTotal": 3,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "First-ever attempt at Graph Algorithms (previously UNKNOWN). A real, correct BFS implementation, closing the loop: the prerequisite work on Queues is now paying off on the dependent skill.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Graph Algorithms",
+          "masteryScore": 55,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 39,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        },
+        {
+          "skillName": "Queues",
+          "masteryScore": 89.2,
+          "masteryState": "COMPETENT",
+          "confidenceScore": 58.7,
+          "trend": "IMPROVING",
+          "evidenceCount": 3
+        }
+      ]
+    }
+  ],
+  "finalDashboard": {
+    "strongSkills": [],
+    "developingSkills": [
+      {
+        "skillId": "skill_python_collections",
+        "skillName": "Python Collections",
+        "masteryScore": 100,
+        "confidenceScore": 39,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_searching",
+        "skillName": "Searching",
+        "masteryScore": 55,
+        "confidenceScore": 52.9,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_queues",
+        "skillName": "Queues",
+        "masteryScore": 89.2,
+        "confidenceScore": 58.7,
+        "masteryState": "COMPETENT",
+        "trend": "IMPROVING"
+      },
+      {
+        "skillId": "skill_stacks",
+        "skillName": "Stacks",
+        "masteryScore": 83.3,
+        "confidenceScore": 44.8,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_graph_algorithms",
+        "skillName": "Graph Algorithms",
+        "masteryScore": 55,
+        "confidenceScore": 39,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      }
+    ],
+    "needsPractice": [],
+    "improvingSkills": [
+      {
+        "skillId": "skill_queues",
+        "skillName": "Queues",
+        "masteryScore": 89.2,
+        "confidenceScore": 58.7,
+        "masteryState": "COMPETENT",
+        "trend": "IMPROVING"
+      }
+    ],
+    "unknownSkills": [
+      {
+        "skillId": "skill_python",
+        "skillName": "Python",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_python_functions",
+        "skillName": "Python Functions",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_python_oop",
+        "skillName": "Python OOP",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_data_structures",
+        "skillName": "Data Structures",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_arrays",
+        "skillName": "Arrays",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_strings",
+        "skillName": "Strings",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_hash_maps",
+        "skillName": "Hash Maps",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_trees",
+        "skillName": "Trees",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_graphs",
+        "skillName": "Graphs",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_algorithms",
+        "skillName": "Algorithms",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_sorting",
+        "skillName": "Sorting",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_two_pointers",
+        "skillName": "Two Pointers",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_sliding_window",
+        "skillName": "Sliding Window",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_recursion",
+        "skillName": "Recursion",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_dp",
+        "skillName": "Dynamic Programming",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      }
+    ],
+    "recommendation": {
+      "id": "9a7bb565-65f1-443f-9797-71dd2601482a",
+      "challengeId": "challenge_two_sum",
+      "challengeTitle": "Two Sum",
+      "skillId": "skill_arrays",
+      "skillName": "Arrays",
+      "gapType": "PREREQUISITE_GAP",
+      "interventionType": "PREREQUISITE_REVIEW",
+      "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+      "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+      "difficultyLevel": "EASY"
+    },
+    "recentProgress": [
+      {
+        "attemptId": "df9b507e-26bf-4408-a657-51e269169261",
+        "challengeTitle": "Word Frequency Counter",
+        "language": "python",
+        "submittedAt": "2026-08-16 01:41:51",
+        "passed": false,
+        "testsPassed": 0,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "635b59bf-ef5b-4bbf-8572-2843300dbfd6",
+        "challengeTitle": "Word Frequency Counter",
+        "language": "python",
+        "submittedAt": "2026-08-16 01:41:51",
+        "passed": true,
+        "testsPassed": 3,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "dee18812-4534-4f09-a7d1-ece1a8df5454",
+        "challengeTitle": "Binary Search",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 01:41:51",
+        "passed": true,
+        "testsPassed": 5,
+        "testsTotal": 5
+      },
+      {
+        "attemptId": "76ef0ef7-bb87-43de-843c-dad9f028eaa2",
+        "challengeTitle": "Search in Rotated Sorted Array",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 01:41:51",
+        "passed": false,
+        "testsPassed": 1,
+        "testsTotal": 4
+      },
+      {
+        "attemptId": "a0f27f04-8e69-46ea-9da6-e91f47c1b592",
+        "challengeTitle": "Implement Queue Using Two Stacks",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 01:41:51",
+        "passed": false,
+        "testsPassed": 2,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "3bbc3e8f-f138-4fcb-bd45-2045fbdf272a",
+        "challengeTitle": "Implement Queue Using Two Stacks",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 01:41:51",
+        "passed": true,
+        "testsPassed": 3,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "bb81357a-83d0-4bbe-b1f1-816b952b4e3b",
+        "challengeTitle": "BFS Traversal Order",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 01:41:51",
+        "passed": true,
+        "testsPassed": 3,
+        "testsTotal": 3
+      }
+    ]
+  },
+  "recommendationHistory": [
+    {
+      "id": "9a7bb565-65f1-443f-9797-71dd2601482a",
+      "studentId": "demo_run",
+      "challengeId": "challenge_two_sum",
+      "skillId": "skill_arrays",
+      "gapType": "PREREQUISITE_GAP",
+      "interventionType": "PREREQUISITE_REVIEW",
+      "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+      "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+      "rankingScore": 0.817,
+      "isRepetition": false,
+      "isExploration": false,
+      "evidenceSnapshot": {
+        "skillState": null,
+        "gapType": "PREREQUISITE_GAP",
+        "gapSeverity": 0.85,
+        "difficultyDecision": {
+          "mode": "HOLD",
+          "targetLevel": "EASY",
+          "reason": "No evidence yet for this skill — starting at the easiest level."
+        },
+        "interventionReason": "A prerequisite skill is under-ready; reinforcing it is higher-leverage than harder practice on the dependent skill.",
+        "aiPolishUsed": false,
+        "candidateCount": 2,
+        "topScore": 0.817,
+        "scoreBreakdown": {
+          "skillGap": 0.85,
+          "prerequisiteFit": 1,
+          "difficultyFit": 1,
+          "roleRelevance": 0.3,
+          "goalRelevance": 0.7,
+          "learningValue": 0.925,
+          "freshness": 1,
+          "diversity": 1,
+          "mistakeRelevance": 0.7,
+          "retentionValue": 0.2,
+          "repetitionPenalty": 0
+        },
+        "recentEvidence": []
+      },
+      "status": "PENDING",
+      "createdAt": "2026-08-16 01:41:51",
+      "acceptedAt": null,
+      "completedAt": null
+    },
+    {
+      "id": "92bb44cc-be51-4bb7-b934-022da5836b66",
+      "studentId": "demo_run",
+      "challengeId": "challenge_climbing_stairs",
+      "skillId": "skill_recursion",
+      "gapType": "INSUFFICIENT_EVIDENCE",
+      "interventionType": "EXPLORATION",
+      "learningObjective": "Establish an initial evidence base for Recursion.",
+      "reason": "This skill has little or no evidence yet — probing it now avoids only ever practicing already-known gaps. You have no recorded attempts on Recursion yet, so this exploratory assessment will establish a real evidence baseline instead of guessing.",
+      "rankingScore": 0.583,
+      "isRepetition": false,
+      "isExploration": true,
+      "evidenceSnapshot": {
+        "skillState": null,
+        "gapType": "INSUFFICIENT_EVIDENCE",
+        "gapSeverity": 0.2,
+        "difficultyDecision": {
+          "mode": "HOLD",
+          "targetLevel": "EASY",
+          "reason": "No evidence yet for this skill — starting at the easiest level."
+        },
+        "interventionReason": "This skill has little or no evidence yet — probing it now avoids only ever practicing already-known gaps.",
+        "aiPolishUsed": false,
+        "candidateCount": 1,
+        "topScore": 0.583,
+        "scoreBreakdown": {
+          "skillGap": 0.2,
+          "prerequisiteFit": 0.6,
+          "difficultyFit": 0.6666666666666667,
+          "roleRelevance": 0.5,
+          "goalRelevance": 0.7,
+          "learningValue": 0.6,
+          "freshness": 1,
+          "diversity": 1,
+          "mistakeRelevance": 0.7,
+          "retentionValue": 0.2,
+          "repetitionPenalty": 0
+        },
+        "recentEvidence": []
+      },
+      "status": "PENDING",
+      "createdAt": "2026-08-16 01:41:51",
+      "acceptedAt": null,
+      "completedAt": null
+    },
+    {
+      "id": "c66e0d6e-70ad-4639-8731-abb4cd76352d",
+      "studentId": "demo_run",
+      "challengeId": "challenge_two_sum",
+      "skillId": "skill_arrays",
+      "gapType": "PREREQUISITE_GAP",
+      "interventionType": "PREREQUISITE_REVIEW",
+      "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+      "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+      "rankingScore": 0.775,
+      "isRepetition": false,
+      "isExploration": false,
+      "evidenceSnapshot": {
+        "skillState": null,
+        "gapType": "PREREQUISITE_GAP",
+        "gapSeverity": 0.85,
+        "difficultyDecision": {
+          "mode": "HOLD",
+          "targetLevel": "EASY",
+          "reason": "No evidence yet for this skill — starting at the easiest level."
+        },
+        "interventionReason": "A prerequisite skill is under-ready; reinforcing it is higher-leverage than harder practice on the dependent skill.",
+        "aiPolishUsed": false,
+        "candidateCount": 2,
+        "topScore": 0.775,
+        "scoreBreakdown": {
+          "skillGap": 0.85,
+          "prerequisiteFit": 1,
+          "difficultyFit": 1,
+          "roleRelevance": 0.3,
+          "goalRelevance": 0.7,
+          "learningValue": 0.925,
+          "freshness": 1,
+          "diversity": 0.3,
+          "mistakeRelevance": 0.7,
+          "retentionValue": 0.2,
+          "repetitionPenalty": 0
+        },
+        "recentEvidence": []
+      },
+      "status": "PENDING",
+      "createdAt": "2026-08-16 01:41:51",
+      "acceptedAt": null,
+      "completedAt": null
+    }
+  ],
+  "stats": {
+    "skillCount": 21,
+    "relationshipCount": 12,
+    "challengeCount": 10,
+    "attemptCount": 7,
+    "evidenceCount": 10
+  }
+};
+
+function el(tag, className, html) {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function titleCase(s) { return String(s ?? '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
+
+function render(data) {
+  const d = data.finalDashboard;
+
+  // Header
+  document.getElementById('student-name').textContent = data.student.displayName;
+  document.getElementById('student-role').textContent = 'Target role: ' + data.student.targetRole;
+  document.getElementById('student-goal').textContent = titleCase(data.student.goal);
+  document.getElementById('student-stats-tag').textContent = data.stats.attemptCount + ' real attempts · ' + data.stats.evidenceCount + ' evidence rows';
+
+  // Hero recommendation
+  const rec = d.recommendation;
+  const recCard = document.getElementById('rec-card');
+  if (rec) {
+    recCard.innerHTML = `
+      <div class="rec-top">
+        <div class="rec-challenge">${esc(rec.challengeTitle)} <span class="skill-of">— ${esc(rec.skillName)}</span></div>
+        <div class="badge-row">
+          ${rec.gapType ? `<span class="badge gap">${esc(titleCase(rec.gapType))}</span>` : ''}
+          <span class="badge intervention">${esc(titleCase(rec.interventionType))}</span>
+          <span class="badge diff">${esc(rec.difficultyLevel)}</span>
+        </div>
+      </div>
+      <div class="rec-objective">${esc(rec.learningObjective)}</div>
+      <div class="rec-reason">${esc(rec.reason)}</div>
+    `;
+  } else {
+    recCard.innerHTML = `<div class="empty-note">No pending recommendation — every real gap the engine could detect has been addressed by the evidence in this run.</div>`;
+  }
+
+  // Mastery map
+  const buckets = [
+    { key: 'strongSkills', cls: 'strong', title: 'Strong', empty: 'No skills at Strong yet — keep building evidence below.' },
+    { key: 'improvingSkills', cls: 'improving', title: 'Improving', empty: 'No skill has enough history yet to show a trend.' },
+    { key: 'developingSkills', cls: 'developing', title: 'Developing', empty: 'Nothing developing yet.' },
+    { key: 'needsPractice', cls: 'needs', title: 'Needs practice', empty: 'Nothing flagged as needing practice right now.' },
+  ];
+  const grid = document.getElementById('bucket-grid');
+  for (const b of buckets) {
+    const items = d[b.key] || [];
+    const bucketEl = el('div', 'bucket ' + b.cls);
+    bucketEl.appendChild(el('div', 'bucket-head', `<span class="bucket-title">${b.title}</span><span class="bucket-count">${items.length}</span>`));
+    if (items.length === 0) {
+      bucketEl.appendChild(el('div', 'empty-note', esc(b.empty)));
+    } else {
+      for (const s of items) {
+        const onSegs = Math.round((s.masteryScore / 100) * 10);
+        let segs = '';
+        for (let i = 0; i < 10; i++) segs += `<div class="seg${i < onSegs ? ' on' : ''}"></div>`;
+        const trend = s.trend === 'IMPROVING' ? '<span class="trend-chip improving">↑ improving</span>' : '';
+        const row = el('div', 'skill-row', `
+          <div class="skill-name-line"><span>${esc(s.skillName)}${trend}</span><span class="score">${Math.round(s.masteryScore)}/100</span></div>
+          <div class="instrument">${segs}</div>
+        `);
+        bucketEl.appendChild(row);
+      }
+    }
+    grid.appendChild(bucketEl);
+  }
+  // Unknown skills as a ghost-tag cloud (Phase 21: UNKNOWN != WEAK, so it gets a lighter visual treatment, not a red flag)
+  const unknown = d.unknownSkills || [];
+  const unknownBucket = el('div', 'bucket unknown');
+  unknownBucket.appendChild(el('div', 'bucket-head', `<span class="bucket-title">Unknown — not yet assessed</span><span class="bucket-count">${unknown.length}</span>`));
+  const cloud = el('div', 'ghost-skills');
+  for (const s of unknown) cloud.appendChild(el('span', 'ghost-tag', esc(s.skillName)));
+  unknownBucket.appendChild(cloud);
+  grid.appendChild(unknownBucket);
+
+  // Evidence ledger
+  const ledger = document.getElementById('ledger');
+  data.steps.forEach((step, i) => {
+    const isRec = !!step.recommendation;
+    const cls = isRec ? 'info' : (step.passed ? 'pass' : 'fail');
+    const entry = el('div', 'ledger-entry ' + cls);
+    entry.style.animationDelay = (i * 0.06) + 's';
+    if (isRec) {
+      entry.innerHTML = `
+        <div class="ledger-head-line">
+          <span class="ledger-step">STEP ${step.step}</span>
+          <span class="ledger-title">recommendation → ${esc(step.recommendation.skillName)}</span>
+          <span class="ledger-result">${esc(titleCase(step.recommendation.interventionType))}</span>
+        </div>
+        <div class="ledger-narrative">${esc(step.narrative)}</div>
+        <div class="ledger-deltas"><span class="delta-chip">objective: <b>${esc(step.recommendation.learningObjective)}</b></span></div>
+      `;
+    } else {
+      const deltas = (step.skillStatesAfter || []).map(s =>
+        `<span class="delta-chip">${esc(s.skillName)}: <b>${Math.round(s.masteryScore)}/100 · ${esc(titleCase(s.masteryState))}</b></span>`
+      ).join('');
+      entry.innerHTML = `
+        <div class="ledger-head-line">
+          <span class="ledger-step">STEP ${step.step}</span>
+          <span class="ledger-title">${esc(step.challengeTitle)}</span>
+          <span class="ledger-lang">${esc(step.language)}</span>
+          <span class="ledger-result">${step.passed ? 'PASS' : 'FAIL'} ${step.testsPassed}/${step.testsTotal}</span>
+        </div>
+        <div class="ledger-narrative">${esc(step.narrative)}</div>
+        <div class="ledger-diag">diagnosis: ${esc(titleCase(step.mistakeCategory))}${step.languageIssue ? ' (language issue — not counted as algorithmic evidence)' : ''}</div>
+        <div class="ledger-deltas">${deltas}</div>
+      `;
+    }
+    ledger.appendChild(entry);
+  });
+
+  // Recommendation trail
+  const trail = document.getElementById('rec-trail');
+  for (const r of data.recommendationHistory.slice().reverse()) {
+    const item = el('div', 'rec-trail-item', `
+      <div class="rec-trail-top">
+        <span class="rec-trail-obj">${esc(r.learningObjective)}</span>
+        <span class="rec-trail-meta">${esc(titleCase(r.interventionType))} · ${esc(r.status)}</span>
+      </div>
+    `);
+    trail.appendChild(item);
+  }
+
+  document.getElementById('footer-stats').textContent =
+    `${data.stats.skillCount} skills · ${data.stats.relationshipCount} prerequisite/relationship edges · ${data.stats.challengeCount} challenges in catalog · generated ${new Date(data.generatedAt).toLocaleString()}`;
+}
+
+render(DASHBOARD_DATA);
+</script>
+</body>
+</html>

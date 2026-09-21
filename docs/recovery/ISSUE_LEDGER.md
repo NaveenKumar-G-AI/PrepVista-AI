@@ -18,3 +18,26 @@ The reported 10/10 production session itself has not been inspected. Do not attr
 2026-09-20 scope correction: user explicitly requested local checks only. No deployment, remote migration or Git push is part of this recovery pass.
 
 Known remaining verification: historical institution/profile snapshot reconciliation and the full platform-specific migration chain require separate qualification; new report/history reads are evidence-derived, but this pass does not certify every legacy institutional aggregate. See RELEASE_CHECKLIST. No remaining verified issue is hidden by a 100% completion claim.
+
+
+## Second incident audit ? 2026-09-20
+
+The reported 11-answer/zero-evaluation production interview was not accessed.
+These are independently verified local defects, not a claimed diagnosis of its
+exact production state. Closed evidence details can explain blank pasted sections;
+blank pasted sections alone do not prove transcript loss.
+
+| ID | Severity | Verified defect | Repair and evidence | State |
+| --- | --- | --- | --- | --- |
+| PV-EVAL-003 | P1 | Actual evaluation calls ignored GROQ_EVAL_MODEL, allowed only 2.9?4.1 seconds and 420?620 output tokens despite a long JSON contract | Dedicated model, bounded 35-second/1800-token background budget, queue-owned retries; actual SDK serialization/response tests | FIXED LOCALLY |
+| PV-EVAL-004 | P1 | Prompt JSON duplicated specificity_score and ended with a trailing comma; truncation was not detected; provider failures lost their cause | Correct prompt shape, finish-reason validation and safe error codes; malformed/truncated/auth/rate/timeout tests | FIXED LOCALLY |
+| PV-REPORT-003 | P1 | Pending jobs meant GENERATING forever; UI polling stopped silently and disabled recovery | Queue age/lease-aware diagnostics, owner retry for expired stalled jobs, visible refresh and saved transcripts independent of evaluations | FIXED LOCALLY; browser verification in progress |
+| PV-AUTH-001 | P1 | Account fetch and token-refresh outages erased credentials; a second generic GET retry after failed refresh caused another 401/logout | Backend transient auth failures remain503; client preserves credentials, blocks unverified private views and offers retry; browser reproduced extra retry defect and regression added | FIXED LOCALLY; final browser rerun pending |
+| PV-ROUTE-001 | P1 | Shared report URLs pointed to a missing frontend page | Public read-only page, no viewer authorization header or private transcripts; invalid/expired link handling | FIXED LOCALLY |
+| PV-RESUME-001 | P1 | Failed resume parsing silently produced an empty profile and generic interview | Explicit parse status, source-backed claims, failed extraction stops before session creation, retained upload/retry | FIXED LOCALLY |
+| PV-RESUME-002 | P2 | Main setup accepted PDF only although backend supported more formats; extraction blocked the event loop | Aligned upload choices, bounded OCR pages and extraction moved off the event loop | FIXED LOCALLY |
+| PV-INSTITUTION-001 | P1 | Missing institutional scores were categorized as at-risk/zero | Explicit not-measured category; implementation and tests in progress | IN PROGRESS |
+| PV-SNAPSHOT-001 | P1 | Historical profile/enrollment trigger only runs on FINISHED transition and skips null; late evaluations cannot refresh those cached snapshots | Direct session-derived views avoid this cache, but cache migration/reconciliation remains unqualified | OPEN |
+
+Provider reference used for contract review: [Groq API reference](https://console.groq.com/docs/api-reference).
+No production credentials, deployment changes or new push were used in this audit.

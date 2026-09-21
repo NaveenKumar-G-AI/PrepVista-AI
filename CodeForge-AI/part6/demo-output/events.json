@@ -1,0 +1,88 @@
+[
+  {
+    "eventType": "ROADMAP_CREATED",
+    "payload": {
+      "versionNumber": 1,
+      "milestoneCount": 6
+    },
+    "createdAt": "2026-08-16 01:37:19"
+  },
+  {
+    "eventType": "ROADMAP_RECALCULATED",
+    "payload": {
+      "versionNumber": 2,
+      "trigger": "EVIDENCE_UPDATE",
+      "diff": {
+        "skillsInserted": [],
+        "skillsCompleted": [
+          {
+            "skillId": "skill_debugging",
+            "skillName": "Debugging"
+          }
+        ],
+        "skillsRegressed": [],
+        "milestonesCompleted": [],
+        "summary": "1 skill(s) reached target."
+      }
+    },
+    "createdAt": "2026-08-16 01:37:19"
+  },
+  {
+    "eventType": "SKILL_COMPLETED",
+    "payload": {
+      "skillId": "skill_debugging",
+      "skillName": "Debugging"
+    },
+    "createdAt": "2026-08-16 01:37:19"
+  },
+  {
+    "eventType": "ROADMAP_RECALCULATED",
+    "payload": {
+      "versionNumber": 3,
+      "trigger": "EVIDENCE_UPDATE",
+      "diff": {
+        "skillsInserted": [],
+        "skillsCompleted": [],
+        "skillsRegressed": [
+          {
+            "skillId": "skill_queues",
+            "skillName": "Queues",
+            "from": "UNKNOWN",
+            "to": "CRITICAL_GAP"
+          }
+        ],
+        "milestonesCompleted": [],
+        "summary": "1 skill(s) regressed."
+      }
+    },
+    "createdAt": "2026-08-16 01:37:19"
+  },
+  {
+    "eventType": "ROADMAP_RECALCULATED",
+    "payload": {
+      "versionNumber": 4,
+      "trigger": "EVIDENCE_UPDATE",
+      "diff": {
+        "skillsInserted": [],
+        "skillsCompleted": [
+          {
+            "skillId": "skill_queues",
+            "skillName": "Queues"
+          }
+        ],
+        "skillsRegressed": [],
+        "milestonesCompleted": [],
+        "summary": "1 skill(s) reached target."
+      }
+    },
+    "createdAt": "2026-08-16 01:37:19"
+  },
+  {
+    "eventType": "SKILL_COMPLETED",
+    "payload": {
+      "skillId": "skill_queues",
+      "skillName": "Queues"
+    },
+    "createdAt": "2026-08-16 01:37:19"
+  }
+]

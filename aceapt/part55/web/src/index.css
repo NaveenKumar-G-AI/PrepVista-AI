@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tw-grid-line: #dce0d8;
+}
+
+body {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  color: #1c2420;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Faint graph-paper texture for panels that want the "lab notebook" feel —
+   used sparingly (one surface at a time), not on every card. */
+.graph-paper {
+  background-image:
+    linear-gradient(to right, var(--tw-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--tw-grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

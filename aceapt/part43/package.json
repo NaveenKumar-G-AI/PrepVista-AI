@@ -1,0 +1,31 @@
+{
+  "name": "aceapt-feature43-adaptive-diagnostic-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ACEAPT Feature 43 - Adaptive Diagnostic Engine (standalone reference implementation, built against ports/interfaces for integration into the real ACEAPT codebase)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.15",
+    "@types/uuid": "^9.0.8",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}

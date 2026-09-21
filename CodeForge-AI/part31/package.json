@@ -1,0 +1,17 @@
+{
+  "name": "role-readiness-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CodeForge AI — Feature 31: Role Readiness Engine. Deterministic, evidence-driven role readiness calculation, with clean integration seams for the real Skill Signal Engine, Mastery Engine, role model service, and persistence layer.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9",
+    "@types/node": "^20.14.10"
+  }
+}

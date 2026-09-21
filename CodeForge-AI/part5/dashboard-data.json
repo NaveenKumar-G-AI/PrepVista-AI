@@ -1,0 +1,636 @@
+{
+  "generatedAt": "2026-08-16T09:34:09.594Z",
+  "student": {
+    "displayName": "Demo Student",
+    "targetRole": "ML Engineer",
+    "goal": "ROLE_PREPARATION"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "title": "Word Frequency Counter",
+      "action": "Submit python solution to \"Word Frequency Counter\"",
+      "challengeTitle": "Word Frequency Counter",
+      "language": "python",
+      "passed": false,
+      "testsPassed": 0,
+      "testsTotal": 3,
+      "mistakeCategory": "SYNTAX_ERROR",
+      "languageIssue": true,
+      "narrative": "First Python submission has a syntax error. This should be diagnosed as a LANGUAGE issue, not an algorithmic one.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Python Collections",
+          "masteryScore": 0,
+          "masteryState": "UNKNOWN",
+          "confidenceScore": 0,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 0
+        }
+      ]
+    },
+    {
+      "step": 2,
+      "title": "Word Frequency Counter",
+      "action": "Submit python solution to \"Word Frequency Counter\"",
+      "challengeTitle": "Word Frequency Counter",
+      "language": "python",
+      "passed": true,
+      "testsPassed": 3,
+      "testsTotal": 3,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "Corrected submission. Real independent evidence is now recorded for Python Collections.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Python Collections",
+          "masteryScore": 100,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 39,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        }
+      ]
+    },
+    {
+      "step": 3,
+      "title": "Binary Search",
+      "action": "Submit javascript solution to \"Binary Search\"",
+      "challengeTitle": "Binary Search",
+      "language": "javascript",
+      "passed": true,
+      "testsPassed": 5,
+      "testsTotal": 5,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "Standard binary search, submitted correctly on the first try.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Searching",
+          "masteryScore": 55,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 39,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        }
+      ]
+    },
+    {
+      "step": 4,
+      "title": "Search in Rotated Sorted Array",
+      "action": "Submit javascript solution to \"Search in Rotated Sorted Array\"",
+      "challengeTitle": "Search in Rotated Sorted Array",
+      "language": "javascript",
+      "passed": false,
+      "testsPassed": 1,
+      "testsTotal": 4,
+      "mistakeCategory": "LOGIC_ERROR",
+      "languageIssue": false,
+      "narrative": "The exact same (unmodified) binary search is applied to a rotated array — the classic transfer failure: strong on the standard form, but the technique was not adapted to the new context.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Searching",
+          "masteryScore": 55,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 52.9,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 2
+        }
+      ]
+    },
+    {
+      "step": 5,
+      "title": "Recommendation generated",
+      "action": "GET /api/recommendations/next",
+      "narrative": "The engine now has both a real TRANSFER_GAP signal (Searching: standard vs. novel) and an unattempted-skill signal to weigh — the recommendation below reflects whichever the engine's real ranking judged higher-priority.",
+      "recommendation": {
+        "skillName": "Two Sum",
+        "gapType": "PREREQUISITE_GAP",
+        "interventionType": "PREREQUISITE_REVIEW",
+        "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+        "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+        "rankingScore": 0.817
+      }
+    },
+    {
+      "step": 6,
+      "title": "Implement Queue Using Two Stacks",
+      "action": "Submit javascript solution to \"Implement Queue Using Two Stacks\"",
+      "challengeTitle": "Implement Queue Using Two Stacks",
+      "language": "javascript",
+      "passed": false,
+      "testsPassed": 2,
+      "testsTotal": 3,
+      "mistakeCategory": "STATE_MANAGEMENT_ERROR",
+      "languageIssue": false,
+      "narrative": "A genuine state-management bug: passes a straightforward push/pop sequence but breaks once pushes and pops are interleaved, because it re-transfers stack contents on every pop instead of only when the output stack is empty.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Queues",
+          "masteryScore": 66.7,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 14,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        },
+        {
+          "skillName": "Stacks",
+          "masteryScore": 66.7,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 14,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        }
+      ]
+    },
+    {
+      "step": 7,
+      "title": "Recommendation generated",
+      "action": "GET /api/recommendations/next",
+      "narrative": "With a real STATE_MANAGEMENT_ERROR pattern now on record for Queues, the engine should propose a debugging-flavored, targeted next step.",
+      "recommendation": {
+        "skillName": "Two Sum",
+        "gapType": "PREREQUISITE_GAP",
+        "interventionType": "PREREQUISITE_REVIEW",
+        "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+        "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+        "rankingScore": 0.775
+      }
+    },
+    {
+      "step": 8,
+      "title": "Implement Queue Using Two Stacks",
+      "action": "Submit javascript solution to \"Implement Queue Using Two Stacks\"",
+      "challengeTitle": "Implement Queue Using Two Stacks",
+      "language": "javascript",
+      "passed": true,
+      "testsPassed": 3,
+      "testsTotal": 3,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "Corrected implementation (only transfers when the output stack is empty). This is a genuine retry after real, specific feedback — not a fresh random problem.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Queues",
+          "masteryScore": 83.3,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 44.8,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 2
+        },
+        {
+          "skillName": "Stacks",
+          "masteryScore": 83.3,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 44.8,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 2
+        }
+      ]
+    },
+    {
+      "step": 9,
+      "title": "Recommendation generated",
+      "action": "GET /api/recommendations/next",
+      "narrative": "Queues evidence has now genuinely improved. Checking whether Graph Algorithms (which lists Queues as a prerequisite) is judged ready.",
+      "recommendation": {
+        "skillName": "Two Sum",
+        "gapType": "PREREQUISITE_GAP",
+        "interventionType": "PREREQUISITE_REVIEW",
+        "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+        "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+        "rankingScore": 0.775
+      }
+    },
+    {
+      "step": 10,
+      "title": "BFS Traversal Order",
+      "action": "Submit javascript solution to \"BFS Traversal Order\"",
+      "challengeTitle": "BFS Traversal Order",
+      "language": "javascript",
+      "passed": true,
+      "testsPassed": 3,
+      "testsTotal": 3,
+      "mistakeCategory": "NONE",
+      "languageIssue": false,
+      "narrative": "First-ever attempt at Graph Algorithms (previously UNKNOWN). A real, correct BFS implementation, closing the loop: the prerequisite work on Queues is now paying off on the dependent skill.",
+      "skillStatesAfter": [
+        {
+          "skillName": "Graph Algorithms",
+          "masteryScore": 55,
+          "masteryState": "DEVELOPING",
+          "confidenceScore": 39,
+          "trend": "INSUFFICIENT_DATA",
+          "evidenceCount": 1
+        },
+        {
+          "skillName": "Queues",
+          "masteryScore": 89.2,
+          "masteryState": "COMPETENT",
+          "confidenceScore": 58.7,
+          "trend": "IMPROVING",
+          "evidenceCount": 3
+        }
+      ]
+    }
+  ],
+  "finalDashboard": {
+    "strongSkills": [],
+    "developingSkills": [
+      {
+        "skillId": "skill_python_collections",
+        "skillName": "Python Collections",
+        "masteryScore": 100,
+        "confidenceScore": 39,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_searching",
+        "skillName": "Searching",
+        "masteryScore": 55,
+        "confidenceScore": 52.9,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_queues",
+        "skillName": "Queues",
+        "masteryScore": 89.2,
+        "confidenceScore": 58.7,
+        "masteryState": "COMPETENT",
+        "trend": "IMPROVING"
+      },
+      {
+        "skillId": "skill_stacks",
+        "skillName": "Stacks",
+        "masteryScore": 83.3,
+        "confidenceScore": 44.8,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_graph_algorithms",
+        "skillName": "Graph Algorithms",
+        "masteryScore": 55,
+        "confidenceScore": 39,
+        "masteryState": "DEVELOPING",
+        "trend": "INSUFFICIENT_DATA"
+      }
+    ],
+    "needsPractice": [],
+    "improvingSkills": [
+      {
+        "skillId": "skill_queues",
+        "skillName": "Queues",
+        "masteryScore": 89.2,
+        "confidenceScore": 58.7,
+        "masteryState": "COMPETENT",
+        "trend": "IMPROVING"
+      }
+    ],
+    "unknownSkills": [
+      {
+        "skillId": "skill_python",
+        "skillName": "Python",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_python_functions",
+        "skillName": "Python Functions",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_python_oop",
+        "skillName": "Python OOP",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_data_structures",
+        "skillName": "Data Structures",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_arrays",
+        "skillName": "Arrays",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_strings",
+        "skillName": "Strings",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_hash_maps",
+        "skillName": "Hash Maps",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_trees",
+        "skillName": "Trees",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_graphs",
+        "skillName": "Graphs",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_algorithms",
+        "skillName": "Algorithms",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_sorting",
+        "skillName": "Sorting",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_two_pointers",
+        "skillName": "Two Pointers",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_sliding_window",
+        "skillName": "Sliding Window",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_recursion",
+        "skillName": "Recursion",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      },
+      {
+        "skillId": "skill_dp",
+        "skillName": "Dynamic Programming",
+        "masteryScore": 0,
+        "confidenceScore": 0,
+        "masteryState": "UNKNOWN",
+        "trend": "INSUFFICIENT_DATA"
+      }
+    ],
+    "recommendation": {
+      "id": "f966c39a-d7c3-4939-87fb-304fa1bb9ee3",
+      "challengeId": "challenge_two_sum",
+      "challengeTitle": "Two Sum",
+      "skillId": "skill_arrays",
+      "skillName": "Arrays",
+      "gapType": "PREREQUISITE_GAP",
+      "interventionType": "PREREQUISITE_REVIEW",
+      "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+      "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+      "difficultyLevel": "EASY"
+    },
+    "recentProgress": [
+      {
+        "attemptId": "1d245741-056c-46ea-a071-e5d903bd9a33",
+        "challengeTitle": "Word Frequency Counter",
+        "language": "python",
+        "submittedAt": "2026-08-16 09:34:09",
+        "passed": false,
+        "testsPassed": 0,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "92880ce2-65ff-47b7-b8ea-ed830db23a0e",
+        "challengeTitle": "Word Frequency Counter",
+        "language": "python",
+        "submittedAt": "2026-08-16 09:34:09",
+        "passed": true,
+        "testsPassed": 3,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "4f50c07b-0e3d-4754-a4ea-9b3a6035cd22",
+        "challengeTitle": "Binary Search",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 09:34:09",
+        "passed": true,
+        "testsPassed": 5,
+        "testsTotal": 5
+      },
+      {
+        "attemptId": "b2f16cc4-b40c-4510-9ea3-a961a27f6ede",
+        "challengeTitle": "Search in Rotated Sorted Array",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 09:34:09",
+        "passed": false,
+        "testsPassed": 1,
+        "testsTotal": 4
+      },
+      {
+        "attemptId": "4f7c1b3a-6926-4649-ac93-47d2b5cfa630",
+        "challengeTitle": "Implement Queue Using Two Stacks",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 09:34:09",
+        "passed": false,
+        "testsPassed": 2,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "b2cbaaf9-debd-4562-b3a9-b47e0faa16b1",
+        "challengeTitle": "Implement Queue Using Two Stacks",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 09:34:09",
+        "passed": true,
+        "testsPassed": 3,
+        "testsTotal": 3
+      },
+      {
+        "attemptId": "185bb3ee-efcc-4bbf-a344-a1229be8e4c3",
+        "challengeTitle": "BFS Traversal Order",
+        "language": "javascript",
+        "submittedAt": "2026-08-16 09:34:09",
+        "passed": true,
+        "testsPassed": 3,
+        "testsTotal": 3
+      }
+    ]
+  },
+  "recommendationHistory": [
+    {
+      "id": "f966c39a-d7c3-4939-87fb-304fa1bb9ee3",
+      "studentId": "demo_run",
+      "challengeId": "challenge_two_sum",
+      "skillId": "skill_arrays",
+      "gapType": "PREREQUISITE_GAP",
+      "interventionType": "PREREQUISITE_REVIEW",
+      "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+      "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+      "rankingScore": 0.817,
+      "isRepetition": false,
+      "isExploration": false,
+      "evidenceSnapshot": {
+        "skillState": null,
+        "gapType": "PREREQUISITE_GAP",
+        "gapSeverity": 0.85,
+        "difficultyDecision": {
+          "mode": "HOLD",
+          "targetLevel": "EASY",
+          "reason": "No evidence yet for this skill — starting at the easiest level."
+        },
+        "interventionReason": "A prerequisite skill is under-ready; reinforcing it is higher-leverage than harder practice on the dependent skill.",
+        "aiPolishUsed": false,
+        "candidateCount": 2,
+        "topScore": 0.817,
+        "scoreBreakdown": {
+          "skillGap": 0.85,
+          "prerequisiteFit": 1,
+          "difficultyFit": 1,
+          "roleRelevance": 0.3,
+          "goalRelevance": 0.7,
+          "learningValue": 0.925,
+          "freshness": 1,
+          "diversity": 1,
+          "mistakeRelevance": 0.7,
+          "retentionValue": 0.2,
+          "repetitionPenalty": 0
+        },
+        "recentEvidence": []
+      },
+      "status": "PENDING",
+      "createdAt": "2026-08-16 09:34:09",
+      "acceptedAt": null,
+      "completedAt": null
+    },
+    {
+      "id": "1a93e970-494b-4cfd-bf8b-60de5a3a13bf",
+      "studentId": "demo_run",
+      "challengeId": "challenge_two_sum",
+      "skillId": "skill_arrays",
+      "gapType": "PREREQUISITE_GAP",
+      "interventionType": "PREREQUISITE_REVIEW",
+      "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+      "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+      "rankingScore": 0.775,
+      "isRepetition": false,
+      "isExploration": false,
+      "evidenceSnapshot": {
+        "skillState": null,
+        "gapType": "PREREQUISITE_GAP",
+        "gapSeverity": 0.85,
+        "difficultyDecision": {
+          "mode": "HOLD",
+          "targetLevel": "EASY",
+          "reason": "No evidence yet for this skill — starting at the easiest level."
+        },
+        "interventionReason": "A prerequisite skill is under-ready; reinforcing it is higher-leverage than harder practice on the dependent skill.",
+        "aiPolishUsed": false,
+        "candidateCount": 2,
+        "topScore": 0.775,
+        "scoreBreakdown": {
+          "skillGap": 0.85,
+          "prerequisiteFit": 1,
+          "difficultyFit": 1,
+          "roleRelevance": 0.3,
+          "goalRelevance": 0.7,
+          "learningValue": 0.925,
+          "freshness": 1,
+          "diversity": 0.3,
+          "mistakeRelevance": 0.7,
+          "retentionValue": 0.2,
+          "repetitionPenalty": 0
+        },
+        "recentEvidence": []
+      },
+      "status": "PENDING",
+      "createdAt": "2026-08-16 09:34:09",
+      "acceptedAt": null,
+      "completedAt": null
+    },
+    {
+      "id": "7c5c70ba-8e47-4c00-9363-1bcc559cfce6",
+      "studentId": "demo_run",
+      "challengeId": "challenge_two_sum",
+      "skillId": "skill_arrays",
+      "gapType": "PREREQUISITE_GAP",
+      "interventionType": "PREREQUISITE_REVIEW",
+      "learningObjective": "Strengthen the underlying prerequisite before returning to harder Arrays problems.",
+      "reason": "\"Searching\" depends on \"Arrays\", which has a mastery score of only 0.0 — below the 35 readiness threshold. Strengthening \"Arrays\" first is higher-leverage than harder practice on \"Searching\". You have no recorded attempts on Arrays yet, so this prerequisite-review challenge will establish a real evidence baseline instead of guessing.",
+      "rankingScore": 0.775,
+      "isRepetition": false,
+      "isExploration": false,
+      "evidenceSnapshot": {
+        "skillState": null,
+        "gapType": "PREREQUISITE_GAP",
+        "gapSeverity": 0.85,
+        "difficultyDecision": {
+          "mode": "HOLD",
+          "targetLevel": "EASY",
+          "reason": "No evidence yet for this skill — starting at the easiest level."
+        },
+        "interventionReason": "A prerequisite skill is under-ready; reinforcing it is higher-leverage than harder practice on the dependent skill.",
+        "aiPolishUsed": false,
+        "candidateCount": 2,
+        "topScore": 0.775,
+        "scoreBreakdown": {
+          "skillGap": 0.85,
+          "prerequisiteFit": 1,
+          "difficultyFit": 1,
+          "roleRelevance": 0.3,
+          "goalRelevance": 0.7,
+          "learningValue": 0.925,
+          "freshness": 1,
+          "diversity": 0.3,
+          "mistakeRelevance": 0.7,
+          "retentionValue": 0.2,
+          "repetitionPenalty": 0
+        },
+        "recentEvidence": []
+      },
+      "status": "PENDING",
+      "createdAt": "2026-08-16 09:34:09",
+      "acceptedAt": null,
+      "completedAt": null
+    }
+  ],
+  "stats": {
+    "skillCount": 21,
+    "relationshipCount": 12,
+    "challengeCount": 10,
+    "attemptCount": 7,
+    "evidenceCount": 10
+  }
+}

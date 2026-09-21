@@ -1,0 +1,67 @@
+{
+  "_seed_data_disclaimer": "SEED DATA — for demonstrating the evaluation engine only. Not real CodeForge challenge content. A real integration reads challenges from the existing challenge system instead of this file.",
+  "skill_prerequisites": [
+    { "skill_id": "hash_maps", "requires_skill_id": "python_basics" },
+    { "skill_id": "algorithms", "requires_skill_id": "hash_maps" }
+  ],
+  "students": [
+    { "student_id": "stu_demo_1", "display_name": "Demo Student", "track": "AI/ML Engineer" }
+  ],
+  "challenges": [
+    {
+      "challenge_id": "sum-two-numbers",
+      "challenge_version": 1,
+      "title": "Sum Two Numbers",
+      "role": "AI/ML Engineer",
+      "skill_id": "python_basics",
+      "subskill_id": "arithmetic",
+      "difficulty": "EASY",
+      "language": "python",
+      "description": "Read JSON {\"a\": int, \"b\": int} from stdin and print json.dumps(a + b).",
+      "starter_code": "import sys, json\ndata = json.loads(sys.stdin.read())\n# TODO: compute the sum and print it as JSON\n",
+      "tests": [
+        { "test_id": "pub_1", "is_hidden": false, "input_data": "{\"a\": 2, \"b\": 3}", "expected_output": "5", "ordinal": 1 },
+        { "test_id": "pub_2", "is_hidden": false, "input_data": "{\"a\": -1, \"b\": 1}", "expected_output": "0", "ordinal": 2 },
+        { "test_id": "hid_1", "is_hidden": true, "input_data": "{\"a\": 1000000, \"b\": 2000000}", "expected_output": "3000000", "ordinal": 3 }
+      ]
+    },
+    {
+      "challenge_id": "most-frequent-element",
+      "challenge_version": 1,
+      "title": "Most Frequent Element",
+      "role": "AI/ML Engineer",
+      "skill_id": "hash_maps",
+      "subskill_id": "frequency_counting",
+      "difficulty": "INTERMEDIATE",
+      "language": "python",
+      "description": "Read JSON {\"items\": [...]} from stdin. Print json.dumps(x) where x is the most frequent item. Break ties by choosing the smallest item (using Python's default < ordering).",
+      "starter_code": "import sys, json\ndata = json.loads(sys.stdin.read())\nitems = data[\"items\"]\n# TODO: count frequencies and print the most frequent item (ties -> smallest) as JSON\n",
+      "prompts_explanation": "Why did you choose this approach to count frequencies?",
+      "tests": [
+        { "test_id": "pub_1", "is_hidden": false, "input_data": "{\"items\": [1, 2, 2, 3]}", "expected_output": "2", "ordinal": 1 },
+        { "test_id": "pub_2", "is_hidden": false, "input_data": "{\"items\": [\"a\", \"b\", \"a\", \"c\"]}", "expected_output": "\"a\"", "ordinal": 2 },
+        { "test_id": "hid_1", "is_hidden": true, "input_data": "{\"items\": [5, 5, 5, 1, 1, 1, 2]}", "expected_output": "1", "ordinal": 3 },
+        { "test_id": "hid_2", "is_hidden": true, "input_data": "{\"items\": [7]}", "expected_output": "7", "ordinal": 4 },
+        { "test_id": "hid_3", "is_hidden": true, "input_data": "{\"items\": [1, 2, 3]}", "expected_output": "1", "ordinal": 5 }
+      ]
+    },
+    {
+      "challenge_id": "binary-search",
+      "challenge_version": 1,
+      "title": "Binary Search",
+      "role": "AI/ML Engineer",
+      "skill_id": "algorithms",
+      "subskill_id": "searching",
+      "difficulty": "ADVANCED",
+      "language": "python",
+      "description": "Read JSON {\"arr\": [sorted ints], \"target\": int}. Print json.dumps(index) of target in arr, or -1 if absent. Aim for O(log n).",
+      "starter_code": "import sys, json\ndata = json.loads(sys.stdin.read())\narr, target = data[\"arr\"], data[\"target\"]\n# TODO: binary search\n",
+      "tests": [
+        { "test_id": "pub_1", "is_hidden": false, "input_data": "{\"arr\": [1,3,5,7,9], \"target\": 5}", "expected_output": "2", "ordinal": 1 },
+        { "test_id": "pub_2", "is_hidden": false, "input_data": "{\"arr\": [1,3,5,7,9], \"target\": 2}", "expected_output": "-1", "ordinal": 2 },
+        { "test_id": "hid_1", "is_hidden": true, "input_data": "{\"arr\": [], \"target\": 1}", "expected_output": "-1", "ordinal": 3 },
+        { "test_id": "hid_2", "is_hidden": true, "input_data": "{\"arr\": [10], \"target\": 10}", "expected_output": "0", "ordinal": 4 }
+      ]
+    }
+  ]
+}

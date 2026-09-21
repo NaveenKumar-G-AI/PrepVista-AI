@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Respect prefers-reduced-motion globally rather than per-component (brief, section 46/48). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* A visible, consistent focus ring everywhere, instead of relying on (and fighting) browser defaults. */
+:focus-visible {
+  outline: 2px solid #14213d;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

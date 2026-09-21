@@ -1,0 +1,158 @@
+/**
+ * Role Skill Gap dashboard - design tokens.
+ *
+ * Plain CSS custom properties, not a Tailwind config, since the target
+ * repository's frontend stack is unknown - this drops into any React
+ * setup (CRA, Vite, Next.js) without extra tooling. Re-express as Tailwind
+ * theme extensions or styled-components if that's your convention.
+ *
+ * Deliberately NOT the generic "cream + warm serif" or "near-black + one
+ * neon accent" look. This is a data-dense, professional engineering
+ * console: a cool off-white surface, ink-navy text, and a restrained
+ * 3-color semantic palette (critical / warning / progress) plus one
+ * cobalt focus color for interactive elements.
+ *
+ * Typography pairs IBM Plex Sans (body - originally designed for
+ * enterprise technical software) with Space Grotesk (headers - a
+ * confident technical display face) and IBM Plex Mono for anything
+ * numeric (scores, counts, versions, timestamps), which reads as
+ * precise/measured rather than decorative.
+ *
+ * The signature visual element is the "gap bar" used throughout
+ * (RoleSkillGapDashboard.tsx / components.tsx): a track with a filled
+ * segment for current mastery and a notch for the target level. The gap
+ * is literally rendered as the empty space between them - not a generic
+ * progress bar or a decorative percentage ring.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+.rsg-root {
+  --rsg-ink: #161a22;
+  --rsg-muted: #667085;
+  --rsg-paper: #f3f4f7;
+  --rsg-surface: #ffffff;
+  --rsg-line: #e3e5ea;
+  --rsg-critical: #b3392a;
+  --rsg-critical-soft: #f7e7e4;
+  --rsg-warning: #a8671a;
+  --rsg-warning-soft: #f6ecdd;
+  --rsg-progress: #1f7a5c;
+  --rsg-progress-soft: #e2f1ec;
+  --rsg-focus: #2954a6;
+  --rsg-focus-soft: #e7edf7;
+
+  --rsg-font-display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+  --rsg-font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --rsg-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  background: var(--rsg-paper);
+  color: var(--rsg-ink);
+  font-family: var(--rsg-font-body);
+  line-height: 1.45;
+}
+
+.rsg-root * {
+  box-sizing: border-box;
+}
+
+.rsg-heading {
+  font-family: var(--rsg-font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.rsg-mono {
+  font-family: var(--rsg-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.rsg-muted {
+  color: var(--rsg-muted);
+}
+
+/* ---------------------------------------------------------------------
+   Gap bar - the signature element. The gap IS the visible space between
+   the fill and the target notch.
+   --------------------------------------------------------------------- */
+.gap-bar {
+  position: relative;
+  padding-top: 8px;
+}
+.gap-bar__track {
+  position: relative;
+  height: 8px;
+  background: var(--rsg-line);
+  border-radius: 4px;
+}
+.gap-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+.gap-bar__target-marker {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 16px;
+  background: var(--rsg-ink);
+}
+.gap-bar__target-marker::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rsg-ink);
+}
+
+/* ---------------------------------------------------------------------
+   Badges
+   --------------------------------------------------------------------- */
+.rsg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rsg-badge--critical {
+  background: var(--rsg-critical-soft);
+  color: var(--rsg-critical);
+}
+.rsg-badge--warning {
+  background: var(--rsg-warning-soft);
+  color: var(--rsg-warning);
+}
+.rsg-badge--progress {
+  background: var(--rsg-progress-soft);
+  color: var(--rsg-progress);
+}
+.rsg-badge--neutral {
+  background: var(--rsg-line);
+  color: var(--rsg-muted);
+}
+
+/* ---------------------------------------------------------------------
+   Cards / layout primitives
+   --------------------------------------------------------------------- */
+.rsg-card {
+  background: var(--rsg-surface);
+  border: 1px solid var(--rsg-line);
+  border-radius: 10px;
+}
+.rsg-panel-title {
+  font-family: var(--rsg-font-display);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rsg-muted);
+}

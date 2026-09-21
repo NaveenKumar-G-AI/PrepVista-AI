@@ -1,0 +1,25 @@
+{
+  "name": "@codeforge/correctness-engine",
+  "version": "0.1.0",
+  "description": "Code Correctness Analysis Engine for CodeForge AI — deterministic evidence pipeline + evidence-grounded AI explanation layer.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^3.23.8",
+    "@supabase/supabase-js": "^2.45.4",
+    "acorn": "^8.12.1",
+    "acorn-walk": "^8.3.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9",
+    "@types/node": "^22.5.4",
+    "tsx": "^4.19.0"
+  }
+}

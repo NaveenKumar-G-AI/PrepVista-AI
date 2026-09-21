@@ -1,0 +1,77 @@
+.rungs {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+
+.rungRow {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.rungTrack {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--hl-border-soft);
+  overflow: hidden;
+}
+
+.rungFill {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background: var(--hl-text-tertiary);
+  transform-origin: left center;
+  transition: transform 480ms var(--hl-ease), background 320ms var(--hl-ease);
+}
+
+.rungFill[data-reached="true"] {
+  background: var(--hl-lamp);
+}
+
+.rungFill[data-current="true"] {
+  background: var(--hl-lamp);
+  box-shadow: 0 0 12px 1px var(--hl-lamp-glow);
+  animation: glow 2.6s ease-in-out infinite;
+}
+
+.rungFill[data-resolved="true"] {
+  background: var(--hl-resolved);
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 10px 0px var(--hl-lamp-glow);
+  }
+  50% {
+    box-shadow: 0 0 16px 3px var(--hl-lamp-glow);
+  }
+}
+
+.rungLabel {
+  font-family: var(--hl-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--hl-text-tertiary);
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.rungLabel[data-reached="true"] {
+  color: var(--hl-text-secondary);
+}
+
+.rungLabel[data-current="true"] {
+  color: var(--hl-lamp);
+}
+
+.rungLabel[data-resolved="true"] {
+  color: var(--hl-resolved);
+}

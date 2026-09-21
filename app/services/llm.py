@@ -17,10 +17,48 @@ _groq_client: AsyncGroq | None = None
 _openai_client: AsyncOpenAI | None = None
 
 
+class LLMError(RuntimeError):
+    """A safe diagnostic; never include prompts, provider bodies or credentials."""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
+
+def llm_error_code(error: Exception) -> str:
+    if isinstance(error, LLMError):
+        return error.code
+    if isinstance(error, (TimeoutError, asyncio.TimeoutError)) or type(error).__name__ == 'APITimeoutError':
+        return 'EVALUATION_TIMEOUT'
+    status = getattr(error, 'status_code', None)
+    if status in (401, 403):
+        return 'EVALUATION_AUTH_FAILED'
+    if status == 429:
+        return 'EVALUATION_RATE_LIMITED'
+    if status == 404:
+        return 'EVALUATION_MODEL_UNAVAILABLE'
+    if status in (400, 422):
+        return 'EVALUATION_REQUEST_REJECTED'
+    return 'EVALUATION_PROVIDER_FAILED'
+
+
+def _completion_text(response) -> str:
+    if not response.choices:
+        raise LLMError('EVALUATION_EMPTY_RESPONSE')
+    choice = response.choices[0]
+    if choice.finish_reason == 'length':
+        raise LLMError('EVALUATION_TRUNCATED')
+    content = choice.message.content
+    if not isinstance(content, str) or not content.strip():
+        raise LLMError('EVALUATION_EMPTY_RESPONSE')
+    return content.strip()
+
+
 def _get_groq() -> AsyncGroq:
     global _groq_client
     if not _groq_client:
-        _groq_client = AsyncGroq(api_key=get_settings().GROQ_API_KEY)
+        # The application owns bounded retries; do not multiply them in the SDK.
+        _groq_client = AsyncGroq(api_key=get_settings().GROQ_API_KEY, max_retries=0)
     return _groq_client
 
 
@@ -41,6 +79,8 @@ async def call_groq(
 ) -> str:
     """Call Groq API (primary provider)."""
     settings = get_settings()
+    if not settings.GROQ_API_KEY:
+        raise LLMError('EVALUATION_NOT_CONFIGURED')
     kwargs = {
         "model": model or settings.GROQ_MODEL,
         "messages": messages,
@@ -56,7 +96,7 @@ async def call_groq(
         client.chat.completions.create(**kwargs),
         timeout=timeout,
     )
-    return response.choices[0].message.content.strip()
+    return _completion_text(response)
 
 
 async def call_openai(
@@ -87,7 +127,7 @@ async def call_openai(
         client.chat.completions.create(**kwargs),
         timeout=timeout,
     )
-    return response.choices[0].message.content.strip()
+    return _completion_text(response)
 
 
 async def call_llm(
@@ -112,12 +152,16 @@ async def call_llm(
     primary_timeout = timeout or settings.DEFAULT_LLM_TIMEOUT
     backup_timeout = fallback_timeout or max(primary_timeout, 12.0)
 
-    for attempt in range(retries):
+    failure_code = 'EVALUATION_PROVIDER_FAILED'
+    for attempt in range(max(1, retries)):
         try:
             result = await call_groq(messages, temperature, json_mode, model, max_tokens, primary_timeout)
             return result
         except Exception as e:
-            logger.warning("groq_call_failed", attempt=attempt + 1, error=str(e))
+            failure_code = llm_error_code(e)
+            logger.warning("groq_call_failed", attempt=attempt + 1, error_code=failure_code)
+            if failure_code in {'EVALUATION_NOT_CONFIGURED', 'EVALUATION_AUTH_FAILED', 'EVALUATION_MODEL_UNAVAILABLE', 'EVALUATION_REQUEST_REJECTED'}:
+                break
             if attempt < retries - 1:
                 import random
                 jittered_delay = retry_delay * (2 ** attempt) + random.uniform(0, 0.3)
@@ -131,15 +175,16 @@ async def call_llm(
                 messages,
                 temperature,
                 json_mode,
-                model,
+                None,  # A Groq model ID is not an OpenAI model ID.
                 max_tokens,
                 backup_timeout,
             )
             return result
         except Exception as e:
-            logger.error("openai_fallback_failed", error=str(e))
+            failure_code = llm_error_code(e)
+            logger.error("openai_fallback_failed", error_code=failure_code)
 
-    raise RuntimeError("All LLM providers failed. Please try again later.")
+    raise LLMError(failure_code)
 
 
 async def call_llm_json(
@@ -167,12 +212,18 @@ async def call_llm_json(
         allow_provider_fallback=allow_provider_fallback,
     )
     try:
-        return json.loads(raw)
+        result = json.loads(raw)
     except json.JSONDecodeError:
-        logger.error("llm_json_parse_error", raw_response=raw[:500])
+        logger.warning("llm_json_parse_error", error_code='EVALUATION_INVALID_JSON')
         # Try to extract JSON from the response
         import re
         json_match = re.search(r'\{[\s\S]*\}', raw)
-        if json_match:
-            return json.loads(json_match.group())
-        raise ValueError("LLM did not return valid JSON.")
+        try:
+            if not json_match:
+                raise ValueError('No JSON object')
+            result = json.loads(json_match.group())
+        except ValueError:
+            raise LLMError('EVALUATION_INVALID_JSON') from None
+    if not isinstance(result, dict):
+        raise LLMError('EVALUATION_INVALID_SCHEMA')
+    return result

@@ -23,6 +23,7 @@ export interface EvidenceReport {
   not_planned: string[]; content_note: string; delivery_note: string;
 }
 const human = (value: string) => value.toLowerCase().replaceAll('_', ' ');
+export interface ResumeExtraction { status: 'AVAILABLE' | 'PARTIAL' | 'NO_CLAIMS' | 'FAILED' }
 
 function RetryAnswer({ sessionId, questionId }: { sessionId: string; questionId: string }) {
   const { user } = useAuth();
@@ -52,7 +53,7 @@ function RetryAnswer({ sessionId, questionId }: { sessionId: string; questionId:
   </div>;
 }
 
-export function InterviewEvidenceReport({ report, sessionId }: { report: EvidenceReport; sessionId: string }) {
+export function InterviewEvidenceReport({ report, sessionId, resumeExtraction }: { report: EvidenceReport; sessionId: string; resumeExtraction?: ResumeExtraction | null }) {
   return <section className="space-y-6 mb-10" aria-labelledby="evidence-heading">
     <div className="card p-5 space-y-3">
       <p className="text-sm text-secondary">{human(report.blueprint.mode)} · {report.blueprint.target_role} · {report.partial ? 'Partial interview' : 'Completed interview'}</p>
@@ -66,7 +67,7 @@ export function InterviewEvidenceReport({ report, sessionId }: { report: Evidenc
     <div className="card p-5">
       <h2 className="text-lg font-semibold mb-3">Areas tested</h2>
       <div className="grid gap-3 sm:grid-cols-2">{Object.entries(report.coverage).map(([family, row]) => <div key={family} className="rounded-lg border border-border p-3">
-        <p className="capitalize">{human(family)}</p><p className="text-sm text-secondary">{human(row.state)} · {row.answered} answers</p>
+        <p className="capitalize">{human(family)}</p><p className="text-sm text-secondary">{human(row.state)} · {row.answered} {row.answered === 1 ? 'answer' : 'answers'}</p>
       </div>)}</div>
       <details className="mt-4"><summary className="cursor-pointer text-sm">Areas outside this interview&apos;s scope</summary><p className="text-sm mt-2">{report.not_planned.map(human).join(', ')}</p></details>
     </div>
@@ -77,19 +78,24 @@ export function InterviewEvidenceReport({ report, sessionId }: { report: Evidenc
       <Link href="/interview/practice" className="inline-block underline min-h-11">Your practice history and story bank</Link>
     </div>
     <div className="card p-5 space-y-3"><h2 className="text-lg font-semibold">Resume claims</h2>
-      {!report.resume_claims.length && <p className="text-sm">No structured skill claims were extracted.</p>}
+      {resumeExtraction?.status === 'FAILED' ? <p className="text-sm">Resume analysis was unavailable for this interview. Missing claims do not mean your resume contains no skills.</p>
+        : resumeExtraction?.status === 'PARTIAL' ? <p className="text-sm">Only part of your resume could be structured. This list may omit skills or projects from your resume.</p>
+          : !report.resume_claims.length && <p className="text-sm">No structured skill claims are available for this interview. This does not establish which skills your resume contains.</p>}
       {report.resume_claims.map(c => <p key={c.claim_id} className="text-sm"><strong>{c.claim_text}</strong> — {human(c.verification_status)}</p>)}
       <p className="text-sm text-secondary">Interview support is not independent verification of a resume claim.</p>
     </div>
     <div className="space-y-3"><h2 className="text-lg font-semibold">Answer evidence and coaching</h2>
-      {report.questions.map(q => { const e = report.evidence.find(item => item.question_id === q.id); return <details key={q.id} className="card p-4" id={`evidence-${q.id}`}>
-        <summary className="cursor-pointer font-medium">{q.text}</summary>
-        {e ? <div className="space-y-3 mt-4"><blockquote className="border-l-2 border-border pl-3 whitespace-pre-wrap">{e.excerpt}</blockquote>
+      {report.questions.map(q => { const e = report.evidence.find(item => item.question_id === q.id); return <article key={q.id} className="card p-4" id={`evidence-${q.id}`}>
+        <h3 className="font-medium">{q.text}</h3>
+        {e ? <>
+          <p className="mt-3 text-sm text-secondary whitespace-pre-wrap break-words">{e.excerpt ? `${e.excerpt.slice(0, 240)}${e.excerpt.length > 240 ? '…' : ''}` : 'No excerpt is available for this evidence record.'}</p>
+          <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">View full evidence and coaching</summary>
+          <div className="space-y-3 mt-4">{e.excerpt && <blockquote className="border-l-2 border-border pl-3 whitespace-pre-wrap break-words">{e.excerpt}</blockquote>}
           <p className="text-sm">Textual signals: {e.signals.length ? e.signals.map(human).join(', ') : 'More evidence is needed.'}</p>
           <p className="text-sm">Gaps in this answer: {e.gaps.length ? e.gaps.map(human).join(', ') : 'No specific gap detected; this is not proof of correctness.'}</p>
           <p className="text-sm text-secondary">Build your answer around context, your action, your reasoning and the actual outcome.</p>
-          <RetryAnswer sessionId={sessionId} questionId={q.id} /></div> : <p className="mt-3 text-sm">No answer evidence was captured. This area remains unmeasured.</p>}
-      </details>; })}
+          <RetryAnswer sessionId={sessionId} questionId={q.id} /></div></details></> : <p className="mt-3 text-sm">No answer evidence was captured. This area remains unmeasured.</p>}
+      </article>; })}
     </div>
   </section>;
 }

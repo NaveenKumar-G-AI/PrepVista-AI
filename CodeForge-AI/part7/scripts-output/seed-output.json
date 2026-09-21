@@ -1,0 +1,33 @@
+{
+  "institutionId": "1b967cd9-8139-45a6-8320-d8aae621b72d",
+  "tpoId": "5e1adbf6-7b11-418a-b31d-a683f070c0ad",
+  "roleId": "6f0afa2f-78fc-41fa-b580-3970799fc514",
+  "skillIds": {
+    "arrays": "6cc6e7c7-e2c4-4a4d-b0bb-0f40fd9a68b2",
+    "hash_maps": "7269eb1f-7a69-4179-8329-ff8affb75c76",
+    "algorithms": "cdee2c7f-2315-4a43-bfc8-e5462cee7ba9",
+    "debugging": "d8ea224c-f299-4359-a14e-2f3425a9a7d4",
+    "graphs": "f57cfafa-fdc2-4632-b2da-9b4f35ac98fe"
+  },
+  "challengeIds": {
+    "two_sum": "47560219-1940-40a1-ba6b-d3461393947a",
+    "contains_duplicate": "2bdb180b-0bdc-4652-aacc-790c680b9e1c",
+    "two_sum_js": "fc1f9a20-c1e2-43aa-9942-27c2b4bb0dd2",
+    "group_by_signature": "65a92a08-eedd-4a7d-b1c3-6c71be0bb70f",
+    "fibonacci_memo": "314fbe50-d2fc-4ea0-9866-63e4a2a7c127",
+    "two_sum_java": "b1d70d0b-8194-4524-a609-088f1a807e7b",
+    "two_sum_cpp": "e2a3a422-f56b-464b-8db7-5e41b3f73a57",
+    "fix_off_by_one": "08a50f35-9ef0-4195-91db-0b782c2ae5ba",
+    "bfs_shortest_path": "895faa6b-3581-4aff-b20b-49f8c34d5569"
+  },
+  "blueprintId": "821c690a-db6e-4740-8839-c62df2ae93c5",
+  "blueprintVersionId": "d9f8ba68-cfb5-42fd-8f14-cca569e7ade3",
+  "students": {
+    "ananya": "f66b328b-9b30-42e8-b8f6-65fb8a766f90",
+    "vikram": "eb69b94d-8188-42ac-9603-c25e185ba1fa",
+    "priya": "bf1d5a3d-558c-4832-b5cd-03cf6586be6d",
+    "karthik": "a6b7c470-bf09-47dc-9faa-9c50845f87dc",
+    "divya": "620c2cd7-194b-49b2-b9dc-de7dd65ed8f5",
+    "rahul": "5ab16a02-f712-4afe-b329-2694ab616845"
+  }
+}

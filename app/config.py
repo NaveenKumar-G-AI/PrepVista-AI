@@ -140,6 +140,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = Field(default="", description="Gemini API key (server only)")
     GROQ_MODEL: str = "llama-3.1-8b-instant"
     GROQ_EVAL_MODEL: str = "llama-3.3-70b-versatile"
+    INTERVIEW_EVALUATION_TIMEOUT_SECONDS: float = Field(default=35.0, ge=5, le=45)
+    INTERVIEW_EVALUATION_MAX_TOKENS: int = Field(default=1800, ge=1000, le=3000)
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API key (fallback)")
     OPENAI_MODEL: str = "gpt-4o-mini"
 

@@ -79,7 +79,8 @@ _QUALITY_FLAG_NUMERIC: list[str] = [
 _TIER_READY        = "ready"         # latest score ≥ 75 AND sessions ≥ 3
 _TIER_ALMOST_READY = "almost_ready"  # latest score ≥ 60 AND sessions ≥ 2
 _TIER_DEVELOPING   = "developing"    # latest score ≥ 40 after at least one session
-_TIER_AT_RISK      = "at_risk"       # everything else (0 sessions or very low score)
+_TIER_AT_RISK      = "at_risk"       # measured score below 40
+_TIER_NOT_MEASURED = "not_measured"  # no usable score or completed session
 
 # ── Numeric thresholds ────────────────────────────────
 _READINESS_TARGET       = 75.0   # score required for "placement-ready" classification
@@ -165,7 +166,7 @@ def _compute_slope(scores: list[float]) -> float | None:
 
 
 def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
-    """Classify a student into one of four readiness tiers (top-down, first match).
+    """Classify a student into a measured tier or an explicit unmeasured state (top-down, first match).
 
     ``readiness_score`` is the student's latest finished-session score. Average
     score remains a separate historical metric and must not drive a different
@@ -174,10 +175,12 @@ def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
     ready:        score ≥ 75  AND sessions ≥ 3
     almost_ready: score ≥ 60  AND sessions ≥ 2
     developing:   score ≥ 40  after at least one session
-    at_risk:      everything else (zero sessions or very low score)
+    at_risk:      measured score below 40
+    not_measured: no usable score or completed session
     """
-    if readiness_score is None or total_sessions == 0:
-        return _TIER_AT_RISK
+    if (readiness_score is None or total_sessions <= 0
+            or not math.isfinite(readiness_score) or not 0 <= readiness_score <= 100):
+        return _TIER_NOT_MEASURED
     if readiness_score >= 75.0 and total_sessions >= 3:
         return _TIER_READY
     if readiness_score >= 60.0 and total_sessions >= 2:
@@ -192,21 +195,13 @@ def _zero_offer_risk(
     total_sessions: int,
     trend_slope: float | None,
 ) -> bool:
-    """Return the legacy-named internal intervention flag.
+    """Flag observed preparation gaps; absence of a score is not a weakness.
 
-    Despite the persisted ``is_zero_offer_risk`` field name, this deterministic
-    rule is a preparation signal, not a prediction of placement offers.
-
-    Risk conditions (OR logic — any single condition triggers the flag):
-      1. Zero sessions (never practiced at all).
-      2. latest readiness score < 40.
-      3. latest readiness score < 50 with ≥ 3 sessions.
-      4. trend_slope < −2.0 — actively declining ≥ 2 pts/session.
+    The legacy field name is retained for API compatibility. This flag does not
+    predict offers. Unmeasured students have a separate readiness state.
     """
-    if total_sessions == 0:
-        return True
-    if readiness_score is None:
-        return True
+    if _readiness_tier(readiness_score, total_sessions) == _TIER_NOT_MEASURED:
+        return False
     if readiness_score < _ZERO_OFFER_SCORE_HARD:
         return True
     if total_sessions >= 3 and readiness_score < _ZERO_OFFER_SCORE_SOFT:
@@ -415,6 +410,7 @@ def _build_traffic_light(tier_counts: dict[str, int], total: int) -> dict:
         _TIER_ALMOST_READY: {"count": tier_counts.get(_TIER_ALMOST_READY, 0), "pct": _pct(tier_counts.get(_TIER_ALMOST_READY, 0))},
         _TIER_DEVELOPING:   {"count": tier_counts.get(_TIER_DEVELOPING, 0),   "pct": _pct(tier_counts.get(_TIER_DEVELOPING, 0))},
         _TIER_AT_RISK:      {"count": tier_counts.get(_TIER_AT_RISK, 0),      "pct": _pct(tier_counts.get(_TIER_AT_RISK, 0))},
+        _TIER_NOT_MEASURED: {"count": tier_counts.get(_TIER_NOT_MEASURED, 0), "pct": _pct(tier_counts.get(_TIER_NOT_MEASURED, 0))},
     }
 
 
@@ -764,7 +760,7 @@ def _render_cohort_summary_export(
         total_stu  = len(rows)
         total_sess = sum(sc_list)
         tc: dict[str, int] = {
-            _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0,
+            _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0, _TIER_NOT_MEASURED: 0,
         }
         zero_risk_count = 0
         for r in rows:
@@ -786,6 +782,7 @@ def _render_cohort_summary_export(
             "almost_ready_count":    tc[_TIER_ALMOST_READY],
             "developing_count":      tc[_TIER_DEVELOPING],
             "at_risk_count":         tc[_TIER_AT_RISK],
+            "not_measured_count":    tc[_TIER_NOT_MEASURED],
             "zero_offer_risk_count": zero_risk_count,
             "ready_pct":             round(tc[_TIER_READY] / total_stu * 100, 1) if total_stu else 0.0,
             **{f"avg_{cat}": cat_avgs.get(cat) for cat in _RUBRIC_CATEGORIES},
@@ -804,7 +801,7 @@ def _render_cohort_summary_export(
             "Segment Type", "Segment Name", "Student Count", "Total Sessions",
             "Sessions / Student", "Avg Overall Score",
             "Ready Count", "Almost Ready Count", "Developing Count", "At Risk Count",
-            "Intervention Flag Count", "Ready %",
+            "Not Measured Count", "Intervention Flag Count", "Ready %",
             *cat_headers,
         ])
         for seg in segments:
@@ -819,6 +816,7 @@ def _render_cohort_summary_export(
                 seg["almost_ready_count"],
                 seg["developing_count"],
                 seg["at_risk_count"],
+                seg["not_measured_count"],
                 seg["zero_offer_risk_count"],
                 _sanitize_csv_cell(seg["ready_pct"]),
                 *[_sanitize_csv_cell(seg[f"avg_{cat}"]) for cat in _RUBRIC_CATEGORIES],

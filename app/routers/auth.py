@@ -798,8 +798,8 @@ async def refresh_token(request: Request):
             detail="Invalid request body. Expected JSON with refresh_token.",
         )
 
-    refresh = body.get("refresh_token")
-    if not refresh:
+    refresh = body.get("refresh_token") if isinstance(body, dict) else None
+    if not isinstance(refresh, str) or not refresh.strip():
         raise HTTPException(status_code=400, detail="refresh_token is required.")
 
     try:
@@ -812,13 +812,19 @@ async def refresh_token(request: Request):
                 "Content-Type": "application/json",
             },
         )
-        data = resp.json()
-
-        if resp.status_code >= 400:
+        if resp.status_code in (400, 401, 403):
             raise HTTPException(
                 status_code=401,
                 detail="Token refresh failed. Please log in again.",
             )
+        if resp.status_code >= 400:
+            # Provider throttling/outages do not invalidate the user's refresh
+            # token. Returning 401 here used to erase valid browser sessions.
+            raise HTTPException(status_code=503, detail="Auth service temporarily unavailable. Please retry.")
+
+        data = resp.json()
+        if not isinstance(data, dict) or not data.get("access_token") or not data.get("refresh_token"):
+            raise HTTPException(status_code=503, detail="Auth service returned an incomplete session. Please retry.")
 
         return {
             "access_token": data.get("access_token"),
@@ -828,8 +834,8 @@ async def refresh_token(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("refresh_error", error=str(e))
-        raise HTTPException(status_code=500, detail="Auth service unavailable.")
+        logger.error("refresh_error", error_type=type(e).__name__)
+        raise HTTPException(status_code=503, detail="Auth service unavailable. Please retry.")
 
 
 @router.post("/onboarding")

@@ -169,8 +169,8 @@ async def setup_interview(
     async with _SETUP_SEMAPHORE:
         # Format-aware extraction; raises 400 on unreadable files and a clear
         # message when the extracted text is under the 200-char quality gate.
-        resume_text = extract_text_from_resume(
-            pdf_bytes, resume.filename or "resume", resume.content_type
+        resume_text = await asyncio.to_thread(
+            extract_text_from_resume, pdf_bytes, resume.filename or "resume", resume.content_type
         )
 
         # Check for prompt injection patterns in the resume text.
@@ -180,8 +180,17 @@ async def setup_interview(
 
         resume_summary = await parse_resume_structured(resume_text)
 
-    if not isinstance(resume_summary, dict):
-        resume_summary = {}
+    extraction = resume_summary.get("resume_extraction", {}) if isinstance(resume_summary, dict) else {}
+    if not isinstance(resume_summary, dict) or extraction.get("status") == "FAILED":
+        # Failure is a service problem, not an empty student profile. Do not
+        # create/consume an interview or silently switch to generic questions.
+        raise HTTPException(
+            status_code=503,
+            detail=("We could read your resume, but could not prepare its interview profile. "
+                    "No interview was started. Your selected file is still available on this page; "
+                    "please try again shortly."),
+            headers={"Retry-After": "30"},
+        )
     if not resume_summary.get("candidate_name"):
         resume_summary["candidate_name"] = getattr(user, "full_name", None)
         resume_summary["candidate_name_source"] = "PROFILE" if resume_summary["candidate_name"] else "UNKNOWN"
@@ -336,6 +345,7 @@ async def setup_interview(
         # was built on — useful for debugging cross-session dedup and for
         # showing the student "session #N with this resume".
         "resume_fingerprint": resume_fingerprint,
+        "resume_extraction": extraction,
         "blueprint": result.get("blueprint"),
     }
 

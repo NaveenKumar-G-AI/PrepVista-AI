@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/EvidenceStrip.tsx","./src/components/MasteryCheckFlow.tsx","./src/components/MasteryMap.tsx","./src/components/SkillDetail.tsx","./src/components/WhatDoIKnow.tsx","./src/components/ui.tsx","./src/lib/api.ts","./src/lib/evidenceStrip.ts","./src/lib/types.ts"],"version":"5.9.3"}

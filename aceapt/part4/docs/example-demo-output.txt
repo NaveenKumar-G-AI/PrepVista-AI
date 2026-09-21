@@ -1,0 +1,70 @@
+
+======================================================================
+PRIYA — goal: PLACEMENT_PREP, deadline: 20 days, 25 min/session
+======================================================================
+Reason: Initial path generated from current skill evidence.
+
+◐ [0] Percentage Application  (score 0.643, IN_PROGRESS)
+     action: PRACTICE on percentage-application
+     why: Application evidence needs more data before a confident call.
+○ [1] Ratio Application  (score 0.482, UPCOMING)
+     action: LEARN on ratio-application
+     why: No foundation evidence yet for this skill.
+◔ [2] Ratio Fundamentals  (score 0.362, REVIEW_DUE)
+     action: REVIEW on ratio-fundamentals
+     why: This skill was last verified 45 days ago — evidence is old enough to need a freshness check, not a full relearn.
+
+======================================================================
+ARJUN — goal: PLACEMENT_PREP, deadline: 3 days (URGENT), 15 min/session
+======================================================================
+Reason: Initial path generated from current skill evidence.
+Tradeoff: You have limited time before your deadline. ACEAPT is prioritizing high-impact readiness skills now while preserving deeper mastery for your longer-term path.
+
+◐ [0] Percentage Application  (score 0.680, IN_PROGRESS)
+     action: PRACTICE on percentage-application
+     why: Application evidence needs more data before a confident call.
+◔ [1] Ratio Fundamentals  (score 0.398, REVIEW_DUE)
+     action: REVIEW on ratio-fundamentals
+     why: This skill was last verified 45 days ago — evidence is old enough to need a freshness check, not a full relearn.
+
+======================================================================
+Same skill evidence for both students. Path differs by context alone.
+======================================================================
+
+Priya's today's plan (25 min):
+  - Warm-up: 4 min — A familiar refresher question.
+  - Targeted practice: 15 min — Application-level questions on this skill.
+  - Challenge + verification: 6 min — One harder question, then a quick check.
+
+Arjun's today's plan (15 min, urgent):
+  - Warm-up: 2 min — A familiar refresher question.
+  - Targeted practice: 9 min — Application-level questions on this skill.
+  - Challenge + verification: 4 min — One harder question, then a quick check.
+
+Why-this for Priya's top node:
+{
+  "what": "Percentage Application",
+  "why": "Current focus: Application evidence needs more data before a confident call.",
+  "evidence": "foundation: 5 attempt(s), developing; application: 4 attempt(s), developing",
+  "impact": "Strengthening this supports Profit & Loss.",
+  "next": "Targeted application practice."
+}
+
+======================================================================
+CLOSING THE LOOP — Priya practices, Feature 3 reports new evidence
+======================================================================
+
+======================================================================
+PRIYA — after new evidence (Percentage Application now strong)
+======================================================================
+Reason: percentage-application moved out of active focus (verified or deferred); profit-loss entered focus based on new evidence
+
+◐ [0] Profit & Loss  (score 0.642, UPCOMING)
+     action: LEARN on profit-loss
+     why: No foundation evidence yet for this skill.
+○ [1] Ratio Application  (score 0.482, UPCOMING)
+     action: LEARN on ratio-application
+     why: No foundation evidence yet for this skill.
+◔ [2] Ratio Fundamentals  (score 0.362, REVIEW_DUE)
+     action: REVIEW on ratio-fundamentals
+     why: This skill was last verified 45 days ago — evidence is old enough to need a freshness check, not a full relearn.

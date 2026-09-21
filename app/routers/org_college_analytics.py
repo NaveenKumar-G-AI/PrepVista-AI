@@ -31,7 +31,7 @@ from app.routers.org_college_helpers import (
     _validate_uuid, _compute_slope, _paginate
 )
 from app.routers.org_college_helpers import (
-    _TIER_READY, _TIER_ALMOST_READY, _TIER_DEVELOPING, _TIER_AT_RISK,
+    _TIER_READY, _TIER_ALMOST_READY, _TIER_DEVELOPING, _TIER_AT_RISK, _TIER_NOT_MEASURED,
     _safe_round, _readiness_tier, _zero_offer_risk,
     _cohort_category_averages, _extract_cat_scores, _sorted_categories,
     _fetch_session_series, _compute_student_growth_map, _is_stuck,
@@ -74,7 +74,7 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
 
     Existing fields preserved verbatim. New performance_summary block adds:
       - cohort_avg_score, students_with_sessions
-      - readiness_tier_counts (all 4 tiers)
+      - readiness_tier_counts (4 measured tiers plus not_measured)
       - preparation-intervention count (legacy response key: zero_offer_risk_count)
       - weakest_3_categories (sorted by avg score ascending)
 
@@ -165,7 +165,7 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
 
     # Python-side KPI computation — zero additional DB round-trips
     tier_counts: dict[str, int] = {
-        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0,
+        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0, _TIER_NOT_MEASURED: 0,
     }
     zero_risk_count = 0
     scored_avgs: list[float] = []
@@ -340,7 +340,7 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
     # ── Python-side analytics ─────────────────────────────────────────────────
     total = len(perf_rows)
     tier_counts: dict[str, int] = {
-        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0,
+        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0, _TIER_NOT_MEASURED: 0,
     }
     zero_risk_count = 0
     scored_avgs: list[float] = []
@@ -448,7 +448,7 @@ async def analytics_performance(
 
     student_summaries: list[dict] = []
     tier_counts: dict[str, int]   = {
-        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0,
+        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0, _TIER_NOT_MEASURED: 0,
     }
     zero_risk_count  = 0
     tq_rows: list    = []
@@ -750,7 +750,7 @@ async def analytics_readiness(
         float(r["avg_score"]) for r in perf_rows if r["avg_score"] is not None
     ]
     tier_buckets: dict[str, list[dict]] = {
-        _TIER_READY: [], _TIER_ALMOST_READY: [], _TIER_DEVELOPING: [], _TIER_AT_RISK: [],
+        _TIER_READY: [], _TIER_ALMOST_READY: [], _TIER_DEVELOPING: [], _TIER_AT_RISK: [], _TIER_NOT_MEASURED: [],
     }
     zero_risk_list: list[dict] = []
 
@@ -804,6 +804,7 @@ async def analytics_readiness(
             _TIER_ALMOST_READY: tier_buckets[_TIER_ALMOST_READY],
             _TIER_DEVELOPING:   tier_buckets[_TIER_DEVELOPING],
             _TIER_AT_RISK:      tier_buckets[_TIER_AT_RISK],
+            _TIER_NOT_MEASURED: tier_buckets[_TIER_NOT_MEASURED],
         },
         "zero_offer_risk": zero_risk_list,
     }
@@ -1643,15 +1644,17 @@ def _cc_percentile_histories(by_user: dict[str, list]) -> dict[str, list[int]]:
 def _cc_tier_for_sessions(sess: list) -> tuple[str, bool]:
     """Apply the shared college-analytics readiness and intervention rules."""
     if not sess:
-        return "At Risk", True
-    latest_score = float(sess[-1]["final_score"] or 0)
-    slope = _compute_slope([float(row["final_score"]) for row in sess]) or 0.0
+        return "Not measured", False
+    latest_score = _safe_round(sess[-1]["final_score"])
+    scores = [float(row["final_score"]) for row in sess if row["final_score"] is not None]
+    slope = _compute_slope(scores)
     key = _readiness_tier(latest_score, len(sess))
     tier = {
         _TIER_READY: "Ready",
         _TIER_ALMOST_READY: "Almost",
         _TIER_DEVELOPING: "Developing",
         _TIER_AT_RISK: "At Risk",
+        _TIER_NOT_MEASURED: "Not measured",
     }[key]
     return tier, _zero_offer_risk(latest_score, len(sess), slope)
 
@@ -1963,12 +1966,12 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
         else:
             skills_first = {sk: None for sk in _CC_SKILLS}
             skills_now = dict(skills_first)
-            first_score = latest_score = 0
+            first_score = latest_score = None
             n_sess = 0
             slope = 0
             stuck = False
-            tier = "At Risk"
-            at_risk = True
+            tier = "Not measured"
+            at_risk = False
             enrolled_at = r["enrolled_at"]
             last_active = max(0, (now - enrolled_at).days) if enrolled_at else 0
             stt = None
@@ -2127,7 +2130,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
         else:
             n_sess = 0
             slope = 0
-            tier = "Not started"
+            tier = "Not measured"
             score = None
             target_role = None
 

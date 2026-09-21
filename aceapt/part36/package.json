@@ -1,0 +1,38 @@
+{
+  "name": "aceapt-feature36-career-execution-intelligence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ACEAPT Feature 36 — Career Execution Intelligence",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "seed": "tsx scripts/seed.ts",
+    "db:reset": "rm -f data/aceapt.db && npm run seed",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@fontsource-variable/bricolage-grotesque": "^5.1.1",
+    "@fontsource/ibm-plex-mono": "^5.1.1",
+    "@fontsource/ibm-plex-sans": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "next": "^15.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.4",
+    "@types/react-dom": "^19.0.2",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,894 @@
+// PrepVista Database Schema
+// Multi-tenant architecture with Student, TPO, College Admin, Super Admin roles
+// All institutional data scoped by collegeId
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* ============================================================
+   CORE TENANT ENTITIES
+   ============================================================ */
+
+model College {
+  id            String   @id @default(uuid())
+  name          String
+  domain        String?  @unique // for email domain-based auto-tenant
+  logoUrl       String?
+  settings      Json?    @default("{}")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users         User[]
+  students      Student[]
+  analytics     CollegeAnalytics[]
+
+  @@index([domain])
+  @@index([isActive])
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  name          String
+  role          Role     @default(STUDENT)
+  collegeId     String?  // null for SuperAdmin
+  isActive      Boolean  @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  college       College? @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  student       Student?
+  tpoProfile    TPOProfile?
+  sessions      Session[]
+
+  @@index([email])
+  @@index([collegeId, role])
+  @@index([collegeId, isActive])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  revokedAt    DateTime?
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum Role {
+  STUDENT
+  TPO
+  COLLEGE_ADMIN
+  SUPER_ADMIN
+}
+
+/* ============================================================
+   STUDENT PROFILE & ACADEMIC INFO
+   ============================================================ */
+
+model Student {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  collegeId       String
+  studentId       String   // college-specific identifier
+  targetRole      String?
+  targetCompanies String[]
+  resumeUrl       String?
+  skills          String[]
+  experienceLevel ExperienceLevel @default(FRESHER)
+  enrollmentYear  Int?
+  graduationYear  Int?
+  department      String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  college         College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  assessments     Assessment[]
+  skillEvidence   SkillEvidence[]
+  recommendations Recommendation[]
+  progressSnapshots ProgressSnapshot[]
+
+  @@unique([collegeId, studentId])
+  @@index([collegeId, isActive])
+  @@index([userId])
+}
+
+enum ExperienceLevel {
+  FRESHER
+  Y0_1
+  Y1_2
+  Y2_3
+  Y3_5
+  Y5_PLUS
+}
+
+model TPOProfile {
+  id          String @id @default(uuid())
+  userId      String @unique
+  collegeId   String
+  department  String?
+  title       String?
+  permissions Json? @default("{}")
+
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  college College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  @@index([collegeId])
+}
+
+/* ============================================================
+   SKILL GRAPH & EVIDENCE
+   ============================================================ */
+
+model Skill {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  parentId    String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent      Skill?   @relation("SkillHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Skill[]  @relation("SkillHierarchy")
+  evidence    SkillEvidence[]
+
+  @@unique([name, category])
+  @@index([category])
+  @@index([parentId])
+}
+
+model SkillEvidence {
+  id           String             @id @default(uuid())
+  studentId    String
+  skillId      String
+  assessmentId String?
+  source       EvidenceSource     @default(AI_ASSESSMENT)
+  signal       String             // the raw observation: "failed to explain time complexity"
+  score        Float              // -1 to 1 (negative = weakness, positive = strength)
+  confidence   EvidenceConfidence @default(LOW)
+  weight       Float              @default(1.0)
+  metadata     Json?              @default("{}")
+  createdAt    DateTime           @default(now())
+
+  student      Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  skill        Skill              @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  assessment   Assessment?        @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, skillId])
+  @@index([assessmentId])
+  @@index([source])
+}
+
+enum EvidenceSource {
+  AI_ASSESSMENT
+  MANUAL_REVIEW
+  PEER_FEEDBACK
+  SELF_REPORTED
+  RESUME_PARSING
+}
+
+enum EvidenceConfidence {
+  HIGH
+  MEDIUM
+  LOW
+  INSUFFICIENT
+}
+
+/* ============================================================
+   ASSESSMENTS & QUESTIONS
+   ============================================================ */
+
+model Assessment {
+  id                String             @id @default(uuid())
+  studentId         String
+  type              AssessmentType
+  difficulty        DifficultyLevel    @default(MEDIUM)
+  targetRole        String?
+  status            AssessmentStatus   @default(CREATED)
+  questionCount     Int                @default(5)
+  timeLimitMinutes  Int                @default(30)
+  overallScore      Float?
+  dimensionScores   Json?              // ExplainableScore JSON
+  aiProcessingId    String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  student           Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  questions         AssessmentQuestion[]
+  evidence          SkillEvidence[]
+
+  @@index([studentId, status])
+  @@index([studentId, createdAt])
+  @@index([type, difficulty])
+}
+
+enum AssessmentType {
+  TECHNICAL
+  BEHAVIORAL
+  COMMUNICATION
+  COMBINED
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
+
+enum AssessmentStatus {
+  CREATED
+  IN_PROGRESS
+  COMPLETED
+  PROCESSING
+  FAILED
+  EXPIRED
+}
+
+model AssessmentQuestion {
+  id               String               @id @default(uuid())
+  assessmentId     String
+  questionText     String
+  category         String
+  difficulty       DifficultyLevel
+  expectedSkills   String[]
+  expectedAnswer   String?
+  rubric           Json?
+  answer           String?
+  score            Float?
+  feedback         String?
+  timeSpentSeconds Int?
+  order            Int
+  createdAt        DateTime             @default(now())
+
+  assessment       Assessment           @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, order])
+}
+
+/* ============================================================
+   INTELLIGENCE ENGINE OUTPUTS
+   ============================================================ */
+
+model Recommendation {
+  id              String              @id @default(uuid())
+  studentId       String
+  type            RecommendationType
+  title           String
+  description     String
+  reason          String
+  priority        Int                 @default(5) // 1-10
+  targetSkillId   String?
+  metadata        Json?               @default("{}")
+  status          RecommendationStatus @default(PENDING)
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  student         Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  targetSkill     Skill?              @relation(fields: [targetSkillId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status])
+  @@index([studentId, priority])
+  @@index([type])
+}
+
+enum RecommendationType {
+  FOCUSED_INTERVIEW
+  SKILL_PRACTICE
+  REATTEMPT_WEAK_CATEGORY
+  COMMUNICATION_DRILL
+  HIGHER_DIFFICULTY
+  REASSESS_READINESS
+}
+
+enum RecommendationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DISMISSED
+  EXPIRED
+}
+
+model ProgressSnapshot {
+  id                    String              @id @default(uuid())
+  studentId             String
+  overallReadiness      Float
+  dimensionScores       Json                // DimensionScore[]
+  topWeaknesses         Json                // Weakness[]
+  recommendedActions    Json                // Recommendation[]
+  evidenceConfidence    EvidenceConfidence
+  assessmentsCompleted  Int                 @default(0)
+  lastAssessmentDate    DateTime?
+  trendDirection        TrendDirection      @default(INSUFFICIENT_DATA)
+  createdAt             DateTime            @default(now())
+
+  student               Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+}
+
+enum TrendDirection {
+  IMPROVING
+  STABLE
+  DECLINING
+  INSUFFICIENT_DATA
+}
+
+/* ============================================================
+   COLLEGE / TPO ANALYTICS (Aggregated, Privacy-Safe)
+   ============================================================ */
+
+model CollegeAnalytics {
+  id                  String   @id @default(uuid())
+  collegeId           String
+  date                DateTime @db.Date
+  totalStudents       Int      @default(0)
+  activeStudents      Int      @default(0)
+  avgReadiness        Float    @default(0)
+  readinessDistribution Json    @default("{}") // {"0-20": n, ...}
+  topWeaknesses       Json     @default("[]")
+  completionRate      Float    @default(0)
+  improvementRate     Float    @default(0)
+  createdAt           DateTime @default(now())
+
+  college             College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  @@unique([collegeId, date])
+  @@index([collegeId, date])
+}
+
+/* ============================================================
+   AI PROCESSING & COST TRACKING
+   ============================================================ */
+
+model AIProcessingJob {
+  id              String            @id @default(uuid())
+  assessmentId    String?           @unique
+  type            AIJobType
+  model           String
+  promptVersion   String
+  inputTokens     Int
+  outputTokens    Int
+  costUsd         Float
+  status          AIJobStatus       @default(PENDING)
+  inputHash       String
+  output          Json?
+  error           String?
+  retryCount      Int               @default(0)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@index([assessmentId])
+  @@index([status])
+  @@index([type, createdAt])
+}
+
+enum AIJobType {
+  QUESTION_GENERATION
+  ANSWER_EVALUATION
+  SCORING
+  WEAKNESS_ANALYSIS
+  RECOMMENDATION_GENERATION
+  READINESS_CALCULATION
+}
+
+enum AIJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+/* ============================================================
+   FEATURE FLAGS
+   ============================================================ */
+
+model FeatureFlag {
+  id          String              @id @default(uuid())
+  key         String              @unique
+  name        String
+  description String?
+  stage       FeatureFlagStage    @default(INTERNAL)
+  isEnabled   Boolean             @default(false)
+  config      Json?               @default("{}")
+  rolloutPct  Int                 @default(0) // 0-100
+  targetRoles Role[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([isEnabled])
+  @@index([stage])
+}
+
+enum FeatureFlagStage {
+  INTERNAL
+  BETA
+  SMALL_GROUP
+  COLLEGE_PILOT
+  GENERAL_AVAILABILITY
+}
+
+/* ============================================================
+   PREPVISTA INTEGRATION (Feature 37)
+   ============================================================ */
+
+model Integration {
+  id              String             @id @default(uuid())
+  name            String
+  type            IntegrationType    @default(PREPVISTA)
+  status          IntegrationStatus  @default(PENDING)
+  collegeId       String
+  externalId      String?            // PrepVista's identifier for this college
+  config          Json               @default("{}") // webhook URLs, API endpoints, etc.
+  sharingPolicyId String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  connectedAt     DateTime?
+  disconnectedAt  DateTime?
+  lastSyncAt      DateTime?
+  lastError       String?
+  errorCount      Int                @default(0)
+
+  college         College            @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  credentials     IntegrationCredential[]
+  mappings        OrganizationMapping[]
+  identityMappings IdentityMapping[]
+  sharingPolicy   SharingPolicy?     @relation(fields: [sharingPolicyId], references: [id], onDelete: SetNull)
+  syncJobs        SyncJob[]
+  events          IntegrationEvent[]
+  webhookDeliveries WebhookDelivery[]
+  errors          IntegrationError[]
+  auditLogs       IntegrationAudit[]
+
+  @@unique([collegeId, type])
+  @@index([collegeId, status])
+  @@index([type, status])
+}
+
+model IntegrationCredential {
+  id            String              @id @default(uuid())
+  integrationId String
+  name          String              // e.g., "api_key", "webhook_secret", "oauth_token"
+  value         String              // encrypted at rest
+  type          CredentialType
+  status        CredentialStatus    @default(ACTIVE)
+  expiresAt     DateTime?
+  rotatedAt     DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  lastUsedAt    DateTime?
+
+  integration   Integration         @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, type])
+  @@index([integrationId, status])
+  @@index([expiresAt])
+}
+
+model OrganizationMapping {
+  id              String       @id @default(uuid())
+  integrationId   String
+  codeforgeCollegeId String    // CodeForge college ID
+  externalOrgId   String       // PrepVista organization ID
+  externalOrgName String?
+  status          MappingStatus @default(PENDING)
+  mappedBy        String       // user ID who created mapping
+  mappedAt        DateTime     @default(now())
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  integration     Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, codeforgeCollegeId])
+  @@unique([integrationId, externalOrgId])
+  @@index([integrationId, status])
+}
+
+model IdentityMapping {
+  id              String           @id @default(uuid())
+  integrationId   String
+  codeforgeStudentId String        // CodeForge student ID
+  externalStudentId String         // PrepVista student ID
+  externalEmail   String?          // PrepVista email for verification
+  method          IdentityMappingMethod
+  status          MappingStatus    @default(PENDING)
+  conflictId      String?          // reference to conflict record if any
+  mappedBy        String?          // user ID who created mapping
+  mappedAt        DateTime         @default(now())
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  revokedAt       DateTime?
+  revokedBy       String?
+  revokeReason    String?
+
+  integration     Integration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, codeforgeStudentId])
+  @@unique([integrationId, externalStudentId])
+  @@index([integrationId, status])
+  @@index([integrationId, method])
+}
+
+model SharingPolicy {
+  id              String         @id @default(uuid())
+  integrationId   String
+  name            String
+  description     String?
+  scopes          SharingScope[] // which data scopes are shared
+  defaultScope    SharingScope   @default(MINIMAL)
+  studentOptIn    Boolean        @default(false) // students must opt in
+  autoApprove     Boolean        @default(false) // auto-approve new students
+  retentionDays   Int            @default(365)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdBy       String
+
+  integration     Integration    @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId])
+}
+
+model SyncJob {
+  id              String           @id @default(uuid())
+  integrationId   String
+  type            SyncJobType
+  status          SyncJobStatus    @default(PENDING)
+  scope           SyncScope
+  studentIds      String[]         // empty = all eligible
+  triggeredBy     String           // user ID or "system"
+  startedAt       DateTime?
+  completedAt     DateTime?
+  totalRecords    Int              @default(0)
+  processedRecords Int             @default(0)
+  failedRecords   Int              @default(0)
+  errorSummary    Json?
+  idempotencyKey  String?          @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  integration     Integration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  records         SyncRecord[]
+
+  @@index([integrationId, status])
+  @@index([integrationId, type, createdAt])
+  @@index([idempotencyKey])
+}
+
+model SyncRecord {
+  id              String             @id @default(uuid())
+  syncJobId       String
+  studentId       String
+  externalStudentId String?
+  resourceType    String             // e.g., "TechnicalProfile", "SkillGraph", "Readiness"
+  resourceVersion String
+  action          SyncAction
+  status          SyncRecordStatus   @default(PENDING)
+  payload         Json?
+  response        Json?
+  error           String?
+  attempts        Int                @default(0)
+  lastAttemptAt   DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  syncJob         SyncJob            @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
+
+  @@unique([syncJobId, studentId, resourceType])
+  @@index([syncJobId, status])
+  @@index([studentId, resourceType, createdAt])
+}
+
+model IntegrationEvent {
+  id              String             @id @default(uuid())
+  integrationId   String
+  eventType       String             // e.g., "technical.profile.updated"
+  schemaVersion   String             @default("v1")
+  eventId         String             @unique // globally unique event identifier
+  source          EventSource        @default(CODEFORGE)
+  occurredAt      DateTime
+  organizationRef String             // college reference
+  externalStudentRef String?         // external student reference
+  dataVersion     String             // version of the data payload
+  payload         Json               // event payload (minimal, no sensitive data)
+  idempotencyKey  String             @unique
+  status          EventStatus        @default(PENDING)
+  deliveryCount   Int                @default(0)
+  lastDeliveryAt  DateTime?
+  nextRetryAt     DateTime?
+  deliveredAt     DateTime?
+  failedAt        DateTime?
+  errorCategory   String?
+  errorMessage    String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  integration     Integration        @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  deliveries      WebhookDelivery[]
+
+  @@index([integrationId, status, nextRetryAt])
+  @@index([integrationId, eventType, occurredAt])
+  @@index([integrationId, organizationRef, occurredAt])
+  @@index([eventId])
+  @@index([idempotencyKey])
+}
+
+model WebhookDelivery {
+  id              String              @id @default(uuid())
+  eventId         String
+  integrationId   String
+  url             String
+  attempt         Int
+  requestPayload  Json
+  requestHeaders  Json
+  responseStatus  Int?
+  responseBody    String?
+  responseHeaders Json?
+  success         Boolean
+  errorCategory   String?
+  errorMessage    String?
+  durationMs      Int
+  createdAt       DateTime            @default(now())
+
+  event           IntegrationEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  integration     Integration         @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, createdAt])
+  @@index([eventId, attempt])
+  @@index([success, createdAt])
+}
+
+model IntegrationError {
+  id              String              @id @default(uuid())
+  integrationId   String
+  category        ErrorCategory
+  severity        ErrorSeverity
+  message         String
+  details         Json?
+  resourceType    String?
+  resourceId      String?
+  studentId       String?
+  syncJobId       String?
+  eventId         String?
+  webhookDeliveryId String?
+  status          ErrorStatus         @default(OPEN)
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  resolution      String?
+  occurrenceCount Int                 @default(1)
+  firstOccurredAt DateTime            @default(now())
+  lastOccurredAt  DateTime            @default(now())
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  integration     Integration         @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, status, severity])
+  @@index([integrationId, category, lastOccurredAt])
+  @@index([integrationId, studentId])
+  @@index([syncJobId])
+  @@index([eventId])
+}
+
+model IntegrationAudit {
+  id              String           @id @default(uuid())
+  integrationId   String
+  action          String           // e.g., "connected", "disconnected", "credential_rotated"
+  actorId         String           // user ID or "system"
+  actorType       AuditActorType
+  resourceType    String?
+  resourceId      String?
+  studentId       String?
+  metadata        Json             @default("{}")
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime         @default(now())
+
+  integration     Integration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, createdAt])
+  @@index([integrationId, action, createdAt])
+  @@index([actorId, createdAt])
+  @@index([studentId, createdAt])
+}
+
+/* ============================================================
+   ENUMS FOR INTEGRATION
+   ============================================================ */
+
+enum IntegrationType {
+  PREPVISTA
+  // Future: EXTERNAL_LMS, EXTERNAL_ATS, etc.
+}
+
+enum IntegrationStatus {
+  PENDING       // Created, awaiting connection
+  CONNECTING    // In process of connecting
+  ACTIVE        // Connected and syncing
+  DEGRADED      // Active but with errors
+  DISCONNECTING // In process of disconnecting
+  DISCONNECTED  // Fully disconnected
+  ERROR         // Fatal error, manual intervention needed
+}
+
+enum CredentialType {
+  API_KEY
+  WEBHOOK_SECRET
+  OAUTH_TOKEN
+  OAUTH_REFRESH_TOKEN
+  SERVICE_ACCOUNT_KEY
+  CERTIFICATE
+}
+
+enum CredentialStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  ROTATING
+  FAILED
+}
+
+enum MappingStatus {
+  PENDING       // Awaiting verification
+  VERIFIED      // Confirmed and active
+  CONFLICT      // Multiple mappings detected
+  REJECTED      // Explicitly rejected
+  REVOKED       // Revoked by admin
+}
+
+enum IdentityMappingMethod {
+  EXTERNAL_ID       // Pre-existing external ID
+  VERIFIED_EMAIL    // Email verified by both systems
+  INSTITUTION_ID    // Institution-provided mapping
+  ADMIN_MANUAL      // Explicit admin mapping
+  AUTO_MATCHED      // System-suggested (requires verification)
+}
+
+enum SharingScope {
+  MINIMAL         // Technical Readiness only
+  STANDARD        // Skills, Mastery, Role Readiness, Skill Gaps
+  DETAILED        // Technical Evidence Summary, Assessment Summary, Interview Evidence, Growth
+  FULL            // All authorized technical intelligence
+}
+
+enum SyncJobType {
+  INITIAL         // First full sync
+  INCREMENTAL     // Changed records only
+  FULL_RESYNC     // Complete resynchronization
+  SINGLE_STUDENT  // Single student sync
+  RECONCILIATION  // Detect and fix divergence
+}
+
+enum SyncScope {
+  ALL_ELIGIBLE    // All students with sharing enabled
+  SPECIFIC_STUDENTS // Only listed studentIds
+  CHANGED_ONLY    // Only students with changes since last sync
+  FAILED_RETRY    // Retry previously failed records
+}
+
+enum SyncJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  PARTIAL         // Some records failed
+  FAILED
+  CANCELLED
+}
+
+enum SyncAction {
+  CREATE
+  UPDATE
+  DELETE
+  NO_CHANGE
+}
+
+enum SyncRecordStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  SKIPPED
+  RETRYING
+}
+
+enum EventSource {
+  CODEFORGE
+  PREPVISTA
+  SYSTEM
+}
+
+enum EventStatus {
+  PENDING       // Created, not yet delivered
+  QUEUED        // In delivery queue
+  DELIVERING    // Active delivery attempt
+  DELIVERED     // Successfully delivered
+  FAILED        // All retries exhausted
+  DEAD_LETTER   // Moved to dead letter queue
+  CANCELLED     // Cancelled before delivery
+}
+
+enum ErrorCategory {
+  AUTHENTICATION
+  AUTHORIZATION
+  VALIDATION
+  NETWORK
+  TIMEOUT
+  RATE_LIMIT
+  DATA_CONFLICT
+  SCHEMA_MISMATCH
+  PERMISSION_DENIED
+  RESOURCE_NOT_FOUND
+  INTERNAL
+  UNKNOWN
+}
+
+enum ErrorSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ErrorStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  IGNORED
+  AUTO_RESOLVED
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  SCHEDULED_JOB
+  WEBHOOK
+}
+
+/* ============================================================
+   AUDIT & EVENT LOG
+   ============================================================ */
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  collegeId   String?
+  action      String
+  resource    String
+  resourceId  String?
+  metadata    Json?    @default("{}")
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([collegeId, createdAt])
+  @@index([action, createdAt])
+  @@index([resource, resourceId])
+}

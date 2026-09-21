@@ -284,7 +284,7 @@ async def _evaluate_and_store(
                 turn=turn_number,
                 category=rubric_category,
             )
-            return "EVALUATION_PROVIDER_OR_SCHEMA_FAILED"
+            return eval_result.get("error_code", "EVALUATION_PROVIDER_OR_SCHEMA_FAILED") if isinstance(eval_result, dict) else "EVALUATION_PROVIDER_OR_SCHEMA_FAILED"
 
         # ---- Phase 3: write (new connection, double-insert guard) ---------
         async with DatabaseConnection() as conn, conn.transaction():
@@ -350,7 +350,7 @@ async def _evaluate_and_store(
                 eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
             )
 
-            await conn.execute("UPDATE question_evaluations SET evaluation_version='rubric-v2',prompt_version='per-question-v1',provider_model=$3 WHERE session_id=$1 AND turn_number=$2",
+            await conn.execute("UPDATE question_evaluations SET evaluation_version='rubric-v2',prompt_version='per-question-v2',provider_model=$3 WHERE session_id=$1 AND turn_number=$2",
                 session_id, turn_number, get_settings().GROQ_EVAL_MODEL or get_settings().GROQ_MODEL)
 
         logger.info(

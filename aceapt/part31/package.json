@@ -1,0 +1,28 @@
+{
+  "name": "aceapt-readiness-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ACEAPT Feature 31 — Readiness Simulator. P0 vertical slice.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.23.8",
+    "@anthropic-ai/sdk": "0.27.3"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "@types/node": "20.12.12",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "tailwindcss": "3.4.10",
+    "postcss": "8.4.38",
+    "autoprefixer": "10.4.19"
+  }
+}

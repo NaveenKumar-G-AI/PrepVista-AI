@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Role Skill Gap - Backend Developer (Preview)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #161a22;
+    --muted: #667085;
+    --paper: #f3f4f7;
+    --surface: #ffffff;
+    --line: #e3e5ea;
+    --critical: #b3392a;
+    --critical-soft: #f7e7e4;
+    --warning: #a8671a;
+    --warning-soft: #f6ecdd;
+    --progress: #1f7a5c;
+    --progress-soft: #e2f1ec;
+    --focus: #2954a6;
+    --focus-soft: #e7edf7;
+    --font-display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.45;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px 60px; }
+  .eyebrow { font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+  h1 { font-family: var(--font-display); font-size: 27px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .summary { display: flex; gap: 28px; margin: 20px 0; flex-wrap: wrap; }
+  .summary .num { font-family: var(--font-mono); font-size: 23px; font-weight: 600; }
+  .summary .lbl { font-size: 12.5px; color: var(--muted); margin-left: 6px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  .panel-title { font-family: var(--font-display); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .grid-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+  .stack { display: grid; gap: 16px; margin-bottom: 20px; }
+  .coverage-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 500; background: var(--paper); border: 1px solid var(--line); }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge--critical { background: var(--critical-soft); color: var(--critical); }
+  .badge--warning { background: var(--warning-soft); color: var(--warning); }
+  .badge--neutral { background: var(--line); color: var(--muted); }
+  .critical-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 4px 0; }
+  .critical-row .delta { font-family: var(--font-mono); color: var(--muted); font-size: 12px; }
+  .unassessed-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 4px 0; color: var(--ink); }
+  .tabs { display: flex; gap: 4px; margin: 18px 0 10px; }
+  .tab { cursor: pointer; padding: 6px 13px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--muted); background: transparent; border: none; font-family: var(--font-body); }
+  .tab.active { background: var(--focus-soft); color: var(--focus); }
+  .skill-list { display: grid; gap: 8px; }
+  .skill-card { padding: 14px 16px; cursor: pointer; }
+  .skill-head { display: flex; align-items: center; gap: 16px; }
+  .skill-name-col { flex: 0 0 152px; }
+  .skill-name { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+  .skill-importance { font-size: 11.5px; color: var(--muted); }
+  .bar-col { flex: 1 1 auto; min-width: 120px; }
+  .bar-track { position: relative; height: 8px; background: var(--line); border-radius: 4px; margin-top: 8px; }
+  .bar-fill { position: absolute; inset: 0 auto 0 0; height: 100%; border-radius: 4px; transition: width .6s ease; }
+  .bar-target { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--ink); }
+  .bar-target::after { content: ""; position: absolute; top: -4px; left: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+  .bar-labels { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .conf-col { flex: 0 0 92px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .trend-col { color: var(--muted); flex: 0 0 18px; }
+  .detail { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); display: none; }
+  .skill-card.expanded .detail { display: grid; gap: 10px; }
+  .detail p { margin: 0; font-size: 13.5px; }
+  .detail .note { color: var(--muted); font-size: 12.5px; }
+  .detail-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--muted); }
+  .detail-meta b { color: var(--ink); font-family: var(--font-mono); font-weight: 500; }
+  .banner { font-size: 12px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">Preview only — rendered from mock data with vanilla HTML/CSS/JS so it can be opened without running the backend. The real components are <code>frontend/RoleSkillGapDashboard.tsx</code>.</div>
+
+  <div class="eyebrow">Target role</div>
+  <h1 id="role-name">Backend Developer</h1>
+  <div class="meta" id="role-meta"></div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="stack">
+    <div class="card" style="padding:16px;">
+      <div class="panel-title">Core skill coverage</div>
+      <div class="coverage-row" id="coverage-row"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card" id="critical-panel" style="padding:16px; border-color: var(--critical);"></div>
+      <div class="card" id="unassessed-panel" style="padding:16px;"></div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="skill-list" id="skill-list"></div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Mock RoleGapProfile - same shape the real API returns (see
+// src/domain/types.ts SkillGapResult / RoleGapProfile).
+// ---------------------------------------------------------------------------
+const PROFILE = {
+  roleName: "Backend Developer",
+  roleModelVersion: "role-model-v3",
+  calculatedAt: "2026-08-21T09:00:00.000Z",
+  coreSkillCoverage: { total: 5, meetingTarget: 2 },
+  skills: [
+    { skillId: "python", skillName: "Python", importance: "CORE", currentState: { masteryLevel: 4, label: "Strong" }, targetState: { masteryLevel: 4, label: "Strong" }, gapStatus: "NO_GAP", severity: "LOW", confidence: 0.93, trend: "STABLE", priorityRank: null, closureState: "CLOSED", evidenceSummary: { totalCount: 14, diversity: 9 }, dependency: { isRootGap: false, blockedBy: [] }, explanation: { summarySentence: "Python currently meets the target level for the Backend Developer role.", }, aiExplanation: null },
+    { skillId: "sql", skillName: "SQL", importance: "CORE", currentState: { masteryLevel: 2, label: "Developing" }, targetState: { masteryLevel: 3, label: "Competent" }, gapStatus: "PARTIAL", severity: "HIGH", confidence: 0.71, trend: "IMPROVING", priorityRank: 2, closureState: "NEARLY_CLOSED", evidenceSummary: { totalCount: 6, diversity: 4 }, dependency: { isRootGap: false, blockedBy: [] }, explanation: { summarySentence: "SQL is close to the target level for the Backend Developer role, with a small remaining gap.", trendNote: "Recent evidence shows improvement, though the required level has not yet been consistently demonstrated." }, aiExplanation: null },
+    { skillId: "debugging", skillName: "Debugging", importance: "CORE", currentState: { masteryLevel: 1, label: "Emerging" }, targetState: { masteryLevel: 3, label: "Competent" }, gapStatus: "BELOW_TARGET", severity: "CRITICAL", confidence: 0.85, trend: "STABLE", priorityRank: 1, closureState: "OPEN", evidenceSummary: { totalCount: 8, diversity: 5 }, dependency: { isRootGap: false, blockedBy: [] }, explanation: { summarySentence: "Debugging is below the target level for the Backend Developer role." }, aiExplanation: null },
+    { skillId: "api-design", skillName: "API Design", importance: "IMPORTANT", currentState: { masteryLevel: 1, label: "Emerging" }, targetState: { masteryLevel: 3, label: "Competent" }, gapStatus: "DEPENDENCY_BLOCKED", severity: "HIGH", confidence: 0.62, trend: "UNKNOWN", priorityRank: 3, closureState: "OPEN", evidenceSummary: { totalCount: 3, diversity: 2 }, dependency: { isRootGap: false, blockedBy: ["debugging"] }, explanation: { summarySentence: "API Design is below target for the Backend Developer role, and is affected by a gap in a foundational prerequisite skill." }, aiExplanation: null },
+    { skillId: "system-design", skillName: "System Design", importance: "CORE", currentState: { masteryLevel: null, label: "Unassessed" }, targetState: { masteryLevel: 2, label: "Developing" }, gapStatus: "UNASSESSED", severity: "HIGH", confidence: 0.2, trend: "UNKNOWN", priorityRank: 4, closureState: "UNASSESSED", evidenceSummary: { totalCount: 0, diversity: 0 }, dependency: { isRootGap: false, blockedBy: [] }, explanation: { summarySentence: "System Design has not yet been assessed for the Backend Developer role." }, aiExplanation: null },
+    { skillId: "docker", skillName: "Docker", importance: "OPTIONAL", currentState: { masteryLevel: 1, label: "Emerging" }, targetState: { masteryLevel: 2, label: "Developing" }, gapStatus: "PARTIAL", severity: "LOW", confidence: 0.68, trend: "STABLE", priorityRank: 5, closureState: "OPEN", evidenceSummary: { totalCount: 3, diversity: 2 }, dependency: { isRootGap: false, blockedBy: [] }, explanation: { summarySentence: "Docker is close to the target level for the Backend Developer role, with a small remaining gap." }, aiExplanation: null },
+  ],
+};
+PROFILE.criticalGaps = PROFILE.skills.filter(s => s.severity === "CRITICAL");
+PROFILE.unassessedSkills = PROFILE.skills.filter(s => s.gapStatus === "UNASSESSED");
+PROFILE.priorityGaps = PROFILE.skills.filter(s => s.gapStatus !== "NO_GAP").sort((a,b) => (a.priorityRank ?? 99) - (b.priorityRank ?? 99));
+
+const MAX_LEVEL = 4;
+const STATUS_COLOR = {
+  NO_GAP: "var(--progress)",
+  BELOW_TARGET: "var(--critical)",
+  DEPENDENCY_BLOCKED: "var(--critical)",
+  PARTIAL: "var(--warning)",
+  INCONSISTENT: "var(--warning)",
+  UNASSESSED: "var(--muted)",
+  INSUFFICIENT_EVIDENCE: "var(--muted)",
+};
+const STATUS_LABEL = {
+  NO_GAP: "Meets target",
+  BELOW_TARGET: "Below target",
+  PARTIAL: "Close to target",
+  UNASSESSED: "Needs assessment",
+  INSUFFICIENT_EVIDENCE: "More evidence needed",
+  INCONSISTENT: "Inconsistent performance",
+  DEPENDENCY_BLOCKED: "Blocked by prerequisite",
+};
+
+function badgeClass(severity) {
+  if (severity === "CRITICAL") return "badge badge--critical";
+  if (severity === "HIGH" || severity === "MEDIUM") return "badge badge--warning";
+  return "badge badge--neutral";
+}
+
+function trendGlyph(trend) {
+  if (trend === "IMPROVING") return "&#8599;";
+  if (trend === "WORSENING") return "&#8600;";
+  if (trend === "VOLATILE") return "&#8776;";
+  return "&#8212;";
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderHeader() {
+  document.getElementById("role-meta").textContent =
+    "role model " + PROFILE.roleModelVersion + " \u00b7 calculated " + new Date(PROFILE.calculatedAt).toLocaleString();
+
+  const s = PROFILE.coreSkillCoverage;
+  document.getElementById("summary").innerHTML =
+    '<div><span class="num">' + s.meetingTarget + "/" + s.total + '</span><span class="lbl">core skills at target</span></div>' +
+    '<div><span class="num" style="color:var(--critical)">' + PROFILE.criticalGaps.length + '</span><span class="lbl">critical</span></div>' +
+    '<div><span class="num">' + PROFILE.unassessedSkills.length + '</span><span class="lbl">need assessment</span></div>';
+}
+
+function renderCoverage() {
+  const core = PROFILE.skills.filter((s) => s.importance === "CORE");
+  document.getElementById("coverage-row").innerHTML = core
+    .map((s) => {
+      const glyph = s.gapStatus === "NO_GAP" ? "&#10003;" : (s.gapStatus === "UNASSESSED" || s.gapStatus === "INSUFFICIENT_EVIDENCE") ? "?" : "!";
+      return '<span class="chip" style="color:' + STATUS_COLOR[s.gapStatus] + '" title="' + STATUS_LABEL[s.gapStatus] + '">' + glyph + " " + escapeHtml(s.skillName) + "</span>";
+    })
+    .join("");
+}
+
+function renderCriticalPanel() {
+  const el = document.getElementById("critical-panel");
+  if (PROFILE.criticalGaps.length === 0) {
+    el.innerHTML = '<div class="panel-title">Critical for this role</div><p style="color:var(--muted);font-size:13px;margin:8px 0 0;">No critical gaps right now.</p>';
+    return;
+  }
+  el.innerHTML =
+    '<div class="panel-title" style="color:var(--critical)">Critical for this role</div>' +
+    '<div style="margin-top:10px;">' +
+    PROFILE.criticalGaps
+      .map(
+        (g) =>
+          '<div class="critical-row"><span>' + escapeHtml(g.skillName) + '</span><span class="delta">' +
+          g.currentState.label + " \u2192 " + g.targetState.label + "</span></div>",
+      )
+      .join("") +
+    "</div>";
+}
+
+function renderUnassessedPanel() {
+  const el = document.getElementById("unassessed-panel");
+  if (PROFILE.unassessedSkills.length === 0) {
+    el.style.display = "none";
+    return;
+  }
+  el.innerHTML =
+    '<div class="panel-title">Needs assessment</div>' +
+    '<p style="color:var(--muted);font-size:12.5px;margin:6px 0 0;">No meaningful evidence yet - this is not the same as a weak result.</p>' +
+    '<div style="margin-top:10px;">' +
+    PROFILE.unassessedSkills.map((s) => '<div class="unassessed-row">? ' + escapeHtml(s.skillName) + "</div>").join("") +
+    "</div>";
+}
+
+let currentFilter = "priority";
+let expandedId = null;
+
+function renderTabs() {
+  const tabs = [
+    ["priority", "Priority (" + PROFILE.priorityGaps.length + ")"],
+    ["all", "All skills (" + PROFILE.skills.length + ")"],
+    ["needs-assessment", "Needs assessment (" + PROFILE.unassessedSkills.length + ")"],
+  ];
+  document.getElementById("tabs").innerHTML = tabs
+    .map(
+      ([value, label]) =>
+        '<button class="tab' + (currentFilter === value ? " active" : "") + '" data-filter="' + value + '">' + label + "</button>",
+    )
+    .join("");
+  document.querySelectorAll(".tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentFilter = btn.getAttribute("data-filter");
+      renderTabs();
+      renderSkillList();
+    });
+  });
+}
+
+function skillsForFilter() {
+  if (currentFilter === "priority") return PROFILE.priorityGaps;
+  if (currentFilter === "needs-assessment") return PROFILE.unassessedSkills;
+  return PROFILE.skills;
+}
+
+function renderSkillList() {
+  const list = skillsForFilter();
+  const container = document.getElementById("skill-list");
+  if (list.length === 0) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:13.5px;">Nothing in this view right now.</p>';
+    return;
+  }
+  container.innerHTML = list.map((skill) => skillCardHtml(skill)).join("");
+  container.querySelectorAll(".skill-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const id = card.getAttribute("data-id");
+      expandedId = expandedId === id ? null : id;
+      renderSkillList();
+    });
+  });
+}
+
+function skillCardHtml(skill) {
+  const pct = (n) => Math.min(100, (n / MAX_LEVEL) * 100) + "%";
+  const isExpanded = expandedId === skill.skillId;
+  const fill =
+    skill.currentState.masteryLevel !== null
+      ? '<div class="bar-fill" style="width:' + pct(skill.currentState.masteryLevel) + ";background:" + STATUS_COLOR[skill.gapStatus] + '"></div>'
+      : "";
+  const detail = isExpanded
+    ? '<div class="detail">' +
+      "<p>" + escapeHtml(skill.aiExplanation || skill.explanation.summarySentence) + "</p>" +
+      (skill.explanation.trendNote ? '<p class="note">' + escapeHtml(skill.explanation.trendNote) + "</p>" : "") +
+      '<div class="detail-meta">' +
+      '<span>Evidence: <b>' + skill.evidenceSummary.totalCount + "</b> (" + skill.evidenceSummary.diversity + " distinct)</span>" +
+      '<span>Closure: <b>' + skill.closureState + "</b></span>" +
+      '<span>Priority rank: <b>' + (skill.priorityRank ?? "-") + "</b></span>" +
+      (skill.dependency.isRootGap ? '<span class="badge badge--critical">Root cause</span>' : "") +
+      (skill.dependency.blockedBy.length > 0 ? "<span>Blocked by " + skill.dependency.blockedBy.length + " prerequisite skill(s)</span>" : "") +
+      "</div></div>"
+    : "";
+
+  return (
+    '<div class="card skill-card' + (isExpanded ? " expanded" : "") + '" data-id="' + skill.skillId + '">' +
+    '<div class="skill-head">' +
+    '<div class="skill-name-col"><div class="skill-name">' + escapeHtml(skill.skillName) + '</div>' +
+    '<div class="skill-importance">' + skill.importance.charAt(0) + skill.importance.slice(1).toLowerCase() + "</div></div>" +
+    '<div class="bar-col"><div class="bar-track">' + fill + '<div class="bar-target" style="left:' + pct(skill.targetState.masteryLevel) + '"></div></div>' +
+    '<div class="bar-labels"><span>' + skill.currentState.label + '</span><span>target: ' + skill.targetState.label + "</span></div></div>" +
+    '<span class="' + badgeClass(skill.severity) + '">' + STATUS_LABEL[skill.gapStatus] + "</span>" +
+    '<span class="trend-col" title="Trend: ' + skill.trend + '">' + trendGlyph(skill.trend) + "</span>" +
+    '<div class="conf-col">confidence ' + Math.round(skill.confidence * 100) + "%</div>" +
+    "</div>" +
+    detail +
+    "</div>"
+  );
+}
+
+renderHeader();
+renderCoverage();
+renderCriticalPanel();
+renderUnassessedPanel();
+renderTabs();
+renderSkillList();
+</script>
+</body>
+</html>

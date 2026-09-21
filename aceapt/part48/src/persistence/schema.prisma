@@ -1,0 +1,62 @@
+// Reference schema for wiring Feature 48 into a real Postgres-backed ACEAPT deployment.
+//
+// The runtime demo in this project uses the in-memory repositories in repositories.ts, which
+// implement the exact same HintInteractionRepository / HintOutcomeRepository /
+// HintPreferenceRepository interfaces — so nothing here needs to exist for `npm run dev` or
+// `npm test` to work. When you're ready to persist for real: generate a Prisma client from this
+// file, write PrismaHintInteractionRepository etc. behind the existing interfaces, and swap the
+// wiring in src/index.ts. No other layer changes.
+//
+// Deliberately minimal, per §68 ("do not store unnecessary data") — this does not duplicate
+// Student, Session, Problem, or Skill tables, which are assumed to already exist in ACEAPT.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model HintInteraction {
+  id                    String       @id @default(cuid())
+  sessionId             String
+  studentId             String
+  problemId             String
+  stepId                String
+  attemptContextVersion Int
+  trigger               String // TriggerType
+  blockType             String // BlockType
+  hintType              String // HintType
+  hintLevel             Int
+  strategyTag           String
+  revealsAnswer         Boolean      @default(false)
+  message                String
+  rationale              String?
+  requestedOrAutomatic   String // "REQUESTED" | "AUTOMATIC"
+  shownAt                DateTime     @default(now())
+  outcome                HintOutcome?
+
+  @@index([sessionId, problemId, stepId])
+  @@index([studentId])
+}
+
+model HintOutcome {
+  id                     String          @id @default(cuid())
+  interaction             HintInteraction @relation(fields: [interactionId], references: [id])
+  interactionId           String          @unique
+  result                  String // HintOutcomeResult
+  timeToRecoveryMs        Int?
+  subsequentIndependence  Boolean?
+  recordedAt              DateTime        @default(now())
+}
+
+model HintPreference {
+  studentId          String   @id
+  prefersShortHints  Boolean?
+  prefersExamples    Boolean?
+  prefersStepGuidance Boolean?
+  prefersQuestions   Boolean?
+  updatedAt          DateTime @updatedAt
+}

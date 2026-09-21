@@ -1,0 +1,141 @@
+{
+  "id": "proj_notification_service_v1",
+  "title": "Production Notification Service",
+  "role": "backend",
+  "projectType": "backend_service",
+  "difficulty": "advanced",
+  "timeEstimateMinutes": 90,
+  "skills": [
+    "api_design",
+    "testing",
+    "error_handling",
+    "database",
+    "reliability"
+  ],
+  "requirements": {
+    "businessGoal": "Notify students automatically when their job application status changes, without duplicate or lost notifications.",
+    "functionalRequirements": [
+      "Expose an internal API that accepts a status-change event for an application.",
+      "Deliver a notification to the affected student for each status change.",
+      "Record notification history per student.",
+      "Prevent duplicate notifications for the same status-change event."
+    ],
+    "nonFunctionalRequirements": [
+      "The service must remain correct under concurrent status-change events for the same application.",
+      "A failed delivery must not silently disappear — it must be retryable or visible in history as failed."
+    ],
+    "assumptions": [
+      "Notification channel (email/SMS/push) is not specified and is left to the student to decide and justify."
+    ],
+    "ambiguities": [
+      "Notification channel is unspecified.",
+      "Retry policy on delivery failure is unspecified.",
+      "Whether delivery is synchronous or asynchronous is unspecified."
+    ],
+    "constraints": [
+      "Duplicate applications for the same job by the same student are already prohibited upstream — this service only handles the notification concern.",
+      "Unauthorized callers must not be able to trigger notifications for students they don't own."
+    ],
+    "edgeCases": [
+      "Status changes twice in rapid succession before the first notification is delivered.",
+      "The same status-change event is submitted twice due to an upstream retry.",
+      "The student record no longer exists at delivery time."
+    ],
+    "acceptanceCriteriaSummary": [
+      "A status change produces exactly one notification record, even under retries.",
+      "Notification history is queryable per student.",
+      "Unauthorized requests are rejected."
+    ]
+  },
+  "rubricId": "rubric_backend_service_v1",
+  "rubric": {
+    "id": "rubric_backend_service_v1",
+    "name": "Backend Service — Advanced",
+    "categories": [
+      {
+        "key": "functionality",
+        "label": "Functionality",
+        "weight": 30
+      },
+      {
+        "key": "testing",
+        "label": "Testing",
+        "weight": 20
+      },
+      {
+        "key": "security",
+        "label": "Security",
+        "weight": 15
+      },
+      {
+        "key": "architecture",
+        "label": "Architecture / Design",
+        "weight": 15
+      },
+      {
+        "key": "code_quality",
+        "label": "Code Quality",
+        "weight": 10
+      },
+      {
+        "key": "documentation",
+        "label": "Documentation",
+        "weight": 10
+      }
+    ]
+  },
+  "acceptanceCriteria": [
+    {
+      "id": "ac_visible_1",
+      "requirementRef": "Expose an internal API that accepts a status-change event.",
+      "description": "POST /events/status-change accepts a valid event and returns 202.",
+      "testType": "visible",
+      "expectedBehavior": "Returns 202 with an event id."
+    },
+    {
+      "id": "ac_visible_2",
+      "requirementRef": "Deliver a notification to the affected student.",
+      "description": "A single status-change event results in exactly one notification record.",
+      "testType": "visible",
+      "expectedBehavior": "notification_history has exactly 1 row for the event."
+    },
+    {
+      "id": "ac_hidden_1",
+      "requirementRef": "Prevent duplicate notifications for the same status-change event.",
+      "description": "Submitting the identical event twice (simulated network retry) still produces exactly one notification.",
+      "testType": "hidden",
+      "expectedBehavior": "notification_history has exactly 1 row after 2 identical submissions."
+    },
+    {
+      "id": "ac_hidden_2",
+      "requirementRef": "Unauthorized callers must not trigger notifications for students they don't own.",
+      "description": "A caller without ownership of the student record is rejected.",
+      "testType": "hidden",
+      "expectedBehavior": "Returns 403, no notification record created."
+    },
+    {
+      "id": "ac_hidden_3",
+      "requirementRef": "The service must remain correct under concurrent status-change events.",
+      "description": "Two rapid status-change events for the same application both result in correctly ordered, non-lost notifications.",
+      "testType": "hidden",
+      "expectedBehavior": "notification_history reflects both events in correct order, no lost writes."
+    }
+  ],
+  "securityRequirements": [
+    "Caller authorization must be verified server-side, not trusted from a client-supplied student_id.",
+    "No secrets or internal identifiers leaked in API error responses."
+  ],
+  "performanceRequirements": [
+    "POST /events/status-change should respond in under 300ms under normal load, excluding actual delivery latency."
+  ],
+  "documentationRequirements": [
+    "README explaining the chosen delivery model (sync/async), retry policy, and idempotency strategy, with reasoning."
+  ],
+  "supportedLanguages": [
+    "typescript",
+    "python",
+    "go",
+    "java"
+  ],
+  "passThreshold": 70
+}

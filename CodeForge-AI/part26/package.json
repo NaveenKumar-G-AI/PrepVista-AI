@@ -1,0 +1,37 @@
+{
+  "name": "codeforge-skill-signal-engine",
+  "version": "1.0.0",
+  "description": "CodeForge AI — Skill Signal Intelligence Engine: evidence-based, confidence-aware skill signals.",
+  "type": "module",
+  "main": "dist/engine/pipeline.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:unit": "vitest run tests/engine-core.test.ts tests/state-trend.test.ts tests/idempotency.test.ts",
+    "test:integration": "vitest run tests/golden-scenario.integration.test.ts tests/security.integration.test.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p frontend/tsconfig.json",
+    "build": "tsc",
+    "dev:api": "tsx src/api/start.ts",
+    "migrate": "node scripts/run-migrations.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/sensible": "^6.0.5",
+    "fastify": "^5.12.1",
+    "pg": "^8.23.0",
+    "tsx": "^4.23.12",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.2.18",
+    "react": "^19.2.8",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

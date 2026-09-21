@@ -10,7 +10,7 @@ from pypdf import PdfReader
 from fastapi import HTTPException
 
 from app.config import get_settings
-from app.services.llm import call_llm_json
+from app.services.llm import call_llm_json, llm_error_code
 from app.services.prompts import build_resume_extraction_prompt
 
 logger = structlog.get_logger("prepvista.resume")
@@ -216,7 +216,7 @@ def _ocr_pdf(pdf_bytes: bytes) -> str:
         logger.info("pdf_ocr_unavailable", reason="pytesseract/pdf2image not installed")
         return ""
     try:
-        images = convert_from_bytes(pdf_bytes, dpi=200, fmt="png")
+        images = convert_from_bytes(pdf_bytes, dpi=200, fmt="png", first_page=1, last_page=_MAX_OCR_PDF_PAGES)
     except Exception as e:  # poppler missing or corrupt PDF
         logger.warning("pdf_ocr_convert_failed", error=str(e))
         return ""
@@ -412,20 +412,126 @@ def validate_pdf_upload(file_bytes: bytes, filename: str):
 
 
 async def parse_resume_structured(resume_text: str) -> dict:
-    """Extract structured resume data using LLM."""
+    """Extract source-backed claims and preserve failure separately from no claims."""
     try:
         prompt = build_resume_extraction_prompt(resume_text)
         result = await call_llm_json(
             [{"role": "system", "content": prompt}],
             temperature=0.1,
+            max_tokens=2000,
+            timeout=15.0,
+            retries=2,
+            allow_provider_fallback=False,
         )
-        # Validate minimum structure
-        if not isinstance(result, dict):
-            return _default_resume_summary(resume_text)
-        return enrich_resume_summary(result, resume_text=resume_text)
+        if not isinstance(result, dict) or not all(isinstance(result.get(key), list) for key in ("skills", "projects")):
+            return _default_resume_summary(resume_text, error_code="RESUME_INVALID_SCHEMA")
+        summary, dropped = _validate_resume_claims(result, resume_text)
+        has_claims = any(summary[key] for key in ("skills", "education", "projects", "experience", "certifications", "programming_languages"))
+        if dropped and not has_claims:
+            return _default_resume_summary(resume_text, error_code="RESUME_UNGROUNDED_RESPONSE")
+        if dropped:
+            status = "PARTIAL"
+        elif has_claims:
+            status = "AVAILABLE"
+        else:
+            status = "NO_CLAIMS"
+        summary["resume_extraction"] = _extraction_metadata(status, summary, dropped_fields=dropped)
+        return enrich_resume_summary(summary, resume_text=resume_text)
     except Exception as e:
-        logger.warning("resume_extraction_failed", error=str(e))
-        return _default_resume_summary(resume_text)
+        code = llm_error_code(e).replace("EVALUATION_", "RESUME_", 1)
+        logger.warning("resume_extraction_failed", error_code=code)
+        return _default_resume_summary(resume_text, error_code=code)
+
+
+def _source_excerpt(value: object, resume_text: str, max_length: int) -> str | None:
+    """Copy an exact source span; tolerate casing/whitespace, never fuzzy claims."""
+    if not isinstance(value, str) or not value.strip() or len(value) > max_length:
+        return None
+    # Do not turn JavaScript into Java or C++ into C. Return original spelling.
+    pattern = r"(?<![\w+#])" + r"\s+".join(re.escape(part) for part in value.split()) + r"(?![\w+#])"
+    match = re.search(pattern, resume_text, re.I)
+    return " ".join(match.group().split()) if match else None
+
+
+def _validate_resume_claims(result: dict, resume_text: str) -> tuple[dict, list[str]]:
+    """Allow only the parser contract, with bounded, source-backed text fields."""
+    dropped: list[str] = []
+
+    def text_list(value: object, path: str, max_length: int = 120) -> list[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            dropped.append(path)
+            return []
+        if len(value) > 64:
+            dropped.append(path)
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in value[:64]:
+            text = _source_excerpt(item, resume_text, max_length)
+            if not text:
+                dropped.append(path)
+            elif text.casefold() not in seen:
+                cleaned.append(text)
+                seen.add(text.casefold())
+        return cleaned
+
+    summary = {
+        "candidate_name": result.get("candidate_name") if isinstance(result.get("candidate_name"), str) else None,
+        "skills": text_list(result.get("skills"), "skills"),
+        "education": text_list(result.get("education"), "education", 400),
+        "certifications": text_list(result.get("certifications"), "certifications", 400),
+        "programming_languages": text_list(result.get("programming_languages"), "programming_languages"),
+        "projects": [],
+        "experience": [],
+    }
+    for section, required, optional in (
+        ("projects", "name", ("description",)),
+        ("experience", "title", ("company", "description")),
+    ):
+        items = result.get(section, [])
+        if not isinstance(items, list):
+            dropped.append(section)
+            continue
+        if len(items) > 30:
+            dropped.append(section)
+        for item in items[:30]:
+            if not isinstance(item, dict):
+                dropped.append(section)
+                continue
+            name = _source_excerpt(item.get(required), resume_text, 200)
+            if not name:
+                dropped.append(f"{section}.{required}")
+                continue
+            clean = {required: name}
+            for field in optional:
+                value = item.get(field)
+                text = _source_excerpt(value, resume_text, 1000 if field == "description" else 200)
+                if value and not text:
+                    dropped.append(f"{section}.{field}")
+                clean[field] = text or ""
+            if section == "projects":
+                clean["tech_stack"] = text_list(item.get("tech_stack"), "projects.tech_stack")
+            if clean not in summary[section]:
+                summary[section].append(clean)
+    # Role/field classification is a declared inference, not a resume claim.
+    allowed_roles = {"junior_swe", "mid_swe", "senior_swe", "data_scientist", "product_manager", "designer", "other"}
+    role = result.get("inferred_role")
+    summary["inferred_role"] = role if isinstance(role, str) and role in allowed_roles else "other"
+    summary["inferred_role_source"] = "MODEL_INFERENCE"
+    summary["department"] = _source_excerpt(result.get("department"), resume_text, 200)
+    return summary, sorted(set(dropped))
+
+
+def _extraction_metadata(status: str, summary: dict, *, error_code: str | None = None, dropped_fields: list[str] | None = None) -> dict:
+    return {
+        "version": 1,
+        "status": status,
+        "error_code": error_code,
+        "skill_count": len(summary.get("skills") or []),
+        "project_count": len(summary.get("projects") or []),
+        "dropped_fields": dropped_fields or [],
+    }
 
 
 def _collect_resume_signal_parts(summary: dict) -> tuple[str, list[str]]:
@@ -556,9 +662,9 @@ def enrich_resume_summary(summary: dict | None, resume_text: str = "") -> dict:
     return base
 
 
-def _default_resume_summary(resume_text: str) -> dict:
+def _default_resume_summary(resume_text: str, error_code: str = "RESUME_EXTRACTION_UNAVAILABLE") -> dict:
     """Fallback resume summary when LLM extraction fails."""
-    return enrich_resume_summary({
+    summary = enrich_resume_summary({
         "candidate_name": None,
         "education": [],
         "skills": [],
@@ -568,3 +674,5 @@ def _default_resume_summary(resume_text: str) -> dict:
         "certifications": [],
         "programming_languages": [],
     }, resume_text=resume_text)
+    summary["resume_extraction"] = _extraction_metadata("FAILED", summary, error_code=error_code)
+    return summary

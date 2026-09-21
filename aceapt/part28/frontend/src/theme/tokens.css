@@ -1,0 +1,86 @@
+/* ACEAPT PROOF — design tokens.
+   Concept: an audit ledger crossed with a scientific measuring instrument —
+   fitting for a feature whose entire premise is "don't claim it, demonstrate
+   it." Signature visual is the Evidence Stack (EvidenceStackVisual.tsx): a
+   row of measured bars crossing a verification line, not a generic radar
+   chart or gauge.
+
+   Typography: Fraunces (a display serif with a stamped/certificate
+   character) is used ONLY for the verdict headline and evidence-dimension
+   names — restraint matters here. IBM Plex Sans carries all body/UI text
+   (Plex's own heritage is technical documentation, which fits an
+   evidence-based product). IBM Plex Mono renders every number — scores,
+   percentages, durations, timestamps — so precision reads as precision.
+
+   Color: a cool stone paper instead of a warm cream, graphite-navy ink
+   instead of near-black, a verdigris accent for "verified" (deliberately
+   not a generic green-success or acid accent), and a warm ochre for
+   "evidence gap" (an attention color, not an alarm-red "error" color,
+   since a gap in PROOF's own language is a next step, not a failure). */
+
+:root {
+  --proof-paper: #eef0ea;
+  --proof-paper-raised: #f7f8f4;
+  --proof-ink: #1b1f27;
+  --proof-ink-soft: #4a4e45;
+  --proof-verified: #1f6f5c;
+  --proof-verified-soft: #e4efe9;
+  --proof-gap: #b8792e;
+  --proof-gap-soft: #f5e9d8;
+  --proof-evidence-empty: #d8dac2;
+  --proof-line: #c7cabd;
+  --proof-line-strong: #9a9d8f;
+
+  --proof-font-display: 'Fraunces', Georgia, serif;
+  --proof-font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --proof-font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+
+  --proof-radius: 3px;
+  --proof-space-1: 4px;
+  --proof-space-2: 8px;
+  --proof-space-3: 16px;
+  --proof-space-4: 24px;
+  --proof-space-5: 40px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --proof-paper: #14171c;
+    --proof-paper-raised: #1b1f26;
+    --proof-ink: #eceee8;
+    --proof-ink-soft: #a7ab9e;
+    --proof-verified: #4fa38a;
+    --proof-verified-soft: #1c2b26;
+    --proof-gap: #d99a4e;
+    --proof-gap-soft: #2e2418;
+    --proof-evidence-empty: #33362d;
+    --proof-line: #363a30;
+    --proof-line-strong: #4d5142;
+  }
+}
+
+.proof-root {
+  background: var(--proof-paper);
+  color: var(--proof-ink);
+  font-family: var(--proof-font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.proof-numeric {
+  font-family: var(--proof-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.proof-display {
+  font-family: var(--proof-font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proof-root * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

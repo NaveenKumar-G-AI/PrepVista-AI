@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+  Design direction: "the instrument, not the verdict."
+
+  ACEAPT's whole thesis is that capability should be shown as calibrated
+  evidence (an 8-step ladder, foundation/application/transfer, speed
+  separate from accuracy) rather than collapsed into one score. The visual
+  language borrows from measurement instruments and lab notebooks — a cool,
+  precise paper tone rather than a warm cream backdrop, a single brass
+  accent standing in for "confirmed by evidence," and a segmented gauge
+  (see EvidenceBar.tsx) as the recurring signature element, used nowhere
+  else but here because it IS the product's core idea made visible.
+*/
+
+@theme {
+  --color-ink: #17213a;
+  --color-ink-soft: #4b5568;
+  --color-ink-faint: #8993a8;
+  --color-paper: #eef1ee;
+  --color-paper-dim: #e3e7e2;
+  --color-surface: #ffffff;
+  --color-brass: #b8863a;
+  --color-brass-strong: #97692a;
+  --color-brass-soft: #ecdfc4;
+  --color-steel: #5b6b8c;
+  --color-steel-soft: #dde2ea;
+  --color-line: #d7dcd6;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html {
+  background-color: var(--color-paper);
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--color-brass-soft);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-steel);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}

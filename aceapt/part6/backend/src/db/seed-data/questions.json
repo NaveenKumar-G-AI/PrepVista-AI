@@ -1,0 +1,2247 @@
+[
+  {
+    "id": "arith_001",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "percentages",
+    "difficulty": "EASY",
+    "prompt": "What is 24% of 150?",
+    "options": [
+      {
+        "id": "A",
+        "text": "30"
+      },
+      {
+        "id": "B",
+        "text": "36"
+      },
+      {
+        "id": "C",
+        "text": "40"
+      },
+      {
+        "id": "D",
+        "text": "45"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "24% of 150 = (24/100) x 150 = 36.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_002",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "averages",
+    "difficulty": "EASY",
+    "prompt": "Find the average of 12, 18, 24, 30, 36.",
+    "options": [
+      {
+        "id": "A",
+        "text": "20"
+      },
+      {
+        "id": "B",
+        "text": "26"
+      },
+      {
+        "id": "C",
+        "text": "24"
+      },
+      {
+        "id": "D",
+        "text": "30"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Sum = 120, count = 5, average = 120/5 = 24.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "averages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_003",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "ratio-proportion",
+    "difficulty": "EASY",
+    "prompt": "Rs. 720 is divided between A and B in the ratio 5:4. How much does B get?",
+    "options": [
+      {
+        "id": "A",
+        "text": "400"
+      },
+      {
+        "id": "B",
+        "text": "320"
+      },
+      {
+        "id": "C",
+        "text": "360"
+      },
+      {
+        "id": "D",
+        "text": "300"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Total parts = 5+4 = 9. B's share = (4/9) x 720 = 320.",
+    "expectedTimeSeconds": 50,
+    "health": "HEALTHY",
+    "tags": [
+      "ratio",
+      "proportion"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_004",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "profit-loss",
+    "difficulty": "MEDIUM",
+    "prompt": "A shopkeeper buys a table for Rs. 800 and sells it for Rs. 960. Find the profit percentage.",
+    "options": [
+      {
+        "id": "A",
+        "text": "15%"
+      },
+      {
+        "id": "B",
+        "text": "20%"
+      },
+      {
+        "id": "C",
+        "text": "25%"
+      },
+      {
+        "id": "D",
+        "text": "18%"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Profit = 960 - 800 = 160. Profit% = (160/800) x 100 = 20%.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "profit-loss",
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_005",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "percentages",
+    "difficulty": "MEDIUM",
+    "prompt": "A city's population increased from 25,000 to 30,000. What is the percentage increase?",
+    "options": [
+      {
+        "id": "A",
+        "text": "16%"
+      },
+      {
+        "id": "B",
+        "text": "22%"
+      },
+      {
+        "id": "C",
+        "text": "20%"
+      },
+      {
+        "id": "D",
+        "text": "30%"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Increase = 5,000. % increase = (5000/25000) x 100 = 20%.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_006",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "time-speed-distance",
+    "difficulty": "MEDIUM",
+    "prompt": "A car travels 180 km in 3 hours. What is its average speed in km/h?",
+    "options": [
+      {
+        "id": "A",
+        "text": "50"
+      },
+      {
+        "id": "B",
+        "text": "55"
+      },
+      {
+        "id": "C",
+        "text": "60"
+      },
+      {
+        "id": "D",
+        "text": "65"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Speed = Distance / Time = 180 / 3 = 60 km/h.",
+    "expectedTimeSeconds": 70,
+    "health": "HEALTHY",
+    "tags": [
+      "time-speed-distance"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_007",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "percentages",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "The price of an item is first increased by 20% and then decreased by 10%. What is the overall percentage change?",
+    "options": [
+      {
+        "id": "A",
+        "text": "+10%"
+      },
+      {
+        "id": "B",
+        "text": "+12%"
+      },
+      {
+        "id": "C",
+        "text": "+8%"
+      },
+      {
+        "id": "D",
+        "text": "+6%"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Net multiplier = 1.20 x 0.90 = 1.08, an overall increase of 8% (successive % changes do not simply add).",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "percentages",
+      "successive-change"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_008",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "simple-interest",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "A sum of Rs. 5,000 earns simple interest of Rs. 1,200 in 4 years. What is the annual rate of interest?",
+    "options": [
+      {
+        "id": "A",
+        "text": "5%"
+      },
+      {
+        "id": "B",
+        "text": "6%"
+      },
+      {
+        "id": "C",
+        "text": "8%"
+      },
+      {
+        "id": "D",
+        "text": "7%"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "SI = P x R x T / 100, so R = (SI x 100) / (P x T) = (1200 x 100) / (5000 x 4) = 6%.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "simple-interest"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_009",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "averages",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "The average age of 8 people is 25 years. A new person joins and the average becomes 26 years. What is the new person's age?",
+    "options": [
+      {
+        "id": "A",
+        "text": "28"
+      },
+      {
+        "id": "B",
+        "text": "30"
+      },
+      {
+        "id": "C",
+        "text": "32"
+      },
+      {
+        "id": "D",
+        "text": "34"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Old total = 25x8 = 200. New total = 26x9 = 234. New person's age = 234 - 200 = 34.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "averages"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_010",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "compound-interest",
+    "difficulty": "HARD",
+    "prompt": "Find the compound interest on Rs. 10,000 for 2 years at 10% per annum, compounded annually.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Rs. 2,000"
+      },
+      {
+        "id": "B",
+        "text": "Rs. 2,200"
+      },
+      {
+        "id": "C",
+        "text": "Rs. 2,500"
+      },
+      {
+        "id": "D",
+        "text": "Rs. 2,100"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Amount = 10000 x (1.10)^2 = 12,100. Compound Interest = 12,100 - 10,000 = Rs. 2,100.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "compound-interest"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_011",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "time-and-work",
+    "difficulty": "HARD",
+    "prompt": "A can complete a piece of work in 12 days and B can complete it in 24 days. Working together, how many days will they take?",
+    "options": [
+      {
+        "id": "A",
+        "text": "6"
+      },
+      {
+        "id": "B",
+        "text": "10"
+      },
+      {
+        "id": "C",
+        "text": "9"
+      },
+      {
+        "id": "D",
+        "text": "8"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "A's rate = 1/12/day, B's rate = 1/24/day. Combined = 1/12 + 1/24 = 3/24 = 1/8, so together they take 8 days.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "time-and-work"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "arith_012",
+    "domain": "QUANTITATIVE",
+    "topic": "ARITHMETIC",
+    "skill": "relative-speed",
+    "difficulty": "HARD",
+    "prompt": "Two trains, 125 m and 100 m long, run in opposite directions on parallel tracks at 45 km/h and 36 km/h respectively. How many seconds will they take to cross each other completely?",
+    "options": [
+      {
+        "id": "A",
+        "text": "8 seconds"
+      },
+      {
+        "id": "B",
+        "text": "12 seconds"
+      },
+      {
+        "id": "C",
+        "text": "15 seconds"
+      },
+      {
+        "id": "D",
+        "text": "10 seconds"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Relative speed (opposite directions) = 45+36 = 81 km/h = 81 x 5/18 = 22.5 m/s. Total length = 225 m. Time = 225/22.5 = 10 s.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "relative-speed",
+      "trains"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_001",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "linear-equations",
+    "difficulty": "EASY",
+    "prompt": "Solve for x: 3x + 5 = 20",
+    "options": [
+      {
+        "id": "A",
+        "text": "4"
+      },
+      {
+        "id": "B",
+        "text": "5"
+      },
+      {
+        "id": "C",
+        "text": "6"
+      },
+      {
+        "id": "D",
+        "text": "3"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "3x = 20 - 5 = 15, so x = 5.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "linear-equations"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_002",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "algebraic-expressions",
+    "difficulty": "EASY",
+    "prompt": "If x = 4, what is the value of 2x^2 + 3?",
+    "options": [
+      {
+        "id": "A",
+        "text": "19"
+      },
+      {
+        "id": "B",
+        "text": "29"
+      },
+      {
+        "id": "C",
+        "text": "35"
+      },
+      {
+        "id": "D",
+        "text": "40"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "2(4)^2 + 3 = 2(16) + 3 = 32 + 3 = 35.",
+    "expectedTimeSeconds": 50,
+    "health": "HEALTHY",
+    "tags": [
+      "algebraic-expressions"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_003",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "age-problems",
+    "difficulty": "MEDIUM",
+    "prompt": "Rahul is twice as old as his son. If the son is 15 years old, what is Rahul's age?",
+    "options": [
+      {
+        "id": "A",
+        "text": "25"
+      },
+      {
+        "id": "B",
+        "text": "28"
+      },
+      {
+        "id": "C",
+        "text": "32"
+      },
+      {
+        "id": "D",
+        "text": "30"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Rahul's age = 2 x 15 = 30 years.",
+    "expectedTimeSeconds": 70,
+    "health": "HEALTHY",
+    "tags": [
+      "age-problems"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_004",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "linear-equations",
+    "difficulty": "MEDIUM",
+    "prompt": "A number increased by 12 equals thrice the number decreased by 6. Find the number.",
+    "options": [
+      {
+        "id": "A",
+        "text": "6"
+      },
+      {
+        "id": "B",
+        "text": "12"
+      },
+      {
+        "id": "C",
+        "text": "15"
+      },
+      {
+        "id": "D",
+        "text": "9"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "x + 12 = 3x - 6  ->  18 = 2x  ->  x = 9.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "linear-equations",
+      "word-problem"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_005",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "simultaneous-equations",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "If x + y = 15 and x - y = 5, what is the value of x?",
+    "options": [
+      {
+        "id": "A",
+        "text": "5"
+      },
+      {
+        "id": "B",
+        "text": "7"
+      },
+      {
+        "id": "C",
+        "text": "12"
+      },
+      {
+        "id": "D",
+        "text": "10"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Adding the two equations: 2x = 20, so x = 10 (and y = 5).",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "simultaneous-equations"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_006",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "age-problems",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "The ages of P and Q are in the ratio 3:4. If the sum of their ages is 35 years, what is Q's age?",
+    "options": [
+      {
+        "id": "A",
+        "text": "15"
+      },
+      {
+        "id": "B",
+        "text": "18"
+      },
+      {
+        "id": "C",
+        "text": "21"
+      },
+      {
+        "id": "D",
+        "text": "20"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Total parts = 3+4 = 7. Q's age = (4/7) x 35 = 20 years.",
+    "expectedTimeSeconds": 105,
+    "health": "HEALTHY",
+    "tags": [
+      "age-problems",
+      "ratio"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_007",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "quadratic-equations",
+    "difficulty": "HARD",
+    "prompt": "If x^2 - 7x + 12 = 0, what is the sum of the two roots of the equation?",
+    "options": [
+      {
+        "id": "A",
+        "text": "12"
+      },
+      {
+        "id": "B",
+        "text": "5"
+      },
+      {
+        "id": "C",
+        "text": "-7"
+      },
+      {
+        "id": "D",
+        "text": "7"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Factoring: x^2-7x+12 = (x-3)(x-4) = 0, so the roots are 3 and 4, and their sum is 7. (Also confirmed by -b/a = 7.)",
+    "expectedTimeSeconds": 140,
+    "health": "HEALTHY",
+    "tags": [
+      "quadratic-equations"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "alg_008",
+    "domain": "QUANTITATIVE",
+    "topic": "ALGEBRA",
+    "skill": "linear-equations",
+    "difficulty": "HARD",
+    "prompt": "A boat travels downstream at a speed of (x+4) km/h and covers 36 km in 2 hours. What is the value of x?",
+    "options": [
+      {
+        "id": "A",
+        "text": "12"
+      },
+      {
+        "id": "B",
+        "text": "16"
+      },
+      {
+        "id": "C",
+        "text": "10"
+      },
+      {
+        "id": "D",
+        "text": "14"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "(x+4) x 2 = 36  ->  x+4 = 18  ->  x = 14.",
+    "expectedTimeSeconds": 140,
+    "health": "HEALTHY",
+    "tags": [
+      "linear-equations",
+      "word-problem"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_001",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "EASY",
+    "prompt": "What is the next number in the series: 4, 8, 12, 16, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "18"
+      },
+      {
+        "id": "B",
+        "text": "20"
+      },
+      {
+        "id": "C",
+        "text": "22"
+      },
+      {
+        "id": "D",
+        "text": "24"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Each term increases by 4: 4, 8, 12, 16, 20.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_002",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "EASY",
+    "prompt": "What is the next number in the series: 3, 6, 12, 24, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "36"
+      },
+      {
+        "id": "B",
+        "text": "42"
+      },
+      {
+        "id": "C",
+        "text": "48"
+      },
+      {
+        "id": "D",
+        "text": "60"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term doubles the previous one: 3, 6, 12, 24, 48.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_003",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "EASY",
+    "prompt": "What is the next number in the series: 2, 5, 8, 11, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "13"
+      },
+      {
+        "id": "B",
+        "text": "14"
+      },
+      {
+        "id": "C",
+        "text": "15"
+      },
+      {
+        "id": "D",
+        "text": "16"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Each term increases by 3: 2, 5, 8, 11, 14.",
+    "expectedTimeSeconds": 45,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_004",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM",
+    "prompt": "What is the next number in the series: 5, 15, 45, 135, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "270"
+      },
+      {
+        "id": "B",
+        "text": "360"
+      },
+      {
+        "id": "C",
+        "text": "405"
+      },
+      {
+        "id": "D",
+        "text": "450"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term is multiplied by 3: 5, 15, 45, 135, 405.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_005",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM",
+    "prompt": "Find the missing number: 7, 14, ?, 28, 35",
+    "options": [
+      {
+        "id": "A",
+        "text": "20"
+      },
+      {
+        "id": "B",
+        "text": "21"
+      },
+      {
+        "id": "C",
+        "text": "22"
+      },
+      {
+        "id": "D",
+        "text": "24"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The series increases by 7 each time: 7, 14, 21, 28, 35.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_006",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "letter-series",
+    "difficulty": "MEDIUM",
+    "prompt": "What comes next in the series: B, D, F, H, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "G"
+      },
+      {
+        "id": "B",
+        "text": "I"
+      },
+      {
+        "id": "C",
+        "text": "J"
+      },
+      {
+        "id": "D",
+        "text": "K"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "One letter is skipped each time (B_D_F_H_J): B, D, F, H, J.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "letter-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_007",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "What is the next number in the series: 1, 2, 4, 7, 11, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "15"
+      },
+      {
+        "id": "B",
+        "text": "16"
+      },
+      {
+        "id": "C",
+        "text": "17"
+      },
+      {
+        "id": "D",
+        "text": "18"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The differences between terms increase by 1 each time (1,2,3,4), so the next difference is 5: 11+5 = 16.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_008",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "What is the next number in the series: 2, 3, 5, 8, 13, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "18"
+      },
+      {
+        "id": "B",
+        "text": "20"
+      },
+      {
+        "id": "C",
+        "text": "21"
+      },
+      {
+        "id": "D",
+        "text": "23"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term is the sum of the two preceding terms (a Fibonacci-style pattern): 8+13 = 21.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_009",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "HARD",
+    "prompt": "What is the next number in the series: 2, 6, 12, 20, 30, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "36"
+      },
+      {
+        "id": "B",
+        "text": "40"
+      },
+      {
+        "id": "C",
+        "text": "42"
+      },
+      {
+        "id": "D",
+        "text": "45"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Each term equals n x (n+1): 1x2, 2x3, 3x4, 4x5, 5x6, 6x7 = 42.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "series_010",
+    "domain": "LOGICAL",
+    "topic": "PATTERNS_SERIES",
+    "skill": "number-series",
+    "difficulty": "HARD",
+    "prompt": "What is the next number in the series: 2, 5, 11, 23, 47, ?",
+    "options": [
+      {
+        "id": "A",
+        "text": "90"
+      },
+      {
+        "id": "B",
+        "text": "94"
+      },
+      {
+        "id": "C",
+        "text": "96"
+      },
+      {
+        "id": "D",
+        "text": "95"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Each term is double the previous term plus 1: 47 x 2 + 1 = 95.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "number-series"
+    ],
+    "createdAt": "2026-08-23T13:47:10.207803+00:00"
+  },
+  {
+    "id": "di_001",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "table-reading",
+    "difficulty": "EASY",
+    "prompt": "Based on the table, in which month was sales highest?",
+    "options": [
+      {
+        "id": "A",
+        "text": "April"
+      },
+      {
+        "id": "B",
+        "text": "June"
+      },
+      {
+        "id": "C",
+        "text": "February"
+      },
+      {
+        "id": "D",
+        "text": "May"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "May had sales of 200 (thousand), the highest value in the table.",
+    "expectedTimeSeconds": 60,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Monthly sales of a store (Rs. thousands):\nJan: 120 | Feb: 150 | Mar: 90 | Apr: 180 | May: 200 | Jun: 160"
+  },
+  {
+    "id": "di_002",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "percentage-change",
+    "difficulty": "MEDIUM",
+    "prompt": "What is the percentage increase in sales from March to April?",
+    "options": [
+      {
+        "id": "A",
+        "text": "50%"
+      },
+      {
+        "id": "B",
+        "text": "80%"
+      },
+      {
+        "id": "C",
+        "text": "100%"
+      },
+      {
+        "id": "D",
+        "text": "120%"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Increase = 180-90 = 90. % increase = (90/90) x 100 = 100%.",
+    "expectedTimeSeconds": 90,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation",
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Monthly sales of a store (Rs. thousands):\nJan: 120 | Feb: 150 | Mar: 90 | Apr: 180 | May: 200 | Jun: 160"
+  },
+  {
+    "id": "di_003",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "averages",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "What is the average monthly sales over the six months shown?",
+    "options": [
+      {
+        "id": "A",
+        "text": "140"
+      },
+      {
+        "id": "B",
+        "text": "145"
+      },
+      {
+        "id": "C",
+        "text": "150"
+      },
+      {
+        "id": "D",
+        "text": "160"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Total = 900. Average = 900/6 = 150.",
+    "expectedTimeSeconds": 120,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation",
+      "averages"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Monthly sales of a store (Rs. thousands):\nJan: 120 | Feb: 150 | Mar: 90 | Apr: 180 | May: 200 | Jun: 160"
+  },
+  {
+    "id": "di_004",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "percentage-share",
+    "difficulty": "HARD",
+    "prompt": "What percentage of the total half-year sales came from Apr-Jun (Q2)?",
+    "options": [
+      {
+        "id": "A",
+        "text": "50%"
+      },
+      {
+        "id": "B",
+        "text": "55%"
+      },
+      {
+        "id": "C",
+        "text": "65%"
+      },
+      {
+        "id": "D",
+        "text": "60%"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Apr+May+Jun = 540. Total = 900. Share = 540/900 x 100 = 60%.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation",
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Monthly sales of a store (Rs. thousands):\nJan: 120 | Feb: 150 | Mar: 90 | Apr: 180 | May: 200 | Jun: 160"
+  },
+  {
+    "id": "di_005",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "table-reading",
+    "difficulty": "EASY",
+    "prompt": "Who scored the most runs?",
+    "options": [
+      {
+        "id": "A",
+        "text": "B"
+      },
+      {
+        "id": "B",
+        "text": "E"
+      },
+      {
+        "id": "C",
+        "text": "A"
+      },
+      {
+        "id": "D",
+        "text": "D"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "D scored 71 runs, the highest total in the table.",
+    "expectedTimeSeconds": 55,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Runs scored by 5 batsmen in a match:\nA: 45 | B: 62 | C: 38 | D: 71 | E: 54"
+  },
+  {
+    "id": "di_006",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "totals",
+    "difficulty": "MEDIUM",
+    "prompt": "What is the total runs scored by all 5 batsmen combined?",
+    "options": [
+      {
+        "id": "A",
+        "text": "260"
+      },
+      {
+        "id": "B",
+        "text": "280"
+      },
+      {
+        "id": "C",
+        "text": "250"
+      },
+      {
+        "id": "D",
+        "text": "270"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "45+62+38+71+54 = 270.",
+    "expectedTimeSeconds": 85,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Runs scored by 5 batsmen in a match:\nA: 45 | B: 62 | C: 38 | D: 71 | E: 54"
+  },
+  {
+    "id": "di_007",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "percentage-share",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "What percentage of the total runs did batsman D score (rounded to the nearest whole percent)?",
+    "options": [
+      {
+        "id": "A",
+        "text": "25%"
+      },
+      {
+        "id": "B",
+        "text": "28%"
+      },
+      {
+        "id": "C",
+        "text": "30%"
+      },
+      {
+        "id": "D",
+        "text": "26%"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "D's share = 71/270 x 100 = 26.30%, which rounds to 26%.",
+    "expectedTimeSeconds": 120,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation",
+      "percentages"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Runs scored by 5 batsmen in a match:\nA: 45 | B: 62 | C: 38 | D: 71 | E: 54"
+  },
+  {
+    "id": "di_008",
+    "domain": "QUANTITATIVE",
+    "topic": "DATA_INTERPRETATION",
+    "skill": "averages",
+    "difficulty": "HARD",
+    "prompt": "If batsman C had scored 15 more runs, what would the new average of all 5 batsmen be?",
+    "options": [
+      {
+        "id": "A",
+        "text": "54"
+      },
+      {
+        "id": "B",
+        "text": "60"
+      },
+      {
+        "id": "C",
+        "text": "52"
+      },
+      {
+        "id": "D",
+        "text": "57"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "New total = 270+15 = 285. New average = 285/5 = 57.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "data-interpretation",
+      "averages"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Runs scored by 5 batsmen in a match:\nA: 45 | B: 62 | C: 38 | D: 71 | E: 54"
+  },
+  {
+    "id": "ar_001",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "arrangement",
+    "difficulty": "EASY",
+    "prompt": "In a queue, Meera is standing 5th from the front and 8th from the end. How many people are in the queue?",
+    "options": [
+      {
+        "id": "A",
+        "text": "13"
+      },
+      {
+        "id": "B",
+        "text": "11"
+      },
+      {
+        "id": "C",
+        "text": "14"
+      },
+      {
+        "id": "D",
+        "text": "12"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Total = (position from front) + (position from end) - 1 = 5 + 8 - 1 = 12.",
+    "expectedTimeSeconds": 60,
+    "health": "HEALTHY",
+    "tags": [
+      "arrangement"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "ar_002",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "comparison",
+    "difficulty": "EASY",
+    "prompt": "Ravi is older than Suman. Suman is older than Kiran. Who is the youngest?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Ravi"
+      },
+      {
+        "id": "B",
+        "text": "Suman"
+      },
+      {
+        "id": "C",
+        "text": "Kiran"
+      },
+      {
+        "id": "D",
+        "text": "Cannot be determined"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "Ravi > Suman > Kiran in age, so Kiran is the youngest.",
+    "expectedTimeSeconds": 50,
+    "health": "HEALTHY",
+    "tags": [
+      "comparison",
+      "ordering"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "ar_003",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "arrangement",
+    "difficulty": "MEDIUM",
+    "prompt": "Four friends P, Q, R, S sit in a row. P is immediately left of Q. R is immediately right of S. S is at the leftmost end, and R is immediately left of P. What is the order from left to right?",
+    "options": [
+      {
+        "id": "A",
+        "text": "P, Q, R, S"
+      },
+      {
+        "id": "B",
+        "text": "S, R, Q, P"
+      },
+      {
+        "id": "C",
+        "text": "Q, R, S, P"
+      },
+      {
+        "id": "D",
+        "text": "S, R, P, Q"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "S is leftmost (position 1). R is immediately right of S, so R is position 2. R is immediately left of P, so P is position 3. P is immediately left of Q, so Q is position 4. Order: S, R, P, Q.",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "arrangement",
+      "seating"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "ar_004",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "direction-sense",
+    "difficulty": "MEDIUM",
+    "prompt": "Anu walks 5 km North, turns right and walks 3 km, then turns right again and walks 5 km. How far is she from her starting point?",
+    "options": [
+      {
+        "id": "A",
+        "text": "5 km"
+      },
+      {
+        "id": "B",
+        "text": "8 km"
+      },
+      {
+        "id": "C",
+        "text": "10 km"
+      },
+      {
+        "id": "D",
+        "text": "3 km"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "North 5km to (0,5); turn right (now facing East) 3km to (3,5); turn right again (now facing South) 5km to (3,0). Distance from (0,0) to (3,0) = 3 km.",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "direction-sense"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "ar_005",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "blood-relations",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "Pointing to a photograph, Rahul said, 'She is the daughter of my grandfather's only son.' How is the woman in the photograph related to Rahul?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Daughter"
+      },
+      {
+        "id": "B",
+        "text": "Mother"
+      },
+      {
+        "id": "C",
+        "text": "Cousin"
+      },
+      {
+        "id": "D",
+        "text": "Sister"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Rahul's grandfather's only son is Rahul's father. The daughter of Rahul's father is Rahul's sister.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "blood-relations"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "ar_006",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "ranking",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "In a class test, Aditi scored higher than Bala. Chetan scored lower than Bala but higher than Deepa. Who scored the lowest?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Chetan"
+      },
+      {
+        "id": "B",
+        "text": "Bala"
+      },
+      {
+        "id": "C",
+        "text": "Aditi"
+      },
+      {
+        "id": "D",
+        "text": "Deepa"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Order from highest to lowest: Aditi > Bala > Chetan > Deepa, so Deepa scored the lowest.",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "ranking"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "ar_007",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "arrangement",
+    "difficulty": "HARD",
+    "prompt": "Six students J, K, L, M, N, O are ranked 1st to 6th in an exam, with no ties. J is ranked immediately above K. L is ranked 3rd. M is ranked immediately below N. O is ranked last (6th). If K is ranked 2nd, what is N's rank?",
+    "options": [
+      {
+        "id": "A",
+        "text": "5th"
+      },
+      {
+        "id": "B",
+        "text": "3rd"
+      },
+      {
+        "id": "C",
+        "text": "6th"
+      },
+      {
+        "id": "D",
+        "text": "4th"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "K=2nd, and J immediately above K means J=1st. L=3rd and O=6th are fixed. The remaining ranks 4 and 5 go to N and M. Since M is immediately below N, N=4th and M=5th.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "arrangement",
+      "ranking"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "ar_008",
+    "domain": "LOGICAL",
+    "topic": "ANALYTICAL_REASONING",
+    "skill": "coding-decoding",
+    "difficulty": "HARD",
+    "prompt": "In a certain code, 'PEN' is written as 'QFO' and 'BOOK' is written as 'CPPL'. How would 'DESK' be written in that code?",
+    "options": [
+      {
+        "id": "A",
+        "text": "EFTM"
+      },
+      {
+        "id": "B",
+        "text": "DFTL"
+      },
+      {
+        "id": "C",
+        "text": "EFUL"
+      },
+      {
+        "id": "D",
+        "text": "EFTL"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "Each letter is shifted forward by one position in the alphabet (P->Q, E->F, N->O; B->C, O->P, O->P, K->L). Applying the same rule: D->E, E->F, S->T, K->L, giving EFTL.",
+    "expectedTimeSeconds": 150,
+    "health": "HEALTHY",
+    "tags": [
+      "coding-decoding"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_001",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "subject-verb-agreement",
+    "difficulty": "EASY",
+    "prompt": "Choose the correct sentence.",
+    "options": [
+      {
+        "id": "A",
+        "text": "She go to school every day."
+      },
+      {
+        "id": "B",
+        "text": "She goes to school every day."
+      },
+      {
+        "id": "C",
+        "text": "She going to school every day."
+      },
+      {
+        "id": "D",
+        "text": "She gone to school every day."
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Third-person singular subjects ('she') take the -s verb form in the simple present tense: 'goes'.",
+    "expectedTimeSeconds": 40,
+    "health": "HEALTHY",
+    "tags": [
+      "subject-verb-agreement"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_002",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "subject-verb-agreement",
+    "difficulty": "EASY",
+    "prompt": "Fill in the blank: He ___ a doctor.",
+    "options": [
+      {
+        "id": "A",
+        "text": "am"
+      },
+      {
+        "id": "B",
+        "text": "is"
+      },
+      {
+        "id": "C",
+        "text": "are"
+      },
+      {
+        "id": "D",
+        "text": "be"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The singular subject 'He' takes the singular verb 'is'.",
+    "expectedTimeSeconds": 35,
+    "health": "HEALTHY",
+    "tags": [
+      "subject-verb-agreement"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_003",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "spelling",
+    "difficulty": "EASY",
+    "prompt": "Choose the correctly spelled word.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Recieve"
+      },
+      {
+        "id": "B",
+        "text": "Receive"
+      },
+      {
+        "id": "C",
+        "text": "Receve"
+      },
+      {
+        "id": "D",
+        "text": "Receeve"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The correct spelling follows 'i before e except after c' is a common (imperfect) rule, but the correct spelling here is simply 'Receive'.",
+    "expectedTimeSeconds": 35,
+    "health": "HEALTHY",
+    "tags": [
+      "spelling"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_004",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "prepositions",
+    "difficulty": "MEDIUM",
+    "prompt": "Choose the correct preposition: She is good ___ mathematics.",
+    "options": [
+      {
+        "id": "A",
+        "text": "in"
+      },
+      {
+        "id": "B",
+        "text": "at"
+      },
+      {
+        "id": "C",
+        "text": "on"
+      },
+      {
+        "id": "D",
+        "text": "with"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The standard idiom is 'good at' a subject or skill.",
+    "expectedTimeSeconds": 60,
+    "health": "HEALTHY",
+    "tags": [
+      "prepositions"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_005",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "subject-verb-agreement",
+    "difficulty": "MEDIUM",
+    "prompt": "Identify the correct sentence.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Neither of the boys were present."
+      },
+      {
+        "id": "B",
+        "text": "Neither of the boys was present."
+      },
+      {
+        "id": "C",
+        "text": "Neither of the boys are present."
+      },
+      {
+        "id": "D",
+        "text": "Neither of the boys is being present."
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "'Neither' is grammatically singular, so it takes the singular verb 'was'.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "subject-verb-agreement"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_006",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "subjunctive-mood",
+    "difficulty": "MEDIUM",
+    "prompt": "Choose the correct form: If I ___ you, I would apologize.",
+    "options": [
+      {
+        "id": "A",
+        "text": "am"
+      },
+      {
+        "id": "B",
+        "text": "was"
+      },
+      {
+        "id": "C",
+        "text": "were"
+      },
+      {
+        "id": "D",
+        "text": "be"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "The subjunctive mood for hypothetical 'if' clauses uses 'were' regardless of subject: 'If I were you'.",
+    "expectedTimeSeconds": 75,
+    "health": "HEALTHY",
+    "tags": [
+      "subjunctive-mood"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_007",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "subject-verb-agreement",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "Choose the sentence with correct subject-verb agreement.",
+    "options": [
+      {
+        "id": "A",
+        "text": "The number of students have increased."
+      },
+      {
+        "id": "B",
+        "text": "The number of students has increased."
+      },
+      {
+        "id": "C",
+        "text": "The number of students increasing."
+      },
+      {
+        "id": "D",
+        "text": "The number of students were increased."
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "'The number of' (referring to the number itself) takes a singular verb: 'has increased'. (Contrast with 'A number of students have increased', which is plural.)",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "subject-verb-agreement"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_008",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "subject-verb-agreement",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "Choose the correct sentence.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Neither the manager nor the employees was informed."
+      },
+      {
+        "id": "B",
+        "text": "Neither the manager nor the employees were informed."
+      },
+      {
+        "id": "C",
+        "text": "Neither the manager nor the employees is informed."
+      },
+      {
+        "id": "D",
+        "text": "Neither the manager nor the employees be informed."
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "In 'neither...nor' constructions, the verb agrees with the subject closer to it - here, the plural 'employees', so 'were' is correct.",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "subject-verb-agreement"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_009",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "subjunctive-mood",
+    "difficulty": "HARD",
+    "prompt": "Choose the sentence that correctly uses the subjunctive mood.",
+    "options": [
+      {
+        "id": "A",
+        "text": "I wish I was taller."
+      },
+      {
+        "id": "B",
+        "text": "I wish I were taller."
+      },
+      {
+        "id": "C",
+        "text": "I wish I am taller."
+      },
+      {
+        "id": "D",
+        "text": "I wish I will be taller."
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "Formal English uses the subjunctive 'were' (not 'was') for hypothetical wishes, regardless of subject.",
+    "expectedTimeSeconds": 130,
+    "health": "HEALTHY",
+    "tags": [
+      "subjunctive-mood"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "gram_010",
+    "domain": "VERBAL",
+    "topic": "GRAMMAR",
+    "skill": "word-choice",
+    "difficulty": "HARD",
+    "prompt": "Identify the sentence with the correct use of 'lay' vs 'lie'.",
+    "options": [
+      {
+        "id": "A",
+        "text": "I am going to lay down for a nap."
+      },
+      {
+        "id": "B",
+        "text": "I am going to lie down for a nap."
+      },
+      {
+        "id": "C",
+        "text": "I am going to lied down for a nap."
+      },
+      {
+        "id": "D",
+        "text": "I am going to laid down for a nap."
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "'Lie' (lie/lay/lain) means to recline and takes no direct object. 'Lay' (lay/laid/laid) requires a direct object, e.g. 'lay the book down'. Since there is no object here, 'lie down' is correct.",
+    "expectedTimeSeconds": 130,
+    "health": "HEALTHY",
+    "tags": [
+      "word-choice"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00"
+  },
+  {
+    "id": "rc_001",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "detail-recall",
+    "difficulty": "EASY",
+    "prompt": "According to the passage, how does pollen typically move from one flower to another?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Wind carries it"
+      },
+      {
+        "id": "B",
+        "text": "It sticks to a bee's body and rubs off at the next flower"
+      },
+      {
+        "id": "C",
+        "text": "Birds transport it"
+      },
+      {
+        "id": "D",
+        "text": "It travels through the plant's roots"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The passage explains pollen sticks to a bee's body hairs and rubs off at the next flower it visits.",
+    "expectedTimeSeconds": 60,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Honeybees play a vital role in pollinating flowering plants, including many of the crops that end up on our dinner tables. As a bee visits a flower to collect nectar, grains of pollen stick to the fine hairs covering its body. When the bee moves to the next flower, some of this pollen rubs off, fertilizing the plant. Without this transfer, many plants would be unable to produce fruit or seeds. In recent decades, beekeepers have reported unusually high losses of honeybee colonies, a phenomenon linked to pesticide exposure, habitat loss, and parasitic mites. Because roughly a third of the food humans eat depends directly or indirectly on pollinators, scientists consider the decline a serious concern for global food security, not just an environmental one."
+  },
+  {
+    "id": "rc_002",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "inference",
+    "difficulty": "MEDIUM",
+    "prompt": "Why does the passage describe honeybee decline as more than an environmental concern?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Because bees are becoming extinct"
+      },
+      {
+        "id": "B",
+        "text": "Because a large share of human food depends on pollinators"
+      },
+      {
+        "id": "C",
+        "text": "Because pesticides are expensive"
+      },
+      {
+        "id": "D",
+        "text": "Because beekeepers are losing income"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The passage ties the decline to food security because roughly a third of human food depends on pollinators.",
+    "expectedTimeSeconds": 90,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension",
+      "inference"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Honeybees play a vital role in pollinating flowering plants, including many of the crops that end up on our dinner tables. As a bee visits a flower to collect nectar, grains of pollen stick to the fine hairs covering its body. When the bee moves to the next flower, some of this pollen rubs off, fertilizing the plant. Without this transfer, many plants would be unable to produce fruit or seeds. In recent decades, beekeepers have reported unusually high losses of honeybee colonies, a phenomenon linked to pesticide exposure, habitat loss, and parasitic mites. Because roughly a third of the food humans eat depends directly or indirectly on pollinators, scientists consider the decline a serious concern for global food security, not just an environmental one."
+  },
+  {
+    "id": "rc_003",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "detail-recall",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "Which of the following is NOT mentioned in the passage as a cause of colony loss?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Pesticide exposure"
+      },
+      {
+        "id": "B",
+        "text": "Habitat loss"
+      },
+      {
+        "id": "C",
+        "text": "Parasitic mites"
+      },
+      {
+        "id": "D",
+        "text": "Climate change"
+      }
+    ],
+    "correctOptionId": "D",
+    "explanation": "The passage lists pesticide exposure, habitat loss, and parasitic mites - climate change is not mentioned.",
+    "expectedTimeSeconds": 100,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Honeybees play a vital role in pollinating flowering plants, including many of the crops that end up on our dinner tables. As a bee visits a flower to collect nectar, grains of pollen stick to the fine hairs covering its body. When the bee moves to the next flower, some of this pollen rubs off, fertilizing the plant. Without this transfer, many plants would be unable to produce fruit or seeds. In recent decades, beekeepers have reported unusually high losses of honeybee colonies, a phenomenon linked to pesticide exposure, habitat loss, and parasitic mites. Because roughly a third of the food humans eat depends directly or indirectly on pollinators, scientists consider the decline a serious concern for global food security, not just an environmental one."
+  },
+  {
+    "id": "rc_004",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "detail-recall",
+    "difficulty": "EASY",
+    "prompt": "What made Gutenberg's printing method different from earlier book production?",
+    "options": [
+      {
+        "id": "A",
+        "text": "He used cheaper paper"
+      },
+      {
+        "id": "B",
+        "text": "He used movable metal type that could be rearranged and reused"
+      },
+      {
+        "id": "C",
+        "text": "He wrote faster than scribes"
+      },
+      {
+        "id": "D",
+        "text": "He translated books into more languages"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The passage credits Gutenberg's use of movable metal type, letters that could be arranged, inked, and reused.",
+    "expectedTimeSeconds": 65,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Before the fifteenth century, books in Europe were copied out by hand, a slow process that made them expensive and rare. Johannes Gutenberg changed this when he developed a printing press that used movable metal type, allowing individual letters to be arranged, inked, and reused for different pages. His method made it possible to produce many identical copies of a text far faster than any scribe could. Within decades, printing workshops had spread across Europe, and the cost of books fell sharply. This wider access to printed material is often credited with accelerating the spread of new ideas during the Renaissance and later contributing to rising literacy rates across the continent."
+  },
+  {
+    "id": "rc_005",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "inference",
+    "difficulty": "MEDIUM",
+    "prompt": "According to the passage, what was one long-term effect of the printing press?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Books became rarer"
+      },
+      {
+        "id": "B",
+        "text": "Literacy rates rose across Europe"
+      },
+      {
+        "id": "C",
+        "text": "Handwriting improved"
+      },
+      {
+        "id": "D",
+        "text": "Scribes became more in demand"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The passage states wider access to printed material contributed to rising literacy rates across the continent.",
+    "expectedTimeSeconds": 85,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Before the fifteenth century, books in Europe were copied out by hand, a slow process that made them expensive and rare. Johannes Gutenberg changed this when he developed a printing press that used movable metal type, allowing individual letters to be arranged, inked, and reused for different pages. His method made it possible to produce many identical copies of a text far faster than any scribe could. Within decades, printing workshops had spread across Europe, and the cost of books fell sharply. This wider access to printed material is often credited with accelerating the spread of new ideas during the Renaissance and later contributing to rising literacy rates across the continent."
+  },
+  {
+    "id": "rc_006",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "vocabulary-in-context",
+    "difficulty": "MEDIUM",
+    "prompt": "The word 'accelerating' in the passage most nearly means:",
+    "options": [
+      {
+        "id": "A",
+        "text": "Slowing"
+      },
+      {
+        "id": "B",
+        "text": "Speeding up"
+      },
+      {
+        "id": "C",
+        "text": "Reversing"
+      },
+      {
+        "id": "D",
+        "text": "Measuring"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "'Accelerating' means increasing the speed or rate of something - here, the spread of new ideas.",
+    "expectedTimeSeconds": 60,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension",
+      "vocabulary"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Before the fifteenth century, books in Europe were copied out by hand, a slow process that made them expensive and rare. Johannes Gutenberg changed this when he developed a printing press that used movable metal type, allowing individual letters to be arranged, inked, and reused for different pages. His method made it possible to produce many identical copies of a text far faster than any scribe could. Within decades, printing workshops had spread across Europe, and the cost of books fell sharply. This wider access to printed material is often credited with accelerating the spread of new ideas during the Renaissance and later contributing to rising literacy rates across the continent."
+  },
+  {
+    "id": "rc_007",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "detail-recall",
+    "difficulty": "MEDIUM",
+    "prompt": "Why are solar and wind power described as 'intermittent'?",
+    "options": [
+      {
+        "id": "A",
+        "text": "They are illegal in some countries"
+      },
+      {
+        "id": "B",
+        "text": "Their output varies depending on conditions like sunlight and wind"
+      },
+      {
+        "id": "C",
+        "text": "They cannot be stored at all"
+      },
+      {
+        "id": "D",
+        "text": "They are more expensive than fossil fuels"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The passage explains solar and wind output varies with conditions such as darkness or still air.",
+    "expectedTimeSeconds": 85,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Solar and wind power are often described as intermittent sources of energy, since a solar panel produces little electricity at night and a wind turbine generates none when the air is still. This variability creates a challenge for electrical grids, which must balance supply and demand at every moment. One common solution is to pair renewable generation with large-scale battery storage, so that excess electricity produced on sunny or windy days can be saved and released later when generation drops. Grid operators also rely on a mix of energy sources and improved forecasting to anticipate changes in wind and sunlight, reducing the risk of sudden shortfalls. As storage technology becomes cheaper, some regions have begun running on renewable sources for extended stretches without interruption."
+  },
+  {
+    "id": "rc_008",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "detail-recall",
+    "difficulty": "MEDIUM_PLUS",
+    "prompt": "According to the passage, what is one way grid operators manage the variability of renewable energy?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Shutting down the grid at night"
+      },
+      {
+        "id": "B",
+        "text": "Relying solely on solar power"
+      },
+      {
+        "id": "C",
+        "text": "Pairing renewables with battery storage"
+      },
+      {
+        "id": "D",
+        "text": "Banning wind turbines"
+      }
+    ],
+    "correctOptionId": "C",
+    "explanation": "The passage names battery storage, alongside a mix of sources and forecasting, as ways to manage variability.",
+    "expectedTimeSeconds": 110,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Solar and wind power are often described as intermittent sources of energy, since a solar panel produces little electricity at night and a wind turbine generates none when the air is still. This variability creates a challenge for electrical grids, which must balance supply and demand at every moment. One common solution is to pair renewable generation with large-scale battery storage, so that excess electricity produced on sunny or windy days can be saved and released later when generation drops. Grid operators also rely on a mix of energy sources and improved forecasting to anticipate changes in wind and sunlight, reducing the risk of sudden shortfalls. As storage technology becomes cheaper, some regions have begun running on renewable sources for extended stretches without interruption."
+  },
+  {
+    "id": "rc_009",
+    "domain": "VERBAL",
+    "topic": "READING_COMPREHENSION",
+    "skill": "main-idea",
+    "difficulty": "HARD",
+    "prompt": "Which statement best reflects the passage's overall argument?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Renewable energy is currently too unreliable to ever replace fossil fuels"
+      },
+      {
+        "id": "B",
+        "text": "The challenges of variable renewable output can be managed through storage, diverse sources, and forecasting"
+      },
+      {
+        "id": "C",
+        "text": "Battery storage has made wind and solar power obsolete"
+      },
+      {
+        "id": "D",
+        "text": "Grid operators prefer fossil fuels because renewables cannot be forecasted"
+      }
+    ],
+    "correctOptionId": "B",
+    "explanation": "The passage presents variability as a manageable challenge, describing storage, a mix of sources, and forecasting as practical mitigations - not as reasons renewables are unworkable.",
+    "expectedTimeSeconds": 160,
+    "health": "HEALTHY",
+    "tags": [
+      "reading-comprehension",
+      "main-idea"
+    ],
+    "createdAt": "2026-08-23T13:48:18.794768+00:00",
+    "context": "Solar and wind power are often described as intermittent sources of energy, since a solar panel produces little electricity at night and a wind turbine generates none when the air is still. This variability creates a challenge for electrical grids, which must balance supply and demand at every moment. One common solution is to pair renewable generation with large-scale battery storage, so that excess electricity produced on sunny or windy days can be saved and released later when generation drops. Grid operators also rely on a mix of energy sources and improved forecasting to anticipate changes in wind and sunlight, reducing the risk of sudden shortfalls. As storage technology becomes cheaper, some regions have begun running on renewable sources for extended stretches without interruption."
+  }
+]

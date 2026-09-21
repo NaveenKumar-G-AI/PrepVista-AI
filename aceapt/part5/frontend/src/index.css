@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  color: #2b3542;
+}
+
+/* Faint blueprint-grid texture used behind the console header — reinforces the
+   "calibration instrument" concept without competing with content. */
+.grid-texture {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.tick-texture {
+  background-image: linear-gradient(rgba(16, 35, 63, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 35, 63, 0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

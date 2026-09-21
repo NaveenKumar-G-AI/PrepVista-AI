@@ -1514,7 +1514,7 @@ def test_durable_evaluation_recovers_saved_answers_and_refreshes_finished_report
             assert len(calls) == len(set(calls)) == 10
             assert all(row['evaluation_version'] == 'rubric-v2' for row in rows)
             messages = await conn.fetch('SELECT * FROM conversation_messages')
-            states = await conn.fetch('SELECT state FROM interview_evaluation_jobs')
+            states = await conn.fetch('SELECT * FROM interview_evaluation_jobs')
             session = dict(await conn.fetchrow('SELECT * FROM interview_sessions WHERE id=$1',sid))
             truth = build_report_truth(session, [dict(row) for row in rows], messages, states)
             assert truth['summary']['answered_questions'] == 10
@@ -1537,6 +1537,42 @@ def test_durable_evaluation_recovers_saved_answers_and_refreshes_finished_report
         assert (await reports.retry_evaluations(str(sid), owner))['queued'] == 10-available_count
         assert (await reports.retry_evaluations(str(sid), owner))['queued'] == 0
 
+    asyncio.run(run())
+
+
+def test_report_retry_recovers_stalled_work_without_resetting_live_leases(database, monkeypatch):
+    from app.routers import reports
+    from app.middleware import rate_limiter
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr(reports, 'DatabaseConnection', database.connect)
+    monkeypatch.setattr(rate_limiter, 'rate_limit_user', AsyncMock())
+
+    async def run():
+        sid = uuid4()
+        async with database.connect() as conn:
+            await conn.execute("INSERT INTO interview_sessions(id,user_id,state) VALUES($1,$2,'FINISHED')", sid, database.users[0])
+            for turn in range(1, 8):
+                await conn.execute("INSERT INTO conversation_messages(session_id,role,content,turn_number) VALUES($1,'user','My saved answer',$2)", sid, turn)
+            await conn.execute("""UPDATE interview_evaluation_jobs SET
+                state=CASE WHEN turn_number IN (3,4) THEN 'RUNNING' WHEN turn_number IN (5,6) THEN 'FAILED' ELSE 'PENDING' END,
+                attempts=2, lease_id=$2,
+                updated_at=NOW()-CASE WHEN turn_number IN (2,4,6) THEN INTERVAL '6 minutes' ELSE INTERVAL '1 minute' END,
+                retry_after=NOW()+CASE WHEN turn_number=3 THEN INTERVAL '1 minute' ELSE INTERVAL '-1 minute' END
+                WHERE session_id=$1""", sid, uuid4())
+            await conn.execute('DELETE FROM interview_evaluation_jobs WHERE session_id=$1 AND turn_number=7', sid)
+        with pytest.raises(HTTPException) as denied:
+            await reports.retry_evaluations(str(sid), SimpleNamespace(id=str(database.users[1])))
+        assert denied.value.status_code == 404
+        owner = SimpleNamespace(id=str(database.users[0]))
+        results = await asyncio.gather(*(reports.retry_evaluations(str(sid), owner) for _ in range(2)))
+        assert sum(result['queued'] for result in results) == 4
+        async with database.connect() as conn:
+            rows = await conn.fetch('SELECT * FROM interview_evaluation_jobs WHERE session_id=$1 ORDER BY turn_number', sid)
+            assert len(rows) == 7
+            assert [row['attempts'] for row in rows] == [2,0,2,0,2,0,0]
+            assert rows[2]['state'] == 'RUNNING'
+            assert rows[4]['state'] == 'FAILED'
+            assert all(rows[turn-1]['lease_id'] is None for turn in (2,4,6,7))
     asyncio.run(run())
 
 
@@ -1594,6 +1630,10 @@ def test_resume_pdf_through_real_interview_finish_evaluation_report_and_pdf(data
     from fpdf import FPDF
     from pypdf import PdfReader
     from io import BytesIO
+    import httpx
+    from groq import AsyncGroq
+    from app.config import get_settings
+    from app.services import llm
     from app.services import resume_parser, interviewer_session, interview_evaluation_jobs
     from app.services.interview_v2_session import process_v2
     from app.services.interview_orchestrator import build_blueprint, InterviewOrchestrator
@@ -1609,15 +1649,34 @@ def test_resume_pdf_through_real_interview_finish_evaluation_report_and_pdf(data
         monkeypatch.setattr(module, 'DatabaseConnection', connect)
     monkeypatch.setattr(resume_parser, 'call_llm_json', AsyncMock(return_value={
         'candidate_name': 'naveenkumar g', 'skills': ['Python','Redis'], 'target_role': 'Backend Engineer',
-        'projects': [{'name':'API cache','description':'I built and tested invalidation.'}]}))
-    async def evaluate(**kwargs):
-        return {'score':8, 'classification':'strong', 'communication_score':8, 'raw_answer':kwargs['raw_answer']}
-    monkeypatch.setattr(interviews_answer, 'evaluate_single_question', evaluate)
+        'projects': [{'name':'API cache','description':'I implemented invalidation, wrote regression tests'}]}))
+    provider_requests = []
+    def provider(request):
+        body = json.loads(request.content)
+        assert body['model'] == 'fixture-evaluation-model'
+        if not body.get('response_format'):
+            content = body['messages'][0]['content'].split('RAW TRANSCRIPT:\n')[1].split('\n\nTASK:')[0]
+            return httpx.Response(200, json={'id':'repair','object':'chat.completion','created':1,
+                'model':'fixture-evaluation-model','choices':[{'index':0,'finish_reason':'stop',
+                    'message':{'role':'assistant','content':content}}]})
+        provider_requests.append(body)
+        if len(provider_requests) == 1:
+            return httpx.Response(503, json={'error': {'message': 'Provider temporarily unavailable'}})
+        payload = {key: 1.6 for key in ('question_match_score', 'technical_accuracy_score',
+            'specificity_score', 'structure_score', 'communication_score')}
+        return httpx.Response(200, json={'id':'fixture','object':'chat.completion','created':1,
+            'model':'fixture-evaluation-model','choices':[{'index':0,'finish_reason':'stop',
+                'message':{'role':'assistant','content':json.dumps(payload)}}]})
+    monkeypatch.setattr(get_settings(), 'GROQ_API_KEY', 'test-only')
+    monkeypatch.setattr(get_settings(), 'GROQ_EVAL_MODEL', 'fixture-evaluation-model')
     # Entitlement reconciliation is covered separately; no external billing in this fixture.
     from app.services import plan_access, history_retention
     monkeypatch.setattr(plan_access, 'sync_profile_plan_state', AsyncMock(return_value={'highest_owned_plan':'pro'}))
     monkeypatch.setattr(history_retention, 'enforce_history_retention', AsyncMock())
     async def run():
+        provider_client = AsyncGroq(api_key='test-only', max_retries=0,
+            http_client=httpx.AsyncClient(transport=httpx.MockTransport(provider)))
+        monkeypatch.setattr(llm, '_groq_client', provider_client)
         async with database.connect() as conn:
             await conn.execute(f'CREATE SCHEMA {full_schema}')
             await conn.execute("""CREATE SCHEMA IF NOT EXISTS auth;
@@ -1655,6 +1714,13 @@ def test_resume_pdf_through_real_interview_finish_evaluation_report_and_pdf(data
         for _ in range(10): assert await interview_evaluation_jobs.process_one(sid)
         user=SimpleNamespace(id=str(uid),email='fixture@example.invalid',plan='pro',effective_plan='pro',premium_override=True)
         report=await reports.get_report(str(sid),user)
+        assert report['summary']['evaluated_questions'] == 9
+        assert len(report['saved_answers']) == 10
+        assert report['evaluation_processing']['jobs'][0]['error_code'] == 'EVALUATION_PROVIDER_FAILED'
+        async with connect() as conn:
+            await conn.execute("UPDATE interview_evaluation_jobs SET retry_after=NOW()-INTERVAL '1 second' WHERE session_id=$1 AND state='PENDING'", sid)
+        assert await interview_evaluation_jobs.process_one(sid)
+        report=await reports.get_report(str(sid),user)
         assert report['session']['candidate_name']=='NAVEENKUMAR G'
         assert report['session']['final_score']==80 and report['report_state']=='READY'
         assert report['summary']['answered_questions']==report['summary']['evaluated_questions']==10
@@ -1664,4 +1730,6 @@ def test_resume_pdf_through_real_interview_finish_evaluation_report_and_pdf(data
         result=await generate_pdf_report(session,evaluations,user.email,session_summary=report['summary'])
         rendered='\n'.join(page.extract_text() for page in PdfReader(BytesIO(result)).pages)
         assert 'NAVEENKUMAR G' in rendered and '80/100' in rendered
+        assert len(provider_requests) == 11
+        await provider_client.close()
     asyncio.run(run())

@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({ testDir: './e2e', timeout: 45000, fullyParallel: false, workers: 1, webServer: { command: 'npm run start -- --port 3220 --hostname 127.0.0.1', url: 'http://127.0.0.1:3220/api/health', reuseExistingServer: true, timeout: 30000 }, use: { baseURL: 'http://127.0.0.1:3220', channel: 'chrome', headless: true, screenshot: 'only-on-failure' }, reporter: [['list']] });

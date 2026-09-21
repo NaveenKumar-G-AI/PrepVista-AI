@@ -1,0 +1,8 @@
+.verification-banner {
+  background: var(--green-soft);
+  color: var(--green-ink);
+  border: 1px solid var(--green);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 14px;
+}

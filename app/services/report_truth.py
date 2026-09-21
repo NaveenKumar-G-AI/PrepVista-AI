@@ -1,5 +1,6 @@
 """One evidence/availability contract for API, finish responses and PDF reports."""
 import math
+from datetime import datetime, timedelta, timezone
 
 from app.services.evaluator_scoring import compute_final_score
 from app.services.interview_summary import compute_interview_summary, coerce_runtime_state
@@ -11,6 +12,85 @@ ANSWER_SENTINELS = {'[NO_ANSWER_TIMEOUT]', '[SYSTEM_DURATION_EXPIRED]', '__start
 def is_recorded_answer(row):
     content = str(row['content'] or '').strip()
     return row['role'] == 'user' and row['turn_number'] > 0 and bool(content) and content not in ANSWER_SENTINELS
+
+
+def _timestamp(value):
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+SAFE_EVALUATION_ERRORS = {
+    'EVALUATION_PROVIDER_OR_SCHEMA_FAILED', 'EVALUATION_PROVIDER_FAILED',
+    'EVALUATION_SOURCE_MISSING', 'EVALUATION_RETRY_EXHAUSTED', 'EVALUATION_PERSIST_FAILED',
+    'EVALUATION_TIMEOUT', 'EVALUATION_AUTH_FAILED', 'EVALUATION_RATE_LIMITED',
+    'EVALUATION_MODEL_UNAVAILABLE', 'EVALUATION_TRUNCATED', 'EVALUATION_INVALID_JSON',
+    'EVALUATION_INVALID_SCHEMA', 'EVALUATION_NOT_CONFIGURED',
+    'EVALUATION_REQUEST_REJECTED', 'EVALUATION_EMPTY_RESPONSE',
+}
+
+
+def evaluation_processing(messages, evaluations, jobs, *, now=None):
+    """Owner-safe recovery state; queue presence alone does not prove progress."""
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(minutes=5)
+    evaluated = {row['turn_number'] for row in evaluations}
+    answered = {row['turn_number'] for row in messages if is_recorded_answer(row)}
+    missing = answered - evaluated
+    by_turn = {row['turn_number']: dict(row) for row in jobs if 'turn_number' in row}
+    details = []
+    retryable = 0
+    active = 0
+    delayed = 0
+    retry_at = []
+    for turn in sorted(missing):
+        job = by_turn.get(turn, {})
+        state = job.get('state', 'NOT_QUEUED')
+        updated = _timestamp(job.get('updated_at'))
+        due = _timestamp(job.get('retry_after'))
+        stale = state in {'PENDING', 'RUNNING'} and bool(updated and updated <= cutoff and due and due <= now)
+        can_retry = state == 'NOT_QUEUED' or stale or (state == 'FAILED' and bool(updated and updated <= cutoff))
+        retryable += bool(can_retry)
+        active += state in {'PENDING', 'RUNNING'} and not stale
+        delayed += bool(stale)
+        if state == 'FAILED' and updated and not can_retry:
+            retry_at.append(updated + timedelta(minutes=5))
+        code = job.get('error_code')
+        details.append({
+            'turn_number': turn, 'state': 'DELAYED' if stale else state,
+            'attempts': int(job.get('attempts') or 0),
+            'error_code': code if code in SAFE_EVALUATION_ERRORS else 'EVALUATION_UNAVAILABLE' if code else None,
+            'updated_at': updated.isoformat() if updated else None,
+            'can_retry': bool(can_retry),
+        })
+    state = 'COMPLETE' if not missing else 'DELAYED' if delayed else 'PROCESSING' if active else 'UNAVAILABLE'
+    return {
+        'state': state, 'retryable_count': retryable, 'delayed_count': delayed,
+        'retry_available_at': min(retry_at).isoformat() if retry_at else None,
+        'jobs': details,
+    }
+
+
+def saved_answer_records(messages, evaluations, processing):
+    """Build owner-only transcripts directly from committed messages, without AI."""
+    questions = {}
+    answers = {}
+    evaluated = {row['turn_number'] for row in evaluations}
+    states = {row['turn_number']: row['state'] for row in processing['jobs']}
+    for row in messages:
+        if row['role'] == 'assistant':
+            questions.setdefault(row['turn_number'], row['content'])
+        elif is_recorded_answer(row):
+            answers.setdefault(row['turn_number'], row['content'])
+    return [{'turn_number': turn, 'question_text': questions.get(turn) or None,
+             'raw_answer': answers[turn],
+             'evaluation_state': 'AVAILABLE' if turn in evaluated else states.get(turn, 'NOT_QUEUED')}
+            for turn in sorted(answers)]
 
 
 def build_report_truth(session, evaluations, messages=None, jobs=None):
@@ -55,10 +135,16 @@ def build_report_truth(session, evaluations, messages=None, jobs=None):
     evidence = runtime.get('evidence_report_v2')
     if evidence:
         evidence = {**evidence, 'numeric_evaluation_status': status.lower(), 'evaluated_answers': evaluated_count}
-    pending = sum(row['state'] in {'PENDING', 'RUNNING'} for row in (jobs or []))
-    failed = sum(row['state'] == 'FAILED' for row in (jobs or []))
+    processing = evaluation_processing(messages, valid, jobs) if messages is not None and jobs is not None else None
+    # A committed evaluation wins over a stale queue receipt left by a crash.
+    # Count outstanding work only, so completed reports stop polling.
+    outstanding_jobs = processing['jobs'] if processing is not None else (jobs or [])
+    pending = sum(row['state'] in {'PENDING', 'RUNNING', 'DELAYED'} for row in outstanding_jobs)
+    failed = sum(row['state'] == 'FAILED' for row in outstanding_jobs)
+    generating = processing['state'] == 'PROCESSING' if processing is not None else bool(pending)
     return {'pending_evaluations': pending, 'failed_evaluations': failed, 'summary': summary, 'aggregate': aggregate, 'evaluations': valid,
-            'evaluation_status': status, 'report_state': 'GENERATING' if pending else 'READY' if status == 'AVAILABLE' else 'PARTIAL',
+            'evaluation_processing': processing,
+            'evaluation_status': status, 'report_state': 'GENERATING' if generating else 'READY' if status == 'AVAILABLE' else 'PARTIAL',
             'interpretation': interpretation, 'evidence_report': evidence, 'report_version': 2}
 
 

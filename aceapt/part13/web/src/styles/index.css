@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    font-family: "IBM Plex Sans", sans-serif;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(79, 209, 165, 0.06), transparent),
+      #0b1220;
+    min-height: 100vh;
+  }
+  ::selection {
+    background: rgba(79, 209, 165, 0.25);
+  }
+}
+
+@layer components {
+  .data-figure {
+    font-family: "IBM Plex Mono", monospace;
+    font-feature-settings: "tnum" 1, "zero" 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .panel {
+    background: #121b2e;
+    box-shadow:
+      0 1px 0 0 rgba(237, 241, 247, 0.04) inset,
+      0 0 0 1px rgba(237, 241, 247, 0.06);
+    border-radius: 0.75rem;
+  }
+
+  .label-caps {
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8794a8;
+    font-weight: 500;
+  }
+
+  .hairline {
+    border-color: rgba(237, 241, 247, 0.08);
+  }
+}

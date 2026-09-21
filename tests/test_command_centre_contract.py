@@ -47,7 +47,7 @@ def test_command_centre_tier_uses_per_session_score_change():
     ]
 
     assert _cc_tier_for_sessions(sessions) == ("Almost", False)
-    assert _cc_tier_for_sessions([]) == ("At Risk", True)
+    assert _cc_tier_for_sessions([]) == ("Not measured", False)
 
 
 def test_readiness_tier_uses_latest_score_with_minimum_evidence() -> None:
@@ -55,7 +55,7 @@ def test_readiness_tier_uses_latest_score_with_minimum_evidence() -> None:
     assert _readiness_tier(80, 2) == "almost_ready"
     assert _readiness_tier(80, 3) == "ready"
     assert _readiness_tier(20, 1) == "at_risk"
-    assert _readiness_tier(None, 0) == "at_risk"
+    assert _readiness_tier(None, 0) == "not_measured"
 
 
 def test_leaderboard_preserves_configured_year_labels():

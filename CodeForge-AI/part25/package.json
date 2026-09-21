@@ -1,0 +1,15 @@
+{
+  "name": "@codeforge/adaptive-challenge-engine",
+  "version": "0.1.0",
+  "description": "CodeForge AI \u2014 Adaptive Challenge Engine (Feature 25). Standalone, integration-ready selection engine.",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node dist/tests/runAll.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.9"
+  }
+}

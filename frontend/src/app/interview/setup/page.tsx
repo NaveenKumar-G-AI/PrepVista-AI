@@ -68,11 +68,13 @@ function InterviewSetupForm() {
     if (!nextFile) {
       return;
     }
-    if (nextFile.type !== 'application/pdf') {
-      setError('Please upload a PDF file.');
+    if (!/\.(pdf|docx?|png|jpe?g|webp|bmp|tiff?)$/i.test(nextFile.name)) {
+      setFile(null);
+      setError('Please upload a PDF, Word document, or resume image.');
       return;
     }
     if (nextFile.size > 5 * 1024 * 1024) {
+      setFile(null);
       setError('File too large. Maximum 5MB.');
       return;
     }
@@ -87,7 +89,11 @@ function InterviewSetupForm() {
       router.push('/pricing');
       return;
     }
-    if (!file || loading) {
+    if (loading) {
+      return;
+    }
+    if (!file) {
+      setError('Choose your resume before starting the interview.');
       return;
     }
     if (artifactId && !artifact?.data) {
@@ -227,7 +233,7 @@ function InterviewSetupForm() {
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.tif"
               className="hidden"
               onChange={event => handleFile(event.target.files?.[0] || null)}
             />
@@ -256,7 +262,8 @@ function InterviewSetupForm() {
                 <p className="font-medium text-primary">
                   {hasRemaining ? 'Drop your resume here or click to browse' : 'Resume upload is paused until access is restored'}
                 </p>
-                <p className="mt-1 text-xs text-secondary">PDF only | Max 5MB</p>
+                <p className="mt-1 text-xs text-secondary">PDF, Word, or image | Max 5MB</p>
+                <button type="button" className="btn-secondary mt-3" disabled={!hasRemaining || loading} onClick={event => { event.stopPropagation(); fileRef.current?.click(); }}>Choose resume</button>
               </>
             )}
           </div>
@@ -347,7 +354,7 @@ function InterviewSetupForm() {
           </section>
 
           {error ? (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
               {error}
             </div>
           ) : null}
@@ -475,7 +482,7 @@ function InterviewSetupForm() {
                 <div className="space-y-3 text-sm text-secondary">
                   <div className="flex items-start gap-3">
                     <FileIcon size={18} className="mt-0.5 text-blue-600 dark:text-blue-300" />
-                    <span>Your resume PDF is used to personalize questions before the session starts.</span>
+                    <span>Your resume is used to personalize questions before the session starts.</span>
                   </div>
                   <div className="flex items-start gap-3">
                     <MicIcon size={18} className="mt-0.5 text-blue-600 dark:text-blue-300" />

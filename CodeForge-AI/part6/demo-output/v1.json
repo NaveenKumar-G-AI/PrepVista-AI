@@ -1,0 +1,943 @@
+{
+  "id": "38754a1e-efb7-4c73-a068-c51afa521821",
+  "roadmapId": "186d54b8-deef-4522-b15a-8ab041d05c7d",
+  "versionNumber": 1,
+  "trigger": "INITIAL",
+  "reason": "Initial roadmap generated from role blueprint and current evidence.",
+  "isCurrent": true,
+  "readinessState": "FOUNDATION_BUILDING",
+  "readinessScore": 0.201,
+  "atRisk": false,
+  "diff": null,
+  "createdAt": "2026-08-16 01:37:19",
+  "milestones": [
+    {
+      "id": "f41a848d-0076-4b26-810c-457efdc80eef",
+      "roadmapVersionId": "38754a1e-efb7-4c73-a068-c51afa521821",
+      "sequence": 0,
+      "name": "Core Problem Solving",
+      "description": "Focused on: Queues, Recursion, Debugging, Problem Solving, Strings.",
+      "status": "AVAILABLE",
+      "prerequisiteMilestoneIds": [],
+      "completionConditions": {
+        "requiredSkillsAtTarget": true,
+        "minConfidence": 0.6,
+        "minIndependentEvidencePerRequiredSkill": 2,
+        "verificationRequired": true
+      },
+      "skills": [
+        {
+          "id": "812906ed-0c40-487e-8216-c3a4eabd78cf",
+          "roadmapMilestoneId": "f41a848d-0076-4b26-810c-457efdc80eef",
+          "skillId": "skill_queues",
+          "skillName": "Queues",
+          "required": true,
+          "priorityScore": 0.5750000000000001,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.5,
+              "weight": 0.25,
+              "contribution": 0.125
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 1,
+              "weight": 0.2,
+              "contribution": 0.2
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.5750000000000001
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Queues — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 0,
+          "insertedReason": null
+        },
+        {
+          "id": "92e678d9-eb11-4caf-a1c4-ad18abb31619",
+          "roadmapMilestoneId": "f41a848d-0076-4b26-810c-457efdc80eef",
+          "skillId": "skill_recursion",
+          "skillName": "Recursion",
+          "required": true,
+          "priorityScore": 0.5641666666666666,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.75,
+              "weight": 0.25,
+              "contribution": 0.1875
+            },
+            "gap": {
+              "value": 0.7,
+              "weight": 0.3,
+              "contribution": 0.21
+            },
+            "block": {
+              "value": 0.3333333333333333,
+              "weight": 0.2,
+              "contribution": 0.06666666666666667
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.5641666666666666
+          },
+          "gapStatus": "GAP",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": "DEVELOPING",
+          "activityType": "TARGETED_PRACTICE",
+          "learningObjective": "Build Recursion up to COMPETENT through targeted, evidence-generating practice.",
+          "sequence": 1,
+          "insertedReason": null
+        },
+        {
+          "id": "5e18af0b-3a8f-48fe-9aa7-4f97879fa419",
+          "roadmapMilestoneId": "f41a848d-0076-4b26-810c-457efdc80eef",
+          "skillId": "skill_debugging",
+          "skillName": "Debugging",
+          "required": true,
+          "priorityScore": 0.5599999999999999,
+          "priorityBreakdown": {
+            "role": {
+              "value": 1,
+              "weight": 0.25,
+              "contribution": 0.25
+            },
+            "gap": {
+              "value": 0.7,
+              "weight": 0.3,
+              "contribution": 0.21
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.5599999999999999
+          },
+          "gapStatus": "GAP",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": "DEVELOPING",
+          "activityType": "TARGETED_PRACTICE",
+          "learningObjective": "Build Debugging up to COMPETENT through targeted, evidence-generating practice.",
+          "sequence": 2,
+          "insertedReason": null
+        },
+        {
+          "id": "9a5d1819-f5d5-48a1-ab33-807bcb5bfaaa",
+          "roadmapMilestoneId": "f41a848d-0076-4b26-810c-457efdc80eef",
+          "skillId": "skill_problem_solving",
+          "skillName": "Problem Solving",
+          "required": true,
+          "priorityScore": 0.5,
+          "priorityBreakdown": {
+            "role": {
+              "value": 1,
+              "weight": 0.25,
+              "contribution": 0.25
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.5
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Problem Solving — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 3,
+          "insertedReason": null
+        },
+        {
+          "id": "fb92dbc5-5b17-4153-a8ce-41138b57373d",
+          "roadmapMilestoneId": "f41a848d-0076-4b26-810c-457efdc80eef",
+          "skillId": "skill_strings",
+          "skillName": "Strings",
+          "required": true,
+          "priorityScore": 0.4375,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.75,
+              "weight": 0.25,
+              "contribution": 0.1875
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.4375
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Strings — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 4,
+          "insertedReason": null
+        }
+      ]
+    },
+    {
+      "id": "f096dbcf-76fd-4515-8edd-1c27c3b67726",
+      "roadmapVersionId": "38754a1e-efb7-4c73-a068-c51afa521821",
+      "sequence": 1,
+      "name": "Core Problem Solving",
+      "description": "Focused on: Trees, Interview Coding, Searching, Sorting, Stacks.",
+      "status": "LOCKED",
+      "prerequisiteMilestoneIds": [
+        "f41a848d-0076-4b26-810c-457efdc80eef"
+      ],
+      "completionConditions": {
+        "requiredSkillsAtTarget": true,
+        "minConfidence": 0.6,
+        "minIndependentEvidencePerRequiredSkill": 2,
+        "verificationRequired": true
+      },
+      "skills": [
+        {
+          "id": "e066a15f-a19c-49ad-a13a-7cda0451adfc",
+          "roadmapMilestoneId": "f096dbcf-76fd-4515-8edd-1c27c3b67726",
+          "skillId": "skill_trees",
+          "skillName": "Trees",
+          "required": true,
+          "priorityScore": 0.4375,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.75,
+              "weight": 0.25,
+              "contribution": 0.1875
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.4375
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Trees — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 0,
+          "insertedReason": null
+        },
+        {
+          "id": "453b10ae-b54e-430a-882a-760cc0dfef06",
+          "roadmapMilestoneId": "f096dbcf-76fd-4515-8edd-1c27c3b67726",
+          "skillId": "skill_interview_coding",
+          "skillName": "Interview Coding",
+          "required": true,
+          "priorityScore": 0.4375,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.75,
+              "weight": 0.25,
+              "contribution": 0.1875
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.4375
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Interview Coding — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 1,
+          "insertedReason": null
+        },
+        {
+          "id": "6c277193-62de-4d0a-8a1c-deecce75bce4",
+          "roadmapMilestoneId": "f096dbcf-76fd-4515-8edd-1c27c3b67726",
+          "skillId": "skill_searching",
+          "skillName": "Searching",
+          "required": true,
+          "priorityScore": 0.43499999999999994,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.5,
+              "weight": 0.25,
+              "contribution": 0.125
+            },
+            "gap": {
+              "value": 0.7,
+              "weight": 0.3,
+              "contribution": 0.21
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.43499999999999994
+          },
+          "gapStatus": "GAP",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": "DEVELOPING",
+          "activityType": "TARGETED_PRACTICE",
+          "learningObjective": "Build Searching up to COMPETENT through targeted, evidence-generating practice.",
+          "sequence": 2,
+          "insertedReason": null
+        },
+        {
+          "id": "5b56483a-1745-4a5a-ba10-326c8c67d5b7",
+          "roadmapMilestoneId": "f096dbcf-76fd-4515-8edd-1c27c3b67726",
+          "skillId": "skill_sorting",
+          "skillName": "Sorting",
+          "required": true,
+          "priorityScore": 0.43499999999999994,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.5,
+              "weight": 0.25,
+              "contribution": 0.125
+            },
+            "gap": {
+              "value": 0.7,
+              "weight": 0.3,
+              "contribution": 0.21
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.43499999999999994
+          },
+          "gapStatus": "GAP",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": "DEVELOPING",
+          "activityType": "TARGETED_PRACTICE",
+          "learningObjective": "Build Sorting up to COMPETENT through targeted, evidence-generating practice.",
+          "sequence": 3,
+          "insertedReason": null
+        },
+        {
+          "id": "907bb2af-c26b-45f3-8346-5845a8455939",
+          "roadmapMilestoneId": "f096dbcf-76fd-4515-8edd-1c27c3b67726",
+          "skillId": "skill_stacks",
+          "skillName": "Stacks",
+          "required": true,
+          "priorityScore": 0.375,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.5,
+              "weight": 0.25,
+              "contribution": 0.125
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.375
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Stacks — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 4,
+          "insertedReason": null
+        }
+      ]
+    },
+    {
+      "id": "dee2fa57-efd6-4b5d-a4c5-794778a6989f",
+      "roadmapVersionId": "38754a1e-efb7-4c73-a068-c51afa521821",
+      "sequence": 2,
+      "name": "Programming Foundations",
+      "description": "Focused on: Complexity Analysis, Java, C++.",
+      "status": "LOCKED",
+      "prerequisiteMilestoneIds": [
+        "f096dbcf-76fd-4515-8edd-1c27c3b67726"
+      ],
+      "completionConditions": {
+        "requiredSkillsAtTarget": true,
+        "minConfidence": 0.6,
+        "minIndependentEvidencePerRequiredSkill": 2,
+        "verificationRequired": true
+      },
+      "skills": [
+        {
+          "id": "b582ac29-5189-4e93-a8e5-66768590caa8",
+          "roadmapMilestoneId": "dee2fa57-efd6-4b5d-a4c5-794778a6989f",
+          "skillId": "skill_complexity",
+          "skillName": "Complexity Analysis",
+          "required": true,
+          "priorityScore": 0.375,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.5,
+              "weight": 0.25,
+              "contribution": 0.125
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.375
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Complexity Analysis — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 0,
+          "insertedReason": null
+        },
+        {
+          "id": "6d09b539-b106-4e9c-ac80-340d5d916e93",
+          "roadmapMilestoneId": "dee2fa57-efd6-4b5d-a4c5-794778a6989f",
+          "skillId": "skill_java",
+          "skillName": "Java",
+          "required": false,
+          "priorityScore": 0.2425,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.25,
+              "weight": 0.25,
+              "contribution": 0.0625
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 0.3,
+              "weight": 0.1,
+              "contribution": 0.03
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.2425
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in Java — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 1,
+          "insertedReason": null
+        },
+        {
+          "id": "ee8a0446-e53f-4ddb-8c4d-34ba8d7e8899",
+          "roadmapMilestoneId": "dee2fa57-efd6-4b5d-a4c5-794778a6989f",
+          "skillId": "skill_cpp",
+          "skillName": "C++",
+          "required": false,
+          "priorityScore": 0.2425,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.25,
+              "weight": 0.25,
+              "contribution": 0.0625
+            },
+            "gap": {
+              "value": 0.5,
+              "weight": 0.3,
+              "contribution": 0.15
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 0.3,
+              "weight": 0.1,
+              "contribution": 0.03
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.2425
+          },
+          "gapStatus": "UNKNOWN",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "EXPLORATION",
+          "learningObjective": "Assess current ability in C++ — no prior evidence exists yet, so this is exploration, not remediation.",
+          "sequence": 2,
+          "insertedReason": null
+        }
+      ]
+    },
+    {
+      "id": "fb9eef99-e16f-4986-bc9d-a8091f5f6aec",
+      "roadmapVersionId": "38754a1e-efb7-4c73-a068-c51afa521821",
+      "sequence": 3,
+      "name": "Core Problem Solving",
+      "description": "Focused on: Breadth-First Search, Dynamic Programming.",
+      "status": "LOCKED",
+      "prerequisiteMilestoneIds": [
+        "dee2fa57-efd6-4b5d-a4c5-794778a6989f"
+      ],
+      "completionConditions": {
+        "requiredSkillsAtTarget": true,
+        "minConfidence": 0.6,
+        "minIndependentEvidencePerRequiredSkill": 2,
+        "verificationRequired": true
+      },
+      "skills": [
+        {
+          "id": "e2198c6b-523a-430f-a6dc-e190d268dfd8",
+          "roadmapMilestoneId": "fb9eef99-e16f-4986-bc9d-a8091f5f6aec",
+          "skillId": "skill_bfs",
+          "skillName": "Breadth-First Search",
+          "required": true,
+          "priorityScore": 0.3583333333333333,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.5,
+              "weight": 0.25,
+              "contribution": 0.125
+            },
+            "gap": {
+              "value": 0,
+              "weight": 0.3,
+              "contribution": 0
+            },
+            "block": {
+              "value": 0.6666666666666666,
+              "weight": 0.2,
+              "contribution": 0.13333333333333333
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.3583333333333333
+          },
+          "gapStatus": "BLOCKED",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "REVIEW",
+          "learningObjective": "Hold on Breadth-First Search until its prerequisite is solid — attempting it now would mostly surface prerequisite gaps, not Breadth-First Search itself.",
+          "sequence": 0,
+          "insertedReason": "Inserted as a prerequisite of Graph Traversal — current evidence shows this isn't solid enough yet to build on."
+        },
+        {
+          "id": "50c6a5ce-429e-4287-a41a-e32cd016b443",
+          "roadmapMilestoneId": "fb9eef99-e16f-4986-bc9d-a8091f5f6aec",
+          "skillId": "skill_dp",
+          "skillName": "Dynamic Programming",
+          "required": true,
+          "priorityScore": 0.2875,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.75,
+              "weight": 0.25,
+              "contribution": 0.1875
+            },
+            "gap": {
+              "value": 0,
+              "weight": 0.3,
+              "contribution": 0
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.2875
+          },
+          "gapStatus": "BLOCKED",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": "DEVELOPING",
+          "activityType": "REVIEW",
+          "learningObjective": "Hold on Dynamic Programming until its prerequisite is solid — attempting it now would mostly surface prerequisite gaps, not Dynamic Programming itself.",
+          "sequence": 1,
+          "insertedReason": null
+        }
+      ]
+    },
+    {
+      "id": "4731fd00-d020-4698-94c4-3654644f2b44",
+      "roadmapVersionId": "38754a1e-efb7-4c73-a068-c51afa521821",
+      "sequence": 4,
+      "name": "Core Problem Solving",
+      "description": "Focused on: Graph Traversal.",
+      "status": "LOCKED",
+      "prerequisiteMilestoneIds": [
+        "fb9eef99-e16f-4986-bc9d-a8091f5f6aec"
+      ],
+      "completionConditions": {
+        "requiredSkillsAtTarget": true,
+        "minConfidence": 0.6,
+        "minIndependentEvidencePerRequiredSkill": 2,
+        "verificationRequired": true
+      },
+      "skills": [
+        {
+          "id": "0f88ad4b-3e43-431e-9bb2-dc11448d6a20",
+          "roadmapMilestoneId": "4731fd00-d020-4698-94c4-3654644f2b44",
+          "skillId": "skill_graph_traversal",
+          "skillName": "Graph Traversal",
+          "required": true,
+          "priorityScore": 0.29166666666666663,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.5,
+              "weight": 0.25,
+              "contribution": 0.125
+            },
+            "gap": {
+              "value": 0,
+              "weight": 0.3,
+              "contribution": 0
+            },
+            "block": {
+              "value": 0.3333333333333333,
+              "weight": 0.2,
+              "contribution": 0.06666666666666667
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.29166666666666663
+          },
+          "gapStatus": "BLOCKED",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "REVIEW",
+          "learningObjective": "Hold on Graph Traversal until its prerequisite is solid — attempting it now would mostly surface prerequisite gaps, not Graph Traversal itself.",
+          "sequence": 0,
+          "insertedReason": "Inserted as a prerequisite of Graphs — current evidence shows this isn't solid enough yet to build on."
+        }
+      ]
+    },
+    {
+      "id": "65f6e716-da7a-49a3-9afa-3940e575783e",
+      "roadmapVersionId": "38754a1e-efb7-4c73-a068-c51afa521821",
+      "sequence": 5,
+      "name": "Core Problem Solving",
+      "description": "Focused on: Graphs.",
+      "status": "LOCKED",
+      "prerequisiteMilestoneIds": [
+        "4731fd00-d020-4698-94c4-3654644f2b44"
+      ],
+      "completionConditions": {
+        "requiredSkillsAtTarget": true,
+        "minConfidence": 0.6,
+        "minIndependentEvidencePerRequiredSkill": 2,
+        "verificationRequired": true
+      },
+      "skills": [
+        {
+          "id": "e84ed22e-f0a1-4d9e-a737-2f485adda038",
+          "roadmapMilestoneId": "65f6e716-da7a-49a3-9afa-3940e575783e",
+          "skillId": "skill_graphs",
+          "skillName": "Graphs",
+          "required": true,
+          "priorityScore": 0.2875,
+          "priorityBreakdown": {
+            "role": {
+              "value": 0.75,
+              "weight": 0.25,
+              "contribution": 0.1875
+            },
+            "gap": {
+              "value": 0,
+              "weight": 0.3,
+              "contribution": 0
+            },
+            "block": {
+              "value": 0,
+              "weight": 0.2,
+              "contribution": 0
+            },
+            "required": {
+              "value": 1,
+              "weight": 0.1,
+              "contribution": 0.1
+            },
+            "urgency": {
+              "value": 0,
+              "weight": 0.1,
+              "contribution": 0
+            },
+            "trend": {
+              "value": 0,
+              "weight": 0.05,
+              "contribution": 0
+            },
+            "total": 0.2875
+          },
+          "gapStatus": "BLOCKED",
+          "targetMastery": "COMPETENT",
+          "currentMasterySnapshot": null,
+          "activityType": "REVIEW",
+          "learningObjective": "Hold on Graphs until its prerequisite is solid — attempting it now would mostly surface prerequisite gaps, not Graphs itself.",
+          "sequence": 0,
+          "insertedReason": null
+        }
+      ]
+    }
+  ]
+}

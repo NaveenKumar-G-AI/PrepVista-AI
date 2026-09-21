@@ -1,0 +1,23 @@
+{
+  "name": "feature-38-positioning-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ACEAPT Feature 38 — Personal Career Positioning Engine (backend, P0 slice)",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "tsx --test src/__tests__/*.test.ts",
+    "seed": "tsx scripts/seedSampleData.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
+  }
+}

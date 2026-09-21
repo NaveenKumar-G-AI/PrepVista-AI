@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: aceapt
+      POSTGRES_USER: aceapt
+      POSTGRES_PASSWORD: aceapt_dev_only
+    ports:
+      - '5432:5432'
+    volumes:
+      - aceapt_speed_pgdata:/var/lib/postgresql/data
+
+volumes:
+  aceapt_speed_pgdata:

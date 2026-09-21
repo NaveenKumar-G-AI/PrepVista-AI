@@ -1,0 +1,7 @@
+'use client';
+import { Copy, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+export function Editor({ code, onChange, language, onReset, disabled = false }: { code: string; onChange: (s: string) => void; language: string; onReset: () => void; disabled?: boolean }) {
+  const [notice, setNotice] = useState('');
+  return <section className="editor-panel"><div className="editor-bar"><span><span className="tiny-dot"/> solution.{language === 'python' ? 'py' : language === 'java' ? 'java' : language === 'cpp' ? 'cpp' : 'js'}</span><div><span className="muted tiny">{code.length.toLocaleString()} / 20,000</span><button type="button" className="icon-button" aria-label="Copy code" onClick={async () => { try { await navigator.clipboard.writeText(code); setNotice('Code copied.'); } catch { setNotice('Select your code and copy it with your keyboard.'); } }}><Copy size={15}/></button><button className="icon-button" aria-label="Reset code" disabled={disabled} onClick={() => { if (window.confirm('Replace this draft with the starter code?')) onReset(); }}><RotateCcw size={15}/></button></div></div><textarea className="code-editor" aria-label="Code editor" spellCheck={false} autoCapitalize="off" autoCorrect="off" value={code} maxLength={20000} onChange={e => onChange(e.target.value)} disabled={disabled}/><div className="editor-status"><span>{notice || 'Draft saved in this browser'}</span><span>{language} · UTF-8</span></div></section>;
+}

@@ -1,0 +1,95 @@
+/*
+  ACEAPT Guided Solving - design tokens.
+
+  Design concept: a technical drafting / lab-notebook workspace, not a chat
+  and not a generic SaaS dashboard. The one deliberately bold element is the
+  "solving rail" (see SolvingPath.tsx) - a vertical trace of step nodes
+  styled after a circuit/instrument readout, because the whole point of
+  Feature 47 is making a multi-step solving PATH visible, including exactly
+  where a mistake first appeared and whether a later step is a fresh error
+  or just carrying that first one forward. Everything else stays quiet so
+  the rail reads clearly.
+*/
+
+:root {
+  /* Palette */
+  --paper: #f1f4f3;
+  --paper-raised: #ffffff;
+  --ink: #17242a;
+  --ink-soft: #4b5a5f;
+  --ink-faint: #8b979a;
+  --line: #d7ddda;
+  --line-strong: #b7c0bd;
+
+  --amber: #d98e2b;
+  --amber-soft: #f6e4c6;
+  --amber-ink: #6b4610;
+
+  --green: #2e6b52;
+  --green-soft: #dcece3;
+  --green-ink: #1c4433;
+
+  --red: #b5453a;
+  --red-soft: #f4dcd8;
+  --red-ink: #6e2a22;
+
+  --gold: #a6875c;
+  --gold-soft: #ede4d3;
+  --gold-ink: #5c4a30;
+
+  --rail: #6e7876;
+
+  /* Type */
+  --font-display: 'IBM Plex Sans Condensed', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* Spacing / shape */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-card: 0 1px 2px rgba(23, 36, 42, 0.06), 0 4px 16px rgba(23, 36, 42, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12181a;
+    --paper-raised: #1a2226;
+    --ink: #eef2f1;
+    --ink-soft: #b7c2c2;
+    --ink-faint: #758184;
+    --line: #2a3438;
+    --line-strong: #3c484c;
+
+    --amber-soft: #3a2c14;
+    --amber-ink: #f2c880;
+
+    --green-soft: #17332a;
+    --green-ink: #7fcaa9;
+
+    --red-soft: #3a2220;
+    --red-ink: #e6a49a;
+
+    --gold-soft: #2f2718;
+    --gold-ink: #d8c39c;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 20px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

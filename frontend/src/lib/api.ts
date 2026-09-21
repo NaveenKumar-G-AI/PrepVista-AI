@@ -26,6 +26,10 @@ if (_isProductionBuild) {
 const API_URL = (_rawApiUrl || 'http://localhost:8000').replace(/\/$/, '');
 export const AUTH_REQUIRED_EVENT = 'prepvista:auth-required';
 
+class AuthServiceUnavailableError extends Error {
+  readonly status = 503;
+}
+
 function notifyAuthenticationRequired(): boolean {
   if (
     typeof window !== 'undefined' &&
@@ -87,8 +91,9 @@ const TIER_META: Record<string, { label: string; color: string }> = {
   developing:   { label: 'Developing',    color: 'orange' },
   at_risk:      { label: 'At Risk',       color: 'red'    },
   not_started:  { label: 'Not Started',   color: 'gray'   },
+  not_measured: { label: 'Not measured', color: 'gray' },
 };
-const TIER_KEYS = ['ready', 'almost_ready', 'developing', 'at_risk'] as const;
+const TIER_KEYS = ['ready', 'almost_ready', 'developing', 'at_risk', 'not_measured'] as const;
 
 type CohortObj = Record<string, unknown>;
 const cObj = (v: unknown): CohortObj => (v && typeof v === 'object' && !Array.isArray(v) ? v as CohortObj : {});
@@ -104,19 +109,19 @@ function adaptReadinessDistribution(raw: unknown): unknown {
   const tiersObj = cObj(r.tiers);
   const summary = cObj(r.summary);
   const grid: CohortObj[] = [];
-  const tierCount: Record<string, number> = { ready: 0, almost_ready: 0, developing: 0, at_risk: 0, not_started: 0 };
+  const tierCount: Record<string, number> = { ready: 0, almost_ready: 0, developing: 0, at_risk: 0, not_measured: 0 };
   const scores: number[] = [];
-  let notStarted = 0;
+  let notMeasured = 0;
 
   for (const key of TIER_KEYS) {
     for (const e0 of cArr(tiersObj[key])) {
       const e = cObj(e0);
       const sc = cNum(e.session_count) ?? 0;
-      const score = cNum(e.latest_score) ?? cNum(e.avg_score);
-      const effTier = sc > 0 ? key : 'not_started';
+      const score = 'latest_score' in e ? cNum(e.latest_score) : cNum(e.avg_score);
+      const effTier = sc > 0 && score !== null ? key : 'not_measured';
       tierCount[effTier] = (tierCount[effTier] ?? 0) + 1;
-      if (effTier === 'not_started') notStarted++;
-      if (score !== null) scores.push(score);
+      if (effTier === 'not_measured') notMeasured++;
+      if (score !== null && effTier !== 'not_measured') scores.push(score);
       grid.push({
         user_id: String(e.user_id ?? ''),
         full_name: (e.name ?? e.full_name ?? '') as string,
@@ -131,7 +136,7 @@ function adaptReadinessDistribution(raw: unknown): unknown {
   }
 
   const total = cNum(summary.total_students) ?? grid.length;
-  const tiers = ['ready', 'almost_ready', 'developing', 'at_risk', 'not_started'].map(k => ({
+  const tiers = TIER_KEYS.map(k => ({
     tier: TIER_META[k].label,
     color: TIER_META[k].color,
     count: tierCount[k] ?? 0,
@@ -160,7 +165,8 @@ function adaptReadinessDistribution(raw: unknown): unknown {
     percentile: {
       buckets,
       total_scored_students: scores.length,
-      not_started_students: notStarted,
+      not_started_students: notMeasured,
+      not_measured_students: notMeasured,
       mean, median, std_dev: std,
     },
   };
@@ -176,7 +182,8 @@ function adaptRiskRoster(raw: unknown): unknown {
       const interventionFlag = e.zero_offer_risk === true;
       if (key !== 'at_risk' && !interventionFlag) continue;
       const sc = cNum(e.session_count) ?? 0;
-      const score = cNum(e.latest_score) ?? cNum(e.avg_score);
+      const score = 'latest_score' in e ? cNum(e.latest_score) : cNum(e.avg_score);
+      if (key === 'not_measured' || sc <= 0 || score === null) continue;
       const reasons: string[] = [];
       if (sc === 0) reasons.push('No interviews attempted yet');
       else if (score !== null && score < 40) reasons.push('Latest score below 40/100');
@@ -427,9 +434,8 @@ class ApiClient {
 
       // If we have a refresh token but no access token (new tab / browser restart),
       // trigger a background refresh to restore the session
-      if (!this.token && this.refreshToken) {
-        void this.tryRefresh();
-      }
+      // Restoration is awaited by ensureAccessToken/request so a temporary
+      // outage is observable rather than becoming an unhandled background task.
 
       // ✅ SEC: Cross-tab logout detection.
       // When a user logs out in tab A, tab B still holds the JWT in memory and
@@ -571,6 +577,9 @@ class ApiClient {
           lastError = new Error('Request timed out. Please try again.');
         }
         const status = (lastError as Error & { status?: number }).status;
+        // Retrying the original expired token after a failed refresh would turn
+        // a recoverable auth outage into a second 401 and erase valid credentials.
+        if (lastError instanceof AuthServiceUnavailableError) break;
         if (status !== undefined && status < 500 && status !== 408 && status !== 429) break;
         if (attempt < retries) {
           // ✅ PERF: Jittered backoff — pure linear backoff (1000ms × attempt) causes
@@ -616,20 +625,27 @@ class ApiClient {
       if (resp.ok) {
         const data = await resp.json() as AuthTokensResponse;
         if (generation !== this.authGeneration) return false;
+        if (!isValidJwtShape(data.access_token) || !data.refresh_token) {
+          throw new Error('The sign-in service returned an incomplete session.');
+        }
         this.setTokens(data.access_token, data.refresh_token);
         return true;
       }
-    } catch (err) {
-      // ✅ FIXED: was empty catch {}. Network errors during token refresh were completely
-      // invisible — engineers had no way to distinguish "refresh endpoint down" from
-      // "user had invalid token". Logging at warn level is intentional: this is not
-      // a silent analytics failure, it directly affects whether users stay logged in.
-      if (typeof console !== 'undefined') {
-        console.warn('[ApiClient] Token refresh network error:', err instanceof Error ? err.message : String(err));
+      if (generation !== this.authGeneration) return false;
+      // Only a credential rejection invalidates the saved session. A provider
+      // outage/rate limit must remain recoverable using the same credentials.
+      if ([400, 401, 403].includes(resp.status)) {
+        this.clearTokens();
+        return false;
       }
+      throw new Error('The sign-in service is temporarily unavailable.');
+    } catch (err) {
+      if (generation !== this.authGeneration) return false;
+      const error = new AuthServiceUnavailableError(err instanceof Error && err.name === 'AbortError'
+        ? 'The sign-in service timed out. Please retry.'
+        : 'The sign-in service is temporarily unavailable. Please retry.');
+      throw error;
     } finally { clearTimeout(timer); }
-    if (generation === this.authGeneration) this.clearTokens();
-    return false;
   }
 
   private async parseError(response: Response): Promise<Error> {
@@ -954,7 +970,7 @@ class ApiClient {
     });
   }
   async setupInterview<T = unknown>(formData: FormData) {
-    return this.request<T>('/interviews/setup', { method: 'POST', body: formData, isFormData: true });
+    return this.request<T>('/interviews/setup', { method: 'POST', body: formData, isFormData: true, timeoutMs: 90000, retries: 0 });
   }
   async submitAnswer<T = unknown>(
     sessionId: string,
@@ -1108,7 +1124,17 @@ class ApiClient {
     return this.request<T>(`/reports/${sessionId}/share`, { method: 'POST' });
   }
   async getSharedReport<T = unknown>(shareToken: string) {
-    return this.request<T>(`/reports/shared/${shareToken}`);
+    // Share links are public. Do not restore or attach a viewer's private
+    // session, or redirect them to login when an unrelated session expires.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(`${API_URL}/reports/shared/${encodeURIComponent(shareToken)}`, {
+        signal: controller.signal, cache: 'no-store',
+      });
+      if (!response.ok) throw await this.parseError(response);
+      return await response.json() as T;
+    } finally { clearTimeout(timer); }
   }
 
   // ── Organization Admin (Main Admin) ───────

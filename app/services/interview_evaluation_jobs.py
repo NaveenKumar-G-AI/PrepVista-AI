@@ -7,12 +7,20 @@ from app.config import get_settings
 from app.database.connection import DatabaseConnection
 
 logger = structlog.get_logger('prepvista.evaluation_jobs')
+# Background response callbacks can arrive in bursts. Wait for local capacity
+# before claiming a durable lease, not inside its execution deadline.
+_JOB_SLOTS = asyncio.Semaphore(6)
 
 
 async def process_one(session_id=None, turn_number=None):
+    async with _JOB_SLOTS:
+        return await _process_one(session_id, turn_number)
+
+
+async def _process_one(session_id=None, turn_number=None):
     lease = uuid4()
     async with DatabaseConnection() as conn:
-        await conn.execute("UPDATE interview_evaluation_jobs SET state='FAILED',error_code='EVALUATION_RETRY_EXHAUSTED' WHERE state='RUNNING' AND retry_after<=NOW() AND attempts>=3")
+        await conn.execute("UPDATE interview_evaluation_jobs SET state='FAILED',error_code='EVALUATION_RETRY_EXHAUSTED',updated_at=NOW() WHERE state='RUNNING' AND retry_after<=NOW() AND attempts>=3")
         job = await conn.fetchrow('''UPDATE interview_evaluation_jobs j SET
             state='RUNNING',attempts=j.attempts+1,lease_id=$1,
             retry_after=NOW()+INTERVAL '2 minutes',updated_at=NOW()
@@ -38,6 +46,8 @@ async def process_one(session_id=None, turn_number=None):
                                                 answer['content'], job['answer_duration_seconds'])
     except asyncio.CancelledError:
         raise  # Lease expiry recovers process shutdown; never acknowledge incomplete work.
+    except TimeoutError:
+        code = 'EVALUATION_TIMEOUT'
     except Exception:
         code = 'EVALUATION_PROVIDER_FAILED'
     async with DatabaseConnection() as conn, conn.transaction():

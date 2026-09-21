@@ -1,0 +1,29 @@
+.f58-insight {
+  max-width: 380px;
+  padding: 1rem 0 1rem 1rem;
+  border-left: 2px solid var(--f58-line);
+}
+
+.f58-insight__headline {
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+}
+
+.f58-insight__body {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+  color: var(--f58-text);
+}
+
+.f58-insight__meta {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  color: var(--f58-text-soft);
+}
+
+.f58-insight__cta {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--f58-resolved);
+}

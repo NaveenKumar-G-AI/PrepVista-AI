@@ -1,0 +1,133 @@
+// ACEAPT AI — Feature 19 persisted schema (reference only)
+//
+// This mirrors the in-memory model in src/domain/types.ts. It is NOT wired
+// up to a repository implementation in this prototype — the service layer
+// only depends on the interfaces in src/repositories/ports.ts. To use this
+// for real:
+//   1. Reconcile studentId / conceptId below with whatever `student` /
+//      `concept` tables already exist in ACEAPT's real schema — they're
+//      meant to be foreign keys into those, not new identities.
+//   2. Write Prisma-backed classes that implement each interface in
+//      src/repositories/ports.ts.
+//   3. Swap the InMemory* classes for those at the composition root
+//      (src/api/server.ts) — nothing in src/engine or src/services changes.
+// See ARCHITECTURE_ASSUMPTIONS.md → "Swapping in a real database".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum KnowledgeStage {
+  EXPOSED
+  UNDERSTOOD
+  PRACTICED
+  MASTERED
+  RETAINED
+  TRANSFERABLE
+  EXAM_READY
+}
+
+enum RetentionRiskState {
+  STABLE
+  MONITOR
+  WEAKENING
+  AT_RISK
+  REACTIVATION_REQUIRED
+  INACCESSIBLE
+}
+
+enum RetentionStrengthBand {
+  STRONG
+  MODERATE
+  WEAK
+  INSUFFICIENT_EVIDENCE
+}
+
+enum RetrievalMode {
+  micro
+  blind
+  contrastive
+  mixed
+  transfer
+  standard
+}
+
+model KnowledgeState {
+  studentId           String
+  conceptId           String
+  stage               KnowledgeStage
+  riskState           RetentionRiskState
+  strengthBand        RetentionStrengthBand
+  strengthScore       Float?
+  evidenceSufficiency Float
+  lastSuccessAt       DateTime?
+  masteredAt          DateTime?
+  lastEvaluatedAt     DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@id([studentId, conceptId])
+}
+
+model RetrievalAttempt {
+  id                         String        @id @default(uuid())
+  studentId                  String
+  conceptId                  String
+  sessionId                  String
+  mode                       RetrievalMode
+  correct                    Boolean
+  latencyMs                  Int
+  hintsUsed                  Int
+  explanationRequested       Boolean
+  confidenceSelfReport       Int?
+  identifiedConceptCorrectly Boolean?
+  templateId                 String
+  difficultyBand             String
+  method                     String
+  topicWrapper                String
+  timed                       Boolean
+  createdAt                   DateTime @default(now())
+
+  @@index([studentId, conceptId, createdAt])
+}
+
+model RecallSession {
+  id          String    @id @default(uuid())
+  studentId   String
+  type        String
+  conceptIds  String[]
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+}
+
+model ReactivationSession {
+  id           String    @id @default(uuid())
+  studentId    String
+  conceptId    String
+  currentLevel Int
+  outcome      String
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  steps        Json
+}
+
+model ConceptDependency {
+  conceptId       String   @id
+  prerequisiteIds String[]
+}
+
+model RetentionEvent {
+  id        String   @id @default(uuid())
+  type      String
+  studentId String
+  conceptId String?
+  payload   Json?
+  timestamp DateTime @default(now())
+
+  @@index([studentId, type, timestamp])
+}

@@ -1,0 +1,62 @@
+/* =============================================================================
+   Design tokens — Hint Ladder
+   =============================================================================
+   Built for a component that sits INSIDE an existing dark code-editor
+   workspace, not a marketing page. When merging into the real CodeForge
+   repo, remap these to CodeForge's actual design-system tokens if one
+   already exists — these are deliberately declared as CSS custom
+   properties (not hardcoded per-component) specifically so that swap is
+   a find-and-replace in one file, not a rewrite of every component.
+
+   Signature element: the ladder itself. Assistance levels are a genuine
+   ordered progression (not decoration), so the progress indicator is
+   drawn as literal horizontal rungs rather than a generic numbered
+   stepper — see LadderRungs.tsx.
+   ============================================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap");
+/* Production note: self-host via next/font/google instead of this @import
+   for performance — left as a CDN import here to keep this reference
+   implementation to a single file per concern. */
+
+:root {
+  /* --- Surfaces -------------------------------------------------------- */
+  --hl-bg-void: #14161b;
+  --hl-surface: #1b1e26;
+  --hl-surface-raised: #232733;
+  --hl-border: #2e3340;
+  --hl-border-soft: #262a35;
+
+  /* --- Text -------------------------------------------------------------- */
+  --hl-text-primary: #ece9e2;
+  --hl-text-secondary: #9199ab;
+  --hl-text-tertiary: #656d7e;
+
+  /* --- Signature accent: "a hint is a small light" ----------------------- */
+  --hl-lamp: #e7b24c;
+  --hl-lamp-dim: #4a3c1c;
+  --hl-lamp-glow: rgba(231, 178, 76, 0.18);
+
+  /* --- Status ------------------------------------------------------------ */
+  --hl-resolved: #63bfa0;
+  --hl-resolved-dim: #1c3730;
+  --hl-stuck: #c97a6d;
+  --hl-stuck-dim: #3a2420;
+
+  /* --- Type ---------------------------------------------------------- */
+  --hl-font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --hl-font-voice: "IBM Plex Serif", Georgia, serif;
+  --hl-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* --- Shape / motion ------------------------------------------------- */
+  --hl-radius: 10px;
+  --hl-radius-sm: 6px;
+  --hl-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

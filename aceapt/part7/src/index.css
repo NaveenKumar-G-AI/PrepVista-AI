@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-ink text-ivory antialiased;
+    font-feature-settings: 'tnum' 1, 'cv01' 1;
+  }
+  ::selection {
+    @apply bg-amber/30 text-ivory;
+  }
+  :focus-visible {
+    outline: 2px solid #f0a83c;
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}

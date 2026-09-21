@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACEAPT — Opportunity-to-Action</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="wordmark">ACEAPT<span class="wordmark-feature">Feature 33</span></div>
+      <div class="tagline">Not a job board — a decision, made with you.</div>
+    </div>
+  </header>
+
+  <main class="desk">
+    <aside class="queue-rail">
+      <div class="rail-section" id="journeyStrip"></div>
+
+      <div class="rail-actions">
+        <button class="btn btn-primary" id="seedBtn">Seed demo data</button>
+        <button class="btn btn-quiet" id="addOppToggle">+ Add an opportunity</button>
+      </div>
+
+      <form class="add-form hidden" id="addOppForm">
+        <label for="f-title">Title</label>
+        <input id="f-title" name="title" required placeholder="e.g. Backend Developer Internship">
+
+        <label for="f-org">Organization</label>
+        <input id="f-org" name="organization" required placeholder="e.g. Acme Systems">
+
+        <label for="f-type">Type</label>
+        <select id="f-type" name="opportunityType">
+          <option value="internship">Internship</option>
+          <option value="job">Job</option>
+          <option value="campus_placement">Campus placement</option>
+          <option value="competition">Competition</option>
+          <option value="hackathon">Hackathon</option>
+          <option value="apprenticeship">Apprenticeship</option>
+          <option value="graduate_program">Graduate program</option>
+          <option value="assessment">Assessment</option>
+          <option value="project">Project</option>
+        </select>
+
+        <label for="f-deadline">Deadline</label>
+        <input id="f-deadline" name="deadline" type="date">
+
+        <label for="f-req">Required (comma or newline separated)</label>
+        <textarea id="f-req" name="requirements" placeholder="Python, SQL, System Design basics"></textarea>
+
+        <label for="f-pref">Preferred (optional)</label>
+        <textarea id="f-pref" name="preferredRequirements" placeholder="Power BI"></textarea>
+
+        <label for="f-elig">Eligibility (as written by the source)</label>
+        <textarea id="f-elig" name="eligibility" placeholder="Final year students. No prior experience required."></textarea>
+        <div class="field-hint">Left blank fields are stored as "not specified" — never guessed at.</div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:6px;">Add + analyze</button>
+      </form>
+
+      <div id="queueTiers">
+        <p class="empty-rail-note">No opportunities analyzed yet. Seed the demo or add one above.</p>
+      </div>
+    </aside>
+
+    <section class="case-file">
+      <div class="empty-state" id="emptyState">Pick an opportunity from the queue to open its case file.</div>
+      <div id="caseFileContent" class="hidden"></div>
+    </section>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+/*
+  DESIGN PLAN (Module 52 — premium, calm, trustworthy, student-focused;
+  explicitly not a generic dashboard, not childish gamification).
+
+  Subject: an aptitude-diagnostic result, read by a student who is often
+  anxious about placement prep and wants a clear, evidence-grounded answer
+  to "where do I stand" — not a cold score, not a badge screen.
+
+  Concept: an instrument reading, not a scoreboard. The visual language
+  borrows from technical/survey instruments — hairlines, tick marks, a
+  calibrated fill rather than a stoplight — because the product's actual
+  claim is "here is what we measured and how sure we are," which is an
+  instrument's job, not a game's.
+
+  Color (cool paper, not the warm-cream/terracotta default; one accent
+  hue used as FILL AMOUNT rather than hue-per-status, so nothing reads as
+  a red/green pass-fail):
+    --paper:      #EEF0EE  (cool, quiet page background)
+    --ink:        #17211D  (near-black with a green-charcoal cast)
+    --ink-soft:   #4A564F  (muted body text)
+    --line:       #D3D6D1  (hairline dividers / ticks)
+    --brass:      #A87C2C  (the one accent — "calibrated instrument" brass;
+                            used for fills, focus states, the signature visual)
+    --brass-soft: #E8DCC3  (brass at low opacity, for tracks/backgrounds)
+    --clay:       #8B5A44  (used ONLY for the "needs focus" text label, at
+                            body-text weight, never as a bar/badge fill —
+                            a label, not an alarm)
+
+  Type: Fraunces (display serif with real character, optical sizing) paired
+  with IBM Plex Sans (body/data — technical without being cold) and IBM
+  Plex Mono used sparingly for evidence figures/counts, reinforcing the
+  "instrument reading" concept. None of these are the Inter/system-ui
+  default. A real integration should load these via the app's existing
+  font pipeline; system fallbacks are provided below.
+
+  Layout: left-aligned, generous whitespace, no symmetric hero — a student
+  scanning this wants the answer fast. Numbered steps appear ONLY in Next
+  Best Step, because that's the one place the content is genuinely
+  sequential; strengths/weaknesses are unordered by nature and stay that
+  way (no fake ranking markers).
+
+  Signature element: the Capability Skyline (CapabilitySkyline.tsx) — a
+  continuous elevation silhouette across difficulty bands, not a bar
+  chart, with a single annotated breakdown marker where accuracy actually
+  drops. Everything else stays quiet around it.
+*/
+
+:root {
+  --diag-paper: #eef0ee;
+  --diag-paper-raised: #f7f8f6;
+  --diag-ink: #17211d;
+  --diag-ink-soft: #4a564f;
+  --diag-ink-faint: #7c8880;
+  --diag-line: #d3d6d1;
+  --diag-brass: #a87c2c;
+  --diag-brass-soft: #e8dcc3;
+  --diag-clay: #8b5a44;
+  --diag-font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --diag-font-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --diag-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --diag-radius: 3px;
+}
+
+.diag-root {
+  background: var(--diag-paper);
+  color: var(--diag-ink);
+  font-family: var(--diag-font-body);
+  line-height: 1.5;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.diag-root * {
+  box-sizing: border-box;
+}
+
+.diag-eyebrow {
+  font-family: var(--diag-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--diag-ink-faint);
+  margin: 0 0 0.5rem;
+}
+
+.diag-h1 {
+  font-family: var(--diag-font-display);
+  font-weight: 480;
+  font-size: 2.25rem;
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+  max-width: 20ch;
+}
+
+.diag-h2 {
+  font-family: var(--diag-font-display);
+  font-weight: 480;
+  font-size: 1.4rem;
+  margin: 0 0 0.9rem;
+}
+
+.diag-lede {
+  font-size: 1.05rem;
+  color: var(--diag-ink-soft);
+  max-width: 58ch;
+  margin: 0 0 1.75rem;
+}
+
+.diag-section {
+  padding: 2rem 0;
+  border-top: 1px solid var(--diag-line);
+}
+
+.diag-confidence-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--diag-font-mono);
+  font-size: 0.75rem;
+  color: var(--diag-ink-soft);
+  border: 1px solid var(--diag-line);
+  border-radius: var(--diag-radius);
+  padding: 0.25rem 0.6rem;
+}
+
+.diag-confidence-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--diag-brass);
+}
+
+.diag-skill-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--diag-line);
+}
+
+.diag-skill-row:first-child {
+  border-top: none;
+}
+
+.diag-skill-label {
+  font-weight: 500;
+}
+
+.diag-skill-meta {
+  font-family: var(--diag-font-mono);
+  font-size: 0.8rem;
+  color: var(--diag-ink-faint);
+}
+
+.diag-gauge-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  background: var(--diag-brass-soft);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.35rem;
+}
+
+.diag-gauge-fill {
+  height: 100%;
+  background: var(--diag-brass);
+  border-radius: 3px;
+}
+
+.diag-status-needs-focus {
+  color: var(--diag-clay);
+}
+
+.diag-why-item {
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--diag-line);
+}
+
+.diag-why-item:first-child {
+  border-top: none;
+}
+
+.diag-why-conclusion {
+  font-weight: 500;
+  margin: 0 0 0.4rem;
+}
+
+.diag-why-evidence {
+  font-size: 0.92rem;
+  color: var(--diag-ink-soft);
+  margin: 0;
+}
+
+.diag-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: diag-step;
+}
+
+.diag-step-item {
+  counter-increment: diag-step;
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.2rem 0.75rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--diag-line);
+}
+
+.diag-step-item:first-child {
+  border-top: none;
+}
+
+.diag-step-item::before {
+  content: counter(diag-step);
+  font-family: var(--diag-font-mono);
+  color: var(--diag-brass);
+  font-size: 0.95rem;
+}
+
+.diag-step-action {
+  font-weight: 500;
+  margin: 0 0 0.2rem;
+}
+
+.diag-step-rationale {
+  font-size: 0.88rem;
+  color: var(--diag-ink-soft);
+  grid-column: 2;
+  margin: 0;
+}
+
+.diag-cta {
+  font-family: var(--diag-font-body);
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: var(--diag-ink);
+  color: var(--diag-paper-raised);
+  border: none;
+  border-radius: var(--diag-radius);
+  padding: 0.85rem 1.5rem;
+  cursor: pointer;
+}
+
+.diag-cta:focus-visible,
+.diag-tab:focus-visible {
+  outline: 2px solid var(--diag-brass);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diag-root * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

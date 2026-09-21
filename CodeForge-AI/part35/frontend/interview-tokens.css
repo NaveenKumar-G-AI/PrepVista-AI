@@ -1,0 +1,75 @@
+/*
+  CodeForge Feature 35 — interview UI design tokens.
+
+  Import this ONCE at your app's root (e.g. next to your global stylesheet
+  import), not from inside InterviewSession.tsx / PostInterviewReport.tsx —
+  those components intentionally don't import it themselves so they stay
+  loadable in a plain Node context (SSR tests, unit tests) without a
+  bundler's CSS loader in front of them.
+
+  Concept: this is an evidence-verification instrument, not a quiz app.
+  The palette reads as a calibration lab, not a marketing page: cool paper
+  background, ink text with a faint green cast, and three signal colors
+  that map 1:1 onto the domain's own evidence states (verified / uncertain
+  / gap) rather than being decorative. Nothing here implies more precision
+  than the product actually claims — see EvidenceGauge.tsx, the signature
+  component, which only ever renders one of four discrete zones.
+*/
+
+:root {
+  /* Surfaces */
+  --cf-bg: #f1f3f0;
+  --cf-surface: #ffffff;
+  --cf-surface-sunken: #e8ebe6;
+  --cf-line: #d8ded9;
+
+  /* Ink */
+  --cf-ink: #12201c;
+  --cf-ink-muted: #5b6b64;
+  --cf-ink-faint: #8a9791;
+
+  /* Signal colors — these ARE the domain's evidence states, not brand accents */
+  --cf-verified: #1f7a5c;
+  --cf-verified-bg: #e3f1ea;
+  --cf-uncertain: #b8863b;
+  --cf-uncertain-bg: #f6eedc;
+  --cf-gap: #a8483a;
+  --cf-gap-bg: #f5e6e2;
+  --cf-unassessed: #8a9791;
+  --cf-unassessed-bg: #e8ebe6;
+
+  /* Type */
+  --cf-font-display: "Fraunces", "Iowan Old Style", ui-serif, Georgia, serif;
+  --cf-font-body: "IBM Plex Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --cf-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --cf-radius: 10px;
+  --cf-shadow: 0 1px 2px rgba(18, 32, 28, 0.06), 0 8px 24px rgba(18, 32, 28, 0.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.cf-root {
+  background: var(--cf-bg);
+  color: var(--cf-ink);
+  font-family: var(--cf-font-body);
+  line-height: 1.5;
+}
+
+.cf-eyebrow {
+  font-family: var(--cf-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cf-ink-muted);
+}
+
+.cf-focus-visible:focus-visible {
+  outline: 2px solid var(--cf-verified);
+  outline-offset: 2px;
+}

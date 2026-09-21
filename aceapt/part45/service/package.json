@@ -1,0 +1,43 @@
+{
+  "name": "@aceapt/feature-45-skill-graph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ACEAPT Feature 45 — Aptitude Skill Graph service (reference implementation)",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "start": "node dist/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:migrate": "ts-node src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "ts-node src/db/seed.ts",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "drizzle-orm": "^0.33.0",
+    "express": "4.19.2",
+    "helmet": "7.1.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/cors": "2.8.17",
+    "@types/express": "4.17.21",
+    "@types/jest": "29.5.12",
+    "@types/node": "20.14.15",
+    "@types/supertest": "6.0.2",
+    "drizzle-kit": "^0.24.2",
+    "jest": "29.7.0",
+    "supertest": "7.0.0",
+    "ts-jest": "29.2.4",
+    "ts-node": "10.9.2",
+    "ts-node-dev": "2.0.0",
+    "typescript": "5.5.4"
+  }
+}

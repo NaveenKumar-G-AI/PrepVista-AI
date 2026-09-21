@@ -1,0 +1,26 @@
+# Optional. Only needed once you switch DATABASE_PROVIDER=postgres
+# and/or CACHE_PROVIDER=redis / QUEUE_PROVIDER=bullmq in .env — the
+# app runs with zero infrastructure in the default "memory" mode.
+#
+# Usage: docker compose up -d
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: codeforge
+      POSTGRES_PASSWORD: codeforge
+      POSTGRES_DB: codeforge_feature36
+    ports:
+      - "5432:5432"
+    volumes:
+      - codeforge_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  codeforge_pgdata:

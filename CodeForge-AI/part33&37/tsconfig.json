@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@prepvista/shared": ["packages/shared/src"],
+      "@prepvista/backend": ["packages/backend/src"],
+      "@prepvista/frontend": ["packages/frontend/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}

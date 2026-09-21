@@ -1,0 +1,549 @@
+/* ============================================================
+   Tokens
+   ============================================================ */
+:root {
+  --ink: #12141a;
+  --surface: #1b1e27;
+  --surface-raised: #232733;
+  --border: #2e3341;
+  --text: #eef0f4;
+  --text-dim: #8b92a3;
+
+  --teal: #3fb8af; /* strong / confirmed */
+  --amber: #e8a33d; /* developing / in progress */
+  --coral: #d8695c; /* gap / needs attention */
+  --violet: #8c7cf0; /* reserved for the recommended-focus hero only */
+
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+}
+
+.page-header {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 14px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.page-sub {
+  color: var(--text-dim);
+  font-size: 15px;
+  max-width: 46ch;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.empty-note {
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 8px 0;
+}
+
+/* ============================================================
+   Hero — Recommended Focus
+   ============================================================ */
+.hero {
+  background: linear-gradient(160deg, var(--surface-raised), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(140, 124, 240, 0.18), transparent 70%);
+  pointer-events: none;
+}
+
+.hero .eyebrow {
+  color: var(--violet);
+}
+
+.hero-main {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.hero-reason {
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 62ch;
+}
+
+.hero-sub {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin: 0;
+}
+
+.hero-breakdown {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.breakdown-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.breakdown-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.breakdown-fill {
+  height: 100%;
+  background: var(--violet);
+  border-radius: 3px;
+}
+
+.hero-also {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.hero-also-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  transition: border-color 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--text-dim);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ============================================================
+   Grid + panels
+   ============================================================ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.panel-wide {
+  grid-column: 1 / -1;
+}
+
+.skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+  text-align: left;
+}
+
+.skill-row:first-of-type {
+  border-top: none;
+  padding-top: 4px;
+}
+
+.skill-row-name {
+  font-size: 14px;
+}
+
+.skill-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skill-row-state {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 92px;
+  text-align: right;
+}
+
+/* ============================================================
+   Insight cards
+   ============================================================ */
+.insight-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.insight-card:last-child {
+  margin-bottom: 0;
+}
+
+.insight-teal {
+  border-left-color: var(--teal);
+}
+
+.insight-amber {
+  border-left-color: var(--amber);
+}
+
+.insight-violet {
+  border-left-color: var(--violet);
+}
+
+/* ============================================================
+   Confidence gauge — the signature glyph
+   ============================================================ */
+.gauge {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  position: relative;
+}
+
+.gauge-bar {
+  display: inline-block;
+  width: 4px;
+  border-radius: 2px;
+}
+
+.gauge-md .gauge-bar {
+  height: 16px;
+}
+
+.gauge-sm .gauge-bar {
+  height: 11px;
+  width: 3px;
+}
+
+.gauge-pip {
+  position: absolute;
+  top: -6px;
+  right: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+/* ============================================================
+   Skill map
+   ============================================================ */
+.map-domain {
+  margin-bottom: 20px;
+}
+
+.map-domain:last-child {
+  margin-bottom: 0;
+}
+
+.map-domain-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.map-topic {
+  margin-bottom: 10px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+
+.map-topic-name {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 6px;
+}
+
+.map-skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.map-skill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 7px 0;
+  text-align: left;
+}
+
+.map-skill-name {
+  font-size: 13.5px;
+  flex: 1;
+}
+
+.map-skill-state {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ============================================================
+   Skill detail overlay
+   ============================================================ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 7, 10, 0.6);
+}
+
+.overlay-panel {
+  position: relative;
+  width: min(440px, 100%);
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  padding: 32px 28px;
+  overflow-y: auto;
+}
+
+.overlay-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.detail-gauge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 6px;
+}
+
+.detail-state-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.detail-evidence-note {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0 0 24px;
+}
+
+.detail-subscores {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.subscore {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subscore-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.subscore-value {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.subscore-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.detail-block {
+  margin-bottom: 22px;
+}
+
+.detail-block-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+}
+
+.detail-reasons {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 780px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .breakdown-row {
+    grid-template-columns: 110px 1fr;
+  }
+  .overlay-panel {
+    width: 100%;
+  }
+  h1 {
+    font-size: 27px;
+  }
+}

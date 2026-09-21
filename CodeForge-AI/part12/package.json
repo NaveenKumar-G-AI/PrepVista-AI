@@ -1,0 +1,24 @@
+{
+  "name": "@codeforge/submission-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CodeForge AI — Submission System: immutable submission snapshots, queue/worker evaluation pipeline, exactly-once finalization, role-aware results.",
+  "type": "module",
+  "scripts": {
+    "test": "bash scripts/run-all-tests.sh",
+    "typecheck": "tsc --noEmit",
+    "worker": "tsx src/worker/worker.ts",
+    "sweeper": "tsx src/worker/sweeper.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "notes": {
+    "runtime_dependencies_in_this_deliverable": "NONE — every file in src/ runs on Node built-ins only, by design (see ENGINEERING_REPORT.md, 'Why zero-dependency'). This matches how CodeForge's other subsystems (diagnostic engine, Engineering Simulator) were built.",
+    "dependencies_the_real_repo_should_wire_in": {
+      "@supabase/supabase-js": "to activate src/repository/supabaseSubmissionRepository.ts (currently a real, complete implementation that is NOT executed in this sandbox — no network/credentials here)",
+      "zod": "optional — src/services/validation.ts ships a small hand-rolled validator with the same shape so it has zero deps; swap in zod schemas if that's CodeForge's existing convention",
+      "typescript, tsx": "dev-only, for building/running this TS source — already used in this sandbox to write and test every file below"
+    }
+  }
+}

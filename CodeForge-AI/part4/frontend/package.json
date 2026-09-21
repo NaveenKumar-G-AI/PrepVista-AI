@@ -1,0 +1,9 @@
+{
+  "name": "codeforge-frontend-reference",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dev-only verification harness for frontend/index.html — jsdom drives the real page against a running instance of the API. Not needed to just open index.html in a browser.",
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@codeforge/understanding-check",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CodeForge AI — Understanding Check: evidence-driven assessment of genuine student understanding, decoupled from code correctness.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9",
+    "@types/node": "^22.5.0",
+    "react": "^18.3.1",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0"
+  }
+}

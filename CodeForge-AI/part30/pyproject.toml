@@ -1,0 +1,12 @@
+[project]
+name = "codeforge-ai-gateway"
+version = "0.1.0"
+description = "CodeForge AI Cost & Performance Control Plane — central AI gateway, model routing, cost/budget engines, resilience, and telemetry."
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

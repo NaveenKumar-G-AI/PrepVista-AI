@@ -1,0 +1,21 @@
+{
+  "name": "codeforge-debugging-coach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CodeForge AI - Debugging Coach: next-best-action coaching intelligence layer on top of an existing Debugging Mode / execution engine.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^20.11.0"
+  }
+}

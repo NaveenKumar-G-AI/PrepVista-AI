@@ -1,0 +1,73 @@
+:root {
+  --ink-950: #0a0d13;
+  --ink-900: #10141d;
+  --ink-850: #151b26;
+  --ink-800: #1c2431;
+  --ink-700: #293344;
+  --mist-500: #6b7488;
+  --mist-400: #8b93a7;
+  --paper-100: #e9ecf2;
+  --paper-050: #f5f6f9;
+
+  --cyan-400: #4fd1c5;
+  --cyan-300: #7fe0d6;
+  --amber-400: #e8b54c;
+  --amber-300: #f0c876;
+  --green-400: #5fbf77;
+  --red-400: #e2685c;
+
+  --font-display: -apple-system, "Segoe UI", "IBM Plex Sans", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "IBM Plex Mono", "Cascadia Code", Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--ink-950);
+  color: var(--paper-100);
+  font-family: var(--font-display);
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(79, 209, 197, 0.05), transparent 40%),
+    radial-gradient(circle at 85% 100%, rgba(232, 181, 76, 0.04), transparent 40%);
+  background-attachment: fixed;
+}
+
+a {
+  color: var(--cyan-400);
+}
+
+code,
+pre,
+textarea.code-editor {
+  font-family: var(--font-mono);
+}
+
+::selection {
+  background: rgba(79, 209, 197, 0.25);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cyan-300);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

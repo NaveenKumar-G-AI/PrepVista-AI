@@ -21,7 +21,7 @@ from app.services.evaluator import (
     get_score_interpretation,
 )
 from app.services.interview_summary import compute_interview_summary, coerce_runtime_state
-from app.services.report_truth import build_report_truth
+from app.services.report_truth import build_report_truth, saved_answer_records
 from app.routers.interviews_helpers import _validate_session_id
 
 router = APIRouter()
@@ -139,7 +139,7 @@ async def get_report(
 
     async with DatabaseConnection() as conn:
         messages = await conn.fetch("SELECT role,content,turn_number FROM conversation_messages WHERE session_id=$1 ORDER BY turn_number,id", session_id)
-        jobs = await conn.fetch("SELECT state FROM interview_evaluation_jobs WHERE session_id=$1", session_id)
+        jobs = await conn.fetch("SELECT turn_number,state,attempts,error_code,updated_at,retry_after FROM interview_evaluation_jobs WHERE session_id=$1", session_id)
     truth = build_report_truth(session_data, [dict(row) for row in eval_rows], messages, jobs)
     plan = session_data["plan"]
     # Use effective_plan to respect admin override
@@ -215,6 +215,8 @@ async def get_report(
     )
 
     interpretation = truth["interpretation"]
+    resume_extraction = coerce_runtime_state(session_data.get("resume_summary")).get("resume_extraction")
+    extraction_status = resume_extraction.get("status") if isinstance(resume_extraction, dict) else None
 
     return {
         "session": {
@@ -236,11 +238,14 @@ async def get_report(
             "summary": summary,
         },
         "evidence_report": truth["evidence_report"],
+        "resume_extraction": {"status": extraction_status} if extraction_status in {"AVAILABLE", "PARTIAL", "NO_CLAIMS", "FAILED"} else None,
         "evaluation_status": truth["evaluation_status"],
         "report_state": truth["report_state"],
         "report_version": truth["report_version"],
         "pending_evaluations": truth["pending_evaluations"],
         "failed_evaluations": truth["failed_evaluations"],
+        "evaluation_processing": truth["evaluation_processing"],
+        "saved_answers": saved_answer_records(messages, truth["evaluations"], truth["evaluation_processing"]),
         "evaluations": evaluations,
         "user_plan": user.plan,
         "has_premium_access": has_premium_access,
@@ -313,10 +318,10 @@ async def _attach_audit_trail(
     signed_by_turn: dict[int, str | None] = {}
     if sign_targets:
         signed_urls = await asyncio.gather(
-            *(create_signed_url(path) for _, path in sign_targets)
+            *(create_signed_url(path) for _, path in sign_targets), return_exceptions=True
         )
         signed_by_turn = {
-            turn: url for (turn, _), url in zip(sign_targets, signed_urls)
+            turn: url if isinstance(url, str) else None for (turn, _), url in zip(sign_targets, signed_urls)
         }
 
     any_audio = False
@@ -606,7 +611,9 @@ async def retry_evaluations(session_id: str, user: UserProfile = Depends(get_cur
     _validate_session_id(session_id)
     await rate_limit_user(user.id)
     async with DatabaseConnection() as conn, conn.transaction():
-        session = await conn.fetchrow("SELECT id FROM interview_sessions WHERE id=$1 AND user_id=$2 AND state='FINISHED' FOR NO KEY UPDATE", session_id, user.id)
+        # The job primary key and conditional UPSERT serialize retries. Taking a
+        # session write lock here would invert the worker's job -> session order.
+        session = await conn.fetchrow("SELECT id FROM interview_sessions WHERE id=$1 AND user_id=$2 AND state='FINISHED'", session_id, user.id)
         if not session:
             raise HTTPException(status_code=404, detail="Completed interview not found.")
         answers = await conn.fetch("""SELECT DISTINCT ON(m.turn_number) m.id,m.role,m.content,m.turn_number
@@ -620,7 +627,9 @@ async def retry_evaluations(session_id: str, user: UserProfile = Depends(get_cur
             changed = await conn.fetchval("""INSERT INTO interview_evaluation_jobs(session_id,turn_number,source_message_id)
                 VALUES($1,$2,$3) ON CONFLICT(session_id,turn_number) DO UPDATE
                 SET state='PENDING',attempts=0,retry_after=NOW(),updated_at=NOW(),error_code=NULL,lease_id=NULL
-                WHERE interview_evaluation_jobs.state='FAILED' AND interview_evaluation_jobs.updated_at < NOW()-INTERVAL '5 minutes'
+                WHERE interview_evaluation_jobs.updated_at <= NOW()-INTERVAL '5 minutes'
+                  AND (interview_evaluation_jobs.state='FAILED'
+                    OR (interview_evaluation_jobs.state IN ('PENDING','RUNNING') AND interview_evaluation_jobs.retry_after <= NOW()))
                 RETURNING turn_number""", session_id, answer['turn_number'], answer['id'])
             queued += changed is not None
     return {"queued": queued, "message": "Saved answers will be evaluated when the service is available."}

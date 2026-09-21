@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* ============================================================
+   DESIGN SYSTEM — "Flight Log"
+   ------------------------------------------------------------
+   Concept: ACEAPT's execution layer reads like a pilot's daily
+   log — one heading, one bearing, precise instrument read-outs
+   for time and progress, a steady and unshowy hand. The app is
+   a bright, orderly logbook; the one moment of real focus (an
+   active execution session) dims to a quiet instrument panel —
+   the single signature contrast in the system.
+
+   Palette is a cool steel/paper neutral (NOT the common warm
+   cream+terracotta AI-default) with a brass "signal" accent used
+   only for the one primary action, plus a small semantic set for
+   positive / attention / neutral states — never decorative color.
+
+   Type: Bricolage Grotesque (display, used sparingly) paired with
+   IBM Plex Sans (UI/body) and IBM Plex Mono (every number: time,
+   durations, counts, timers) — numerals read like instrument
+   telemetry, which is the one deliberate structural device here.
+   ============================================================ */
+
+@theme {
+  /* Logbook (default) surface */
+  --color-bg: #f1f2f4;
+  --color-surface: #ffffff;
+  --color-surface-recessed: #e7e9ec;
+  --color-ink: #1a2233;
+  --color-ink-muted: #5b6472;
+  --color-ink-faint: #8a92a1;
+  --color-hairline: #dadde1;
+  --color-hairline-strong: #c3c7cd;
+
+  /* Signal accents — semantic only, never decorative */
+  --color-brass: #a97a2e;
+  --color-brass-strong: #8a641f;
+  --color-brass-soft: #f2e6d1;
+  --color-sage: #3f7566;
+  --color-sage-soft: #e1ece8;
+  --color-rust: #a14f3c;
+  --color-rust-soft: #f3e2dd;
+  --color-slate: #6b7280;
+  --color-slate-soft: #e9eaec;
+
+  /* Focus mode (dark instrument panel — session screen only) */
+  --color-focus-bg: #14171f;
+  --color-focus-surface: #1c202b;
+  --color-focus-surface-raised: #232837;
+  --color-focus-ink: #ececE6;
+  --color-focus-ink-muted: #8d93a3;
+  --color-focus-hairline: #2c3140;
+  --color-focus-brass: #d9a24b;
+
+  /* Type */
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--color-brass-soft);
+  color: var(--color-ink);
+}
+
+/* Visible keyboard focus everywhere — never suppressed */
+:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Hairline rule — the recurring structural device standing in for
+   dividers/section breaks throughout the logbook (never a card
+   shadow). */
+.rule {
+  border-top: 1px solid var(--color-hairline);
+}
+
+/* Tabular numerals for every piece of instrument telemetry: time
+   budgets, durations, counters, timers. */
+.tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Custom scrollbar, quiet */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline-strong) transparent;
+}

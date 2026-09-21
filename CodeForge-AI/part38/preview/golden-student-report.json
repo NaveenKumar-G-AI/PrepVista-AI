@@ -1,0 +1,366 @@
+{
+  "metadata": {
+    "reportId": "3c2c787f-885c-46c7-9d02-bd5c155631ab",
+    "reportType": "STUDENT_TECHNICAL_MASTERY",
+    "schemaVersion": "1.0.0",
+    "sourceDataVersion": 1,
+    "generatedAt": "2026-08-23T01:53:34.111Z",
+    "generatedById": "user_student_golden",
+    "status": "COMPLETED"
+  },
+  "identity": {
+    "studentId": "student_golden",
+    "studentName": "Kavya Iyer"
+  },
+  "organization": {
+    "orgId": "org_demo",
+    "orgName": "Skyline Institute of Technology"
+  },
+  "summary": {
+    "overallMastery": "COMPETENT",
+    "targetRole": "Backend Developer",
+    "roleReadiness": "NEAR_READY",
+    "strongestAreas": [
+      "Data Structures & Algorithms",
+      "Python"
+    ],
+    "criticalGaps": [
+      "System Design"
+    ],
+    "recentGrowthHighlight": "Testing moved from Foundational to Developing",
+    "nextBestAction": "Complete the System Design Fundamentals module"
+  },
+  "mastery": {
+    "overallLevel": "COMPETENT"
+  },
+  "skills": [
+    {
+      "skillId": "skill_backend",
+      "skillName": "Backend Engineering",
+      "masteryLevel": "COMPETENT",
+      "trend": "STABLE",
+      "evidenceStrength": "MODERATE",
+      "evidenceCount": 14,
+      "lastEvaluatedAt": "2026-08-19T01:53:34.102Z",
+      "roleRelevance": [
+        "Backend Developer"
+      ],
+      "gapStatus": "NOT_APPLICABLE"
+    },
+    {
+      "skillId": "skill_ds",
+      "skillName": "Data Structures & Algorithms",
+      "masteryLevel": "ADVANCED",
+      "trend": "STABLE",
+      "evidenceStrength": "STRONG",
+      "evidenceCount": 30,
+      "lastEvaluatedAt": "2026-08-19T01:53:34.103Z",
+      "roleRelevance": [
+        "Backend Developer",
+        "ML Engineer",
+        "Data Analyst"
+      ],
+      "gapStatus": "NOT_APPLICABLE"
+    },
+    {
+      "skillId": "skill_python",
+      "skillName": "Python",
+      "masteryLevel": "PROFICIENT",
+      "trend": "UP",
+      "evidenceStrength": "STRONG",
+      "evidenceCount": 24,
+      "lastEvaluatedAt": "2026-08-19T01:53:34.102Z",
+      "roleRelevance": [
+        "Backend Developer",
+        "ML Engineer"
+      ],
+      "gapStatus": "NOT_APPLICABLE"
+    },
+    {
+      "skillId": "skill_sql",
+      "skillName": "SQL",
+      "masteryLevel": "DEVELOPING",
+      "trend": "UP",
+      "evidenceStrength": "MODERATE",
+      "evidenceCount": 9,
+      "lastEvaluatedAt": "2026-08-19T01:53:34.102Z",
+      "roleRelevance": [
+        "Backend Developer",
+        "Data Analyst"
+      ],
+      "gapStatus": "NOT_APPLICABLE"
+    },
+    {
+      "skillId": "skill_sysdesign",
+      "skillName": "System Design",
+      "masteryLevel": "FOUNDATIONAL",
+      "trend": "UP",
+      "evidenceStrength": "LIMITED",
+      "evidenceCount": 3,
+      "lastEvaluatedAt": "2026-08-19T01:53:34.103Z",
+      "roleRelevance": [
+        "Backend Developer",
+        "ML Engineer"
+      ],
+      "gapStatus": "BLOCKING_GAP"
+    },
+    {
+      "skillId": "skill_testing",
+      "skillName": "Testing",
+      "masteryLevel": "DEVELOPING",
+      "trend": "UP",
+      "evidenceStrength": "LIMITED",
+      "evidenceCount": 5,
+      "lastEvaluatedAt": "2026-08-19T01:53:34.103Z",
+      "roleRelevance": [
+        "Backend Developer"
+      ],
+      "gapStatus": "GAP"
+    }
+  ],
+  "roles": [
+    {
+      "roleId": "role_backend_dev",
+      "roleName": "Backend Developer",
+      "readiness": "NEAR_READY",
+      "readyAreas": [
+        "Python",
+        "Data Structures & Algorithms"
+      ],
+      "developingAreas": [
+        "SQL",
+        "Testing"
+      ],
+      "blockingGaps": [
+        "System Design"
+      ]
+    },
+    {
+      "roleId": "role_data_analyst",
+      "roleName": "Data Analyst",
+      "readiness": "READY",
+      "readyAreas": [
+        "SQL",
+        "Data Structures & Algorithms"
+      ],
+      "developingAreas": [],
+      "blockingGaps": []
+    }
+  ],
+  "gaps": [
+    {
+      "skillId": "skill_sysdesign",
+      "skillName": "System Design",
+      "roleId": "role_backend_dev",
+      "roleName": "Backend Developer",
+      "currentState": "FOUNDATIONAL",
+      "expectedState": "COMPETENT",
+      "gap": "2 levels",
+      "evidenceRefs": [
+        "Coding evidence",
+        "Mock interview"
+      ],
+      "roleImpact": "Blocking for senior backend interview loops",
+      "recommendedAction": "Complete the System Design fundamentals track and the distributed-systems project challenge."
+    },
+    {
+      "skillId": "skill_testing",
+      "skillName": "Testing",
+      "roleId": "role_backend_dev",
+      "roleName": "Backend Developer",
+      "currentState": "DEVELOPING",
+      "expectedState": "COMPETENT",
+      "gap": "1 level",
+      "evidenceRefs": [
+        "Coding evidence"
+      ],
+      "roleImpact": "Reduces confidence in code-review readiness",
+      "recommendedAction": "Pair on writing test suites for two upcoming coding challenges."
+    }
+  ],
+  "evidence": {
+    "coding": {
+      "correctness": "Consistently correct on medium-difficulty problems",
+      "efficiency": "Occasionally submits solutions with avoidable extra time complexity",
+      "complexity": "Comfortable with medium complexity; struggles with multi-constraint problems",
+      "codeQuality": "Consistent style; some duplication across similar functions",
+      "problemSolving": "Breaks problems into steps reliably",
+      "evidenceState": "OBSERVED",
+      "sampleCount": 24,
+      "lastEvaluatedAt": "2026-08-19T01:53:34.105Z"
+    },
+    "debugging": {
+      "capability": "Systematic; uses logging and bisection effectively",
+      "commonWeakness": "Struggles to isolate concurrency-related bugs",
+      "trend": "UP",
+      "evidenceState": "OBSERVED"
+    },
+    "reasoning": {
+      "reasoningNote": "Explains most solutions clearly in code review",
+      "understandingNote": "Occasional gap between code produced and verbal explanation on advanced topics",
+      "evidenceState": "OBSERVED"
+    },
+    "projects": [
+      {
+        "projectId": "proj_inventory",
+        "projectName": "Inventory Management API",
+        "skillsDemonstrated": [
+          "Python",
+          "Backend Engineering",
+          "SQL"
+        ],
+        "technicalDepth": "Implemented a REST API with token authentication and a normalized relational schema across six tables.",
+        "relevantRole": "Backend Developer",
+        "evidenceState": "OBSERVED"
+      },
+      {
+        "projectId": "proj_finance",
+        "projectName": "Personal Finance Dashboard",
+        "skillsDemonstrated": [
+          "Python",
+          "Data Structures & Algorithms"
+        ],
+        "technicalDepth": "Built a data-processing pipeline with custom sorting and aggregation logic over transaction data.",
+        "relevantRole": "Data Analyst",
+        "evidenceState": "OBSERVED"
+      }
+    ],
+    "interviews": [
+      {
+        "interviewId": "iv_mock1",
+        "interviewName": "Mock Backend Interview — Round 1",
+        "outcome": "Passed. Strong problem-solving; weaker on system-design trade-off discussion.",
+        "evaluatedSkills": [
+          "Python",
+          "System Design",
+          "Data Structures & Algorithms"
+        ],
+        "evidenceState": "OBSERVED",
+        "occurredAt": "2026-08-03T01:53:34.105Z"
+      }
+    ]
+  },
+  "growth": {
+    "timeline": [
+      {
+        "skillName": "Python",
+        "occurredAt": "2026-05-25T01:53:34.104Z",
+        "fromLevel": "DEVELOPING",
+        "toLevel": "COMPETENT",
+        "note": "Completed the intermediate Python assessment"
+      },
+      {
+        "skillName": "Python",
+        "occurredAt": "2026-06-29T01:53:34.104Z",
+        "fromLevel": "COMPETENT",
+        "toLevel": "PROFICIENT",
+        "note": "Strong performance across three coding challenges"
+      },
+      {
+        "skillName": "SQL",
+        "occurredAt": "2026-07-29T01:53:34.104Z",
+        "fromLevel": "FOUNDATIONAL",
+        "toLevel": "DEVELOPING",
+        "note": "Completed the SQL joins & aggregation module"
+      },
+      {
+        "skillName": "Data Structures & Algorithms",
+        "occurredAt": "2026-08-11T01:53:34.104Z",
+        "fromLevel": "COMPETENT",
+        "toLevel": "ADVANCED",
+        "note": "High marks on the data structures assessment"
+      },
+      {
+        "skillName": "Testing",
+        "occurredAt": "2026-08-13T01:53:34.104Z",
+        "fromLevel": "FOUNDATIONAL",
+        "toLevel": "DEVELOPING",
+        "note": "Wrote first full unit test suite"
+      }
+    ],
+    "fastestImproving": [
+      "Python"
+    ],
+    "stable": [],
+    "persistentGaps": [],
+    "recentlyImproved": [
+      "SQL",
+      "Data Structures & Algorithms",
+      "Testing"
+    ],
+    "insufficientData": false
+  },
+  "strengths": [
+    {
+      "title": "Data Structures & Algorithms — Advanced",
+      "evidenceRefs": [
+        "Coding evidence",
+        "Project: Personal Finance Dashboard",
+        "Interview: Mock Backend Interview — Round 1"
+      ],
+      "skill": "Data Structures & Algorithms",
+      "roleRelevance": [
+        "Backend Developer",
+        "ML Engineer",
+        "Data Analyst"
+      ]
+    },
+    {
+      "title": "Python — Proficient",
+      "evidenceRefs": [
+        "Coding evidence",
+        "Project: Inventory Management API",
+        "Interview: Mock Backend Interview — Round 1"
+      ],
+      "skill": "Python",
+      "roleRelevance": [
+        "Backend Developer",
+        "ML Engineer"
+      ]
+    }
+  ],
+  "weaknesses": [
+    {
+      "title": "System Design — Foundational",
+      "evidenceRefs": [
+        "Coding evidence",
+        "Mock interview"
+      ],
+      "impact": "Blocking for senior backend interview loops",
+      "recommendedAction": "Complete the System Design fundamentals track and the distributed-systems project challenge."
+    },
+    {
+      "title": "Testing — Developing",
+      "evidenceRefs": [
+        "Coding evidence"
+      ],
+      "impact": "Reduces confidence in code-review readiness",
+      "recommendedAction": "Pair on writing test suites for two upcoming coding challenges."
+    }
+  ],
+  "recommendations": [
+    {
+      "action": "Complete the System Design Fundamentals module",
+      "why": "System Design is currently your largest gap toward Backend Developer readiness.",
+      "relatedSkill": "System Design",
+      "roleImpact": "Directly unblocks Backend Developer readiness",
+      "priority": 1
+    },
+    {
+      "action": "Pair-review two SQL query optimization challenges",
+      "why": "SQL is trending up but evidence volume is still limited.",
+      "relatedSkill": "SQL",
+      "roleImpact": "Strengthens Data Analyst and Backend Developer readiness",
+      "priority": 2
+    }
+  ],
+  "narrative": {
+    "executiveSummary": "Kavya Iyer's current overall technical mastery is Competent. Toward the Backend Developer target, readiness is currently Near ready. Recommended next step: Complete the System Design Fundamentals module.",
+    "strengthsNarrative": "Demonstrated strengths include Data Structures & Algorithms (Advanced), Python (Proficient).",
+    "weaknessesNarrative": "System Design — Foundational: Blocking for senior backend interview loops. Next step: Complete the System Design fundamentals track and the distributed-systems project challenge. Testing — Developing: Reduces confidence in code-review readiness. Next step: Pair on writing test suites for two upcoming coding challenges.",
+    "growthNarrative": "Recent activity shows measurable movement across multiple skills — see the growth timeline for specifics.",
+    "source": "fallback",
+    "validated": true
+  },
+  "freshness": "UP_TO_DATE"
+}

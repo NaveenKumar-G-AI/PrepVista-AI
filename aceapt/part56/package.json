@@ -1,0 +1,33 @@
+{
+  "name": "formula-intelligence-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ACEAPT Feature 56 - Formula Intelligence Engine: formula understanding, recognition, selection, mapping, application, verification, transfer and retention, scaffolded as an integration-ready module.",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/src/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^5.2.1",
+    "mathjs": "^15.2.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.4.0",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

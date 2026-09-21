@@ -1,0 +1,22 @@
+{
+  "name": "ai-code-coach",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Evidence-grounded AI coaching engine for CodeForge — standalone module built to plug into an existing CodeForge backend.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

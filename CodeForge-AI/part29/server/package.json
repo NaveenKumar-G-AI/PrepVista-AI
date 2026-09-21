@@ -1,0 +1,32 @@
+{
+  "name": "codeforge-growth-tracking-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "db:setup": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f db/schema.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f db/rls_policies.sql",
+    "seed:demo": "tsx scripts/seedDemo.ts",
+    "test:rls": "tsx scripts/testRls.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "pg": "^8.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.7.4",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

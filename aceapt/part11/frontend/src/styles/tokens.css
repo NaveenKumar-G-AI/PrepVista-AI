@@ -1,0 +1,200 @@
+/*
+  Design direction: this is a page about MEASUREMENT - how consistently
+  someone practiced, how much evidence backs a claim, how well-calibrated
+  their confidence is. The visual language leans into that (cool paper,
+  hairline "ruled notebook" margins, a tick-mark evidence meter) instead of
+  a generic SaaS-dashboard look. Deliberately avoids: warm cream + serif
+  (cafe aesthetic), near-black + neon (gamified), and dense multi-column
+  broadsheet layouts - see frontend-design skill notes.
+
+  Type: Space Grotesk for headings (confident, technical), IBM Plex Sans
+  for body copy (calm, humanist), IBM Plex Mono for every number - dates,
+  percentages, evidence counts read like instrument readouts.
+*/
+:root {
+  --paper: #eef0f2;
+  --surface: #f8f9fa;
+  --ink: #1b2430;
+  --muted: #5b6570;
+  --line: #c7cdd3;
+  --line-soft: #dde1e5;
+  --accent: #2b5c79;
+  --accent-soft: #dce8ee;
+  --strong: #3d7a5c;
+  --strong-soft: #dfeee6;
+  --watch: #a8772f;
+  --watch-soft: #f3e8d6;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius: 3px;
+  --content-width: 720px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.abi-page {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+.abi-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.abi-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  margin: 6px 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.abi-summary {
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 40px;
+  max-width: 56ch;
+}
+
+.abi-cold-start {
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  margin-bottom: 32px;
+}
+
+.abi-cold-start p { margin: 0; color: var(--muted); line-height: 1.6; }
+
+.abi-dimension {
+  position: relative;
+  padding: 20px 0 20px 24px;
+  border-top: 1px solid var(--line-soft);
+}
+.abi-dimension:last-child { border-bottom: 1px solid var(--line-soft); }
+
+.abi-dimension::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 24px;
+  bottom: 24px;
+  width: 2px;
+  background: var(--line);
+}
+.abi-dimension[data-level='STRONG']::before { background: var(--strong); }
+.abi-dimension[data-level='LOW']::before { background: var(--watch); }
+
+.abi-dimension-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.abi-dimension-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.abi-dimension-level {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+}
+.abi-dimension[data-level='STRONG'] .abi-dimension-level { color: var(--strong); }
+.abi-dimension[data-level='LOW'] .abi-dimension-level { color: var(--watch); }
+.abi-dimension[data-level='DEVELOPING'] .abi-dimension-level { color: var(--muted); font-style: italic; }
+
+.abi-dimension-explanation {
+  margin: 8px 0 14px;
+  line-height: 1.55;
+  font-size: 14.5px;
+  color: var(--ink);
+  max-width: 60ch;
+}
+
+/* Signature element: an evidence "ruler" - tick marks, not a smooth
+   gradient bar. Filled ticks = confidence; the caption below states the
+   raw evidence count and window, so the visual and the number always
+   agree (never a bar with no explanation behind it). */
+.abi-evidence-ruler {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 14px;
+}
+.abi-evidence-tick {
+  width: 4px;
+  background: var(--line);
+  border-radius: 1px;
+}
+.abi-evidence-tick[data-filled='true'] { background: var(--accent); }
+
+.abi-evidence-caption {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.abi-plan-change {
+  margin-top: 40px;
+  border: 1px solid var(--accent-soft);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.abi-plan-change-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.abi-plan-change-sub {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--accent);
+  margin: 0 0 16px;
+}
+
+.abi-plan-change ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.abi-plan-change li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+.abi-plan-change li:last-child { margin-bottom: 0; }
+
+.abi-loading, .abi-error {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+  padding: 40px 0;
+}

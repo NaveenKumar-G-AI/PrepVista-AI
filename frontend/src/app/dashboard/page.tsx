@@ -147,7 +147,7 @@ export default function DashboardPage() {
   useEffect(() => {
     // Only fetch once — the API cache handles freshness
     if (fetchedRef.current) return;
-    if (!authLoading && !user) return; // Will be redirected
+    if (authLoading || !user) return; // Wait for verified identity and role.
 
     fetchedRef.current = true;
 

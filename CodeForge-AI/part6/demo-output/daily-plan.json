@@ -1,0 +1,27 @@
+{
+  "planDate": "2026-08-16",
+  "primaryAction": "Transfer challenge: Recursion",
+  "blocks": [
+    {
+      "minutes": 33,
+      "activityType": "PRACTICE",
+      "skillId": "skill_recursion",
+      "skillName": "Recursion",
+      "label": "Practice: Recursion"
+    },
+    {
+      "minutes": 16,
+      "activityType": "TRANSFER",
+      "skillId": "skill_bfs",
+      "skillName": "Breadth-First Search",
+      "label": "Transfer challenge: Breadth-First Search"
+    },
+    {
+      "minutes": 11,
+      "activityType": "VERIFICATION",
+      "skillId": "skill_recursion",
+      "skillName": "Recursion",
+      "label": "Verification challenge: Recursion"
+    }
+  ]
+}

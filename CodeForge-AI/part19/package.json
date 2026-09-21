@@ -1,0 +1,23 @@
+{
+  "name": "codeforge-reasoning-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CodeForge AI — Reasoning Verification Engine. Standalone, integration-ready module. See README.md before wiring into the main app.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "acorn": "^8.15.0",
+    "acorn-walk": "^8.3.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8",
+    "tsx": "^4.19.2",
+    "@types/node": "^22.10.5"
+  }
+}

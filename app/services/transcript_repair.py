@@ -232,9 +232,8 @@ async def repair_transcript(
             retries=1,
             timeout=6.0,
             fallback_timeout=7.0,
-            # Repair quality matters more than provider; allow OpenAI fallback,
-            # but the whole call is best-effort and degrades to raw on failure.
-            allow_provider_fallback=True,
+            # Groq-only repair is best-effort and preserves the raw text on failure.
+            allow_provider_fallback=False,
         )
     except Exception as exc:  # noqa: BLE001 — never break scoring on repair
         logger.warning(
