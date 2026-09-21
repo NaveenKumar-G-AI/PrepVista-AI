@@ -319,7 +319,7 @@ export class ServerSttSession {
       });
 
       // Only accept if still no transcript for this window
-      if (result?.final_transcript && this.currentWindowState !== 'WS_SUCCEEDED') {
+      if (result?.final_transcript) {
         this.currentWindowState = 'REST_FALLBACK';
         const text = result.final_transcript.trim();
         if (text) {
