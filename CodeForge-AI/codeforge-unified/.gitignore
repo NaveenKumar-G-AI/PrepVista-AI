@@ -1,9 +1,0 @@
-node_modules/
-.next/
-.npm-cache/
-.env*
-!.env.example
-playwright-report/
-test-results/
-public/runner.js
-*.tsbuildinfo

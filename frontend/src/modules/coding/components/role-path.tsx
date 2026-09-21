@@ -1,8 +1,0 @@
-'use client';
-import { roles, skills, skillPrerequisites } from '@/modules/coding/engines/catalog/seed/data';
-import { useWorkspace } from '@/modules/coding/lib/state';
-import { ActionLink } from './ui';
-export function RolePath() {
-  const { state, update } = useWorkspace(); const active = roles.filter(r => r.status === 'ACTIVE'); const role = active.find(r => r.slug === state.role) ?? active[0];
-  return <section className="panel"><div className="section-header"><h2>A direction for your learning</h2><span className="tag violet">OPTIONAL ROLE PATH</span></div><label className="field-label">Role to explore<select value={role.slug} onChange={e => update(s => ({ ...s, role: e.target.value }))}>{active.map(r => <option key={r.slug} value={r.slug}>{r.name}</option>)}</select></label><p>{role.shortDescription}</p><p className="muted small">The PrepVista role catalog identifies relevant skills and prerequisites. Reading checkpoints are self-recorded; they do not establish job readiness.</p><div className="role-skills">{role.skills.map(r => { const skill = skills.find(s => s.slug === r.skill); if (!skill) return null; const prereqs = skillPrerequisites.filter(p => p.skill === skill.slug).map(p => skills.find(s => s.slug === p.prerequisite)?.name).filter(Boolean); return <div className="list-row" key={r.skill}><div><strong>{skill.name}</strong><p>{prereqs.length ? `Review first: ${prereqs.join(', ')}` : skill.description}</p></div><span className={`tag ${state.learned.includes(skill.slug) ? 'cyan' : ''}`}>{state.learned.includes(skill.slug) ? 'Explored' : 'To explore'}</span></div>; })}</div><ActionLink href="/coding/learn" secondary>Explore the concept library</ActionLink></section>;
-}

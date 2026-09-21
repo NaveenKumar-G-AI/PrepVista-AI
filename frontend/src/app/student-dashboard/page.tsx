@@ -11,7 +11,6 @@ import { useRouter } from 'next/navigation';
 
 import { BoltIcon, HistoryIcon, PlayIcon, SparklesIcon, TargetIcon } from '@/components/icons';
 import { StudentSideRail } from '@/components/student-side-rail';
-import { JourneyView } from '@/modules/coding/journey';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { hasRemainingUsage, isUnlimitedUsage, PlanUsage } from '@/lib/plan-usage';
@@ -31,7 +30,7 @@ interface StudentDashboardData {
   recent_sessions?: Array<{
     id: string;
     plan: string;
-    final_score: number | null;
+    final_score: number;
     state: string;
     total_turns: number;
     duration: number | null;
@@ -151,7 +150,6 @@ export default function StudentDashboardPage() {
       />
 
       <div className="space-y-6">
-        <JourneyView compact />
         {error ? (
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-300">
             {error}
@@ -299,7 +297,7 @@ export default function StudentDashboardPage() {
                 >
                   <div>
                     <div className="text-sm font-medium text-primary">
-                      {session.state === 'FINISHED' ? session.final_score === null ? 'Evaluation unavailable' : `Score: ${session.final_score}/100` : 'In Progress'}
+                      {session.state === 'FINISHED' ? `Score: ${session.final_score}/100` : 'In Progress'}
                     </div>
                     <div className="mt-0.5 text-xs text-secondary">
                       {formatDateTime(session.created_at)}

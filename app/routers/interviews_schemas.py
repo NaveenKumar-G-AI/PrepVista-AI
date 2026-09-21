@@ -5,7 +5,7 @@ Extracted from interviews.py.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 from app.routers.interviews_helpers import _normalize_proctoring_mode, _clip_text, _MAX_VIOLATION_TYPE_LEN, _MAX_VIOLATION_DETAIL_LEN, _MAX_REASON_LEN
 from typing import Any
 from app.routers.interviews_helpers import _MIN_ACCESS_TOKEN_LEN, _CLIENT_REQ_ID_RE, _VIOLATION_TYPE_RE
@@ -16,8 +16,6 @@ class AnswerRequest(BaseModel):
     duration_actual: int | None = None
     answer_duration_seconds: int | None = None
     client_request_id: str | None = None
-    expected_turn: int | None = Field(default=None, ge=0, le=1000)
-    end_interview: bool = False
 
     @field_validator("user_text", "access_token", "client_request_id", mode="before")
     @classmethod
@@ -45,7 +43,7 @@ class AnswerRequest(BaseModel):
             return None
         try:
             return max(0, int(value))
-        except (TypeError, ValueError, OverflowError):
+        except (TypeError, ValueError):
             return None
 
 
@@ -72,7 +70,7 @@ class FinishRequest(BaseModel):
             return None
         try:
             return max(0, int(value))
-        except (TypeError, ValueError, OverflowError):
+        except (TypeError, ValueError):
             return None
 
 
@@ -100,7 +98,7 @@ class TerminateRequest(BaseModel):
             return None
         try:
             return max(0, int(value))
-        except (TypeError, ValueError, OverflowError):
+        except (TypeError, ValueError):
             return None
 
 

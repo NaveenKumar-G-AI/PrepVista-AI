@@ -43,11 +43,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
-      # Coding APIs and evidence processing run in this same backend service.
-      # Use the existing DATABASE_URL and GROQ_API_KEY. Enable features after
-      # the additive schema is applied: docs/architecture/SAME_SERVICE_CODING.md.
-      - key: UNIFIED_EVIDENCE_IN_PROCESS_ENABLED
-        value: "true"
+      - key: OPENAI_API_KEY
+        sync: false
       - key: STT_SERVER_ENABLED
         sync: false
       - key: GROQ_WHISPER_MODEL

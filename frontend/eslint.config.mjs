@@ -15,9 +15,6 @@ const eslintConfig = defineConfig([
     // Static browser bundles are copied verbatim and are not application source.
     // Linting the minified ECharts bundle produced thousands of false positives.
     "public/**",
-    // Browser traces contain generated copies of runtime bundles, not source.
-    "test-results/**",
-    "playwright-report/**",
   ]),
   {
     rules: {

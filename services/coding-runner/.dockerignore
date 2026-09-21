@@ -1,6 +1,0 @@
-*
-!package.json
-!package-lock.json
-!evaluate.mjs
-!job.mjs
-!Dockerfile

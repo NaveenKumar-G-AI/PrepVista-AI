@@ -12,16 +12,16 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, Re
 import { api, ApiUser, AUTH_REQUIRED_EVENT } from '@/lib/api';
 import { deriveUsageForPlan } from '@/lib/plan-usage';
 import { getSupabase } from '@/lib/supabase';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export type User = ApiUser;
 
-type AuthState = 'loading' | 'authenticated' | 'unauthenticated' | 'unavailable';
+type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  /** Unavailable preserves credentials but exposes no unverified role data. */
+  /** Granular auth state: 'loading' | 'authenticated' | 'unauthenticated' */
   authState: AuthState;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, fullName: string, verificationCode: string) => Promise<void>;
@@ -36,53 +36,62 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [unavailable, setUnavailable] = useState(false);
   const initDone = useRef(false);
   const userRef = useRef<User | null>(null);
   const refreshingRef = useRef(false);
-  const authEpochRef = useRef(0);
   const router = useRouter();
-  const pathname = usePathname();
-  const isPublicReport = pathname.startsWith('/report/shared/');
 
   // Derived auth state for pages that need granular checks
-  const authState: AuthState = loading ? 'loading' : unavailable ? 'unavailable' : user ? 'authenticated' : 'unauthenticated';
+  const authState: AuthState = loading ? 'loading' : user ? 'authenticated' : 'unauthenticated';
+
+  const buildMinimalUser = (id: string, email: string): User => ({
+    id,
+    email,
+    full_name: null,
+    plan: 'free',
+    active_plan: 'free',
+    owned_plans: ['free'],
+    expired_plans: [],
+    highest_owned_plan: 'free',
+    effective_plan: 'free',
+    is_admin: false,
+    is_org_admin: false,
+    org_student: false,
+    organization_id: null,
+    premium_override: false,
+    subscription_status: 'none',
+    onboarding_completed: false,
+    prep_goal: null,
+    theme_preference: 'system',
+    usage: {
+      plan: 'free',
+      used: 0,
+      limit: 2,
+      remaining: 2,
+      is_unlimited: false,
+      period_start: null,
+    },
+  });
 
   const refreshUser = useCallback(async () => {
     // Prevent duplicate concurrent refresh calls
     if (refreshingRef.current) return;
     refreshingRef.current = true;
-    setLoading(true);
-    const epoch = authEpochRef.current;
     try {
       api.loadTokens();
-      if (!await api.ensureAccessToken()) {
-        if (epoch !== authEpochRef.current) return;
-        userRef.current = null;
+      if (!api.getToken()) {
         setUser(null);
-        setUnavailable(false);
+        setLoading(false);
         return;
       }
       const data = await api.getMe<User>();
-      if (epoch !== authEpochRef.current || !api.getToken()) return;
       userRef.current = data;
       setUser(data);
-      setUnavailable(false);
-    } catch (error) {
-      if (epoch !== authEpochRef.current) return;
-      userRef.current = null;
+    } catch {
       setUser(null);
-      const status = (error as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
-        api.clearTokens();
-        setUnavailable(false);
-      } else {
-        // Failure to fetch roles is not evidence that the session is invalid.
-        // Hide protected data while keeping credentials and local drafts intact.
-        setUnavailable(true);
-      }
+      api.clearTokens();
     } finally {
-      if (epoch === authEpochRef.current) setLoading(false);
+      setLoading(false);
       refreshingRef.current = false;
     }
   }, []);
@@ -127,11 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Silently update tokens without triggering any re-render
             api.setTokens(session.access_token, session.refresh_token || '');
           } else if (event === 'SIGNED_OUT') {
-            authEpochRef.current++;
-            userRef.current = null;
             api.clearTokens();
             setUser(null);
-            setUnavailable(false);
             setLoading(false);
           }
         }
@@ -144,16 +150,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleAuthenticationRequired = () => {
-      authEpochRef.current++;
       userRef.current = null;
       setUser(null);
-      setUnavailable(false);
       setLoading(false);
-      if (!isPublicReport) router.replace('/login');
+      router.replace('/login');
     };
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthenticationRequired);
     return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthenticationRequired);
-  }, [router, isPublicReport]);
+  }, [router]);
 
   useEffect(() => {
     // Prevent double-init in React StrictMode
@@ -183,37 +187,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     setLoading(true);
-    try {
-      await api.login(email, password);
-      // Fetch full role data before navigating
-      await refreshUser();
-      if (!userRef.current) return;
-      // Route to the correct workspace based on role (use ref to avoid second API call)
-      if (userRef.current?.is_org_admin) {
-        router.push('/org-admin');
-      } else if (userRef.current?.org_student) {
-        router.push('/student-dashboard');
-      } else {
-        router.push('/dashboard');
-      }
-    } finally { setLoading(false); }
+    const data = await api.login(email, password);
+    if (data.user?.id && data.user?.email) {
+      setUser(buildMinimalUser(data.user.id, data.user.email));
+    }
+    // Fetch full role data before navigating
+    await refreshUser();
+    // Route to the correct workspace based on role (use ref to avoid second API call)
+    if (userRef.current?.is_org_admin) {
+      router.push('/org-admin');
+    } else if (userRef.current?.org_student) {
+      router.push('/student-dashboard');
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   const signup = async (email: string, password: string, fullName: string, verificationCode: string) => {
     setLoading(true);
-    try {
-      await api.signup(email, password, fullName, verificationCode);
-      await refreshUser();
-      if (!userRef.current) return;
-      // Route to the correct workspace based on role (use ref to avoid second API call)
-      if (userRef.current?.is_org_admin) {
-        router.push('/org-admin');
-      } else if (userRef.current?.org_student) {
-        router.push('/student-dashboard');
-      } else {
-        router.push('/dashboard');
-      }
-    } finally { setLoading(false); }
+    const data = await api.signup(email, password, fullName, verificationCode);
+    if (data.user?.id && data.user?.email) {
+      setUser(buildMinimalUser(data.user.id, data.user.email));
+    }
+    await refreshUser();
+    // Route to the correct workspace based on role (use ref to avoid second API call)
+    if (userRef.current?.is_org_admin) {
+      router.push('/org-admin');
+    } else if (userRef.current?.org_student) {
+      router.push('/student-dashboard');
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   const loginWithGoogle = async () => {
@@ -231,28 +235,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    authEpochRef.current++;
-    userRef.current = null;
     api.logout();
-    try { void getSupabase().auth.signOut().catch(() => {}); } catch { /* ok */ }
+    try { getSupabase().auth.signOut(); } catch { /* ok */ }
     setUser(null);
-    setUnavailable(false);
     setLoading(false);
     router.push('/');
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading: loading || unavailable, authState, login, signup, loginWithGoogle, logout, refreshUser, applyOptimisticPlan }}>
-      {unavailable && !isPublicReport ? (
-        <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6">
-          <h1 className="text-2xl font-semibold">Account access is temporarily unavailable</h1>
-          <p role="status">We could not verify your account right now. Your sign-in details and saved work are preserved. Retry when the service or your connection recovers.</p>
-          <div className="flex flex-wrap gap-4">
-            <button type="button" className="btn-primary" disabled={loading} onClick={() => void refreshUser()}>{loading ? 'Checking account…' : 'Retry account access'}</button>
-            <button type="button" className="btn-secondary" onClick={logout}>Sign out</button>
-          </div>
-        </main>
-      ) : children}
+    <AuthContext.Provider value={{ user, loading, authState, login, signup, loginWithGoogle, logout, refreshUser, applyOptimisticPlan }}>
+      {children}
     </AuthContext.Provider>
   );
 }

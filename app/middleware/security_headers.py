@@ -156,7 +156,7 @@ class SecurityHeadersMiddleware:
 
         # Determine if this is an API route (Rec D)
         path: str = scope.get("path", "")
-        is_api_route = path.startswith(("/api/", "/coding/", "/journey/"))
+        is_api_route = path.startswith("/api/")
 
         async def send_with_security_headers(message: dict) -> None:
             if message["type"] == "http.response.start":

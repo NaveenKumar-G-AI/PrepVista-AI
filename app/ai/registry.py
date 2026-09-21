@@ -45,15 +45,14 @@ def build_prepvista_registry() -> ProviderRegistry:
       - openrouter (openai SDK pointed at openrouter.ai — installed)
       - mock       (in-memory, always available, used in tests)
 
-    Gemini uses the existing HTTP client and requires its configured API key.
-    Cerebras remains a capability stub; it cannot silently call another provider.
+    Gemini and Cerebras adapters are registered but return 'misconfigured'
+    from health() if their SDKs are not installed — no import-time crash.
     """
     from app.ai.providers.mock import MockProvider
     from app.ai.providers.groq_adapter import GroqAdapter
     from app.ai.providers.openai_adapter import OpenAIAdapter
     from app.ai.providers.openrouter_adapter import OpenRouterAdapter
     from app.ai.providers.stub import StubProvider
-    from app.ai.providers.gemini_adapter import GeminiAdapter
     from app.config import get_settings
 
     settings = get_settings()
@@ -64,7 +63,7 @@ def build_prepvista_registry() -> ProviderRegistry:
     registry.register("openai",     lambda: OpenAIAdapter(api_key=settings.OPENAI_API_KEY))
     registry.register("openrouter", lambda: OpenRouterAdapter(api_key=getattr(settings, "OPENROUTER_API_KEY", None)))
     # Stubs for SDKs not currently installed
-    registry.register("gemini",   lambda: GeminiAdapter(settings.GEMINI_API_KEY))
+    registry.register("gemini",   lambda: StubProvider("gemini",   "google-genai SDK not installed"))
     registry.register("cerebras", lambda: StubProvider("cerebras", "cerebras-cloud-sdk not installed"))
     return registry
 

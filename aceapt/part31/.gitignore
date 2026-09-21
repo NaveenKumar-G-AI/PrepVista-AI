@@ -1,7 +1,0 @@
-node_modules
-.next
-data/*.json
-.env
-.env.local
-*.log
-tsconfig.tsbuildinfo

@@ -67,8 +67,7 @@ _QUALITY_FLAG_NUMERIC: list[str] = [
 _TIER_READY        = "ready"         # avg ≥ 75 AND sessions ≥ 3
 _TIER_ALMOST_READY = "almost_ready"  # avg ≥ 60 AND sessions ≥ 2
 _TIER_DEVELOPING   = "developing"    # avg ≥ 40 OR  sessions ≥ 1
-_TIER_AT_RISK      = "at_risk"       # measured score below 40
-_TIER_NOT_MEASURED = "not_measured"  # no usable score or completed session
+_TIER_AT_RISK      = "at_risk"       # everything else
 
 # ── Performance thresholds ────────────────────────────
 _READINESS_TARGET       = 75.0
@@ -152,7 +151,7 @@ def _safe_round(value: Any, decimals: int = 1) -> float | None:
 
 
 def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
-    """Classify a student into a measured tier or an explicit unmeasured state (top-down, first match).
+    """Classify a student into one of four readiness tiers (top-down, first match).
 
     ``readiness_score`` is the latest finished-session score so platform-admin
     and college-admin views expose the same classification.
@@ -160,12 +159,10 @@ def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
     ready:        score ≥ 75 AND sessions ≥ 3
     almost_ready: score ≥ 60 AND sessions ≥ 2
     developing:   score ≥ 40 after at least one session
-    at_risk:      measured score below 40
-    not_measured: no usable score or completed session
+    at_risk:      everything else
     """
-    if (readiness_score is None or total_sessions <= 0
-            or not math.isfinite(readiness_score) or not 0 <= readiness_score <= 100):
-        return _TIER_NOT_MEASURED
+    if readiness_score is None or total_sessions == 0:
+        return _TIER_AT_RISK
     if readiness_score >= 75.0 and total_sessions >= 3:
         return _TIER_READY
     if readiness_score >= 60.0 and total_sessions >= 2:
@@ -180,13 +177,15 @@ def _zero_offer_risk(
     total_sessions: int,
     trend_slope: float | None,
 ) -> bool:
-    """Flag observed preparation gaps; absence of a score is not a weakness.
+    """Return the legacy-named internal intervention flag (OR logic).
 
-    The legacy field name is retained for API compatibility. This flag does not
-    predict offers. Unmeasured students have a separate readiness state.
+    1. Zero sessions.
+    2. latest readiness score < 40 (hard floor).
+    3. latest readiness score < 50 with ≥ 3 sessions.
+    4. trend_slope < −2.0 (actively declining).
     """
-    if _readiness_tier(readiness_score, total_sessions) == _TIER_NOT_MEASURED:
-        return False
+    if total_sessions == 0 or readiness_score is None:
+        return True
     if readiness_score < _ZERO_OFFER_SCORE_HARD:
         return True
     if total_sessions >= 3 and readiness_score < _ZERO_OFFER_SCORE_SOFT:
@@ -232,7 +231,6 @@ def _build_traffic_light(tier_counts: dict[str, int], total: int) -> dict:
         _TIER_ALMOST_READY: {"count": tier_counts.get(_TIER_ALMOST_READY, 0), "pct": _pct(tier_counts.get(_TIER_ALMOST_READY, 0))},
         _TIER_DEVELOPING:   {"count": tier_counts.get(_TIER_DEVELOPING, 0),   "pct": _pct(tier_counts.get(_TIER_DEVELOPING, 0))},
         _TIER_AT_RISK:      {"count": tier_counts.get(_TIER_AT_RISK, 0),      "pct": _pct(tier_counts.get(_TIER_AT_RISK, 0))},
-        _TIER_NOT_MEASURED: {"count": tier_counts.get(_TIER_NOT_MEASURED, 0), "pct": _pct(tier_counts.get(_TIER_NOT_MEASURED, 0))},
     }
 
 
@@ -308,7 +306,7 @@ def _compute_org_perf_summary(
     org_row is the organizations record (provides access_expiry for renewal signals).
     """
     tier_counts: dict[str, int] = {
-        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0, _TIER_NOT_MEASURED: 0,
+        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0,
     }
     zero_risk_count = 0
     scored_avgs: list[float] = []

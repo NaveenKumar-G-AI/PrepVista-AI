@@ -77,184 +77,225 @@ function pickMimeType(): string {
   return '';
 }
 
-/** Captures continuously; transcription is queued independently of recording. */
 export class ServerSttSession {
   private opts: Required<Pick<ServerSttOptions, 'language' | 'windowMs'>> & ServerSttOptions;
   private ws: WebSocket | null = null;
   private stream: MediaStream | null = null;
   private recorder: MediaRecorder | null = null;
+  private windowChunks: BlobPart[] = [];
   private rolling = '';
   private windowIdx = 0;
   private active = false;
   private mimeType = '';
-  private recordingDone: Promise<void> = Promise.resolve();
-  private queue: Promise<void> = Promise.resolve();
-  private stopPromise: Promise<string> | null = null;
-  private windowTimer: ReturnType<typeof setTimeout> | null = null;
-  private pending: { id: string; resolve: (text: string) => void; reject: (error: Error) => void } | null = null;
-  private queuedWindows = 0;
-  private failure: Error | null = null;
+  /** Resolver for the in-flight window's server 'final' frame. */
+  private pendingFinal: ((text: string) => void) | null = null;
 
   constructor(options: ServerSttOptions) {
-    this.opts = { language: 'en-IN', windowMs: 3000, ...options };
+    this.opts = {
+      language: 'en-IN',
+      windowMs: 3000,
+      ...options,
+    };
   }
 
-  get transcript(): string { return this.rolling.trim(); }
-  private status(s: ServerSttStatus) { this.opts.onStatus?.(s); }
+  get transcript(): string {
+    return this.rolling.trim();
+  }
+
+  private status(s: ServerSttStatus) {
+    this.opts.onStatus?.(s);
+  }
 
   private wsUrl(): string {
     const base = this.opts.backendUrl.replace(/^http/, 'ws').replace(/\/$/, '');
-    return `${base}/ws/stt/${encodeURIComponent(this.opts.sessionId)}?token=${encodeURIComponent(this.opts.token)}`;
+    const token = encodeURIComponent(this.opts.token);
+    return `${base}/ws/stt/${encodeURIComponent(this.opts.sessionId)}?token=${token}`;
   }
 
+  /** Open mic + WebSocket and begin recording windows. */
   async start(): Promise<void> {
-    if (this.active || this.stopPromise) return;
+    if (this.active) return;
     this.active = true;
     this.status('connecting');
-    try {
-      if (!serverSttSupported()) throw new Error('Audio capture is not supported in this browser.');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Permission can resolve after navigation or cancellation.
-      if (!this.active) { stream.getTracks().forEach(t => t.stop()); return; }
-      this.stream = stream;
-      this.mimeType = pickMimeType();
-      try { await this.openSocket(); }
-      catch { this.ws?.close(); this.ws = null; } // authenticated REST fallback
-      if (!this.active) { this.release(); return; }
-      this.status('listening');
-      this.recordNextWindow();
-    } catch (error) {
-      this.active = false;
-      this.release();
+
+    if (!serverSttSupported()) {
       this.status('error');
-      throw error;
+      this.opts.onError?.('Your browser cannot capture audio. Please try a different browser.');
+      this.active = false;
+      throw new Error('server STT unsupported');
     }
+
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.mimeType = pickMimeType();
+
+    await this.openSocket();
+    this.status('listening');
+    this.recordNextWindow();
   }
 
   private openSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(this.wsUrl());
-      this.ws = ws;
-      const timer = setTimeout(() => { reject(new Error('Transcription connection timed out.')); ws.close(); }, 8000);
-      ws.binaryType = 'arraybuffer';
-      ws.onopen = () => { clearTimeout(timer); resolve(); };
-      ws.onerror = () => { clearTimeout(timer); reject(new Error('Transcription connection failed.')); };
-      ws.onclose = () => {
-        clearTimeout(timer);
-        reject(new Error('Transcription connection closed.'));
-        this.pending?.reject(new Error('Transcription connection closed.'));
+      try {
+        this.ws = new WebSocket(this.wsUrl());
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      this.ws.binaryType = 'arraybuffer';
+      this.ws.onopen = () => resolve();
+      this.ws.onerror = () => {
+        // Surface as a connect failure; caller may fall back to REST.
+        this.opts.onError?.('Live transcription connection failed.');
+        reject(new Error('ws error'));
       };
-      ws.onmessage = ev => {
-        let msg: Record<string, unknown>;
-        try { msg = JSON.parse(typeof ev.data === 'string' ? ev.data : ''); }
-        catch { return; }
-        if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
-        // A delayed result must never satisfy a later audio window.
-        if (!this.pending || String(msg.turn_id) !== this.pending.id) return;
-        if (msg.type === 'final') this.pending.resolve(typeof msg.final_transcript === 'string' ? msg.final_transcript.trim() : '');
-        if (msg.type === 'error') this.pending.reject(new Error('Could not transcribe this audio window.'));
+      this.ws.onclose = () => {
+        if (this.active) this.opts.onError?.('Live transcription disconnected.');
       };
+      this.ws.onmessage = (ev) => this.onSocketMessage(ev);
     });
   }
 
-  private recordNextWindow() {
-    if (!this.active || !this.stream) return;
-    const chunks: BlobPart[] = [];
-    const turnId = `${this.opts.turnNumber}-${this.windowIdx++}`;
+  private onSocketMessage(ev: MessageEvent) {
+    let parsed: unknown;
     try {
-      const recorder = this.mimeType ? new MediaRecorder(this.stream, { mimeType: this.mimeType }) : new MediaRecorder(this.stream);
-      this.recorder = recorder;
-      this.recordingDone = new Promise<void>(resolve => {
-        recorder.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
-        recorder.onerror = () => this.fail(new Error('Microphone recording failed.'));
-        recorder.onstop = () => {
-          if (this.windowTimer) clearTimeout(this.windowTimer);
-          this.windowTimer = null;
-          const blob = new Blob(chunks, { type: recorder.mimeType || this.mimeType || 'audio/webm' });
-          if (blob.size) this.enqueueWindow(turnId, blob);
-          resolve();
-          // Start the next complete clip immediately, not after network inference.
-          if (this.active) this.recordNextWindow();
-        };
-        recorder.start();
-        this.windowTimer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, this.opts.windowMs);
-      });
-    } catch { this.fail(new Error('Audio recording failed to start.')); }
-  }
-
-  private fail(error: Error) {
-    if (!this.failure) this.opts.onError?.(error.message);
-    this.failure = error;
-    this.active = false;
-    if (this.recorder?.state === 'recording') this.recorder.stop();
-    this.stream?.getTracks().forEach(t => t.stop());
-    this.status('error');
-  }
-
-  private enqueueWindow(id: string, blob: Blob) {
-    if (++this.queuedWindows > 10) {
-      this.fail(new Error('Transcription is too slow. Please retry your answer.'));
+      parsed = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
+    } catch {
       return;
     }
-    this.queue = this.queue.then(async () => {
-      if (this.failure) return;
-      let text: string;
-      try { text = await this.sendWindow(id, blob); }
-      catch {
-        const result = await transcribeBlobViaRest({ ...this.opts, blob, turnId: id });
-        if (!result) throw new Error('Could not capture all of your answer. Please retry before submitting.');
-        text = result.final_transcript;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+    const msg = parsed as Record<string, unknown>;
+    if (msg.type === 'final') {
+      const text = typeof msg.final_transcript === 'string' ? msg.final_transcript.trim() : '';
+      if (this.pendingFinal) {
+        const resolve = this.pendingFinal;
+        this.pendingFinal = null;
+        resolve(text);
       }
-      if (text) {
-        this.rolling = `${this.rolling} ${text}`.trim();
-        this.opts.onTranscript(this.rolling);
+    } else if (msg.type === 'error') {
+      this.opts.onError?.(
+        typeof msg.message === 'string' ? msg.message : 'Could not process audio, please try again.',
+      );
+      if (this.pendingFinal) {
+        const resolve = this.pendingFinal;
+        this.pendingFinal = null;
+        resolve('');
       }
-    }).catch(error => this.fail(error instanceof Error ? error : new Error('Transcription failed.')))
-      .finally(() => { this.queuedWindows--; });
+    }
   }
 
-  private async sendWindow(id: string, blob: Blob): Promise<string> {
-    const ws = this.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error('Socket unavailable');
-    const bytes = await blob.arrayBuffer();
-    return new Promise<string>((resolve, reject) => {
-      const settle = (text: string | null, error?: Error) => {
-        clearTimeout(timer);
-        if (this.pending?.id === id) this.pending = null;
-        if (error) reject(error); else resolve(text || '');
+  /** Record one ~windowMs clip, send it, await its transcript, then loop. */
+  private recordNextWindow() {
+    if (!this.active || !this.stream) return;
+
+    this.windowChunks = [];
+    const turnId = `${this.opts.turnNumber}-${this.windowIdx++}`;
+    let recorder: MediaRecorder;
+    try {
+      recorder = this.mimeType
+        ? new MediaRecorder(this.stream, { mimeType: this.mimeType })
+        : new MediaRecorder(this.stream);
+    } catch {
+      this.opts.onError?.('Audio recording failed to start.');
+      this.status('error');
+      return;
+    }
+    this.recorder = recorder;
+
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) this.windowChunks.push(e.data);
+    };
+
+    recorder.onstop = async () => {
+      const blob = new Blob(this.windowChunks, { type: this.mimeType || 'audio/webm' });
+      if (blob.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
+        const text = await this.sendWindow(turnId, blob);
+        if (text) {
+          this.rolling = `${this.rolling} ${text}`.trim();
+          this.opts.onTranscript(this.rolling);
+        }
+      }
+      // Loop the next window if still listening.
+      if (this.active) {
+        this.recordNextWindow();
+      }
+    };
+
+    recorder.start();
+    // Close this window after windowMs — produces a complete, decodable clip.
+    window.setTimeout(() => {
+      if (recorder.state !== 'inactive') {
+        try {
+          recorder.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+    }, this.opts.windowMs);
+  }
+
+  /** Send one window over the WS and resolve with its server transcript. */
+  private sendWindow(turnId: string, blob: Blob): Promise<string> {
+    return new Promise<string>((resolve) => {
+      const ws = this.ws;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        resolve('');
+        return;
+      }
+      this.status('processing');
+      this.pendingFinal = (text) => {
+        this.status(this.active ? 'listening' : 'idle');
+        resolve(text);
       };
-      const timer = setTimeout(() => settle(null, new Error('Transcription timed out.')), 12000);
-      this.pending = { id, resolve: text => settle(text), reject: error => settle(null, error) };
-      try {
-        ws.send(JSON.stringify({ type: 'turn_start', turn_id: id, mime_type: blob.type, language_hint: this.opts.language }));
-        ws.send(bytes);
-        ws.send(JSON.stringify({ type: 'turn_end' }));
-      } catch { settle(null, new Error('Audio send failed.')); }
+      // Guard: if the server never answers, don't hang the window loop.
+      const guard = window.setTimeout(() => {
+        if (this.pendingFinal) {
+          this.pendingFinal = null;
+          resolve('');
+        }
+      }, 12000);
+
+      ws.send(JSON.stringify({ type: 'turn_start', turn_id: turnId }));
+      blob.arrayBuffer().then((buf) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(buf);
+          ws.send(JSON.stringify({ type: 'turn_end' }));
+        } else {
+          window.clearTimeout(guard);
+          resolve('');
+        }
+      });
     });
   }
 
-  private release() {
-    if (this.windowTimer) clearTimeout(this.windowTimer);
-    this.windowTimer = null;
-    this.ws?.close(); this.ws = null;
-    this.stream?.getTracks().forEach(t => t.stop()); this.stream = null;
-    this.recorder = null;
-  }
-
-  /** Flush the final recorder event AND all queued responses before submitting. */
-  stop(): Promise<string> {
-    if (this.stopPromise) return this.stopPromise;
+  /** Stop recording + close the socket. Returns the full rolling transcript. */
+  async stop(): Promise<string> {
     this.active = false;
-    this.stopPromise = (async () => {
-      try {
-        if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop();
-        await this.recordingDone;
-        await this.queue;
-        if (this.failure) throw this.failure;
-        return this.transcript;
-      } finally { this.release(); this.status(this.failure ? 'error' : 'idle'); }
-    })();
-    return this.stopPromise;
+    try {
+      if (this.recorder && this.recorder.state !== 'inactive') {
+        this.recorder.stop();
+      }
+    } catch {
+      /* ignore */
+    }
+    // Give the final in-flight window a brief moment to return its transcript.
+    await new Promise((r) => window.setTimeout(r, 400));
+
+    try {
+      this.ws?.send(JSON.stringify({ type: 'close' }));
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.ws?.close();
+    } catch {
+      /* ignore */
+    }
+    this.ws = null;
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    this.recorder = null;
+    this.status('idle');
+    return this.transcript;
   }
 }
 
@@ -267,31 +308,24 @@ export async function transcribeBlobViaRest(params: {
   token: string;
   sessionId: string;
   turnNumber: number;
-  turnId?: string;
   blob: Blob;
   language?: string;
 }): Promise<{ final_transcript: string; confidence: number; audio_url: string | null } | null> {
   const form = new FormData();
-  const extension = params.blob.type.includes('mp4') ? 'mp4' : params.blob.type.includes('ogg') ? 'ogg' : 'webm';
-  form.append('audio', params.blob, `answer.${extension}`);
+  form.append('audio', params.blob, 'answer.webm');
   form.append('session_id', params.sessionId);
-  form.append('turn_id', params.turnId ?? String(params.turnNumber));
+  form.append('turn_id', String(params.turnNumber));
   form.append('language_hint', params.language || 'en-IN');
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     const resp = await fetch(`${params.backendUrl.replace(/\/$/, '')}/api/stt/transcribe`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${params.token}` },
       body: form,
-      signal: controller.signal,
     });
     if (!resp.ok) return null;
-    const data = await resp.json();
-    if (!data || typeof data.final_transcript !== 'string') return null;
-    return data;
+    return await resp.json();
   } catch {
     return null;
-  } finally { clearTimeout(timeout); }
+  }
 }

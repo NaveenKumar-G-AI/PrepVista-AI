@@ -23,12 +23,8 @@ if (_isProductionBuild) {
     );
   }
 }
-const API_URL = (_rawApiUrl || 'http://localhost:8000').replace(/\/$/, '');
+const API_URL = _rawApiUrl || 'http://localhost:8000';
 export const AUTH_REQUIRED_EVENT = 'prepvista:auth-required';
-
-class AuthServiceUnavailableError extends Error {
-  readonly status = 503;
-}
 
 function notifyAuthenticationRequired(): boolean {
   if (
@@ -91,9 +87,8 @@ const TIER_META: Record<string, { label: string; color: string }> = {
   developing:   { label: 'Developing',    color: 'orange' },
   at_risk:      { label: 'At Risk',       color: 'red'    },
   not_started:  { label: 'Not Started',   color: 'gray'   },
-  not_measured: { label: 'Not measured', color: 'gray' },
 };
-const TIER_KEYS = ['ready', 'almost_ready', 'developing', 'at_risk', 'not_measured'] as const;
+const TIER_KEYS = ['ready', 'almost_ready', 'developing', 'at_risk'] as const;
 
 type CohortObj = Record<string, unknown>;
 const cObj = (v: unknown): CohortObj => (v && typeof v === 'object' && !Array.isArray(v) ? v as CohortObj : {});
@@ -109,19 +104,19 @@ function adaptReadinessDistribution(raw: unknown): unknown {
   const tiersObj = cObj(r.tiers);
   const summary = cObj(r.summary);
   const grid: CohortObj[] = [];
-  const tierCount: Record<string, number> = { ready: 0, almost_ready: 0, developing: 0, at_risk: 0, not_measured: 0 };
+  const tierCount: Record<string, number> = { ready: 0, almost_ready: 0, developing: 0, at_risk: 0, not_started: 0 };
   const scores: number[] = [];
-  let notMeasured = 0;
+  let notStarted = 0;
 
   for (const key of TIER_KEYS) {
     for (const e0 of cArr(tiersObj[key])) {
       const e = cObj(e0);
       const sc = cNum(e.session_count) ?? 0;
-      const score = 'latest_score' in e ? cNum(e.latest_score) : cNum(e.avg_score);
-      const effTier = sc > 0 && score !== null ? key : 'not_measured';
+      const score = cNum(e.latest_score) ?? cNum(e.avg_score);
+      const effTier = sc > 0 ? key : 'not_started';
       tierCount[effTier] = (tierCount[effTier] ?? 0) + 1;
-      if (effTier === 'not_measured') notMeasured++;
-      if (score !== null && effTier !== 'not_measured') scores.push(score);
+      if (effTier === 'not_started') notStarted++;
+      if (score !== null) scores.push(score);
       grid.push({
         user_id: String(e.user_id ?? ''),
         full_name: (e.name ?? e.full_name ?? '') as string,
@@ -136,7 +131,7 @@ function adaptReadinessDistribution(raw: unknown): unknown {
   }
 
   const total = cNum(summary.total_students) ?? grid.length;
-  const tiers = TIER_KEYS.map(k => ({
+  const tiers = ['ready', 'almost_ready', 'developing', 'at_risk', 'not_started'].map(k => ({
     tier: TIER_META[k].label,
     color: TIER_META[k].color,
     count: tierCount[k] ?? 0,
@@ -165,8 +160,7 @@ function adaptReadinessDistribution(raw: unknown): unknown {
     percentile: {
       buckets,
       total_scored_students: scores.length,
-      not_started_students: notMeasured,
-      not_measured_students: notMeasured,
+      not_started_students: notStarted,
       mean, median, std_dev: std,
     },
   };
@@ -182,8 +176,7 @@ function adaptRiskRoster(raw: unknown): unknown {
       const interventionFlag = e.zero_offer_risk === true;
       if (key !== 'at_risk' && !interventionFlag) continue;
       const sc = cNum(e.session_count) ?? 0;
-      const score = 'latest_score' in e ? cNum(e.latest_score) : cNum(e.avg_score);
-      if (key === 'not_measured' || sc <= 0 || score === null) continue;
+      const score = cNum(e.latest_score) ?? cNum(e.avg_score);
       const reasons: string[] = [];
       if (sc === 0) reasons.push('No interviews attempted yet');
       else if (score !== null && score < 40) reasons.push('Latest score below 40/100');
@@ -314,9 +307,6 @@ class ApiClient {
   private token: string | null = null;
   private refreshToken: string | null = null;
   private refreshInFlight: Promise<boolean> | null = null;
-  private authGeneration = 0;
-  private cacheGeneration = 0;
-  private storageListenerInstalled = false;
   private cache = new Map<string, CacheEntry>();
   // ✅ FIXED: Promise<any> → Promise<unknown>. 'any' was leaking implicit type unsafety
   // through the entire cache and deduplication layer into every caller.
@@ -330,7 +320,6 @@ class ApiClient {
    * @param options  Standard request options (method is always GET)
    */
   async cachedRequest<T = unknown>(path: string, staleMs = 30_000, options: ApiOptions = {}): Promise<T> {
-    const generation = this.cacheGeneration;
     const entry = this.cache.get(path) as CacheEntry<T> | undefined;
     const now = Date.now();
 
@@ -347,9 +336,9 @@ class ApiClient {
       // never checked, so background revalidations could accumulate without bound.
       if (!this.inFlightRequests.has(path) && this.inFlightRequests.size < ApiClient.MAX_INFLIGHT) {
         const promise = this.request<T>(path, options)
-          .then(fresh => { if (generation === this.cacheGeneration) this.cache.set(path, { data: fresh, timestamp: Date.now(), lastAccessed: Date.now() }); return fresh; })
+          .then(fresh => { this.cache.set(path, { data: fresh, timestamp: Date.now(), lastAccessed: Date.now() }); })
           .catch(() => { /* background revalidation failed, keep stale */ })
-          .finally(() => { if (this.inFlightRequests.get(path) === promise) this.inFlightRequests.delete(path); });
+          .finally(() => { this.inFlightRequests.delete(path); });
         this.inFlightRequests.set(path, promise);
       }
       return entry.data;
@@ -362,7 +351,7 @@ class ApiClient {
 
     const promise = this.request<T>(path, options)
       .then(data => {
-        if (generation === this.cacheGeneration) this.cache.set(path, { data, timestamp: Date.now(), lastAccessed: Date.now() });
+        this.cache.set(path, { data, timestamp: Date.now(), lastAccessed: Date.now() });
         if (this.cache.size > ApiClient.MAX_CACHE_ENTRIES) {
           // ✅ PERF: LRU eviction — find and remove the least-recently-accessed entry.
           // Previously used Map.keys().next().value which evicted the oldest-INSERTED
@@ -381,7 +370,7 @@ class ApiClient {
         return data;
       })
       .finally(() => {
-        if (this.inFlightRequests.get(path) === promise) this.inFlightRequests.delete(path);
+        this.inFlightRequests.delete(path);
       });
     
     this.inFlightRequests.set(path, promise);
@@ -390,8 +379,6 @@ class ApiClient {
 
   /** Invalidate cache entries matching a prefix (e.g., '/dashboard') */
   invalidateCache(pathPrefix?: string) {
-    this.cacheGeneration++;
-    this.inFlightRequests.clear();
     if (!pathPrefix) {
       this.cache.clear();
       return;
@@ -404,7 +391,6 @@ class ApiClient {
   }
 
   setTokens(access: string, refresh: string) {
-    if (access !== this.token) { this.authGeneration++; this.invalidateCache(); }
     this.token = access;
     this.refreshToken = refresh;
     if (typeof window !== 'undefined') {
@@ -434,8 +420,9 @@ class ApiClient {
 
       // If we have a refresh token but no access token (new tab / browser restart),
       // trigger a background refresh to restore the session
-      // Restoration is awaited by ensureAccessToken/request so a temporary
-      // outage is observable rather than becoming an unhandled background task.
+      if (!this.token && this.refreshToken) {
+        void this.tryRefresh();
+      }
 
       // ✅ SEC: Cross-tab logout detection.
       // When a user logs out in tab A, tab B still holds the JWT in memory and
@@ -443,12 +430,12 @@ class ApiClient {
       // The 'storage' event fires in all OTHER tabs when localStorage changes,
       // so we detect token removal and clear in-memory state immediately.
       // This closes the "forgot to close tabs" session hijack window.
-      if (this.storageListenerInstalled) return;
-      this.storageListenerInstalled = true;
       window.addEventListener('storage', (event: StorageEvent) => {
         if (event.key === 'pv_refresh_token' && event.newValue === null) {
           // Another tab cleared the refresh token — treat as logout
-          this.clearTokens();
+          this.token = null;
+          this.refreshToken = null;
+          this.cache.clear();
           // Navigate to login if on a protected page
           notifyAuthenticationRequired();
         }
@@ -457,22 +444,12 @@ class ApiClient {
   }
 
   clearTokens() {
-    this.authGeneration++;
-    this.invalidateCache();
     this.token = null;
     this.refreshToken = null;
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pv_access_token');
       localStorage.removeItem('pv_refresh_token');
       sessionStorage.removeItem('pv_refresh_token'); // legacy cleanup
-      // Coding drafts are tab-local recovery data, never guest imports. Clear
-      // only this namespace on logout/identity expiry, retaining other settings.
-      try {
-        for (let index = sessionStorage.length - 1; index >= 0; index--) {
-          const key = sessionStorage.key(index);
-          if (key?.startsWith('pv_coding_draft_v1:') || key?.startsWith('pv_coding_workspace_v1:')) sessionStorage.removeItem(key);
-        }
-      } catch { /* Storage may be unavailable; credential invalidation still wins. */ }
     }
   }
 
@@ -487,16 +464,10 @@ class ApiClient {
     return this.token;
   }
 
-  async ensureAccessToken(): Promise<string | null> {
-    if (!this.getToken() && this.refreshToken) await this.tryRefresh();
-    return this.getToken();
-  }
-
   async request<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
-    const { method = 'GET', body, headers = {}, isFormData = false, retries = method === 'GET' ? 1 : 0, timeoutMs = 30000 } = options;
+    const { method = 'GET', body, headers = {}, isFormData = false, retries = 1, timeoutMs = 30000 } = options;
 
     const requestHeaders: Record<string, string> = { ...headers };
-    if (!this.getToken() && this.refreshToken) await this.tryRefresh();
     const currentToken = this.getToken();
     // ✅ SEC: Validate JWT shape before injecting into Authorization header.
     // Prevents XSS-written arbitrary strings from becoming header injection vectors.
@@ -545,13 +516,19 @@ class ApiClient {
             if (!retryResp.ok) {
               if (retryResp.status === 401) {
                 this.clearTokens();
-                notifyAuthenticationRequired();
+                if (notifyAuthenticationRequired()) {
+                  // ✅ FIXED: return early after redirect — previously both the redirect
+                  // AND throw parseError fired, causing a redundant async parseError call
+                  // after navigation had already started. Confusing for future engineers.
+                  return undefined as unknown as T;
+                }
               }
               throw await this.parseError(retryResp);
             }
-            const data = retryResp.status === 204 ? undefined as T : await retryResp.json() as T;
-            if (timeoutHandle !== null) globalThis.clearTimeout(timeoutHandle);
-            return data;
+            if (timeoutHandle !== null) {
+              globalThis.clearTimeout(timeoutHandle);
+            }
+            return retryResp.json() as Promise<T>;
           }
         }
 
@@ -565,9 +542,10 @@ class ApiClient {
           throw await this.parseError(response);
         }
 
-        const data = response.status === 204 ? undefined as T : await response.json() as T;
-        if (timeoutHandle !== null) globalThis.clearTimeout(timeoutHandle);
-        return data;
+        if (timeoutHandle !== null) {
+          globalThis.clearTimeout(timeoutHandle);
+        }
+        return response.json() as Promise<T>;
       } catch (err) {
         if (timeoutHandle !== null) {
           globalThis.clearTimeout(timeoutHandle);
@@ -576,12 +554,7 @@ class ApiClient {
         if (lastError.name === 'AbortError') {
           lastError = new Error('Request timed out. Please try again.');
         }
-        const status = (lastError as Error & { status?: number }).status;
-        // Retrying the original expired token after a failed refresh would turn
-        // a recoverable auth outage into a second 401 and erase valid credentials.
-        if (lastError instanceof AuthServiceUnavailableError) break;
-        if (status !== undefined && status < 500 && status !== 408 && status !== 429) break;
-        if (attempt < retries) {
+        if (attempt < retries && method === 'GET') {
           // ✅ PERF: Jittered backoff — pure linear backoff (1000ms × attempt) causes
           // thundering herd: all 500 concurrent failures retry at the exact same ms.
           // Full-jitter formula: random delay in [0, base * 2^attempt] spreads the
@@ -611,41 +584,28 @@ class ApiClient {
   }
 
   private async _doRefresh(): Promise<boolean> {
-    const generation = this.authGeneration;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const resp = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: this.refreshToken }),
-        signal: controller.signal,
-        cache: 'no-store',
       });
       if (resp.ok) {
         const data = await resp.json() as AuthTokensResponse;
-        if (generation !== this.authGeneration) return false;
-        if (!isValidJwtShape(data.access_token) || !data.refresh_token) {
-          throw new Error('The sign-in service returned an incomplete session.');
-        }
         this.setTokens(data.access_token, data.refresh_token);
         return true;
       }
-      if (generation !== this.authGeneration) return false;
-      // Only a credential rejection invalidates the saved session. A provider
-      // outage/rate limit must remain recoverable using the same credentials.
-      if ([400, 401, 403].includes(resp.status)) {
-        this.clearTokens();
-        return false;
-      }
-      throw new Error('The sign-in service is temporarily unavailable.');
     } catch (err) {
-      if (generation !== this.authGeneration) return false;
-      const error = new AuthServiceUnavailableError(err instanceof Error && err.name === 'AbortError'
-        ? 'The sign-in service timed out. Please retry.'
-        : 'The sign-in service is temporarily unavailable. Please retry.');
-      throw error;
-    } finally { clearTimeout(timer); }
+      // ✅ FIXED: was empty catch {}. Network errors during token refresh were completely
+      // invisible — engineers had no way to distinguish "refresh endpoint down" from
+      // "user had invalid token". Logging at warn level is intentional: this is not
+      // a silent analytics failure, it directly affects whether users stay logged in.
+      if (typeof console !== 'undefined') {
+        console.warn('[ApiClient] Token refresh network error:', err instanceof Error ? err.message : String(err));
+      }
+    }
+    this.clearTokens();
+    return false;
   }
 
   private async parseError(response: Response): Promise<Error> {
@@ -970,7 +930,7 @@ class ApiClient {
     });
   }
   async setupInterview<T = unknown>(formData: FormData) {
-    return this.request<T>('/interviews/setup', { method: 'POST', body: formData, isFormData: true, timeoutMs: 90000, retries: 0 });
+    return this.request<T>('/interviews/setup', { method: 'POST', body: formData, isFormData: true });
   }
   async submitAnswer<T = unknown>(
     sessionId: string,
@@ -979,8 +939,6 @@ class ApiClient {
     durationActual?: number,
     clientRequestId?: string,
     answerDurationSeconds?: number,
-    endInterview = false,
-    expectedTurn?: number,
   ) {
     return this.request<T>(`/interviews/${sessionId}/answer`, {
       method: 'POST',
@@ -990,14 +948,12 @@ class ApiClient {
         duration_actual: durationActual,
         client_request_id: clientRequestId,
         answer_duration_seconds: answerDurationSeconds,
-        end_interview: endInterview,
-        expected_turn: expectedTurn,
       },
       // ✅ PERF: retries 0→1. A single network blip previously lost the answer
       // permanently. One retry with jittered backoff recovers from transient errors
       // without meaningfully delaying the interview flow for the student.
-      retries: 0, // The interview UI owns retries with a stable idempotency key.
-      timeoutMs: 90000,
+      retries: 1,
+      timeoutMs: 20000,
     });
   }
   async finishInterview<T = unknown>(sessionId: string, accessToken: string, durationActual?: number) {
@@ -1021,8 +977,7 @@ class ApiClient {
 
 
   // ── Reports ───────────────────────────────
-  async getReport<T = unknown>(sessionId: string) { return this.request<T>(`/reports/${sessionId}`); }
-  async retryReportEvaluations(sessionId: string) { return this.request<{ queued: number }>(`/reports/${sessionId}/retry-evaluations`, { method: 'POST' }); }
+  async getReport<T = unknown>(sessionId: string) { return this.cachedRequest<T>(`/reports/${sessionId}`, 60_000); }
   async downloadPDF(sessionId: string): Promise<Blob> {
     const downloadTimeoutMs = 120000;
     const normalizeDownloadError = (err: unknown): Error => {
@@ -1124,17 +1079,7 @@ class ApiClient {
     return this.request<T>(`/reports/${sessionId}/share`, { method: 'POST' });
   }
   async getSharedReport<T = unknown>(shareToken: string) {
-    // Share links are public. Do not restore or attach a viewer's private
-    // session, or redirect them to login when an unrelated session expires.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-    try {
-      const response = await fetch(`${API_URL}/reports/shared/${encodeURIComponent(shareToken)}`, {
-        signal: controller.signal, cache: 'no-store',
-      });
-      if (!response.ok) throw await this.parseError(response);
-      return await response.json() as T;
-    } finally { clearTimeout(timer); }
+    return this.request<T>(`/reports/shared/${shareToken}`);
   }
 
   // ── Organization Admin (Main Admin) ───────

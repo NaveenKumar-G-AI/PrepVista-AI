@@ -19,7 +19,7 @@ from typing import Any
 from app.routers.org_admin_helpers import (
     ORG_DEFAULT_PAGE_SIZE,
     _RUBRIC_CATEGORIES,
-    _TIER_READY, _TIER_ALMOST_READY, _TIER_DEVELOPING, _TIER_AT_RISK, _TIER_NOT_MEASURED,
+    _TIER_READY, _TIER_ALMOST_READY, _TIER_DEVELOPING, _TIER_AT_RISK,
     _paginate,
     _validate_uuid,
     _safe_round,
@@ -124,7 +124,7 @@ async def get_org_analytics_admin(
 
     # Python-side analytics
     tier_counts: dict[str, int] = {
-        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0, _TIER_NOT_MEASURED: 0,
+        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0,
     }
     zero_risk_count = 0
     scored_avgs: list[float] = []
@@ -403,7 +403,7 @@ async def get_org_performance_admin(
 
     student_summaries: list[dict] = []
     tier_counts: dict[str, int]   = {
-        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0, _TIER_NOT_MEASURED: 0,
+        _TIER_READY: 0, _TIER_ALMOST_READY: 0, _TIER_DEVELOPING: 0, _TIER_AT_RISK: 0,
     }
     zero_risk_count   = 0
     per_student_cats: list[dict[str, float | None]] = []
@@ -547,7 +547,7 @@ async def get_org_readiness_admin(
 
     scored_avgs = [float(r["avg_score"]) for r in perf_rows if r["avg_score"] is not None]
     tier_buckets: dict[str, list[dict]] = {
-        _TIER_READY: [], _TIER_ALMOST_READY: [], _TIER_DEVELOPING: [], _TIER_AT_RISK: [], _TIER_NOT_MEASURED: [],
+        _TIER_READY: [], _TIER_ALMOST_READY: [], _TIER_DEVELOPING: [], _TIER_AT_RISK: [],
     }
     zero_risk_list: list[dict] = []
 
@@ -593,7 +593,6 @@ async def get_org_readiness_admin(
             _TIER_ALMOST_READY: tier_buckets[_TIER_ALMOST_READY],
             _TIER_DEVELOPING:   tier_buckets[_TIER_DEVELOPING],
             _TIER_AT_RISK:      tier_buckets[_TIER_AT_RISK],
-            _TIER_NOT_MEASURED: tier_buckets[_TIER_NOT_MEASURED],
         },
         "zero_offer_risk": zero_risk_list,
     }

@@ -3,19 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/build-coding-runner.mjs",
-    "prebuild": "node scripts/build-coding-runner.mjs",
-    "build:coding-runner": "node scripts/build-coding-runner.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.mjs",
-    "test:e2e": "playwright test"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",
     "@radix-ui/react-accordion": "1.2.20",
     "@radix-ui/react-dialog": "1.1.23",
     "@radix-ui/react-progress": "1.1.16",
@@ -33,23 +27,19 @@
     "next": "16.3.3",
     "papaparse": "^5.6.0",
     "pdf-lib": "^1.17.1",
-    "quickjs-emscripten-core": "0.32.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.8.1",
     "swr": "^2.4.1",
     "tailwind-merge": "3.6.0",
-    "tw-animate-css": "1.4.0",
-    "zod": "3.25.76"
+    "tw-animate-css": "1.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "^16.3.3",
     "tailwindcss": "^4",

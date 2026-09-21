@@ -304,7 +304,7 @@ export default function HistoryPage() {
                   <div className="flex items-center justify-between gap-3 sm:justify-end">
                     <div className="text-right">
                       {session.state === 'FINISHED' ? (
-                        <div className={`text-2xl font-bold ${scoreColor}`}>{session.score === null ? 'Unavailable' : `${Math.round(session.score)}%`}</div>
+                        <div className={`text-2xl font-bold ${scoreColor}`}>{Math.round(session.score || 0)}%</div>
                       ) : (
                         <div className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                           {session.state}

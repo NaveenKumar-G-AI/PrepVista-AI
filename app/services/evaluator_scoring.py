@@ -10,13 +10,12 @@ from __future__ import annotations
 
 import json
 import re
-import math
 from collections import defaultdict
 
 import structlog
 
 from app.config import CATEGORY_WEIGHTS, PLAN_CONFIG, get_settings
-from app.services.llm import call_llm_json, LLMError, llm_error_code
+from app.services.llm import call_llm_json
 from app.services.placement_readiness import (
     build_placement_readiness,
     category_averages_from_evaluations,
@@ -114,7 +113,6 @@ async def _maybe_rewrite_ideal_answer(
     normalized_answer: str,
     resume_summary,
     rubric_category: str,
-    strict_evidence: bool = False,
 ) -> dict:
     """Fix 5 — grounding-gated LLM rewrite of the model answer.
 
@@ -126,7 +124,7 @@ async def _maybe_rewrite_ideal_answer(
     same anti-fabrication guards. Otherwise the suppress+note answer stands.
     No-op (and no extra LLM call) when the flag is off or grounding is adequate.
     """
-    if strict_evidence or not get_settings().BETTER_ANSWER_REWRITE_ENABLED:
+    if not get_settings().BETTER_ANSWER_REWRITE_ENABLED:
         return result
     summary = _coerce_resume_summary_dict(resume_summary)
     facts = _extract_grounding_facts(question_text, normalized_answer, summary)
@@ -183,7 +181,6 @@ async def evaluate_single_question(
     *,
     session_id: object = None,
     turn_id: object = None,
-    strict_evidence: bool = False,
 ) -> dict:
     """
     Evaluate a single question-answer pair using the rubric system.
@@ -212,7 +209,6 @@ async def evaluate_single_question(
         resume_summary=resume_summary,
         rubric_category=rubric_category,
         plan=plan,
-        strict_evidence=strict_evidence,
     )
     if isinstance(result, dict):
         # Preserve the TRUE raw transcript and surface the repaired one so the
@@ -220,19 +216,7 @@ async def evaluate_single_question(
         # the repaired text inside the core.
         result.setdefault("raw_answer", raw_answer)
         result["repaired_answer"] = repaired_answer
-        if strict_evidence:
-            result["ideal_answer"] = "Use only your actual facts: context, personal action, reasoning, result and learning. Add missing evidence before rewriting."
     return result
-
-
-def _validate_evidence_scores(result: dict, plan: str) -> None:
-    fields = ["specificity_score", "structure_score", "communication_score"]
-    fields += ["question_match_score", "technical_accuracy_score"] if plan == "pro" else ["relevance_score", "depth_score" if plan == "career" else "clarity_score"]
-    if not isinstance(result, dict) or any(
-        not isinstance(result.get(key), (int, float)) or isinstance(result.get(key), bool)
-        or not math.isfinite(result[key]) or not 0 <= result[key] <= 2 for key in fields
-    ):
-        raise LLMError('EVALUATION_INVALID_SCHEMA')
 
 
 async def _evaluate_question_core(
@@ -242,7 +226,6 @@ async def _evaluate_question_core(
     resume_summary: str,
     rubric_category: str,
     plan: str,
-    strict_evidence: bool = False,
 ) -> dict:
     """
     Core rubric evaluation. ``repaired_answer`` is the transcript-repaired text
@@ -251,7 +234,6 @@ async def _evaluate_question_core(
     on the TRUE ``raw_answer`` so a repair pass can never mask a no-answer turn.
     """
     rubric_category = normalize_rubric_category(question_text, rubric_category, plan)
-    settings = get_settings()
     normalized_answer = (
         recover_spoken_meaning(repaired_answer)
         if plan == "free"
@@ -334,14 +316,13 @@ async def _evaluate_question_core(
             result = await call_llm_json(
                 [{"role": "system", "content": eval_prompt}],
                 temperature=0.15,
-                model=settings.GROQ_EVAL_MODEL or settings.GROQ_MODEL,
-                max_tokens=settings.INTERVIEW_EVALUATION_MAX_TOKENS,
-                retries=1,  # The durable queue owns retries across process restarts.
-                timeout=settings.INTERVIEW_EVALUATION_TIMEOUT_SECONDS,
+                max_tokens=420,
+                retries=1,
+                timeout=2.9,
+                fallback_timeout=3.5,
+                retry_delay=0.12,
                 allow_provider_fallback=False,
             )
-            if strict_evidence:
-                _validate_evidence_scores(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_free_result(
                     raw_answer=raw_answer,
@@ -352,16 +333,13 @@ async def _evaluate_question_core(
                     llm_result=result if isinstance(result, dict) else {},
                 ),
                 plan=plan,
-                strict_evidence=strict_evidence,
                 question_text=question_text,
                 normalized_answer=normalized_answer,
                 resume_summary=resume_summary,
                 rubric_category=rubric_category,
             )
         except Exception as exc:
-            logger.warning("free_question_evaluation_failed", error_code=llm_error_code(exc))
-            if strict_evidence:
-                return {"evaluation_status": "unavailable", "error_code": llm_error_code(exc)}
+            logger.warning("free_question_evaluation_failed", error=str(exc), question=question_text[:100])
             return _fallback_free_evaluation(
                 question_text=question_text,
                 raw_answer=raw_answer,
@@ -382,14 +360,13 @@ async def _evaluate_question_core(
             result = await call_llm_json(
                 [{"role": "system", "content": eval_prompt}],
                 temperature=0.12,
-                model=settings.GROQ_EVAL_MODEL or settings.GROQ_MODEL,
-                max_tokens=settings.INTERVIEW_EVALUATION_MAX_TOKENS,
-                retries=1,  # The durable queue owns retries across process restarts.
-                timeout=settings.INTERVIEW_EVALUATION_TIMEOUT_SECONDS,
+                max_tokens=520,
+                retries=1,
+                timeout=3.2,
+                fallback_timeout=4.0,
+                retry_delay=0.12,
                 allow_provider_fallback=False,
             )
-            if strict_evidence:
-                _validate_evidence_scores(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_pro_result(
                     raw_answer=raw_answer,
@@ -400,16 +377,13 @@ async def _evaluate_question_core(
                     llm_result=result if isinstance(result, dict) else {},
                 ),
                 plan=plan,
-                strict_evidence=strict_evidence,
                 question_text=question_text,
                 normalized_answer=normalized_answer,
                 resume_summary=resume_summary,
                 rubric_category=rubric_category,
             )
         except Exception as exc:
-            logger.warning("pro_question_evaluation_failed", error_code=llm_error_code(exc))
-            if strict_evidence:
-                return {"evaluation_status": "unavailable", "error_code": llm_error_code(exc)}
+            logger.warning("pro_question_evaluation_failed", error=str(exc), question=question_text[:100])
             return _fallback_pro_evaluation(
                 question_text=question_text,
                 raw_answer=raw_answer,
@@ -430,14 +404,13 @@ async def _evaluate_question_core(
             result = await call_llm_json(
                 [{"role": "system", "content": eval_prompt}],
                 temperature=0.1,
-                model=settings.GROQ_EVAL_MODEL or settings.GROQ_MODEL,
-                max_tokens=settings.INTERVIEW_EVALUATION_MAX_TOKENS,
-                retries=1,  # The durable queue owns retries across process restarts.
-                timeout=settings.INTERVIEW_EVALUATION_TIMEOUT_SECONDS,
-                allow_provider_fallback=False,
+                max_tokens=620,
+                retries=2,
+                timeout=4.1,
+                fallback_timeout=5.0,
+                retry_delay=0.12,
+                allow_provider_fallback=True,
             )
-            if strict_evidence:
-                _validate_evidence_scores(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_career_result(
                     raw_answer=raw_answer,
@@ -448,16 +421,13 @@ async def _evaluate_question_core(
                     llm_result=result if isinstance(result, dict) else {},
                 ),
                 plan=plan,
-                strict_evidence=strict_evidence,
                 question_text=question_text,
                 normalized_answer=normalized_answer,
                 resume_summary=resume_summary,
                 rubric_category=rubric_category,
             )
         except Exception as exc:
-            logger.warning("career_question_evaluation_failed", error_code=llm_error_code(exc))
-            if strict_evidence:
-                return {"evaluation_status": "unavailable", "error_code": llm_error_code(exc)}
+            logger.warning("career_question_evaluation_failed", error=str(exc), question=question_text[:100])
             return _fallback_career_evaluation(
                 question_text=question_text,
                 raw_answer=raw_answer,
@@ -1107,7 +1077,7 @@ def compute_final_score(
     """
     if not question_evaluations:
         return {
-            "final_score": None,
+            "final_score": 0,
             "category_scores": {},
             "total_questions": 0,
             "answered_questions": 0,
@@ -1158,9 +1128,7 @@ def compute_final_score(
         if resolved_expected_questions > 0
         else 1.0
     )
-    # Evaluation coverage is separate from quality. Missing evaluation is not
-    # a failed answer, including when the provider or persistence failed.
-    final_score = base_score
+    final_score = round(base_score * coverage_ratio)
 
     final_score = max(0, min(100, final_score))
 
@@ -1195,8 +1163,6 @@ def compute_final_score(
 
 def get_score_interpretation(score: int, plan: str | None = None) -> str:
     """Human-readable interpretation of the final score."""
-    if score is None:
-        return "Evaluation unavailable. Recorded answers are preserved; no performance score has been assigned."
     if plan == "free":
         if score >= 80:
             return "Strong start - your answers are clear and confident for beginner interviews."

@@ -36,7 +36,6 @@ from app.services.interviewer import create_session, finish_session, process_ans
 from app.services.quota import enforce_quota
 from app.services.resume_parser import extract_text_from_pdf, parse_resume_structured, validate_pdf_upload
 from app.routers.interviews_schemas import AnswerRequest
-from app.services.interview_evaluation_jobs import dispatch as _dispatch_evaluation
 
 router = APIRouter()
 logger = structlog.get_logger("prepvista.interviews")
@@ -69,9 +68,6 @@ async def submit_answer(
     settings = get_settings()
     max_answer_length = getattr(settings, "MAX_ANSWER_TEXT_LENGTH", 3000)
 
-    if len(req.user_text) > max_answer_length:
-        raise HTTPException(status_code=413, detail=f"Your answer exceeds {max_answer_length} characters. Please shorten it and retry.")
-
     # --- Pre-validate and normalize the answer text ---
     normalized_text, pre_validation_warning = _pre_validate_answer(
         req.user_text, max_answer_length
@@ -91,19 +87,26 @@ async def submit_answer(
     if normalized_text:
         _check_prompt_injection(normalized_text, source="answer_text", session_context=session_id)
 
+    # --- Fast path: idempotent cache check ---
+    cached = await _get_cached_client_response(
+        session_id=session_id,
+        access_token=req.access_token,
+        client_request_id=req.client_request_id,
+    )
+    if cached:
+        logger.debug("idempotent_cache_hit", session_id=session_id,
+                     client_request_id=req.client_request_id)
+        return cached
+
     # --- Core answer processing ---
     result = await process_answer(
         session_id=session_id,
         user_text=normalized_text,
         access_token=req.access_token,
-        client_request_id=req.client_request_id,
-        expected_turn=req.expected_turn,
-        end_interview=req.end_interview,
-        user_id=user.id,
     )
 
     if result.get("action") == "error":
-        raise HTTPException(status_code=result.get("status", 400), detail=result.get("detail", "Answer processing failed."))
+        raise HTTPException(status_code=400, detail=result.get("detail", "Answer processing failed."))
 
     question_for_eval = result.get("question_for_eval")
     turn_for_eval     = result.get("turn_for_eval")
@@ -137,10 +140,22 @@ async def submit_answer(
         was_active = await _session_is_active(session_id, req.access_token)
 
         if should_evaluate:
-            background_tasks.add_task(
-                _dispatch_evaluation, session_id=session_id, turn_number=int(turn_for_eval),
-                answer_duration_seconds=req.answer_duration_seconds,
-            )
+            try:
+                await _evaluate_and_store(
+                    session_id=session_id,
+                    turn_number=int(turn_for_eval),
+                    question_text=str(question_for_eval),
+                    raw_answer=normalized_text,
+                    answer_duration_seconds=req.answer_duration_seconds,
+                    answer_word_count=answer_word_count,
+                )
+            except Exception as exc:
+                logger.error(
+                    "final_eval_failed",
+                    session_id=session_id,
+                    turn=turn_for_eval,
+                    error=str(exc),
+                )
 
         final_result = await finish_session(
             session_id=session_id,
@@ -177,7 +192,7 @@ async def submit_answer(
     # --- Mid-interview → background evaluation ---
     if should_evaluate:
         background_tasks.add_task(
-            _dispatch_evaluation,
+            _evaluate_and_store,
             session_id=session_id,
             turn_number=int(turn_for_eval),
             question_text=str(question_for_eval),
@@ -203,7 +218,7 @@ async def _evaluate_and_store(
     raw_answer: str,
     answer_duration_seconds: int | None = None,
     answer_word_count: int | None = None,
-) -> str | None:
+) -> None:
     """Run per-question AI evaluation and persist the result.
 
     Structured in three DB-separated phases so the connection is never
@@ -237,7 +252,7 @@ async def _evaluate_and_store(
                 return  # Already evaluated — skip
 
             session = await conn.fetchrow(
-                "SELECT plan, resume_summary, question_plan, runtime_state FROM interview_sessions WHERE id = $1",
+                "SELECT plan, resume_summary, question_plan FROM interview_sessions WHERE id = $1",
                 session_id,
             )
             if not session:
@@ -246,7 +261,6 @@ async def _evaluate_and_store(
 
         # ---- Derive rubric category (no DB connection) --------------------
         plan = _normalize_plan(session["plan"])
-        v2 = bool(_safe_json_loads(session["runtime_state"], {}).get("orchestrator_v2"))
         resume_summary = session["resume_summary"] or "{}"
         question_plan = _safe_json_loads(session["question_plan"], [])
         if not isinstance(question_plan, list):
@@ -270,30 +284,23 @@ async def _evaluate_and_store(
             eval_result = await evaluate_single_question(
                 question_text=question_text,
                 raw_answer=raw_answer,
-                resume_summary=json.dumps(resume_summary) if isinstance(resume_summary, dict) else str(resume_summary),
+                resume_summary=str(resume_summary),
                 rubric_category=rubric_category,
                 plan=plan,
                 session_id=session_id,
                 turn_id=turn_number,
-                strict_evidence=True,
             )
-        if not isinstance(eval_result, dict) or eval_result.get("evaluation_status") == "unavailable":
+        if not isinstance(eval_result, dict):
             logger.warning(
                 "invalid_eval_result_type",
                 session_id=session_id,
                 turn=turn_number,
                 category=rubric_category,
             )
-            return eval_result.get("error_code", "EVALUATION_PROVIDER_OR_SCHEMA_FAILED") if isinstance(eval_result, dict) else "EVALUATION_PROVIDER_OR_SCHEMA_FAILED"
+            return
 
         # ---- Phase 3: write (new connection, double-insert guard) ---------
-        async with DatabaseConnection() as conn, conn.transaction():
-            if v2:
-                state = await conn.fetchval(
-                    "SELECT state FROM interview_sessions WHERE id = $1 FOR NO KEY UPDATE", session_id,
-                )
-                if state not in {"ACTIVE", "FINISHED"}:
-                    return "EVALUATION_SESSION_UNAVAILABLE"
+        async with DatabaseConnection() as conn:
             existing = await conn.fetchrow(
                 "SELECT id FROM question_evaluations WHERE session_id = $1 AND turn_number = $2",
                 session_id,
@@ -350,9 +357,6 @@ async def _evaluate_and_store(
                 eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
             )
 
-            await conn.execute("UPDATE question_evaluations SET evaluation_version='rubric-v2',prompt_version='per-question-v2',provider_model=$3 WHERE session_id=$1 AND turn_number=$2",
-                session_id, turn_number, get_settings().GROQ_EVAL_MODEL or get_settings().GROQ_MODEL)
-
         logger.info(
             "question_evaluated",
             session_id=session_id,
@@ -365,8 +369,8 @@ async def _evaluate_and_store(
 
     except Exception as exc:
         logger.error(
-            "EVALUATION_PERSIST_FAILED",
+            "background_eval_failed",
             session_id=session_id,
             turn=turn_number,
-            error_code="EVALUATION_PERSIST_OR_PROVIDER_FAILED", error_type=type(exc).__name__,
+            error=str(exc),
         )

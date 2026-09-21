@@ -2146,9 +2146,6 @@ def _live_question_is_rejected(
         return True
     if is_greeting:
         return False
-    from app.services.interview_catalog import valid_question_wording
-    if not valid_question_wording(candidate, asked_questions or [], allow_repeat=allow_duplicate_retry):
-        return True
     if not _looks_like_interviewer_question(candidate):
         return True
     if _question_family_from_text(candidate) in (combined_avoid_families or set()):
@@ -2242,5 +2239,5 @@ async def generate_live_followup_with_dedup(
         turn=upcoming_turn,
         attempts=total_attempts,
     )
-    return ""  # Exhausted wording must trigger the authored fallback.
+    return last_candidate
 

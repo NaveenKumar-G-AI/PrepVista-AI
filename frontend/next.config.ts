@@ -35,15 +35,6 @@ const nextConfig: NextConfig = {
           }] : []),
         ],
       },
-      {
-        // A worker uses its own response policy. WASM is enabled only on this
-        // asset; interview page CSP and microphone permission stay unchanged.
-        source: "/coding-assets/:path*",
-        headers: [
-          { key: "Content-Security-Policy", value: "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'none'; worker-src 'none'; object-src 'none'" },
-          { key: "Cache-Control", value: "no-cache, must-revalidate" },
-        ],
-      },
     ];
   },
 };

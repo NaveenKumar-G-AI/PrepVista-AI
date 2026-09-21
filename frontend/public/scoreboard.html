@@ -194,8 +194,8 @@
 let DEPTS=[];
 let YEARS=[];
 const SERIES=['#6366F1','#22D3EE','#34D399','#FBBF24','#FB7185','#A78BFA'];
-const TIER_COLOR={'Ready':'#34D399','Almost':'#38BDF8','Developing':'#FBBF24','At Risk':'#FB7185','Not started':'#565C6E','Not measured':'#565C6E'};
-const TIER_CLASS={'Ready':'Ready','Almost':'Almost','Developing':'Developing','At Risk':'AtRisk','Not started':'NotStarted','Not measured':'NotStarted'};
+const TIER_COLOR={'Ready':'#34D399','Almost':'#38BDF8','Developing':'#FBBF24','At Risk':'#FB7185','Not started':'#565C6E'};
+const TIER_CLASS={'Ready':'Ready','Almost':'Almost','Developing':'Developing','At Risk':'AtRisk','Not started':'NotStarted'};
 const round=(v,d=0)=>{const f=10**d;return Math.round(v*f)/f;};
 const avg=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
 const esc=v=>String(v==null?'':v).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));

@@ -29,10 +29,6 @@ from app.routers.training import router as training_router
 from app.routers.assessments import router as assessments_router
 from app.routers.ai_health import router as ai_health_router
 from app.routers.communications import router as communications_router
-from app.routers.coding import router as coding_router
-from app.routers.journey import router as journey_router
-from app.routers.journey_assignments import router as journey_assignments_router
-from app.routers.artifact_reviews import router as artifact_reviews_router
 from app.services.user_activity import refresh_user_activity_stats
 
 
@@ -214,13 +210,6 @@ async def _bootstrap_runtime_services(app: FastAPI):
             app.state.activity_refresh_task = asyncio.create_task(_run_user_activity_refresh_loop())
             from app.services.report_schedules import run_report_schedule_loop
             app.state.report_schedule_task = asyncio.create_task(run_report_schedule_loop())
-            from app.services.unified_evidence_worker import run_in_process
-            settings = get_settings()
-            from app.services.interview_evaluation_jobs import run as run_evaluation_jobs
-            if getattr(settings, 'INTERVIEW_EVALUATION_WORKER_ENABLED', False):
-                app.state.interview_evaluation_task = asyncio.create_task(run_evaluation_jobs())
-            if settings.UNIFIED_EVIDENCE_ENABLED and settings.UNIFIED_EVIDENCE_IN_PROCESS_ENABLED:
-                app.state.unified_evidence_task = asyncio.create_task(run_in_process())
             try:
                 async with DatabaseConnection() as conn:
                     await refresh_user_activity_stats(conn)
@@ -271,8 +260,6 @@ async def lifespan(app: FastAPI):
     app.state.db_init_error = None
     app.state.activity_refresh_task = None
     app.state.report_schedule_task = None
-    app.state.unified_evidence_task = None
-    app.state.interview_evaluation_task = None
     app.state.runtime_bootstrap_task = asyncio.create_task(_bootstrap_runtime_services(app))
     yield
     runtime_bootstrap_task = getattr(app.state, "runtime_bootstrap_task", None)
@@ -294,20 +281,6 @@ async def lifespan(app: FastAPI):
         report_schedule_task.cancel()
         try:
             await report_schedule_task
-        except asyncio.CancelledError:
-            pass
-    unified_evidence_task = getattr(app.state, "unified_evidence_task", None)
-    if unified_evidence_task:
-        unified_evidence_task.cancel()
-        try:
-            await unified_evidence_task
-        except asyncio.CancelledError:
-            pass
-    evaluation_task = getattr(app.state, "interview_evaluation_task", None)
-    if evaluation_task:
-        evaluation_task.cancel()
-        try:
-            await evaluation_task
         except asyncio.CancelledError:
             pass
     await close_db_pool()
@@ -467,10 +440,6 @@ def create_app() -> FastAPI:
 
     # ── Routers ──────────────────────────────────
     app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-    app.include_router(coding_router, prefix="/coding", tags=["Coding"])
-    app.include_router(journey_router, prefix="/journey", tags=["Student Journey"])
-    app.include_router(journey_assignments_router, prefix="/journey", tags=["Institutional Practice Assignments"])
-    app.include_router(artifact_reviews_router, prefix="/artifact-reviews", tags=["Consented Artifact Feedback"])
     app.include_router(interviews.router, prefix="/interviews", tags=["Interviews"])
     app.include_router(reports.router, prefix="/reports", tags=["Reports"])
     app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])

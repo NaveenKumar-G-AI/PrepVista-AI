@@ -27,7 +27,7 @@ interface LeaderboardPayload {
     started: boolean;
     score: number | null;
     slope: number;
-    tier: 'Ready' | 'Almost' | 'Developing' | 'At Risk' | 'Not started' | 'Not measured';
+    tier: 'Ready' | 'Almost' | 'Developing' | 'At Risk' | 'Not started';
     targetRole: string | null;
   }>;
 }

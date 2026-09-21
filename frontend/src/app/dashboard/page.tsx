@@ -9,7 +9,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { AuthHeader } from '@/components/auth-header';
-import { JourneyView } from '@/modules/coding/journey';
 import { BoltIcon, GiftIcon, HistoryIcon, PlayIcon, ShareIcon, SparklesIcon, TargetIcon } from '@/components/icons';
 import { MainSideRail } from '@/components/main-side-rail';
 import { PlanSelector } from '@/components/plan-selector';
@@ -55,7 +54,7 @@ interface DashboardData {
   recent_sessions?: Array<{
     id: string;
     plan: string;
-    final_score: number | null;
+    final_score: number;
     state: string;
     total_turns: number;
     duration: number | null;
@@ -147,7 +146,7 @@ export default function DashboardPage() {
   useEffect(() => {
     // Only fetch once — the API cache handles freshness
     if (fetchedRef.current) return;
-    if (authLoading || !user) return; // Wait for verified identity and role.
+    if (!authLoading && !user) return; // Will be redirected
 
     fetchedRef.current = true;
 
@@ -273,7 +272,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen surface-primary">
       <AuthHeader />
-      <div className="mx-auto max-w-7xl px-6 pt-6"><JourneyView compact /></div>
 
       <div className="mx-auto max-w-7xl px-6 py-8">
         {error ? (
@@ -399,11 +397,6 @@ export default function DashboardPage() {
                 </div>
               </section>
             ) : null}
-
-            <section className="card p-5 flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="font-semibold">Turn feedback into practice</h2><p className="text-sm text-secondary">Review your next mission, compare answer retries and build your story bank.</p></div>
-              <Link href="/interview/practice" className="btn-secondary min-h-11">Open interview practice</Link>
-            </section>
 
             {isLaunchOfferActive ? (
               <section className="rounded-[28px] border border-emerald-200/70 bg-emerald-50/90 px-6 py-5 text-emerald-900 shadow-[0_18px_45px_rgba(5,150,105,0.08)] fade-in dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">

@@ -79,8 +79,6 @@ def _clamp_score(value, maximum: float = 10.0) -> float:
 
 
 def _score_palette(score: float) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
-    if score is None:
-        return (71, 85, 105), (241, 245, 249)
     if score >= 70:
         return (22, 163, 74), (240, 253, 244)
     if score >= 50:
@@ -301,8 +299,6 @@ def _summary_dimension_labels(evaluations: list[dict]) -> tuple[list[str], list[
 
 
 def _build_overall_summary(plan: str, score: float, strengths: list[str], weaknesses: list[str], evaluations: list[dict]) -> str:
-    if score is None:
-        return "Evaluation unavailable. Recorded answers are preserved; no performance score or readiness tier has been assigned."
     strong_count = sum(1 for item in evaluations if _safe_pdf_text(item.get("classification", "")).lower() == "strong")
     weak_count = sum(1 for item in evaluations if _safe_pdf_text(item.get("classification", "")).lower() in {"vague", "wrong", "silent"})
     plan_key = _safe_text(plan).lower() or "free"
@@ -382,7 +378,7 @@ def _minimal_pdf_report(score: float, plan: str, email: str, evaluations: list[d
     lines = [
         "PrepVista Interview Report",
         f"Plan: {plan.upper()}",
-        (f"Score: {int(round(score))}/100" if score is not None else "Evaluation unavailable; no score assigned"),
+        f"Score: {int(round(score))}/100",
         f"Candidate: {_safe_pdf_text(email)}",
         f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
         "",

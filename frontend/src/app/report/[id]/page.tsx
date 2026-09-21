@@ -13,7 +13,6 @@ import { BrandLogo } from '@/components/brand-logo';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { IntelDashboard } from './_intel/dashboard';
-import { InterviewEvidenceReport, type EvidenceReport, type ResumeExtraction } from '@/components/interview-evidence-report';
 
 interface Evaluation {
   turn_number: number;
@@ -104,24 +103,10 @@ interface InterviewSummary {
 }
 
 interface ReportData {
-  report_state?: 'GENERATING' | 'PARTIAL' | 'READY';
-  evaluation_status?: 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
-  pending_evaluations?: number;
-  failed_evaluations?: number;
-  evaluation_processing?: {
-    state: 'COMPLETE' | 'DELAYED' | 'PROCESSING' | 'UNAVAILABLE';
-    retryable_count: number;
-    delayed_count: number;
-    retry_available_at?: string | null;
-    jobs: { turn_number: number; state: string; attempts: number; error_code?: string | null; can_retry: boolean }[];
-  } | null;
-  saved_answers?: { turn_number: number; question_text: string | null; raw_answer: string; evaluation_state: string }[];
-  evidence_report?: EvidenceReport | null;
-  resume_extraction?: ResumeExtraction | null;
   session: {
     id: string;
     plan: string;
-    final_score: number | null;
+    final_score: number;
     total_turns: number;
     created_at: string;
     finished_at?: string | null;
@@ -200,15 +185,10 @@ export default function ReportPage() {
 
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshError, setRefreshError] = useState('');
+  const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
   const [downloadSuccess, setDownloadSuccess] = useState('');
-  const [retrying, setRetrying] = useState(false);
-  const [retryMessage, setRetryMessage] = useState('');
-  const [refreshCount, setRefreshCount] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [pollingStopped, setPollingStopped] = useState(false);
 
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -225,41 +205,11 @@ export default function ReportPage() {
       return;
     }
 
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let polls = 0;
-    const load = async () => {
-      try {
-        const report = await api.getReport<ReportData>(sessionId);
-        if (cancelled) return;
-        setData(report);
-        setRefreshError('');
-        const processing = report.report_state === 'GENERATING' || (report.pending_evaluations ?? 0) > 0;
-        if (processing && polls++ < 36) timer = setTimeout(load, 5000);
-        else setPollingStopped(processing);
-      } catch (err) {
-        if (!cancelled) setRefreshError(err instanceof Error ? err.message : 'Failed to refresh report.');
-      } finally { if (!cancelled) { setLoading(false); setRefreshing(false); } }
-    };
-    void load();
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [authLoading, router, sessionId, user, refreshCount]);
-
-  const refreshReport = () => {
-    setRefreshing(true);
-    setPollingStopped(false);
-    setRefreshCount(count => count + 1);
-  };
-
-  const retryEvaluations = async () => {
-    setRetrying(true);
-    try {
-      const result = await api.retryReportEvaluations(sessionId);
-      setRetryMessage(result.queued ? `${result.queued} saved answers queued for evaluation.` : 'Evaluation is already queued, or the retry cooldown is active. Refresh this report shortly.');
-      refreshReport();
-    } catch (err) { setRetryMessage(err instanceof Error ? err.message : 'Could not retry. Please try again.'); }
-    finally { setRetrying(false); }
-  };
+    api.getReport<ReportData>(sessionId)
+      .then(report => setData(report))
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load report.'))
+      .finally(() => setLoading(false));
+  }, [authLoading, router, sessionId, user]);
 
   if (loading || authLoading) {
     return (
@@ -269,12 +219,11 @@ export default function ReportPage() {
     );
   }
 
-  if (refreshError && !data) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center surface-primary">
         <div className="card p-8 text-center max-w-md">
-          <p className="text-red-600 dark:text-red-400 mb-4">{refreshError}</p>
-          <button type="button" className="btn-secondary mb-3" onClick={refreshReport} disabled={refreshing}>{refreshing ? 'Refreshing...' : 'Refresh report'}</button>
+          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
           <Link href="/dashboard" className="btn-primary inline-block">Back to Dashboard</Link>
         </div>
       </div>
@@ -291,16 +240,12 @@ export default function ReportPage() {
   const isCareerSession = session.plan === 'career';
   const showProReview = isProSession && has_premium_access;
   const showCareerReview = isCareerSession && has_premium_access;
-  const scoreAvailable = session.final_score != null && evaluations.length > 0 && data.evidence_report?.numeric_evaluation_status !== 'unavailable';
-  const scoreColor = !scoreAvailable ? '#64748b' : session.final_score! >= 70 ? '#22c55e' : session.final_score! >= 50 ? '#eab308' : '#ef4444';
+  const scoreColor = session.final_score >= 70 ? '#22c55e' : session.final_score >= 50 ? '#eab308' : '#ef4444';
   const summary = session.summary ?? data.summary;
   const expectedQuestions = summary?.planned_questions ?? session.expected_questions ?? data.expected_questions ?? evaluations.length;
   const answeredQuestions = summary?.answered_questions ?? session.answered_questions ?? data.answered_questions ?? evaluations.filter(item => item.classification !== 'silent').length;
   const durationLabel = formatDurationLabel(summary?.total_duration_seconds ?? session.duration_seconds ?? data.duration_seconds ?? null);
   const averageAnswerTime = summary?.average_response_seconds ?? session.average_answer_time_seconds ?? data.average_answer_time_seconds ?? null;
-  const processing = data.evaluation_processing;
-  const canRetryEvaluations = processing ? processing.retryable_count > 0 : data.report_state !== 'GENERATING' || pollingStopped;
-  const pendingAnswers = (data.saved_answers ?? []).filter(answer => answer.evaluation_state !== 'AVAILABLE');
 
   const handleDownloadPDF = async () => {
     if (downloading) {
@@ -359,7 +304,6 @@ export default function ReportPage() {
       </nav>
 
       <div className="max-w-3xl mx-auto px-6 py-10">
-        {data.evidence_report && <InterviewEvidenceReport report={data.evidence_report} sessionId={sessionId} resumeExtraction={data.resume_extraction} />}
         <div className="text-center mb-10 fade-in">
           <p className="text-sm text-secondary mb-2">
             {session.plan.toUpperCase()} Interview - {new Date(session.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -369,40 +313,16 @@ export default function ReportPage() {
             style={{ background: `${scoreColor}15`, border: `3px solid ${scoreColor}` }}
           >
             <span className="text-4xl font-bold" style={{ color: scoreColor }}>
-              {!scoreAvailable ? '—' : Math.round(session.final_score ?? 0)}
+              {Math.round(session.final_score)}
             </span>
           </div>
           <p className="text-sm text-secondary">
-            {!scoreAvailable ? 'Evaluation unavailable. Your recorded answers are preserved.' : `out of 100 - ${answeredQuestions} answered out of ${expectedQuestions} planned questions`}
+            out of 100 - {answeredQuestions} answered out of {expectedQuestions} planned questions
           </p>
           <p className="mt-2 text-sm text-secondary">
             Total time: {durationLabel}{averageAnswerTime ? ` | Avg response: ${averageAnswerTime}s` : ''}
           </p>
-          <p className="mt-2 text-sm text-secondary">{answeredQuestions} answers recorded; {evaluations.length} evaluated. Evaluation coverage: {answeredQuestions ? `${Math.round(100 * evaluations.length / answeredQuestions)}%` : 'Not available'}.</p>
-          {data.evaluation_status && data.evaluation_status !== 'AVAILABLE' && (
-          <section className="card p-4 mb-6" aria-live="polite">
-            <p>{processing?.state === 'DELAYED'
-              ? 'Evaluation is delayed. Your saved answers are available below, and you can retry delayed evaluations.'
-              : pollingStopped
-                ? 'Automatic updates paused after three minutes. Refresh to check progress; your saved answers remain available.'
-                : data.report_state === 'GENERATING'
-                  ? 'Evaluating saved answers. This report updates automatically for three minutes.'
-                  : 'Some saved answers have no evaluation yet. This does not mean a zero score.'}</p>
-            {processing?.retry_available_at && !canRetryEvaluations && <p className="mt-2 text-sm text-secondary">Retry becomes available after {new Date(processing.retry_available_at).toLocaleTimeString()}. Refresh then to check availability.</p>}
-            <div className="flex flex-wrap justify-center gap-3 mt-3">
-              <button type="button" className="btn-secondary" disabled={retrying || !canRetryEvaluations} onClick={retryEvaluations}>{retrying ? 'Queuing...' : 'Retry missing evaluations'}</button>
-              <button type="button" className="btn-secondary" disabled={refreshing} onClick={refreshReport}>{refreshing ? 'Refreshing...' : 'Refresh report'}</button>
-            </div>
-            {processing?.jobs.some(job => job.error_code) && <details className="mt-3 text-left text-sm">
-              <summary className="cursor-pointer">Evaluation service status</summary>
-              <p className="mt-2 text-secondary">These service errors do not assess your answer quality.</p>
-              <ul className="mt-2 space-y-1">{processing.jobs.filter(job => job.error_code).map(job => <li key={job.turn_number}>Answer {job.turn_number}: {job.error_code?.replace('EVALUATION_', '').toLowerCase().replaceAll('_', ' ')}.</li>)}</ul>
-            </details>}
-            {retryMessage && <p className="mt-2">{retryMessage}</p>}
-          </section>
-        )}
-        {refreshError && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">{refreshError} Your last loaded report is still shown. <button type="button" className="underline" disabled={refreshing} onClick={refreshReport}>Try refreshing again</button></p>}
-        {data.interpretation ? (
+          {data.interpretation ? (
             <p className="mt-3 text-sm text-secondary max-w-xl mx-auto">{data.interpretation}</p>
           ) : null}
 
@@ -451,11 +371,11 @@ export default function ReportPage() {
           </section>
         ) : null}
 
-        {has_premium_access && !data.evidence_report && session.final_score !== null && evaluations.length > 0 && data.evaluation_status === 'AVAILABLE' ? (
+        {has_premium_access ? (
           <section className="mb-6 slide-up">
             <h2 className="text-lg font-semibold text-primary mb-1">Interview Intelligence</h2>
             <p className="text-sm text-secondary mb-4">Premium analytics derived from this session&apos;s per-question evaluator data.</p>
-            <IntelDashboard report={{ ...data, session: { ...session, final_score: session.final_score } }} />
+            <IntelDashboard report={data} />
           </section>
         ) : null}
 
@@ -472,7 +392,7 @@ export default function ReportPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-secondary">No evaluated strengths are available yet.</p>
+              <p className="text-sm text-secondary">Complete more interviews to see strengths.</p>
             )}
           </div>
 
@@ -488,22 +408,12 @@ export default function ReportPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-secondary">No improvement feedback is available yet.</p>
+              <p className="text-sm text-secondary">Great job! Keep practicing.</p>
             )}
           </div>
         </div>
 
-        {pendingAnswers.length > 0 && <section className="mb-6 space-y-4" aria-labelledby="saved-answers-heading">
-          <h2 id="saved-answers-heading" className="text-lg font-semibold text-primary">Saved answers awaiting evaluation</h2>
-          <p className="text-sm text-secondary">These are your recorded transcripts. Feedback will appear when evaluation completes.</p>
-          {pendingAnswers.map(answer => <article key={answer.turn_number} className="card p-5">
-            <h3 className="font-medium">Q{answer.turn_number}. {answer.question_text || 'Saved interview answer'}</h3>
-            <blockquote className="mt-3 border-l-2 border-border pl-3 whitespace-pre-wrap break-words">{answer.raw_answer}</blockquote>
-            <p className="mt-3 text-sm text-secondary">Evaluation: {answer.evaluation_state.toLowerCase().replaceAll('_', ' ')}</p>
-          </article>)}
-        </section>}
-
-        {evaluations.length > 0 && <section className="slide-up">
+        <section className="slide-up">
           <h2 className="text-lg font-semibold text-primary mb-4">
             {isFreeSession ? 'Per-Question Coaching' : showProReview ? 'Pro Answer Review' : showCareerReview ? 'Career Answer Review' : 'Per-Question Breakdown'}
           </h2>
@@ -782,7 +692,7 @@ export default function ReportPage() {
               );
             })}
           </div>
-        </section>}
+        </section>
 
         {showProReview && data.pro_summary ? (
           <section className="card p-6 mt-8 slide-up">

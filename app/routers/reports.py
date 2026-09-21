@@ -20,8 +20,7 @@ from app.services.evaluator import (
     build_pro_readiness_summary,
     get_score_interpretation,
 )
-from app.services.interview_summary import compute_interview_summary, coerce_runtime_state
-from app.services.report_truth import build_report_truth, saved_answer_records
+from app.services.interview_summary import compute_interview_summary
 from app.routers.interviews_helpers import _validate_session_id
 
 router = APIRouter()
@@ -137,21 +136,17 @@ async def get_report(
             session_id,
         )
 
-    async with DatabaseConnection() as conn:
-        messages = await conn.fetch("SELECT role,content,turn_number FROM conversation_messages WHERE session_id=$1 ORDER BY turn_number,id", session_id)
-        jobs = await conn.fetch("SELECT turn_number,state,attempts,error_code,updated_at,retry_after FROM interview_evaluation_jobs WHERE session_id=$1", session_id)
-    truth = build_report_truth(session_data, [dict(row) for row in eval_rows], messages, jobs)
     plan = session_data["plan"]
     # Use effective_plan to respect admin override
     effective_cfg = PLAN_CONFIG.get(user.effective_plan, PLAN_CONFIG["free"])
     has_premium_access = effective_cfg["has_ideal_answers"]
     has_free_guidance = plan == "free"
     expose_guidance = has_premium_access or has_free_guidance
-    score = truth["aggregate"]["final_score"]
+    score = float(session_data["final_score"]) if session_data["final_score"] else 0
 
     # Build per-question data with plan-based gating
     evaluations = []
-    for row in truth["evaluations"]:
+    for row in eval_rows:
         q = {
             "turn_number": row["turn_number"],
             "rubric_category": row["rubric_category"],
@@ -189,12 +184,20 @@ async def get_report(
     # (Fix 2 repair); audio link + confidence appear only when server-side STT was
     # used. Owner-only endpoint, so no extra plan gating on the student's own record.
     audit_meta = await _attach_audit_trail(
-        evaluations, truth["evaluations"], audio_rows, created_at=session_data["created_at"]
+        evaluations, eval_rows, audio_rows, created_at=session_data["created_at"]
     )
 
+    rubric_scores = json.loads(session_data["rubric_scores"]) if session_data["rubric_scores"] else {}
     violations = json.loads(session_data["proctoring_violations"]) if session_data["proctoring_violations"] else []
 
-    summary = truth["summary"]
+    summary = compute_interview_summary(
+        plan=plan,
+        question_plan=session_data["question_plan"],
+        total_turns=int(session_data["total_turns"] or 0),
+        evaluations=evaluations,
+        duration_seconds=session_data["duration_actual_seconds"],
+        runtime_state=session_data.get("runtime_state"),
+    )
     expected_questions = summary["planned_questions"]
     answered_questions = summary["answered_questions"]
     average_answer_time_seconds = summary["average_response_seconds"]
@@ -205,47 +208,40 @@ async def get_report(
             session_data["resume_summary"],
             expected_questions=expected_questions,
         )
-        if plan == "career" and has_premium_access and truth["evaluation_status"] == "AVAILABLE"
+        if plan == "career" and has_premium_access
         else None
     )
     pro_summary = (
         build_pro_readiness_summary(evaluations, expected_questions=expected_questions)
-        if plan == "pro" and has_premium_access and truth["evaluation_status"] == "AVAILABLE"
+        if plan == "pro" and has_premium_access
         else None
     )
 
-    interpretation = truth["interpretation"]
-    resume_extraction = coerce_runtime_state(session_data.get("resume_summary")).get("resume_extraction")
-    extraction_status = resume_extraction.get("status") if isinstance(resume_extraction, dict) else None
+    interpretation = get_score_interpretation(int(score), plan)
+    if expected_questions and summary["closed_questions"] < expected_questions:
+        interpretation = (
+            f"{interpretation} This report reflects {summary['closed_questions']} of "
+            f"{expected_questions} planned questions completed."
+        )
 
     return {
         "session": {
             "id": session_id,
-            "candidate_name": coerce_runtime_state(session_data.get("resume_summary")).get("candidate_name"),
             "plan": plan,
             "final_score": score,
             "total_turns": session_data["total_turns"],
             "expected_questions": expected_questions,
             "answered_questions": answered_questions,
             "closed_questions": summary["closed_questions"],
-            "strengths": truth["aggregate"]["strengths"],
-            "weaknesses": truth["aggregate"]["weaknesses"],
-            "rubric_scores": truth["aggregate"]["category_scores"] if effective_cfg["has_rubric_breakdown"] else {},
+            "strengths": session_data["strengths"] or [],
+            "weaknesses": session_data["weaknesses"] or [],
+            "rubric_scores": rubric_scores if effective_cfg["has_rubric_breakdown"] else {},
             "created_at": str(session_data["created_at"]),
             "finished_at": str(session_data["finished_at"]) if session_data["finished_at"] else None,
             "duration_seconds": session_data["duration_actual_seconds"],
             "average_answer_time_seconds": average_answer_time_seconds,
             "summary": summary,
         },
-        "evidence_report": truth["evidence_report"],
-        "resume_extraction": {"status": extraction_status} if extraction_status in {"AVAILABLE", "PARTIAL", "NO_CLAIMS", "FAILED"} else None,
-        "evaluation_status": truth["evaluation_status"],
-        "report_state": truth["report_state"],
-        "report_version": truth["report_version"],
-        "pending_evaluations": truth["pending_evaluations"],
-        "failed_evaluations": truth["failed_evaluations"],
-        "evaluation_processing": truth["evaluation_processing"],
-        "saved_answers": saved_answer_records(messages, truth["evaluations"], truth["evaluation_processing"]),
         "evaluations": evaluations,
         "user_plan": user.plan,
         "has_premium_access": has_premium_access,
@@ -318,10 +314,10 @@ async def _attach_audit_trail(
     signed_by_turn: dict[int, str | None] = {}
     if sign_targets:
         signed_urls = await asyncio.gather(
-            *(create_signed_url(path) for _, path in sign_targets), return_exceptions=True
+            *(create_signed_url(path) for _, path in sign_targets)
         )
         signed_by_turn = {
-            turn: url if isinstance(url, str) else None for (turn, _), url in zip(sign_targets, signed_urls)
+            turn: url for (turn, _), url in zip(sign_targets, signed_urls)
         }
 
     any_audio = False
@@ -423,22 +419,26 @@ async def download_pdf(
     # Build PDF payload
     from app.services.report_builder import generate_pdf_report
 
-    async with DatabaseConnection() as conn:
-        messages = await conn.fetch("SELECT role,content,turn_number FROM conversation_messages WHERE session_id=$1 ORDER BY turn_number,id", session_id)
     session_payload = dict(session)
     eval_dicts = [dict(r) for r in eval_rows]
 
-    truth = build_report_truth(session_payload, eval_dicts, messages)
-    summary = truth['summary']
+    summary = compute_interview_summary(
+        plan=str(session_payload.get("plan") or "free"),
+        question_plan=session_payload.get("question_plan"),
+        total_turns=int(session_payload.get("total_turns") or 0),
+        evaluations=eval_dicts,
+        duration_seconds=session_payload.get("duration_actual_seconds"),
+        runtime_state=session_payload.get("runtime_state"),
+    )
     expected_questions = summary["planned_questions"]
 
     # Inject plan-specific coaching summaries into the session payload
-    if session_payload.get("plan") == "pro" and truth["evaluation_status"] == "AVAILABLE":
+    if session_payload.get("plan") == "pro":
         session_payload["pro_summary"] = build_pro_readiness_summary(
             eval_dicts,
             expected_questions=expected_questions,
         )
-    if session_payload.get("plan") == "career" and truth["evaluation_status"] == "AVAILABLE":
+    if session_payload.get("plan") == "career":
         session_payload["career_summary"] = build_career_readiness_summary(
             eval_dicts,
             session_payload.get("resume_summary"),
@@ -564,10 +564,8 @@ async def get_shared_report(share_token: str):
             str(session["id"]),
         )
 
-        messages = await conn.fetch("SELECT role,content,turn_number FROM conversation_messages WHERE session_id=$1", session['id'])
-    truth = build_report_truth(dict(session), [dict(row) for row in eval_rows], messages)
-    rubric_scores = truth['aggregate']['category_scores']
-    score = truth['aggregate']['final_score']
+    rubric_scores = json.loads(session["rubric_scores"]) if session["rubric_scores"] else {}
+    score = float(session["final_score"]) if session["final_score"] else 0
 
     # Limited per-question data — no answers, no ideal answers
     evaluations_limited = [
@@ -578,17 +576,24 @@ async def get_shared_report(share_token: str):
             "classification": row["classification"],
             "score": float(row["score"]),
         }
-        for row in truth['evaluations']
+        for row in eval_rows
     ]
 
-    summary = truth['summary']
+    summary = compute_interview_summary(
+        plan=str(session["plan"]),
+        question_plan=session["question_plan"],
+        total_turns=int(session["total_turns"] or 0),
+        evaluations=[dict(r) for r in eval_rows],
+        duration_seconds=session["duration_actual_seconds"],
+        runtime_state=session.get("runtime_state"),
+    )
 
     return {
         "session": {
             "plan": session["plan"],
             "final_score": score,
-            "strengths": truth["aggregate"]["strengths"],
-            "weaknesses": truth["aggregate"]["weaknesses"],
+            "strengths": session["strengths"] or [],
+            "weaknesses": session["weaknesses"] or [],
             "rubric_scores": rubric_scores,
             "total_turns": session["total_turns"],
             "completed_at": str(session["finished_at"]) if session["finished_at"] else None,
@@ -596,40 +601,6 @@ async def get_shared_report(share_token: str):
             "summary": summary,
         },
         "evaluations": evaluations_limited,
-        "interpretation": truth["interpretation"],
-        "evaluation_status": truth["evaluation_status"],
-        "report_state": truth["report_state"],
+        "interpretation": get_score_interpretation(int(score), str(session["plan"])),
         "is_shared": True,
     }
-
-
-@router.post("/{session_id}/retry-evaluations")
-async def retry_evaluations(session_id: str, user: UserProfile = Depends(get_current_user)):
-    """Retry missing evaluations from saved answers without changing interview usage."""
-    from app.middleware.rate_limiter import rate_limit_user
-    from app.services.report_truth import is_recorded_answer
-    _validate_session_id(session_id)
-    await rate_limit_user(user.id)
-    async with DatabaseConnection() as conn, conn.transaction():
-        # The job primary key and conditional UPSERT serialize retries. Taking a
-        # session write lock here would invert the worker's job -> session order.
-        session = await conn.fetchrow("SELECT id FROM interview_sessions WHERE id=$1 AND user_id=$2 AND state='FINISHED'", session_id, user.id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Completed interview not found.")
-        answers = await conn.fetch("""SELECT DISTINCT ON(m.turn_number) m.id,m.role,m.content,m.turn_number
-            FROM conversation_messages m WHERE m.session_id=$1 AND m.role='user'
-            AND NOT EXISTS(SELECT 1 FROM question_evaluations e WHERE e.session_id=m.session_id AND e.turn_number=m.turn_number)
-            ORDER BY m.turn_number,m.id LIMIT 100""", session_id)
-        queued = 0
-        for answer in answers:
-            if not is_recorded_answer(answer):
-                continue
-            changed = await conn.fetchval("""INSERT INTO interview_evaluation_jobs(session_id,turn_number,source_message_id)
-                VALUES($1,$2,$3) ON CONFLICT(session_id,turn_number) DO UPDATE
-                SET state='PENDING',attempts=0,retry_after=NOW(),updated_at=NOW(),error_code=NULL,lease_id=NULL
-                WHERE interview_evaluation_jobs.updated_at <= NOW()-INTERVAL '5 minutes'
-                  AND (interview_evaluation_jobs.state='FAILED'
-                    OR (interview_evaluation_jobs.state IN ('PENDING','RUNNING') AND interview_evaluation_jobs.retry_after <= NOW()))
-                RETURNING turn_number""", session_id, answer['turn_number'], answer['id'])
-            queued += changed is not None
-    return {"queued": queued, "message": "Saved answers will be evaluated when the service is available."}
