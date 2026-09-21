@@ -134,8 +134,13 @@ async def stt_websocket(websocket: WebSocket, session_id: str):
                 data: bytes = message["bytes"]
                 if buffered_bytes + len(data) > _MAX_TURN_BYTES:
                     await websocket.send_json(
-                        {"type": "error", "message": "Turn audio too large; ending turn."}
+                        {"type": "error", "message": "Turn audio too large; transcribing partial audio."}
                     )
+                    await _finalize_turn(
+                        websocket, session_id, current_turn, buffer,
+                        settings.STT_LANGUAGE_HINT, resume_context, partial=True
+                    )
+                    _reset_turn(current_turn)
                     continue
                 buffer.append(data)
                 buffered_bytes += len(data)
@@ -192,6 +197,7 @@ async def _finalize_turn(
     buffer: list[bytes],
     language_hint: str,
     resume_context: str | None,
+    partial: bool = False,
 ) -> None:
     full_audio = b"".join(buffer)
     if not full_audio:
@@ -208,29 +214,36 @@ async def _finalize_turn(
     object_path = await store_audio_chunk(session_id, turn_id, "full", full_audio)
     audio_url = await create_signed_url(object_path) if object_path else None
 
+    # ALWAYS record the audit trail, even on transcription failure
+    transcription_status = "partial_max_buffer" if partial else ("failed" if result["provider"] == "none" else "success")
+    await record_audio_turn(
+        session_id,
+        turn_id,
+        object_path,
+        result["confidence"] if result["provider"] != "none" else 0,
+        result["provider"],
+        transcription_status=transcription_status,
+    )
+
     if result["provider"] == "none":
         await websocket.send_json(
             {"type": "error", "message": "Could not process audio, please try again."}
         )
         return
 
-    # Persist the per-turn audio audit record so the report can re-mint a signed
-    # playback URL and show transcription confidence (Fix 7). Best-effort.
-    await record_audio_turn(
-        session_id, turn_id, object_path, result["confidence"], result["provider"]
-    )
+    response = {
+        "type": "final",
+        "turn_id": turn_id,
+        "final_transcript": result["transcript"],
+        "raw_transcript": result["raw_transcript"],
+        "confidence": result["confidence"],
+        "audio_id": result["audio_id"],
+        "audio_url": audio_url,
+    }
+    if partial:
+        response["transcription_status"] = "partial_max_buffer"
 
-    await websocket.send_json(
-        {
-            "type": "final",
-            "turn_id": turn_id,
-            "final_transcript": result["transcript"],
-            "raw_transcript": result["raw_transcript"],
-            "confidence": result["confidence"],
-            "audio_id": result["audio_id"],
-            "audio_url": audio_url,
-        }
-    )
+    await websocket.send_json(response)
 
 
 @router.post("/api/stt/transcribe")

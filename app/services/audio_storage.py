@@ -126,6 +126,7 @@ async def record_audio_turn(
     object_path: str | None,
     confidence: float | None,
     provider: str | None,
+    transcription_status: str | None = None,
 ) -> None:
     """Persist one answer turn's audio audit record (Fix 7). Best-effort; never raises.
 
@@ -141,30 +142,60 @@ async def record_audio_turn(
         return
     try:
         async with DatabaseConnection() as conn:
-            await conn.execute(
-                """
-                INSERT INTO interview_audio_turns
-                    (session_id, turn_number, audio_object_path, stt_confidence, stt_provider)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (session_id, turn_number) DO UPDATE SET
-                    audio_object_path = EXCLUDED.audio_object_path,
-                    stt_confidence    = EXCLUDED.stt_confidence,
-                    stt_provider      = EXCLUDED.stt_provider,
-                    updated_at        = now()
-                """,
-                session_id,
-                turn_number,
-                object_path,
-                confidence,
-                provider,
-            )
+            try:
+                await conn.execute(
+                    """
+                    INSERT INTO interview_audio_turns
+                        (session_id, turn_number, audio_object_path, stt_confidence, stt_provider, transcription_status)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    ON CONFLICT (session_id, turn_number) DO UPDATE SET
+                        audio_object_path = EXCLUDED.audio_object_path,
+                        stt_confidence    = EXCLUDED.stt_confidence,
+                        stt_provider      = EXCLUDED.stt_provider,
+                        transcription_status = EXCLUDED.transcription_status,
+                        updated_at        = now()
+                    """,
+                    session_id,
+                    turn_number,
+                    object_path,
+                    confidence,
+                    provider,
+                    transcription_status,
+                )
+            except Exception:
+                await conn.execute(
+                    """
+                    INSERT INTO interview_audio_turns
+                        (session_id, turn_number, audio_object_path, stt_confidence, stt_provider)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (session_id, turn_number) DO UPDATE SET
+                        audio_object_path = EXCLUDED.audio_object_path,
+                        stt_confidence    = EXCLUDED.stt_confidence,
+                        stt_provider      = EXCLUDED.stt_provider,
+                        updated_at        = now()
+                    """,
+                    session_id,
+                    turn_number,
+                    object_path,
+                    confidence,
+                    provider,
+                )
     except Exception as exc:  # noqa: BLE001 — audit persistence must never break STT
-        logger.warning(
-            "audio_turn_record_failed",
-            error=str(exc),
-            session_id=session_id,
-            turn_id=str(turn_id),
-        )
+        if object_path:
+            logger.error(
+                "audio_audit_integrity_violation",
+                error=str(exc),
+                session_id=session_id,
+                turn_id=str(turn_id),
+                transcription_status=transcription_status,
+            )
+        else:
+            logger.warning(
+                "audio_turn_record_failed",
+                error=str(exc),
+                session_id=session_id,
+                turn_id=str(turn_id),
+            )
 
 
 async def create_signed_url(object_path: str, *, ttl_seconds: int = _SIGNED_URL_TTL_SECONDS) -> str | None:

@@ -126,13 +126,23 @@ async def submit_answer(
             question_preview=next_question_text[:80],
         )
 
-    # Only evaluate turns with real answer content and a valid question+turn pair
+    # Determine the terminal state for this turn
+    is_verified_silence = (
+        normalized_text in {'[NO_ANSWER_TIMEOUT]', ''}
+        and pre_validation_warning == 'empty_answer'
+    )
+    is_stt_failure = (
+        not normalized_text.strip()
+        and pre_validation_warning == 'empty_answer'
+        and normalized_text not in {'[NO_ANSWER_TIMEOUT]'}
+    )
+
     should_evaluate = bool(
         normalized_text
         and normalized_text.strip()
         and question_for_eval
         and turn_for_eval is not None
-        and pre_validation_warning not in {"empty_answer"}
+        and pre_validation_warning not in {'empty_answer'}
     )
 
     # --- Final answer → synchronous eval + finish ---
@@ -156,6 +166,20 @@ async def submit_answer(
                     turn=turn_for_eval,
                     error=str(exc),
                 )
+        elif question_for_eval and turn_for_eval is not None:
+            if normalized_text == '[NO_ANSWER_TIMEOUT]' or (not normalized_text.strip() and pre_validation_warning == 'empty_answer'):
+                answer_status = 'no_answer' if normalized_text == '[NO_ANSWER_TIMEOUT]' else 'transcription_failed'
+                try:
+                    await _record_unevaluated_turn(
+                        session_id=session_id,
+                        turn_number=int(turn_for_eval),
+                        question_text=str(question_for_eval),
+                        raw_answer=normalized_text,
+                        answer_status=answer_status,
+                        answer_duration_seconds=req.answer_duration_seconds,
+                    )
+                except Exception as exc:
+                    logger.error("final_unevaluated_turn_record_failed", session_id=session_id, turn=turn_for_eval, error=str(exc))
 
         final_result = await finish_session(
             session_id=session_id,
@@ -200,6 +224,18 @@ async def submit_answer(
             answer_duration_seconds=req.answer_duration_seconds,
             answer_word_count=answer_word_count,
         )
+    elif question_for_eval and turn_for_eval is not None:
+        if normalized_text == '[NO_ANSWER_TIMEOUT]' or (not normalized_text.strip() and pre_validation_warning == 'empty_answer'):
+            answer_status = 'no_answer' if normalized_text == '[NO_ANSWER_TIMEOUT]' else 'transcription_failed'
+            background_tasks.add_task(
+                _record_unevaluated_turn,
+                session_id=session_id,
+                turn_number=int(turn_for_eval),
+                question_text=str(question_for_eval),
+                raw_answer=normalized_text,
+                answer_status=answer_status,
+                answer_duration_seconds=req.answer_duration_seconds,
+            )
 
     # Additive: surface answer quality hint to the frontend so it can
     # show a non-blocking nudge ("Your answer seems a bit short — consider
@@ -209,6 +245,59 @@ async def submit_answer(
 
     await _cache_client_response(session_id, req.client_request_id, result)
     return result
+
+async def _record_unevaluated_turn(
+    session_id: str,
+    turn_number: int,
+    question_text: str,
+    raw_answer: str,
+    answer_status: str,
+    answer_duration_seconds: int | None = None,
+) -> None:
+    # Insert a minimal record so every turn has an evaluation row
+    # NO_ANSWER = candidate chose not to answer (score 0)
+    # TRANSCRIPTION_FAILED = system failure (score null, not_measured)
+    try:
+        score = 0 if answer_status == 'no_answer' else None
+        rationale = (
+            'Candidate did not provide an answer within the allotted time.'
+            if answer_status == 'no_answer'
+            else 'Audio transcription failed — this turn cannot be evaluated. System failure; not a reflection of candidate performance.'
+        )
+        async with DatabaseConnection() as conn:
+            await conn.execute(
+                """INSERT INTO question_evaluations
+                   (session_id, turn_number, rubric_category, question_text,
+                    raw_answer, normalized_answer, classification, score,
+                    scoring_rationale, answer_status,
+                    answer_duration_seconds)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                   ON CONFLICT (session_id, turn_number) DO NOTHING""",
+                session_id,
+                turn_number,
+                'unevaluated',
+                question_text,
+                raw_answer,
+                raw_answer,
+                '',
+                score,
+                rationale,
+                answer_status,
+                answer_duration_seconds,
+            )
+        logger.info(
+            'unevaluated_turn_recorded',
+            session_id=session_id,
+            turn=turn_number,
+            answer_status=answer_status,
+        )
+    except Exception as exc:
+        logger.error(
+            'unevaluated_turn_record_failed',
+            session_id=session_id,
+            turn=turn_number,
+            error=str(exc),
+        )
 
 
 async def _evaluate_and_store(

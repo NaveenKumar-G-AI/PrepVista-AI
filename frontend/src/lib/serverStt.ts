@@ -21,6 +21,12 @@
  * Speech, so the synchronous "read transcript at submit" path is unchanged.
  *
  * Every window's audio is retained server-side for the dispute/audit trail.
+ *
+ * Bug-fix notes:
+ * - Per-window state machine prevents duplicate transcript append from late WS + REST.
+ * - stop() properly awaits in-flight operations instead of sleeping.
+ * - WS drop and guard timeout surface debounced errors instead of silent loss.
+ * - Audio blobs are preserved for REST fallback when WS fails.
  */
 
 export type ServerSttStatus =
@@ -29,6 +35,9 @@ export type ServerSttStatus =
   | 'listening'
   | 'processing'
   | 'error';
+
+/** Per-window lifecycle state — exactly one transcript result is accepted. */
+type WindowState = 'PENDING' | 'WS_SUCCEEDED' | 'REST_FALLBACK' | 'FAILED';
 
 export interface ServerSttOptions {
   sessionId: string;
@@ -47,6 +56,12 @@ export interface ServerSttOptions {
   onStatus?: (status: ServerSttStatus) => void;
   /** Non-fatal errors (the caller decides whether to show them). */
   onError?: (message: string) => void;
+}
+
+/** Flush result returned by stop() so callers know if the final window was captured. */
+export interface StopResult {
+  transcript: string;
+  flush_status: 'ok' | 'timeout' | 'no_inflight';
 }
 
 /** True only when the runtime can actually do server STT (browser + APIs present). */
@@ -87,8 +102,27 @@ export class ServerSttSession {
   private windowIdx = 0;
   private active = false;
   private mimeType = '';
+
   /** Resolver for the in-flight window's server 'final' frame. */
   private pendingFinal: ((text: string) => void) | null = null;
+
+  /** Promise that resolves when the current in-flight sendWindow completes. */
+  private inflightSend: Promise<string> | null = null;
+
+  /** Per-window state: prevents duplicate transcript from late WS + REST. */
+  private currentWindowState: WindowState = 'PENDING';
+
+  /** Last Blob from the most recent recording window — preserved for REST fallback. */
+  private lastWindowBlob: Blob | null = null;
+  private lastWindowTurnId: string = '';
+
+  /** Debounce: timestamp of last user-facing error surfaced. */
+  private lastErrorSurfacedAt = 0;
+  /** Minimum ms between user-facing error messages. */
+  private static readonly ERROR_DEBOUNCE_MS = 10_000;
+
+  /** Count of consecutive failed windows (for internal tracking). */
+  private consecutiveFailures = 0;
 
   constructor(options: ServerSttOptions) {
     this.opts = {
@@ -104,6 +138,19 @@ export class ServerSttSession {
 
   private status(s: ServerSttStatus) {
     this.opts.onStatus?.(s);
+  }
+
+  /** Surface an error to the user, debounced to avoid spam on flaky networks. */
+  private surfaceError(code: string, message: string) {
+    // Always log internally (caller can wire to analytics)
+    console.warn(`[ServerSTT] ${code}:`, message);
+
+    const now = Date.now();
+    if (now - this.lastErrorSurfacedAt < ServerSttSession.ERROR_DEBOUNCE_MS) {
+      return; // Suppress — too soon since last user-facing error
+    }
+    this.lastErrorSurfacedAt = now;
+    this.opts.onError?.(message);
   }
 
   private wsUrl(): string {
@@ -149,7 +196,7 @@ export class ServerSttSession {
         reject(new Error('ws error'));
       };
       this.ws.onclose = () => {
-        if (this.active) this.opts.onError?.('Live transcription disconnected.');
+        if (this.active) this.surfaceError('STT_SOCKET_DROPPED', 'Some speech could not be transcribed. Please retry this answer if needed.');
       };
       this.ws.onmessage = (ev) => this.onSocketMessage(ev);
     });
@@ -172,7 +219,8 @@ export class ServerSttSession {
         resolve(text);
       }
     } else if (msg.type === 'error') {
-      this.opts.onError?.(
+      this.surfaceError(
+        'STT_SERVER_ERROR',
         typeof msg.message === 'string' ? msg.message : 'Could not process audio, please try again.',
       );
       if (this.pendingFinal) {
@@ -188,14 +236,17 @@ export class ServerSttSession {
     if (!this.active || !this.stream) return;
 
     this.windowChunks = [];
+    this.currentWindowState = 'PENDING';
     const turnId = `${this.opts.turnNumber}-${this.windowIdx++}`;
+    this.lastWindowTurnId = turnId;
+
     let recorder: MediaRecorder;
     try {
       recorder = this.mimeType
         ? new MediaRecorder(this.stream, { mimeType: this.mimeType })
         : new MediaRecorder(this.stream);
     } catch {
-      this.opts.onError?.('Audio recording failed to start.');
+      this.surfaceError('STT_RECORDER_FAILED', 'Audio recording failed to start.');
       this.status('error');
       return;
     }
@@ -207,13 +258,32 @@ export class ServerSttSession {
 
     recorder.onstop = async () => {
       const blob = new Blob(this.windowChunks, { type: this.mimeType || 'audio/webm' });
+      // Preserve blob for potential REST fallback
+      this.lastWindowBlob = blob;
+
       if (blob.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
-        const text = await this.sendWindow(turnId, blob);
-        if (text) {
+        const sendPromise = this.sendWindow(turnId, blob);
+        this.inflightSend = sendPromise;
+        const text = await sendPromise;
+        this.inflightSend = null;
+
+        // Only accept transcript if this window is still PENDING (no REST fallback raced us)
+        if (text && this.currentWindowState === 'PENDING') {
+          this.currentWindowState = 'WS_SUCCEEDED';
           this.rolling = `${this.rolling} ${text}`.trim();
           this.opts.onTranscript(this.rolling);
+          this.consecutiveFailures = 0;
+        } else if (!text && this.currentWindowState === 'PENDING') {
+          this.currentWindowState = 'FAILED';
+          this.consecutiveFailures++;
         }
+      } else if (blob.size > 0) {
+        // WebSocket not available — attempt REST fallback
+        this.currentWindowState = 'FAILED';
+        this.consecutiveFailures++;
+        await this.attemptRestFallback(turnId, blob);
       }
+
       // Loop the next window if still listening.
       if (this.active) {
         this.recordNextWindow();
@@ -233,11 +303,43 @@ export class ServerSttSession {
     }, this.opts.windowMs);
   }
 
+  /** Attempt REST fallback transcription for a window whose WS path failed. */
+  private async attemptRestFallback(turnId: string, blob: Blob): Promise<void> {
+    // Don't attempt if window already succeeded via WS
+    if (this.currentWindowState === 'WS_SUCCEEDED') return;
+
+    try {
+      const result = await transcribeBlobViaRest({
+        backendUrl: this.opts.backendUrl,
+        token: this.opts.token,
+        sessionId: this.opts.sessionId,
+        turnNumber: this.opts.turnNumber,
+        blob,
+        language: this.opts.language,
+      });
+
+      // Only accept if still no transcript for this window
+      if (result?.final_transcript && this.currentWindowState !== 'WS_SUCCEEDED') {
+        this.currentWindowState = 'REST_FALLBACK';
+        const text = result.final_transcript.trim();
+        if (text) {
+          this.rolling = `${this.rolling} ${text}`.trim();
+          this.opts.onTranscript(this.rolling);
+          this.consecutiveFailures = 0;
+        }
+      }
+    } catch {
+      // REST fallback also failed — window is truly lost
+      console.warn('[ServerSTT] REST fallback also failed for window', turnId);
+    }
+  }
+
   /** Send one window over the WS and resolve with its server transcript. */
   private sendWindow(turnId: string, blob: Blob): Promise<string> {
     return new Promise<string>((resolve) => {
       const ws = this.ws;
       if (!ws || ws.readyState !== WebSocket.OPEN) {
+        this.surfaceError('STT_SOCKET_DROPPED', 'Some speech could not be transcribed. Please retry this answer if needed.');
         resolve('');
         return;
       }
@@ -250,6 +352,7 @@ export class ServerSttSession {
       const guard = window.setTimeout(() => {
         if (this.pendingFinal) {
           this.pendingFinal = null;
+          this.surfaceError('STT_WINDOW_TIMEOUT', 'Some speech could not be transcribed. Please retry this answer if needed.');
           resolve('');
         }
       }, 12000);
@@ -261,15 +364,30 @@ export class ServerSttSession {
           ws.send(JSON.stringify({ type: 'turn_end' }));
         } else {
           window.clearTimeout(guard);
+          this.surfaceError('STT_SOCKET_DROPPED', 'Some speech could not be transcribed. Please retry this answer if needed.');
           resolve('');
         }
       });
     });
   }
 
-  /** Stop recording + close the socket. Returns the full rolling transcript. */
-  async stop(): Promise<string> {
+  /**
+   * Stop recording + close the socket. Returns the full rolling transcript and
+   * a flush_status indicating whether the final in-flight window was captured.
+   *
+   * Flow:
+   * 1. Stop accepting new windows (this.active = false)
+   * 2. Finalize current MediaRecorder window
+   * 3. Await any in-flight sendWindow()
+   * 4. Await pendingFinal (bounded timeout)
+   * 5. Return accumulated transcript + flush status
+   */
+  async stop(): Promise<StopResult> {
     this.active = false;
+    let flushStatus: StopResult['flush_status'] = 'no_inflight';
+
+    // Step 1: Stop the current MediaRecorder so its onstop fires and
+    // produces the final blob + sendWindow call.
     try {
       if (this.recorder && this.recorder.state !== 'inactive') {
         this.recorder.stop();
@@ -277,9 +395,63 @@ export class ServerSttSession {
     } catch {
       /* ignore */
     }
-    // Give the final in-flight window a brief moment to return its transcript.
-    await new Promise((r) => window.setTimeout(r, 400));
 
+    // Step 2: Await the in-flight sendWindow (set by recorder.onstop).
+    // The recorder.onstop handler is async and sets this.inflightSend.
+    // We need a brief moment for onstop to fire first (it's event-driven).
+    await new Promise((r) => window.setTimeout(r, 50));
+
+    if (this.inflightSend) {
+      flushStatus = 'ok';
+      try {
+        // Bounded wait for the in-flight send to complete
+        const result = await Promise.race([
+          this.inflightSend,
+          new Promise<string>((resolve) =>
+            window.setTimeout(() => resolve('__timeout__'), 8000)
+          ),
+        ]);
+        if (result === '__timeout__') {
+          flushStatus = 'timeout';
+          console.warn('[ServerSTT] Final window flush timed out after 8s');
+        }
+      } catch {
+        flushStatus = 'timeout';
+      }
+    } else if (this.pendingFinal) {
+      // There's a pendingFinal but no tracked inflightSend — wait for it directly
+      flushStatus = 'ok';
+      try {
+        await Promise.race([
+          new Promise<void>((resolve) => {
+            const originalResolve = this.pendingFinal;
+            if (!originalResolve) {
+              resolve();
+              return;
+            }
+            this.pendingFinal = (text: string) => {
+              originalResolve(text);
+              resolve();
+            };
+          }),
+          new Promise<void>((resolve) =>
+            window.setTimeout(() => {
+              // Force-resolve pendingFinal if still waiting
+              if (this.pendingFinal) {
+                const pf = this.pendingFinal;
+                this.pendingFinal = null;
+                pf('');
+              }
+              resolve();
+            }, 8000)
+          ),
+        ]);
+      } catch {
+        flushStatus = 'timeout';
+      }
+    }
+
+    // Step 3: Clean up resources
     try {
       this.ws?.send(JSON.stringify({ type: 'close' }));
     } catch {
@@ -294,8 +466,11 @@ export class ServerSttSession {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.recorder = null;
+    this.inflightSend = null;
+    this.lastWindowBlob = null;
     this.status('idle');
-    return this.transcript;
+
+    return { transcript: this.transcript, flush_status: flushStatus };
   }
 }
 

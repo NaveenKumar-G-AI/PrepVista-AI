@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
-import { ServerSttSession, serverSttSupported } from '@/lib/serverStt';
+import { ServerSttSession, serverSttSupported, transcribeBlobViaRest, type StopResult } from '@/lib/serverStt';
 
 import styles from './page.module.css';
 
@@ -1212,20 +1212,57 @@ export default function LiveInterviewPage() {
       },
     });
     serverSttRef.current = session;
-    session.start().catch(() => {
-      setPageError('Could not access the microphone. Please allow mic access and reload.');
-      setUiState('ERROR');
+    session.start().catch((err) => {
       serverSttRef.current = null;
+
+      // Distinguish mic permission denial from WebSocket connection failure.
+      // Mic denial is fatal — the user must grant permission.
+      // WS failure is recoverable — the session's internal REST fallback can
+      // still transcribe if the user retries or the next window succeeds.
+      const isMicError = err instanceof DOMException && (
+        err.name === 'NotAllowedError' || err.name === 'NotFoundError'
+      );
+      if (isMicError) {
+        setPageError('Could not access the microphone. Please allow mic access and reload.');
+        setUiState('ERROR');
+      } else {
+        // WebSocket connection failed — warn but don't block the interview.
+        // The user can still speak and submit; audio will attempt REST fallback
+        // on subsequent windows if the session is retried.
+        setTimerMessage('Live transcription unavailable. Your answer will still be recorded when you press Submit Answer.');
+        console.warn('[Interview] ServerSTT WebSocket failed to connect:', err);
+      }
     });
   }
 
-  function stopServerStt() {
+  async function stopServerStt(): Promise<StopResult | null> {
     const session = serverSttRef.current;
-    if (!session) return;
+    if (!session) return null;
     serverSttRef.current = null;
-    // Fire-and-forget: the rolling transcript is already in the refs; stop()
-    // also flushes the last in-flight window and tears down the mic + socket.
-    session.stop().catch(() => {});
+
+    // Await the final flush — stop() properly awaits in-flight sendWindow and
+    // pendingFinal with a bounded timeout, so we capture the last recording
+    // window's transcript instead of discarding it.
+    try {
+      const result = await session.stop();
+
+      // Write the final flushed transcript into the refs so it's available
+      // for submission. This is critical: without this, the last ~3s of
+      // speech would be silently lost.
+      if (result.transcript) {
+        accumulatedTranscriptRef.current = result.transcript;
+        currentTranscriptRef.current = normalizeLiveTranscript(result.transcript);
+        setLiveTranscript(currentTranscriptRef.current ? `"${currentTranscriptRef.current}"` : '');
+      }
+
+      if (result.flush_status === 'timeout') {
+        console.warn('[Interview] ServerSTT final flush timed out — some speech may be lost');
+      }
+
+      return result;
+    } catch {
+      return null;
+    }
   }
 
   function startListeningLoop(promptOverride = '', resetQuestionTimer = true) {
@@ -1876,9 +1913,33 @@ export default function LiveInterviewPage() {
   const handleConfirmEndInterview = async () => {
     setEndInterviewOpen(false);
 
-    // Instantly kill all audio/mic — no waiting
-    stopAllMedia();
+    // ── Step 1: Finalize audio capture BEFORE reading transcript ──────────
+    // Critical fix: await the server STT flush so the final recording window's
+    // transcript is written into the refs BEFORE we read them for submission.
+    // Previously, stopAllMedia() fire-and-forgot the STT stop, and the transcript
+    // was read immediately — losing the last ~3 seconds of speech.
+    await stopServerStt();
 
+    // Now stop remaining media (Web Speech, waveform, timers, TTS)
+    clearWaveformMonitor();
+    clearSilenceTimers();
+    clearGlobalClock();
+    const recognition = recognitionRef.current;
+    if (recognition) {
+      if (rafPendingRef.current !== null) {
+        cancelAnimationFrame(rafPendingRef.current);
+        rafPendingRef.current = null;
+      }
+      recognition.onend = null;
+      try { recognition.stop(); } catch { /* no-op */ }
+      recognitionRef.current = null;
+    }
+    if (typeof window !== 'undefined') {
+      window.speechSynthesis?.cancel();
+    }
+    setHardwareActive(false);
+
+    // ── Step 2: Show farewell UI ──────────────────────────────────────────
     const farewellName = getClosingName(sessionDataRef.current?.candidate_name, user?.full_name);
     const farewellMessage = `Thank you ${farewellName}. It was great to interview you. Your report is being prepared now.`;
 
@@ -1889,7 +1950,7 @@ export default function LiveInterviewPage() {
     // Speak farewell immediately (non-blocking)
     speak(farewellMessage, () => {});
 
-    // Fire backend termination in parallel — don't wait for speech
+    // ── Step 3: Read transcript (now contains flushed final window) ───────
     const activeSession = sessionDataRef.current;
     if (!activeSession) {
       router.push('/dashboard');
