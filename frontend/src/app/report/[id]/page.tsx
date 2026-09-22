@@ -42,6 +42,7 @@ interface Evaluation {
   corrected_intent?: string | null;
   answer_duration_seconds?: number | null;
   audit?: EvaluationAudit | null;
+  assistance_provenance?: string | null;
 }
 
 interface EvaluationAudit {
@@ -134,6 +135,14 @@ interface ReportData {
   duration_seconds?: number | null;
   average_answer_time_seconds?: number | null;
   summary?: InterviewSummary;
+  assistance_summary?: {
+    enabled: boolean;
+    total_questions: number;
+    independent: number;
+    hint_assisted: number;
+    answer_guided: number;
+    independent_coverage_pct: number;
+  } | null;
 }
 
 function formatDurationLabel(totalSeconds?: number | null) {
@@ -349,6 +358,34 @@ export default function ReportPage() {
           ) : null}
         </div>
 
+        {/* ── Assistance & Independence ─────────────────────────────── */}
+        {data.assistance_summary && data.assistance_summary.enabled ? (
+          <section className="card p-6 mb-6 slide-up">
+            <h2 className="text-lg font-semibold text-primary mb-4">Assistance &amp; Independence</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{data.assistance_summary.independent}</div>
+                <div className="text-xs text-secondary mt-1">Independent</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{data.assistance_summary.hint_assisted}</div>
+                <div className="text-xs text-secondary mt-1">Hint-assisted</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{data.assistance_summary.answer_guided}</div>
+                <div className="text-xs text-secondary mt-1">Answer-guided</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{data.assistance_summary.independent_coverage_pct}%</div>
+                <div className="text-xs text-secondary mt-1">Independent coverage</div>
+              </div>
+            </div>
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/15 px-4 py-3 text-xs text-blue-800 dark:text-blue-300">
+              Assistance is recorded so PrepVista can distinguish what you demonstrated independently from what you completed with guidance. Supported answers remain useful learning evidence, but they require an independent retry before PrepVista treats them as independently demonstrated.
+            </div>
+          </section>
+        ) : null}
+
         {session.rubric_scores && Object.keys(session.rubric_scores).length > 0 ? (
           <section className="card p-6 mb-6 slide-up">
             <h2 className="text-lg font-semibold text-primary mb-4">Category Breakdown</h2>
@@ -456,6 +493,28 @@ export default function ReportPage() {
                     </span>
                     <span className="text-sm font-semibold ml-auto">{evaluation.score}/10</span>
                   </div>
+
+                  {/* Per-question assistance label */}
+                  {data.assistance_summary?.enabled && evaluation.assistance_provenance && evaluation.assistance_provenance !== 'unknown' ? (
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                        evaluation.assistance_provenance === 'independent'
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                          : evaluation.assistance_provenance === 'hint_assisted'
+                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                            : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                      }`}>
+                        {evaluation.assistance_provenance === 'independent'
+                          ? '✓ Independent'
+                          : evaluation.assistance_provenance === 'hint_assisted'
+                            ? '💡 Hint used'
+                            : '📝 Answer guidance viewed'}
+                      </span>
+                      {evaluation.assistance_provenance !== 'independent' ? (
+                        <span className="text-xs text-secondary">Retry without assistance to verify independently</span>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   <p className="text-sm text-primary mb-2"><strong>Question:</strong> {evaluation.question_text}</p>
                   <p className="text-sm text-secondary mb-2"><strong>Your answer:</strong> {evaluation.normalized_answer || evaluation.raw_answer || 'No answer'}</p>

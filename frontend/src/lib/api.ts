@@ -976,6 +976,42 @@ class ApiClient {
   }
 
 
+  // ── Guided Interview Assistance ──────────────
+  async requestHint<T = unknown>(
+    sessionId: string,
+    accessToken: string,
+    clientRequestId: string,
+    questionText: string,
+    level: number = 1,
+  ) {
+    return this.request<T>(`/interviews/${sessionId}/assistance/hint`, {
+      method: 'POST',
+      body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText, level },
+      timeoutMs: 15_000,
+    });
+  }
+  async requestAnswerGuidance<T = unknown>(
+    sessionId: string,
+    accessToken: string,
+    clientRequestId: string,
+    questionText: string,
+  ) {
+    return this.request<T>(`/interviews/${sessionId}/assistance/answer-guidance`, {
+      method: 'POST',
+      body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText },
+      timeoutMs: 20_000,
+    });
+  }
+  async markAssistanceViewed<T = unknown>(sessionId: string, accessToken: string, eventId: string) {
+    return this.request<T>(`/interviews/${sessionId}/assistance/${eventId}/viewed`, {
+      method: 'POST',
+      body: { access_token: accessToken },
+    });
+  }
+  async getAssistanceSummary<T = unknown>(sessionId: string, accessToken: string) {
+    return this.request<T>(`/interviews/${sessionId}/assistance/summary?access_token=${encodeURIComponent(accessToken)}`);
+  }
+
   // ── Reports ───────────────────────────────
   async getReport<T = unknown>(sessionId: string) { return this.cachedRequest<T>(`/reports/${sessionId}`, 60_000); }
   async downloadPDF(sessionId: string): Promise<Blob> {

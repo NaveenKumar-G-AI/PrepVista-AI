@@ -26,6 +26,7 @@ export default function InterviewSetupPage() {
   const [dragActive, setDragActive] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [difficultyMode, setDifficultyMode] = useState('auto');
+  const [guidedAssistance, setGuidedAssistance] = useState(false);
 
   useEffect(() => {
     if (authLoading) {
@@ -78,6 +79,7 @@ export default function InterviewSetupPage() {
       formData.append('resume', file);
       formData.append('plan', activePlan);
       formData.append('difficulty_mode', difficultyMode);
+      formData.append('guided_assistance', guidedAssistance ? 'true' : 'false');
 
       const result = await api.setupInterview<{
         session_id: string;
@@ -88,6 +90,7 @@ export default function InterviewSetupPage() {
         difficulty_mode: string;
         candidate_name: string;
         proctoring_mode: string;
+        assistance_enabled?: boolean;
       }>(formData);
 
       sessionStorage.setItem('pv_interview_session', JSON.stringify({
@@ -99,6 +102,7 @@ export default function InterviewSetupPage() {
         difficulty_mode: result.difficulty_mode,
         candidate_name: result.candidate_name,
         proctoring_mode: result.proctoring_mode,
+        assistance_enabled: result.assistance_enabled ?? false,
       }));
 
       router.push(`/interview/${result.session_id}`);
@@ -267,6 +271,61 @@ export default function InterviewSetupPage() {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* ── Guided Interview Assistance ────────────────────────────── */}
+          <div className="card relative overflow-visible p-4 sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                  <BoltIcon size={18} />
+                </div>
+                <div>
+                  <div className="text-sm text-secondary">Guided Interview Assistance</div>
+                  <div className="font-semibold text-primary">
+                    {guidedAssistance ? 'Guided mode is enabled' : 'Assistance is off — independent mode'}
+                  </div>
+                  <div className="mt-1 text-xs text-secondary">
+                    Get contextual hints and professional answer guidance when you are unsure how to respond.
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 lg:items-end">
+                <button
+                  type="button"
+                  onClick={() => setGuidedAssistance(!guidedAssistance)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    guidedAssistance
+                      ? 'bg-blue-600'
+                      : 'bg-slate-300 dark:bg-slate-600'
+                  }`}
+                  role="switch"
+                  aria-checked={guidedAssistance}
+                  aria-label="Toggle Guided Interview Assistance"
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      guidedAssistance ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs text-secondary">
+                  {guidedAssistance ? 'ON — hints and answer guidance available' : 'OFF — independent interview'}
+                </span>
+              </div>
+            </div>
+
+            {guidedAssistance ? (
+              <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2.5 text-xs text-blue-800 dark:bg-blue-900/15 dark:text-blue-300">
+                <div className="space-y-1">
+                  <div>• <strong>Hint</strong> will help you understand what the interviewer is looking for.</div>
+                  <div>• <strong>Show Answer</strong> will provide structured professional guidance grounded in your profile.</div>
+                  <div>• Assistance use will be <strong>recorded</strong> in your final report.</div>
+                  <div>• Assisted responses are kept separate from independent evidence.</div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {error ? (

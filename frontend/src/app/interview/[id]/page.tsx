@@ -47,6 +47,8 @@ interface StoredSessionData {
   proctoring_mode?: string;
   // Additive: resume fingerprint returned by the setup endpoint for cross-session dedup
   resume_fingerprint?: string;
+  // Additive: guided interview assistance policy
+  assistance_enabled?: boolean;
 }
 
 interface ContinueResponse {
@@ -591,6 +593,112 @@ export default function LiveInterviewPage() {
   // full component tree.  Direct DOM writes (setLiveTranscript) still happen
   // synchronously inside onresult for zero-latency visual feedback.
   const rafPendingRef = useRef<number | null>(null);
+
+  // ── Guided Interview Assistance state ──────────────────────────────────
+  const assistanceEnabled = sessionData?.assistance_enabled ?? false;
+  const [hintContent, setHintContent] = useState<string | null>(null);
+  const [hintLevel, setHintLevel] = useState(0);
+  const [guidanceContent, setGuidanceContent] = useState<string | null>(null);
+  const [guidanceWhyItWorks, setGuidanceWhyItWorks] = useState<string[]>([]);
+  const [assistanceLoading, setAssistanceLoading] = useState(false);
+  const [assistanceStatus, setAssistanceStatus] = useState<'independent' | 'hint' | 'guided'>('independent');
+  const [assistancePanelOpen, setAssistancePanelOpen] = useState(false);
+  const assistanceTurnRef = useRef<number>(0); // stale response protection
+
+  // Reset guidance content when the turn changes
+  useEffect(() => {
+    setHintContent(null);
+    setHintLevel(0);
+    setGuidanceContent(null);
+    setGuidanceWhyItWorks([]);
+    setAssistanceStatus('independent');
+    setAssistancePanelOpen(false);
+    setAssistanceLoading(false);
+    assistanceTurnRef.current = currentTurn;
+  }, [currentTurn]);
+
+  /** Request a hint for the current question from the backend. */
+  async function requestHint() {
+    const session = sessionDataRef.current;
+    if (!session || !assistanceEnabled || assistanceLoading) return;
+    const requestedLevel = hintLevel + 1;
+    if (requestedLevel > 2) return; // max 2 levels
+
+    setAssistanceLoading(true);
+    setAssistancePanelOpen(true);
+    const turnAtRequest = currentTurn;
+
+    try {
+      const resp = await api.requestHint<{
+        content: string;
+        level: number;
+        turn_number: number;
+        event_id: string;
+      }>(
+        session.session_id,
+        session.access_token,
+        `hint-${session.session_id}-${currentTurn}-${requestedLevel}`,
+        lastQuestionRef.current || '',
+        requestedLevel,
+      );
+
+      // Stale protection: discard if turn advanced while we were waiting
+      if (turnAtRequest !== assistanceTurnRef.current) return;
+
+      setHintContent(resp.content);
+      setHintLevel(resp.level);
+      setAssistanceStatus((prev) => prev === 'guided' ? 'guided' : 'hint');
+
+      // Mark as viewed
+      try {
+        await api.markAssistanceViewed(session.session_id, session.access_token, resp.event_id);
+      } catch { /* best effort */ }
+    } catch {
+      setHintContent('Unable to generate a hint right now. Try structuring your answer as: Situation → Action → Result.');
+    } finally {
+      setAssistanceLoading(false);
+    }
+  }
+
+  /** Request answer guidance for the current question. */
+  async function requestAnswerGuidance() {
+    const session = sessionDataRef.current;
+    if (!session || !assistanceEnabled || assistanceLoading) return;
+
+    setAssistanceLoading(true);
+    setAssistancePanelOpen(true);
+    const turnAtRequest = currentTurn;
+
+    try {
+      const resp = await api.requestAnswerGuidance<{
+        content: string;
+        turn_number: number;
+        event_id: string;
+        why_it_works?: string[];
+      }>(
+        session.session_id,
+        session.access_token,
+        `guidance-${session.session_id}-${currentTurn}`,
+        lastQuestionRef.current || '',
+      );
+
+      // Stale protection
+      if (turnAtRequest !== assistanceTurnRef.current) return;
+
+      setGuidanceContent(resp.content);
+      setGuidanceWhyItWorks(resp.why_it_works || []);
+      setAssistanceStatus('guided');
+
+      // Mark as viewed
+      try {
+        await api.markAssistanceViewed(session.session_id, session.access_token, resp.event_id);
+      } catch { /* best effort */ }
+    } catch {
+      setGuidanceContent('Professional answer guidance is temporarily unavailable. Try structuring your answer as: Situation → Your responsibility → Decision → Why → Result.');
+    } finally {
+      setAssistanceLoading(false);
+    }
+  }
 
   useEffect(() => {
     uiStateRef.current = uiState;
@@ -2101,6 +2209,19 @@ export default function LiveInterviewPage() {
               </div>
             </div>
 
+            {/* ── Interview Assistance Summary ───────────────────────── */}
+            {assistanceEnabled ? (
+              <div style={{ margin: '16px 0', padding: '16px', borderRadius: '12px', border: '1px solid rgba(59,130,246,0.2)', backgroundColor: 'rgba(59,130,246,0.03)' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Guided Interview Mode</h3>
+                <div style={{ fontSize: '13px', color: 'rgba(100,116,139,0.8)', marginBottom: '8px' }}>
+                  This session used Guided Interview Assistance. Your full report includes a detailed breakdown of which questions were answered independently and which used hints or answer guidance.
+                </div>
+                <div style={{ fontSize: '12px', color: 'rgba(100,116,139,0.6)', textAlign: 'center' }}>
+                  Assisted responses are valuable learning evidence, but PrepVista keeps them separate from independent answers.
+                </div>
+              </div>
+            ) : null}
+
             <div className={styles.actions}>
               <Link href={`/report/${sessionId}`} className={styles.actionButton}>View Full Report</Link>
               <Link href="/dashboard" className={styles.secondaryButton}>Return To Dashboard</Link>
@@ -2183,10 +2304,115 @@ export default function LiveInterviewPage() {
                 {uiState === 'USER_LISTENING' ? (
                   <>
                     <button type="button" className={styles.forceButton} onClick={handleManualSubmit}>Submit Answer</button>
+                    {assistanceEnabled ? (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.endButton}
+                          style={{ opacity: assistanceLoading ? 0.6 : 1 }}
+                          disabled={assistanceLoading || hintLevel >= 2}
+                          onClick={requestHint}
+                          aria-label="Show contextual hint for current interview question"
+                        >
+                          {assistanceLoading && !guidanceContent ? 'Preparing...' : hintLevel >= 2 ? 'Hints used' : '💡 Hint'}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.endButton}
+                          style={{ opacity: assistanceLoading ? 0.6 : 1 }}
+                          disabled={assistanceLoading || !!guidanceContent}
+                          onClick={requestAnswerGuidance}
+                          aria-label="Show professional answer guidance for current interview question"
+                        >
+                          {assistanceLoading && !hintContent ? 'Preparing...' : guidanceContent ? 'Guidance shown' : '📝 Show Answer'}
+                        </button>
+                      </>
+                    ) : null}
                     <button type="button" className={styles.endButton} onClick={handleEndInterview}>End Interview</button>
                   </>
                 ) : null}
               </div>
+
+              {/* ── Guided Assistance Panel ──────────────────────────────── */}
+              {assistanceEnabled && assistancePanelOpen && uiState === 'USER_LISTENING' ? (
+                <div
+                  style={{
+                    margin: '12px 0',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(59,130,246,0.25)',
+                    backgroundColor: 'rgba(59,130,246,0.05)',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Assistance status label */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(59,130,246,0.8)' }}>
+                      PrepVista Guidance
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'rgba(100,116,139,0.8)' }}>
+                      {assistanceStatus === 'independent' ? 'Independent so far' : assistanceStatus === 'hint' ? 'Guided · Hint used' : 'Guided · Answer guidance viewed'}
+                    </span>
+                  </div>
+
+                  {assistanceLoading ? (
+                    <div style={{ textAlign: 'center', padding: '12px', color: 'rgba(100,116,139,0.8)' }}>
+                      Preparing guidance...
+                    </div>
+                  ) : null}
+
+                  {/* Hint content */}
+                  {hintContent && !assistanceLoading ? (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: '4px', fontSize: '13px' }}>
+                        {hintLevel === 1 ? 'What the interviewer wants:' : 'How to structure your answer:'}
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{hintContent}</div>
+                      {hintLevel < 2 && !guidanceContent ? (
+                        <button
+                          type="button"
+                          onClick={requestHint}
+                          disabled={assistanceLoading}
+                          style={{ marginTop: '8px', fontSize: '12px', color: 'rgb(59,130,246)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                          Need another hint?
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* Answer guidance content */}
+                  {guidanceContent && !assistanceLoading ? (
+                    <div style={{ marginTop: hintContent ? '12px' : '0', borderTop: hintContent ? '1px solid rgba(59,130,246,0.15)' : 'none', paddingTop: hintContent ? '12px' : '0' }}>
+                      <div style={{ fontWeight: 600, marginBottom: '4px', fontSize: '13px' }}>Professional Answer Guidance</div>
+                      <div style={{ fontSize: '12px', color: 'rgba(100,116,139,0.8)', marginBottom: '8px' }}>
+                        Use this as a guide. Keep only facts that are true for you.
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{guidanceContent}</div>
+                      {guidanceWhyItWorks.length > 0 ? (
+                        <div style={{ marginTop: '10px', fontSize: '12px' }}>
+                          <div style={{ fontWeight: 600, marginBottom: '4px' }}>Why this works:</div>
+                          {guidanceWhyItWorks.map((reason, i) => (
+                            <div key={i} style={{ paddingLeft: '8px' }}>• {reason}</div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* Collapse button */}
+                  <button
+                    type="button"
+                    onClick={() => setAssistancePanelOpen(false)}
+                    style={{ position: 'absolute', top: '8px', right: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'rgba(100,116,139,0.6)' }}
+                    aria-label="Collapse guidance panel"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null}
 
               <div className={styles.transcriptPanel} ref={transcriptPanelRef}>
                 {transcriptLog.length === 0 ? (

@@ -63,6 +63,7 @@ async def setup_interview(
     difficulty_mode: str = Form("auto"),
     duration: int = Form(600),
     proctoring_mode: str = Form("practice"),
+    guided_assistance: str = Form("false"),
     user: UserProfile = Depends(get_current_user),
 ):
     """Set up a new interview session.
@@ -196,6 +197,22 @@ async def setup_interview(
 
     session_id = result["session_id"]
 
+    assistance_enabled = guided_assistance.lower() == 'true'
+    try:
+        async with DatabaseConnection() as conn:
+            await conn.execute(
+                """INSERT INTO interview_assistance_policy
+                   (session_id, enabled, hints_enabled, answer_guidance_enabled)
+                   VALUES ($1, $2, $3, $4)
+                   ON CONFLICT (session_id) DO NOTHING""",
+                session_id,
+                assistance_enabled,
+                assistance_enabled,
+                assistance_enabled,
+            )
+    except Exception as exc:
+        logger.warning("assistance_policy_create_failed", error=str(exc))
+
     logger.info(
         "interview_setup_complete",
         user_id=user.id,
@@ -207,7 +224,6 @@ async def setup_interview(
         resume_fingerprint=resume_fingerprint,
     )
 
-    # Persist the resume fingerprint and fire post-session funnel events in a
     # Persist the resume fingerprint against the session so the interviewer
     # service can use it for cross-session question variation.
     # SEPARATE try/except from funnel tracking — these two operations are
@@ -266,6 +282,7 @@ async def setup_interview(
         # was built on — useful for debugging cross-session dedup and for
         # showing the student "session #N with this resume".
         "resume_fingerprint": resume_fingerprint,
+        "assistance_enabled": assistance_enabled,
     }
 
 

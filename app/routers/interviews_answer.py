@@ -145,6 +145,37 @@ async def submit_answer(
         and pre_validation_warning not in {'empty_answer'}
     )
 
+    # Derive assistance provenance for this turn
+    assistance_provenance = 'independent'
+    if turn_for_eval is not None:
+        try:
+            async with DatabaseConnection() as conn:
+                events = await conn.fetch(
+                    """SELECT assistance_type, viewed_at FROM interview_assistance_event
+                       WHERE session_id = $1 AND turn_number = $2 AND viewed_at IS NOT NULL
+                       ORDER BY viewed_at""",
+                    session_id, int(turn_for_eval),
+                )
+            if events:
+                for ev in events:
+                    if ev['assistance_type'] == 'answer_guidance':
+                        assistance_provenance = 'answer_guided'
+                        break
+                    elif ev['assistance_type'] == 'hint':
+                        assistance_provenance = 'hint_assisted'
+                # Mark events as used_before_answer
+                try:
+                    async with DatabaseConnection() as conn:
+                        await conn.execute(
+                            """UPDATE interview_assistance_event SET used_before_answer = TRUE
+                               WHERE session_id = $1 AND turn_number = $2 AND viewed_at IS NOT NULL""",
+                            session_id, int(turn_for_eval),
+                        )
+                except Exception:
+                    pass
+        except Exception as exc:
+            logger.warning("assistance_provenance_lookup_failed", error=str(exc))
+
     # --- Final answer → synchronous eval + finish ---
     if result.get("action") == "finish":
         was_active = await _session_is_active(session_id, req.access_token)
@@ -158,6 +189,7 @@ async def submit_answer(
                     raw_answer=normalized_text,
                     answer_duration_seconds=req.answer_duration_seconds,
                     answer_word_count=answer_word_count,
+                    assistance_provenance=assistance_provenance,
                 )
             except Exception as exc:
                 logger.error(
@@ -223,6 +255,7 @@ async def submit_answer(
             raw_answer=normalized_text,
             answer_duration_seconds=req.answer_duration_seconds,
             answer_word_count=answer_word_count,
+            assistance_provenance=assistance_provenance,
         )
     elif question_for_eval and turn_for_eval is not None:
         if normalized_text == '[NO_ANSWER_TIMEOUT]' or (not normalized_text.strip() and pre_validation_warning == 'empty_answer'):
@@ -307,6 +340,7 @@ async def _evaluate_and_store(
     raw_answer: str,
     answer_duration_seconds: int | None = None,
     answer_word_count: int | None = None,
+    assistance_provenance: str = 'independent',
 ) -> None:
     """Run per-question AI evaluation and persist the result.
 
@@ -408,11 +442,11 @@ async def _evaluate_and_store(
                     answer_status, content_understanding, depth_quality,
                     communication_clarity, what_worked, what_was_missing,
                     how_to_improve, answer_blueprint, corrected_intent,
-                    answer_duration_seconds, repaired_answer)
+                    answer_duration_seconds, repaired_answer, assistance_provenance)
                    VALUES
                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
                     $12,$13,$14,$15,$16,$17,$18,$19,$20,
-                    $21,$22,$23,$24,$25,$26,$27,$28)
+                    $21,$22,$23,$24,$25,$26,$27,$28,$29)
                    ON CONFLICT (session_id, turn_number) DO NOTHING""",
                 session_id,
                 turn_number,
@@ -444,6 +478,7 @@ async def _evaluate_and_store(
                 eval_result.get("corrected_intent", ""),
                 answer_duration_seconds,
                 eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
+                assistance_provenance,
             )
 
         logger.info(

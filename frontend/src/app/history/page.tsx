@@ -21,6 +21,7 @@ interface HistoryResponse {
     duration: number | null;
     created_at: string;
     finished_at: string | null;
+    assistance_enabled?: boolean;
   }>;
   total: number;
   locked: boolean;
@@ -295,6 +296,9 @@ export default function HistoryPage() {
                       <div className="mt-1 text-sm text-secondary">
                         {session.total_turns} questions | {session.duration ? `${Math.round(session.duration / 60)} min` : 'Duration not recorded'}
                       </div>
+                      {session.assistance_enabled ? (
+                        <div className="mt-1 text-xs text-blue-600 dark:text-blue-400 font-medium">Guided interview</div>
+                      ) : null}
                       <div className="mt-1 text-xs text-tertiary">
                         Started {new Date(session.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </div>

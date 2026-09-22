@@ -119,12 +119,31 @@ async def get_report(
                       relevance_score, clarity_score, specificity_score, structure_score,
                       answer_status, content_understanding, depth_quality, communication_clarity,
                       what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
-                      answer_duration_seconds, repaired_answer
+                      answer_duration_seconds, repaired_answer, assistance_provenance
                FROM question_evaluations
                WHERE session_id = $1
                ORDER BY turn_number""",
             session_id,
         )
+
+        # Fetch assistance summary
+        assistance_policy = None
+        assistance_events = []
+        try:
+            assistance_policy = await conn.fetchrow(
+                "SELECT enabled FROM interview_assistance_policy WHERE session_id = $1",
+                session_id,
+            )
+            if assistance_policy and assistance_policy['enabled']:
+                assistance_events = await conn.fetch(
+                    """SELECT turn_number, assistance_type, assistance_level, viewed_at
+                       FROM interview_assistance_event
+                       WHERE session_id = $1 AND viewed_at IS NOT NULL
+                       ORDER BY turn_number""",
+                    session_id,
+                )
+        except Exception as exc:
+            logger.warning("assistance_data_fetch_failed", error=str(exc))
 
         # Per-turn audio audit records (Fix 7) — present only when server-side STT
         # was enabled for the session. Used to re-mint signed playback URLs and
@@ -174,6 +193,7 @@ async def get_report(
             "answer_blueprint": row["answer_blueprint"] if expose_guidance else None,
             "corrected_intent": row["corrected_intent"] if expose_guidance else None,
             "answer_duration_seconds": row["answer_duration_seconds"],
+            "assistance_provenance": row["assistance_provenance"],
         }
         evaluations.append(q)
 
@@ -224,6 +244,31 @@ async def get_report(
             f"{expected_questions} planned questions completed."
         )
 
+    assistance_summary = None
+    if assistance_policy and assistance_policy['enabled']:
+        per_turn_provenance = {}
+        for ev in assistance_events:
+            tn = ev['turn_number']
+            if ev['assistance_type'] == 'answer_guidance':
+                per_turn_provenance[tn] = 'answer_guided'
+            elif tn not in per_turn_provenance or per_turn_provenance[tn] == 'independent':
+                per_turn_provenance[tn] = 'hint_assisted'
+        
+        total = len(evaluations) if evaluations else 0
+        guided_count = sum(1 for v in per_turn_provenance.values() if v != 'independent')
+        hint_count = sum(1 for v in per_turn_provenance.values() if v == 'hint_assisted')
+        answer_guided_count = sum(1 for v in per_turn_provenance.values() if v == 'answer_guided')
+        independent_count = total - guided_count
+        
+        assistance_summary = {
+            'enabled': True,
+            'total_questions': total,
+            'independent': independent_count,
+            'hint_assisted': hint_count,
+            'answer_guided': answer_guided_count,
+            'independent_coverage_pct': round(independent_count / max(total, 1) * 100),
+        }
+
     return {
         "session": {
             "id": session_id,
@@ -264,6 +309,7 @@ async def get_report(
         "pro_summary": pro_summary,
         "career_summary": career_summary,
         "audit": audit_meta,
+        "assistance_summary": assistance_summary,
     }
 
 
