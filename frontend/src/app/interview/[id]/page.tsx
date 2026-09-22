@@ -2025,7 +2025,7 @@ export default function LiveInterviewPage() {
   const handleManualSubmit = () => {
     const spokenText = normalizeLiveTranscript(currentTranscriptRef.current.trim());
     setTimerMessage('Answer captured. Moving to the next question...');
-    void submitToBackend(spokenText || '[NO_ANSWER_TIMEOUT]');
+    void submitToBackend(spokenText || '');
   };
 
   const handleEndInterview = () => {

@@ -130,8 +130,8 @@ async def submit_answer(
 
     # Determine the terminal state for this turn
     is_verified_silence = (
-        normalized_text in {'[NO_ANSWER_TIMEOUT]', ''}
-        and pre_validation_warning == 'empty_answer'
+        normalized_text == '[NO_ANSWER_TIMEOUT]'
+        or (not normalized_text.strip() and pre_validation_warning == 'empty_answer')
     )
     is_stt_failure = (
         not normalized_text.strip()
@@ -145,6 +145,7 @@ async def submit_answer(
         and question_for_eval
         and turn_for_eval is not None
         and pre_validation_warning not in {'empty_answer'}
+        and normalized_text not in {'[USER_REQUESTED_END]', '[NO_ANSWER_TIMEOUT]'}
     )
 
     question_instance_id_for_eval = result.get("question_instance_id_for_eval")

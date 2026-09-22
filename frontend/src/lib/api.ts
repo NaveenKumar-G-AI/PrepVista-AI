@@ -930,7 +930,7 @@ class ApiClient {
     });
   }
   async setupInterview<T = unknown>(formData: FormData) {
-    return this.request<T>('/interviews/setup', { method: 'POST', body: formData, isFormData: true });
+    return this.request<T>('/interviews/setup', { method: 'POST', body: formData, isFormData: true, timeoutMs: 60000 });
   }
   async submitAnswer<T = unknown>(
     sessionId: string,
@@ -953,7 +953,7 @@ class ApiClient {
       // permanently. One retry with jittered backoff recovers from transient errors
       // without meaningfully delaying the interview flow for the student.
       retries: 1,
-      timeoutMs: 20000,
+      timeoutMs: 45000,
     });
   }
   async finishInterview<T = unknown>(sessionId: string, accessToken: string, durationActual?: number) {
