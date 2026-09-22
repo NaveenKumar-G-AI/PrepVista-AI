@@ -982,11 +982,12 @@ class ApiClient {
     accessToken: string,
     clientRequestId: string,
     questionText: string,
+    questionInstanceId: string,
     level: number = 1,
   ) {
     return this.request<T>(`/interviews/${sessionId}/assistance/hint`, {
       method: 'POST',
-      body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText, level },
+      body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText, question_instance_id: questionInstanceId, level },
       timeoutMs: 15_000,
     });
   }
@@ -995,10 +996,11 @@ class ApiClient {
     accessToken: string,
     clientRequestId: string,
     questionText: string,
+    questionInstanceId: string,
   ) {
     return this.request<T>(`/interviews/${sessionId}/assistance/answer-guidance`, {
       method: 'POST',
-      body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText },
+      body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText, question_instance_id: questionInstanceId },
       timeoutMs: 20_000,
     });
   }

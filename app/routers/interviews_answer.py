@@ -58,9 +58,11 @@ async def submit_answer(
     the submitted answer is detected as low-quality (too short, empty,
     repetitive, or a keyboard mash).  The frontend can use this hint to
     show the student a non-blocking nudge like "Consider adding more detail
-    to your answer."  Clients that do not recognise this field can safely
-    ignore it — it is purely informational.
+    next time." The backend still accepts and scores the turn.  Clients that
+    do not recognise this field can safely ignore it — it is purely
+    informational.
     """
+    answer_submitted_at = datetime.now(timezone.utc)
     # UUID format check before any DB query — eliminates path-traversal probes
     _validate_session_id(session_id)
     await rate_limit_session(session_id)
@@ -145,31 +147,34 @@ async def submit_answer(
         and pre_validation_warning not in {'empty_answer'}
     )
 
+    question_instance_id_for_eval = result.get("question_instance_id_for_eval")
+
     # Derive assistance provenance for this turn
     assistance_provenance = 'independent'
-    if turn_for_eval is not None:
+    if question_instance_id_for_eval is not None:
         try:
             async with DatabaseConnection() as conn:
                 events = await conn.fetch(
                     """SELECT assistance_type, viewed_at FROM interview_assistance_event
-                       WHERE session_id = $1 AND turn_number = $2 AND viewed_at IS NOT NULL
+                       WHERE session_id = $1 AND question_instance_id = $2 
+                         AND viewed_at IS NOT NULL AND viewed_at < $3
                        ORDER BY viewed_at""",
-                    session_id, int(turn_for_eval),
+                    session_id, question_instance_id_for_eval, answer_submitted_at,
                 )
             if events:
                 for ev in events:
                     if ev['assistance_type'] == 'answer_guidance':
                         assistance_provenance = 'answer_guided'
-                        break
-                    elif ev['assistance_type'] == 'hint':
+                    elif ev['assistance_type'] == 'hint' and assistance_provenance != 'answer_guided':
                         assistance_provenance = 'hint_assisted'
+                
                 # Mark events as used_before_answer
                 try:
                     async with DatabaseConnection() as conn:
                         await conn.execute(
                             """UPDATE interview_assistance_event SET used_before_answer = TRUE
-                               WHERE session_id = $1 AND turn_number = $2 AND viewed_at IS NOT NULL""",
-                            session_id, int(turn_for_eval),
+                               WHERE session_id = $1 AND question_instance_id = $2 AND viewed_at IS NOT NULL AND viewed_at < $3""",
+                            session_id, question_instance_id_for_eval, answer_submitted_at,
                         )
                 except Exception:
                     pass
@@ -190,6 +195,7 @@ async def submit_answer(
                     answer_duration_seconds=req.answer_duration_seconds,
                     answer_word_count=answer_word_count,
                     assistance_provenance=assistance_provenance,
+                    question_instance_id=question_instance_id_for_eval,
                 )
             except Exception as exc:
                 logger.error(
@@ -209,6 +215,7 @@ async def submit_answer(
                         raw_answer=normalized_text,
                         answer_status=answer_status,
                         answer_duration_seconds=req.answer_duration_seconds,
+                        question_instance_id=question_instance_id_for_eval,
                     )
                 except Exception as exc:
                     logger.error("final_unevaluated_turn_record_failed", session_id=session_id, turn=turn_for_eval, error=str(exc))
@@ -256,6 +263,7 @@ async def submit_answer(
             answer_duration_seconds=req.answer_duration_seconds,
             answer_word_count=answer_word_count,
             assistance_provenance=assistance_provenance,
+            question_instance_id=question_instance_id_for_eval,
         )
     elif question_for_eval and turn_for_eval is not None:
         if normalized_text == '[NO_ANSWER_TIMEOUT]' or (not normalized_text.strip() and pre_validation_warning == 'empty_answer'):
@@ -268,6 +276,7 @@ async def submit_answer(
                 raw_answer=normalized_text,
                 answer_status=answer_status,
                 answer_duration_seconds=req.answer_duration_seconds,
+                question_instance_id=question_instance_id_for_eval,
             )
 
     # Additive: surface answer quality hint to the frontend so it can
@@ -286,6 +295,7 @@ async def _record_unevaluated_turn(
     raw_answer: str,
     answer_status: str,
     answer_duration_seconds: int | None = None,
+    question_instance_id: str | None = None,
 ) -> None:
     # Insert a minimal record so every turn has an evaluation row
     # NO_ANSWER = candidate chose not to answer (score 0)
@@ -303,8 +313,8 @@ async def _record_unevaluated_turn(
                    (session_id, turn_number, rubric_category, question_text,
                     raw_answer, normalized_answer, classification, score,
                     scoring_rationale, answer_status,
-                    answer_duration_seconds)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                    answer_duration_seconds, question_instance_id)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
                    ON CONFLICT (session_id, turn_number) DO NOTHING""",
                 session_id,
                 turn_number,
@@ -317,6 +327,7 @@ async def _record_unevaluated_turn(
                 rationale,
                 answer_status,
                 answer_duration_seconds,
+                question_instance_id,
             )
         logger.info(
             'unevaluated_turn_recorded',
@@ -341,6 +352,7 @@ async def _evaluate_and_store(
     answer_duration_seconds: int | None = None,
     answer_word_count: int | None = None,
     assistance_provenance: str = 'independent',
+    question_instance_id: str | None = None,
 ) -> None:
     """Run per-question AI evaluation and persist the result.
 
@@ -442,11 +454,11 @@ async def _evaluate_and_store(
                     answer_status, content_understanding, depth_quality,
                     communication_clarity, what_worked, what_was_missing,
                     how_to_improve, answer_blueprint, corrected_intent,
-                    answer_duration_seconds, repaired_answer, assistance_provenance)
+                    answer_duration_seconds, repaired_answer, assistance_provenance, question_instance_id)
                    VALUES
                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
                     $12,$13,$14,$15,$16,$17,$18,$19,$20,
-                    $21,$22,$23,$24,$25,$26,$27,$28,$29)
+                    $21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
                    ON CONFLICT (session_id, turn_number) DO NOTHING""",
                 session_id,
                 turn_number,
@@ -479,6 +491,7 @@ async def _evaluate_and_store(
                 answer_duration_seconds,
                 eval_result.get("repaired_answer") or eval_result.get("raw_answer", raw_answer),
                 assistance_provenance,
+                question_instance_id,
             )
 
         logger.info(

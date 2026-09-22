@@ -11,6 +11,7 @@ import json
 import re
 import secrets
 import asyncio
+import uuid
 from datetime import timedelta
 from typing import Any
 
@@ -554,6 +555,7 @@ async def process_answer(
 
         question_closed_for_eval = None
         turn_closed_for_eval = None
+        question_instance_id_closed_for_eval = None
         new_silence = silence_count
         next_followup_count = consecutive_followups
         updated_skip_topics = list(skip_topics)
@@ -586,6 +588,7 @@ async def process_answer(
                 "remaining_turns": max(max_turn_limit - total_turns, 0),
                 "question_for_eval": None,
                 "turn_for_eval": None,
+                "question_instance_id": runtime_state.get("active_question_id"),
             }
 
         if is_exit_request:
@@ -616,8 +619,9 @@ async def process_answer(
                 "turn": total_turns,
                 "max_turns": max_turn_limit,
                 "remaining_turns": max(max_turn_limit - total_turns, 0),
-                "question_for_eval": None,
-                "turn_for_eval": None,
+                "question_for_eval": question_closed_for_eval,
+                "turn_for_eval": turn_closed_for_eval,
+                "question_instance_id_for_eval": question_instance_id_closed_for_eval,
             }
 
         if is_time_up:
@@ -641,6 +645,7 @@ async def process_answer(
                 "remaining_turns": max(max_turn_limit - total_turns, 0),
                 "question_for_eval": None,
                 "turn_for_eval": None,
+                "question_instance_id_for_eval": None,
             }
 
         normalized_user_text = ""
@@ -659,6 +664,7 @@ async def process_answer(
             new_silence = 0
             question_closed_for_eval = question_for_eval
             turn_closed_for_eval = turn_for_eval
+            question_instance_id_closed_for_eval = runtime_state.get("active_question_id")
             closed_outcome = TURN_OUTCOME_ANSWERED
             newly_covered_families = _extract_answer_coverage(
                 question_for_eval or "",
@@ -737,10 +743,12 @@ async def process_answer(
                     "remaining_turns": max(max_turn_limit - total_turns, 0),
                     "question_for_eval": None,
                     "turn_for_eval": None,
+                    "question_instance_id": runtime_state.get("active_question_id"),
                 }
 
             question_closed_for_eval = question_for_eval
             turn_closed_for_eval = turn_for_eval
+            question_instance_id_closed_for_eval = runtime_state.get("active_question_id")
             closed_outcome = TURN_OUTCOME_TIMEOUT
             runtime_state = _record_turn_outcome(
                 runtime_state,
@@ -764,6 +772,7 @@ async def process_answer(
                 "remaining_turns": max(max_turn_limit - total_turns, 0),
                 "question_for_eval": None,
                 "turn_for_eval": None,
+                "question_instance_id": runtime_state.get("active_question_id"),
             }
 
         if should_finish_after_close:
@@ -792,6 +801,7 @@ async def process_answer(
                 "remaining_turns": max(max_turn_limit - total_turns, 0),
                 "question_for_eval": question_closed_for_eval,
                 "turn_for_eval": turn_closed_for_eval,
+                "question_instance_id_for_eval": question_instance_id_closed_for_eval,
             }
 
         master_prompt = build_master_prompt(
@@ -1182,6 +1192,8 @@ async def process_answer(
                 next_followup_count = 0
 
         runtime_state["question_state"] = TURN_STATE_ACTIVE_QUESTION_OPEN
+        new_question_instance_id = str(uuid.uuid4())
+        runtime_state["active_question_id"] = new_question_instance_id
 
         await conn.execute(
             """UPDATE interview_sessions
@@ -1215,6 +1227,8 @@ async def process_answer(
         "remaining_turns": max(max_turn_limit - new_turn, 0),
         "question_for_eval": question_closed_for_eval if not is_greeting else None,
         "turn_for_eval": turn_closed_for_eval if not is_greeting else None,
+        "question_instance_id_for_eval": question_instance_id_closed_for_eval if not is_greeting else None,
+        "question_instance_id": runtime_state.get("active_question_id"),
     }
 
 

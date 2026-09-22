@@ -61,6 +61,8 @@ interface ContinueResponse {
   // ("too_short" | "repetitive_filler" | "keyboard_mash" | "low_alpha_content")
   // Frontend uses this to show a non-blocking coaching nudge to the student.
   answer_quality_hint?: string | null;
+  // Additive: stable question instance ID for assistance tracking
+  question_instance_id?: string;
 }
 
 interface NeuralFeedback {
@@ -596,6 +598,7 @@ export default function LiveInterviewPage() {
 
   // ── Guided Interview Assistance state ──────────────────────────────────
   const assistanceEnabled = sessionData?.assistance_enabled ?? false;
+  const [currentQuestionInstanceId, setCurrentQuestionInstanceId] = useState<string | null>(null);
   const [hintContent, setHintContent] = useState<string | null>(null);
   const [hintLevel, setHintLevel] = useState(0);
   const [guidanceContent, setGuidanceContent] = useState<string | null>(null);
@@ -603,9 +606,10 @@ export default function LiveInterviewPage() {
   const [assistanceLoading, setAssistanceLoading] = useState(false);
   const [assistanceStatus, setAssistanceStatus] = useState<'independent' | 'hint' | 'guided'>('independent');
   const [assistancePanelOpen, setAssistancePanelOpen] = useState(false);
-  const assistanceTurnRef = useRef<number>(0); // stale response protection
+  const assistanceTurnRef = useRef<number>(0); // stale response protection fallback
+  const assistanceInstanceRef = useRef<string | null>(null); // stale response protection main
 
-  // Reset guidance content when the turn changes
+  // Reset guidance content when the question instance changes
   useEffect(() => {
     setHintContent(null);
     setHintLevel(0);
@@ -615,7 +619,8 @@ export default function LiveInterviewPage() {
     setAssistancePanelOpen(false);
     setAssistanceLoading(false);
     assistanceTurnRef.current = currentTurn;
-  }, [currentTurn]);
+    assistanceInstanceRef.current = currentQuestionInstanceId;
+  }, [currentQuestionInstanceId, currentTurn]);
 
   /** Request a hint for the current question from the backend. */
   async function requestHint() {
@@ -627,6 +632,7 @@ export default function LiveInterviewPage() {
     setAssistanceLoading(true);
     setAssistancePanelOpen(true);
     const turnAtRequest = currentTurn;
+    const instanceAtRequest = currentQuestionInstanceId;
 
     try {
       const resp = await api.requestHint<{
@@ -639,11 +645,13 @@ export default function LiveInterviewPage() {
         session.access_token,
         `hint-${session.session_id}-${currentTurn}-${requestedLevel}`,
         lastQuestionRef.current || '',
+        instanceAtRequest || '',
         requestedLevel,
       );
 
-      // Stale protection: discard if turn advanced while we were waiting
-      if (turnAtRequest !== assistanceTurnRef.current) return;
+      // Stale protection: discard if question instance advanced while we were waiting
+      if (instanceAtRequest && instanceAtRequest !== assistanceInstanceRef.current) return;
+      if (!instanceAtRequest && turnAtRequest !== assistanceTurnRef.current) return;
 
       setHintContent(resp.content);
       setHintLevel(resp.level);
@@ -668,6 +676,7 @@ export default function LiveInterviewPage() {
     setAssistanceLoading(true);
     setAssistancePanelOpen(true);
     const turnAtRequest = currentTurn;
+    const instanceAtRequest = currentQuestionInstanceId;
 
     try {
       const resp = await api.requestAnswerGuidance<{
@@ -680,10 +689,12 @@ export default function LiveInterviewPage() {
         session.access_token,
         `guidance-${session.session_id}-${currentTurn}`,
         lastQuestionRef.current || '',
+        instanceAtRequest || '',
       );
 
       // Stale protection
-      if (turnAtRequest !== assistanceTurnRef.current) return;
+      if (instanceAtRequest && instanceAtRequest !== assistanceInstanceRef.current) return;
+      if (!instanceAtRequest && turnAtRequest !== assistanceTurnRef.current) return;
 
       setGuidanceContent(resp.content);
       setGuidanceWhyItWorks(resp.why_it_works || []);
@@ -1646,6 +1657,9 @@ export default function LiveInterviewPage() {
       if (response.action === 'continue') {
         setCurrentTurn(response.turn);
         setMaxTurns(response.max_turns);
+        if (response.question_instance_id) {
+          setCurrentQuestionInstanceId(response.question_instance_id);
+        }
         appendTranscript('ai', response.text);
         // Store quality hint so startListeningLoop can show it after the AI speaks
         if (response.answer_quality_hint) {

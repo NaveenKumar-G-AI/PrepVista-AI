@@ -311,7 +311,7 @@ export default function InterviewSetupPage() {
                   />
                 </button>
                 <span className="text-xs text-secondary">
-                  {guidedAssistance ? 'ON — hints and answer guidance available' : 'OFF — independent interview'}
+                  {guidedAssistance ? 'ON — hints and answer guidance available' : 'OFF — independent attempt interview'}
                 </span>
               </div>
             </div>
