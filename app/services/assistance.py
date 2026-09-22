@@ -77,7 +77,8 @@ async def generate_hint(
             temperature=0.3,
             max_tokens=150,
             retries=1,
-            timeout=5.0
+            timeout=5.0,
+            use_live_key=True,
         )
         content = result.get("content", "")
         if not content:
@@ -149,7 +150,8 @@ async def generate_answer_guidance(
             temperature=0.2,
             max_tokens=400,
             retries=1,
-            timeout=6.0
+            timeout=6.0,
+            use_live_key=True,
         )
         
         return {

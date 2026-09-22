@@ -17,10 +17,19 @@ _groq_client: AsyncGroq | None = None
 _openai_client: AsyncOpenAI | None = None
 
 
-def _get_groq() -> AsyncGroq:
-    global _groq_client
+_groq_client_live: AsyncGroq | None = None
+
+def _get_groq(use_live_key: bool = False) -> AsyncGroq:
+    global _groq_client, _groq_client_live
+    settings = get_settings()
+    
+    if use_live_key and settings.GROQ_API_KEY_LIVE:
+        if not _groq_client_live:
+            _groq_client_live = AsyncGroq(api_key=settings.GROQ_API_KEY_LIVE)
+        return _groq_client_live
+
     if not _groq_client:
-        _groq_client = AsyncGroq(api_key=get_settings().GROQ_API_KEY)
+        _groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
     return _groq_client
 
 
@@ -38,6 +47,7 @@ async def call_groq(
     model: str | None = None,
     max_tokens: int | None = None,
     timeout: float = 15.0,
+    use_live_key: bool = False,
 ) -> str:
     """Call Groq API (primary provider)."""
     settings = get_settings()
@@ -51,7 +61,7 @@ async def call_groq(
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
 
-    client = _get_groq()
+    client = _get_groq(use_live_key=use_live_key)
     response = await asyncio.wait_for(
         client.chat.completions.create(**kwargs),
         timeout=timeout,
@@ -101,6 +111,7 @@ async def call_llm(
     fallback_timeout: float | None = None,
     retry_delay: float = 0.35,
     allow_provider_fallback: bool = True,
+    use_live_key: bool = False,
 ) -> str:
     """
     Call LLM with automatic Groq → OpenAI fallback.
@@ -114,7 +125,7 @@ async def call_llm(
 
     for attempt in range(retries):
         try:
-            result = await call_groq(messages, temperature, json_mode, model, max_tokens, primary_timeout)
+            result = await call_groq(messages, temperature, json_mode, model, max_tokens, primary_timeout, use_live_key=use_live_key)
             return result
         except Exception as e:
             logger.warning("groq_call_failed", attempt=attempt + 1, error=str(e))
@@ -152,6 +163,7 @@ async def call_llm_json(
     fallback_timeout: float | None = None,
     retry_delay: float = 0.35,
     allow_provider_fallback: bool = True,
+    use_live_key: bool = False,
 ) -> dict:
     """Call LLM and parse the response as JSON."""
     raw = await call_llm(
@@ -165,6 +177,7 @@ async def call_llm_json(
         fallback_timeout=fallback_timeout,
         retry_delay=retry_delay,
         allow_provider_fallback=allow_provider_fallback,
+        use_live_key=use_live_key,
     )
     try:
         return json.loads(raw)
