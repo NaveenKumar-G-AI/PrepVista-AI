@@ -988,7 +988,7 @@ class ApiClient {
     return this.request<T>(`/interviews/${sessionId}/assistance/hint`, {
       method: 'POST',
       body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText, question_instance_id: questionInstanceId, level },
-      timeoutMs: 15_000,
+      timeoutMs: 45_000,
     });
   }
   async requestAnswerGuidance<T = unknown>(
@@ -1001,7 +1001,7 @@ class ApiClient {
     return this.request<T>(`/interviews/${sessionId}/assistance/answer-guidance`, {
       method: 'POST',
       body: { access_token: accessToken, client_request_id: clientRequestId, question_text: questionText, question_instance_id: questionInstanceId },
-      timeoutMs: 20_000,
+      timeoutMs: 45_000,
     });
   }
   async markAssistanceViewed<T = unknown>(sessionId: string, accessToken: string, eventId: string) {
