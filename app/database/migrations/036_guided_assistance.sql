@@ -1,7 +1,5 @@
--- Guided Interview Assistance — database schema
--- Run after all existing migrations.
+﻿-- Guided Interview Assistance database schema
 
--- Assistance policy per interview session (immutable after creation)
 CREATE TABLE IF NOT EXISTS interview_assistance_policy (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL UNIQUE REFERENCES interview_sessions(id) ON DELETE CASCADE,
@@ -13,12 +11,12 @@ CREATE TABLE IF NOT EXISTS interview_assistance_policy (
 );
 CREATE INDEX IF NOT EXISTS idx_assistance_policy_session ON interview_assistance_policy(session_id);
 
--- Individual assistance events (one per hint/guidance request)
 CREATE TABLE IF NOT EXISTS interview_assistance_event (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES interview_sessions(id) ON DELETE CASCADE,
     user_id UUID NOT NULL,
     turn_number INTEGER NOT NULL,
+    question_instance_id UUID,
     
     assistance_type TEXT NOT NULL CHECK (assistance_type IN ('hint', 'answer_guidance')),
     assistance_level INTEGER NOT NULL DEFAULT 1,
@@ -41,15 +39,17 @@ CREATE TABLE IF NOT EXISTS interview_assistance_event (
     viewed_at TIMESTAMPTZ,
     
     used_before_answer BOOLEAN,
-    
-    invalidated BOOLEAN NOT NULL DEFAULT FALSE,
-    
-    UNIQUE (session_id, turn_number, assistance_type, assistance_level)
+    invalidated BOOLEAN NOT NULL DEFAULT FALSE
 );
+
 CREATE INDEX IF NOT EXISTS idx_assistance_event_session ON interview_assistance_event(session_id);
 CREATE INDEX IF NOT EXISTS idx_assistance_event_turn ON interview_assistance_event(session_id, turn_number);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_assistance_event_instance_idempotent 
+    ON interview_assistance_event (session_id, question_instance_id, assistance_type, assistance_level)
+    WHERE question_instance_id IS NOT NULL;
 
--- Add assistance_provenance to existing question_evaluations
 ALTER TABLE question_evaluations
     ADD COLUMN IF NOT EXISTS assistance_provenance TEXT DEFAULT 'unknown';
--- Values: 'independent', 'hint_assisted', 'answer_guided', 'unknown'
+
+ALTER TABLE question_evaluations
+    ADD COLUMN IF NOT EXISTS question_instance_id UUID;
