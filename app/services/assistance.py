@@ -55,7 +55,11 @@ async def generate_hint(
     family = question_family or classify_question_family(question_text)
     
     if level == 1:
-        instruction = "Explain what the interviewer is really testing or looking for with this question in 1-2 short sentences."
+        instruction = (
+            "Explain what the interviewer is really testing or looking for with this question in 1-2 short sentences. "
+            "If it's an introductory question like 'Tell me about yourself', output EXACTLY this structure:\n"
+            "Who I am → What I know → What I built → What I can do → What I want to become"
+        )
     else:
         instruction = "Provide a bulleted list of 3-4 building blocks or key elements the candidate should include in their answer."
         
@@ -119,10 +123,12 @@ async def generate_answer_guidance(
     prompt = (
         "You are an expert interview coach. Draft an answer guidance for the candidate. "
         "CRITICAL RULES:\n"
-        "1. Use ONLY the provided candidate_known_facts and resume_context.\n"
-        "2. NEVER invent candidate facts (metrics, achievements, company names, project names).\n"
-        "3. Use placeholders like [Insert Metric] or [Specific Tool] when facts are missing.\n"
-        "4. Output should be concise: 30-90 seconds spoken length (around 3-6 sentences).\n"
+        "1. Use ONLY the provided candidate_known_facts and resume_context. If facts are missing, DO NOT output a generic 'Since I couldn't access...' message. Instead, output a strong, direct fill-in-the-blank template for the student to use.\n"
+        "2. NEVER invent candidate facts. Use bracketed placeholders like [Your Name] or [Specific Tool] when facts are missing.\n"
+        "3. Output should be a direct, professional example tailored to the student (3-6 sentences).\n"
+        "4. If this is an introductory question (e.g. 'Tell me about yourself'), use a format similar to:\n"
+        "   'Hello, I am [Name], a [Year] student in [Major]. My strongest area is building [Field] applications using [Skills]. I have developed projects like [Project 1]. My goal is to become a skilled [Role].'\n"
+        "   (Fill in as many details as possible from the resume context, keep the rest as placeholders).\n"
         "5. Include a list of 'why_it_works' giving reasons why this structure is effective.\n\n"
         f"Question: {question_text}\n"
         f"Role Context: {role_context}\n"
@@ -131,7 +137,7 @@ async def generate_answer_guidance(
         "Determine confidence: 'full' if enough facts were available, 'partial' if some placeholders were used, "
         "'insufficient' if mostly placeholders were used.\n\n"
         "Respond in JSON format: {{\n"
-        "  \"content\": \"the drafted answer\",\n"
+        "  \"content\": \"the drafted answer or template\",\n"
         "  \"grounding_used\": [\"fact1\", \"fact2\"],\n"
         "  \"missing_facts\": [\"missing info needed\"],\n"
         "  \"placeholders_used\": [\"[Metric]\"],\n"

@@ -655,6 +655,7 @@ export default function LiveInterviewPage() {
 
       setHintContent(resp.content);
       setHintLevel(resp.level);
+      setGuidanceContent(null); // Make mutually exclusive with Answer Guidance
       setAssistanceStatus((prev) => prev === 'guided' ? 'guided' : 'hint');
 
       // Mark as viewed
@@ -698,6 +699,7 @@ export default function LiveInterviewPage() {
 
       setGuidanceContent(resp.content);
       setGuidanceWhyItWorks(resp.why_it_works || []);
+      setHintContent(null); // Make mutually exclusive with Hint
       setAssistanceStatus('guided');
 
       // Mark as viewed
