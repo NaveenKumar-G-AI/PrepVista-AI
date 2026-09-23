@@ -56,9 +56,10 @@ async def generate_hint(
     
     if level == 1:
         instruction = (
-            "Explain what the interviewer is really testing or looking for with this question in 1-2 short sentences. "
-            "If it's an introductory question like 'Tell me about yourself', output EXACTLY this structure:\n"
-            "Who I am → What I know → What I built → What I can do → What I want to become"
+            "Provide a high-impact structural formula (using arrows '→') specific to this exact question format, followed by 1 short sentence explaining what the interviewer is testing.\n"
+            "Example for Introductions: 'Who I am → What I know → What I built → What I can do → What I want to become'\n"
+            "Example for Behavioral: 'Situation → My Specific Action → The Technical Challenge → The Result'\n"
+            "Example for Technical: 'Core Concept → How it works → Trade-offs → Real-world Use Case'"
         )
     else:
         instruction = "Provide a bulleted list of 3-4 building blocks or key elements the candidate should include in their answer."
@@ -126,9 +127,10 @@ async def generate_answer_guidance(
         "1. Use ONLY the provided candidate_known_facts and resume_context. If facts are missing, DO NOT output a generic 'Since I couldn't access...' message. Instead, output a strong, direct fill-in-the-blank template for the student to use.\n"
         "2. NEVER invent candidate facts. Use bracketed placeholders like [Your Name] or [Specific Tool] when facts are missing.\n"
         "3. Output should be a direct, professional example tailored to the student (3-6 sentences).\n"
-        "4. If this is an introductory question (e.g. 'Tell me about yourself'), use a format similar to:\n"
-        "   'Hello, I am [Name], a [Year] student in [Major]. My strongest area is building [Field] applications using [Skills]. I have developed projects like [Project 1]. My goal is to become a skilled [Role].'\n"
-        "   (Fill in as many details as possible from the resume context, keep the rest as placeholders).\n"
+        "4. EVERY answer guidance MUST be formatted as a highly-structured, direct fill-in-the-blank script for the specific question type. Do not just give generic advice.\n"
+        "   Example for Intro: 'Hello, I am [Name], a [Year] student in [Major]. My strongest area is building [Field] applications using [Skills]...'\n"
+        "   Example for Behavioral: 'In my academic project [Project Name], we needed to solve [Problem]. I took the lead on [Action] by utilizing [Tool/Tech]. As a result, we achieved [Metric/Outcome].'\n"
+        "   (Fill in as many details as possible from the resume context, keep the rest as [Placeholders]).\n"
         "5. Include a list of 'why_it_works' giving reasons why this structure is effective.\n\n"
         f"Question: {question_text}\n"
         f"Role Context: {role_context}\n"
