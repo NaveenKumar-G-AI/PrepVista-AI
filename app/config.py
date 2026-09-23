@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = Field(default="", description="Groq API key")
     GROQ_API_KEY_LIVE: str = Field(default="", description="Secondary Groq API key for live interview assistance (to isolate rate limits)")
     GROQ_MODEL: str = "llama-3.1-8b-instant"
-    GROQ_EVAL_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_EVAL_MODEL: str = "llama3-70b-8192"
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API key (fallback)")
     OPENAI_MODEL: str = "gpt-4o-mini"
 
