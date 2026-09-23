@@ -151,7 +151,12 @@ export async function appendIntelCharts(serverPdf: Blob): Promise<Blob> {
   for (const s of shots) {
     let png;
     try {
-      const bytes = await fetch(s.dataUrl).then(r => r.arrayBuffer());
+      const b64 = s.dataUrl.split(',')[1];
+      const binaryString = atob(b64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
       png = await pdf.embedPng(bytes);
     } catch { continue; }
 
