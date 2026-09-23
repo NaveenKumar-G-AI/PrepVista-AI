@@ -112,19 +112,38 @@ async def get_report(
         session_data = dict(session)
 
         # Fetch per-question evaluations
-        eval_rows = await conn.fetch(
-            """SELECT turn_number, rubric_category, question_text, raw_answer,
-                      normalized_answer, classification, score, scoring_rationale,
-                      missing_elements, ideal_answer, communication_score, communication_notes,
-                      relevance_score, clarity_score, specificity_score, structure_score,
-                      answer_status, content_understanding, depth_quality, communication_clarity,
-                      what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
-                      answer_duration_seconds, repaired_answer, assistance_provenance
-               FROM question_evaluations
-               WHERE session_id = $1
-               ORDER BY turn_number""",
-            session_id,
-        )
+        # Defensive: assistance_provenance may not exist yet if migration 036 hasn't run.
+        try:
+            eval_rows = await conn.fetch(
+                """SELECT turn_number, rubric_category, question_text, raw_answer,
+                          normalized_answer, classification, score, scoring_rationale,
+                          missing_elements, ideal_answer, communication_score, communication_notes,
+                          relevance_score, clarity_score, specificity_score, structure_score,
+                          answer_status, content_understanding, depth_quality, communication_clarity,
+                          what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
+                          answer_duration_seconds, repaired_answer,
+                          COALESCE(assistance_provenance, 'unknown') AS assistance_provenance
+                   FROM question_evaluations
+                   WHERE session_id = $1
+                   ORDER BY turn_number""",
+                session_id,
+            )
+        except Exception:
+            # Column doesn't exist yet — query without it
+            eval_rows = await conn.fetch(
+                """SELECT turn_number, rubric_category, question_text, raw_answer,
+                          normalized_answer, classification, score, scoring_rationale,
+                          missing_elements, ideal_answer, communication_score, communication_notes,
+                          relevance_score, clarity_score, specificity_score, structure_score,
+                          answer_status, content_understanding, depth_quality, communication_clarity,
+                          what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
+                          answer_duration_seconds, repaired_answer,
+                          'unknown' AS assistance_provenance
+                   FROM question_evaluations
+                   WHERE session_id = $1
+                   ORDER BY turn_number""",
+                session_id,
+            )
 
         # Fetch assistance summary
         assistance_policy = None
@@ -193,7 +212,7 @@ async def get_report(
             "answer_blueprint": row["answer_blueprint"] if expose_guidance else None,
             "corrected_intent": row["corrected_intent"] if expose_guidance else None,
             "answer_duration_seconds": row["answer_duration_seconds"],
-            "assistance_provenance": row["assistance_provenance"],
+            "assistance_provenance": row["assistance_provenance"] if "assistance_provenance" in row.keys() else "unknown",
         }
         evaluations.append(q)
 
