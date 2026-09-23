@@ -177,7 +177,7 @@ async def setup_interview(
     try:
         async with DatabaseConnection() as conn:
             await track_funnel_event(
-                conn, "setup started",
+                conn, "setup_started",
                 user_id=user.id,
                 metadata={"plan": normalized_plan, "resume_fingerprint": resume_fingerprint},
             )

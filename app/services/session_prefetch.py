@@ -642,8 +642,10 @@ def _select_model_for_plan(plan: str) -> str:
     reserve the larger model for live evaluation in process_answer().
     """
     if plan == "free":
-        return os.getenv("GROQ_PLAN_MODEL", "llama-3.1-8b-instant")
-    return os.getenv("GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile")
+        m = os.getenv("GROQ_PLAN_MODEL", "llama-3.1-8b-instant")
+    else:
+        m = os.getenv("GROQ_DEFAULT_MODEL", "llama3-70b-8192")
+    return "llama3-70b-8192" if m == "llama-3.3-70b-versatile" else m
 
 
 def _temperature_from_seed(variant_seed: int) -> float:

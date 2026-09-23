@@ -228,6 +228,13 @@ class Settings(BaseSettings):
             return value.strip()
         return value
 
+    @field_validator("GROQ_MODEL", "GROQ_EVAL_MODEL", mode="after")
+    @classmethod
+    def _rewrite_dead_models(cls, value: str) -> str:
+        if value == "llama-3.3-70b-versatile":
+            return "llama3-70b-8192"
+        return value
+
     @field_validator("FRONTEND_URL", "BACKEND_URL", "SUPABASE_URL")
     @classmethod
     def _normalize_urls(cls, value: str) -> str:

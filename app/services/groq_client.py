@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_MODEL = "llama3-70b-8192"
 
 # Groq paid-tier conservative defaults (tune via env).
 # If you have multiple API keys, set GROQ_API_KEYS as comma-separated.
