@@ -158,7 +158,7 @@ async def generate_answer_guidance(
             temperature=0.2,
             max_tokens=400,
             retries=1,
-            timeout=6.0,
+            timeout=8.0,
             use_live_key=True,
         )
         
@@ -176,8 +176,30 @@ async def generate_answer_guidance(
         }
     except Exception as exc:
         logger.warning("generate_answer_guidance_failed", error=str(exc), question=question_text[:50])
+        
+        # Provide a question-specific, first-person template as a fallback
+        target_role = "this role"
+        if isinstance(role_context, str) and role_context != "Interview Candidate":
+            target_role = role_context
+            
+        structures = {
+            "intro": "I am [Name] and my strongest area is [Field]. I recently worked on [Project], where I delivered [Concrete Result]. I am targeting roles like this where I can bring practical experience.",
+            "studies_background": "My current focus is [Field of Study], which I applied directly in [Project]. In that work, I handled [Specific Task] and achieved [Concrete Result].",
+            "ownership": "In [Project], I personally owned the [Specific Component] part of the work. I made the decision to [Action Taken] because [Reason], which ultimately resulted in [Concrete Result].",
+            "workflow": "First, I evaluated [Initial Step] to understand the requirements. Then, I implemented [Core Method] to handle the main logic, which allowed me to achieve [Concrete Result].",
+            "tool_method": "I used [Tool or Method] because it was the best fit for handling [Specific Challenge]. By applying it, I was able to deliver [Concrete Result].",
+            "validation": "To validate my work, I checked [Specific Metric] before and after the change. The results showed [Concrete Improvement], confirming the decision was right.",
+            "tradeoff": "I had to choose between [Option A] and [Option B] under a real constraint. I chose [Option] because [Reason], which led to a successful [Result].",
+            "behavioral": "In [Project], I faced a situation where [Challenge]. I took action by [Specific Action], which resulted in [Positive Outcome]. This taught me the value of [Lesson Learned].",
+            "communication": "I explained the concept to the team by breaking it down simply. This mattered because it helped us align on the decision and move forward to [Result].",
+            "role_fit": f"My background makes me a strong fit for {target_role}. For example, in [Project], I proved I can handle this by [Specific Proof Point].",
+            "learning_growth": "One area I am actively improving is [Growth Area]. I am currently working to strengthen it because I know it is critical for success in this field.",
+            "closeout": "You should hire me because I can deliver [Core Strength]. In [Project], I proved this by achieving [Concrete Result], and I want to bring that same impact here.",
+        }
+        fallback_content = structures.get(family, "In [Project], I handled [Specific Task] and decided to [Action Taken]. This directly resulted in [Concrete Result].")
+        
         return {
-            "content": "Focus on your actual experience. Start with the situation, describe your actions clearly, and end with the concrete result. Since I couldn't access enough of your specific details, use your own real examples.",
+            "content": fallback_content,
             "question_family": family,
             "grounding_used": [],
             "missing_facts": ["LLM generation failed"],
@@ -186,5 +208,5 @@ async def generate_answer_guidance(
             "model_provider": "fallback",
             "model_version": "static",
             "safety_passed": True,
-            "why_it_works": ["Provides a generic but safe structural template."]
+            "why_it_works": ["Provides a structured, professional fill-in-the-blank template for this specific question type."]
         }
