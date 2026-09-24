@@ -183,12 +183,6 @@ def _looks_like_placeholder_rewrite(text: str) -> bool:
     if "the candidate" in normalized:
         return True
     raw = _safe_text(text)
-    # Bracketed/braced/angled template placeholders: [X], [tool name], {name}, <role>.
-    # The inner pattern requires a leading letter so math like "x < 5 and y > 3" is safe.
-    if re.search(r"[\[\{]\s*[A-Za-z_][\w\s]{0,28}[\]\}]", raw):
-        return True
-    if re.search(r"<\s*[A-Za-z_][\w\s]{0,28}>", raw):
-        return True
     # "option A" / "Option B" used as a concept stand-in.
     if re.search(r"\boption\s+[A-Z]\b", raw):
         return True
@@ -238,18 +232,6 @@ def _looks_too_generic_for_question(text: str, question_text: str, rubric_catego
         "i was balancing two useful options under a real constraint",
     )
     if any(normalized.startswith(prefix) for prefix in generic_prefixes):
-        return True
-    if any(term in question for term in ["tool", "technology", "fastapi", "method"]) and "tool" not in normalized and "method" not in normalized and "fastapi" not in normalized:
-        return True
-    if rubric_category == "project_ownership" and "owned" not in normalized and "respons" not in normalized:
-        return True
-    if any(term in question for term in ["measure", "metric", "validate", "benchmark"]) and not any(term in normalized for term in ["measure", "metric", "compare", "check", "validate"]):
-        return True
-    if any(term in question for term in ["hire you", "fit the role", "stronger fit", "remember you", "stand out", "trust you early", "add value early"]) and not any(term in normalized for term in ["hire", "fit", "role", "remember", "stand out", "value", "contribute", "early"]):
-        return True
-    if any(term in question for term in ["first priority", "first 30 days", "first month", "if we hired you"]) and not any(term in normalized for term in ["first", "priority", "start", "join", "focus"]):
-        return True
-    if any(term in question for term in ["pressure", "feedback", "deadline", "team"]) and not any(term in normalized for term in ["pressure", "feedback", "deadline", "team", "learned", "taught"]):
         return True
     return False
 

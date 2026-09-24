@@ -466,7 +466,7 @@ EVALUATION RULES:
 - Score based on SEMANTIC MEANING, not grammar or speech artifacts
 - If the answer shows real understanding but poor articulation, score the understanding
 - Identify exactly what is missing, with specific elements
-- Write the ideal answer as if coaching the candidate
+- Write the ideal answer as a direct, first-person script that upgrades the candidate's ACTUAL answer. Do NOT invent a random or generic answer. Improve their phrasing, structure, and depth, but keep it authentic to their core points. NEVER start with "A strong answer would be...".
 - "I don't know" + honest = score 1, not 0. Separate from "wrong."
 - An answer that is vague about ML pipeline should score 3-4, not 7
 
@@ -478,7 +478,7 @@ Return EXACTLY this JSON:
   "score": <0-10>,
   "scoring_rationale": "<1-2 sentence explanation>",
   "missing_elements": ["<specific element 1>", "<specific element 2>"],
-  "ideal_answer": "<2-4 sentences: what a great answer would include>",
+  "ideal_answer": "<2-4 sentences: first-person upgraded version of the candidate's actual answer>",
   "communication_score": <0-10>,
   "communication_notes": "<1 sentence about how they communicated>"
 }}

@@ -246,9 +246,13 @@ def _build_improvement_points(evaluation: dict) -> list[str]:
 
 
 def _build_improved_answer(evaluation: dict) -> str:
-    ideal_answer = _safe_pdf_text(evaluation.get("ideal_answer", ""))
-    if ideal_answer:
-        return ideal_answer
+    # PRO/CAREER plans output 'better_answer', FREE plan outputs 'ideal_answer'
+    improved = _safe_pdf_text(evaluation.get("better_answer", ""))
+    if not improved:
+        improved = _safe_pdf_text(evaluation.get("ideal_answer", ""))
+        
+    if improved:
+        return improved
 
     category = _safe_pdf_text(evaluation.get("rubric_category", "general")).lower()
     if "behavioral" in category:
