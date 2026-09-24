@@ -213,8 +213,9 @@ FEEDBACK STYLE:
 - What worked: one short sentence
 - What was missing: one short sentence that explains the main missing part or why the score is not higher
 - How to improve: one short practical coaching sentence beginning like a next step
-- Better answer: exactly 2 or 3 short grounded sentences, student-level, realistic, and never inflated
-
+- The "better_answer" MUST be written in the FIRST PERSON ("I am", "My experience", "I worked on") as a direct script for the candidate to use.
+- NEVER start the better answer with coaching meta-text like "A strong answer would be..." or "You could say...". Just provide the exact script.
+- NEVER invent facts. Use bracketed placeholders like [Project Name] if you don't know the exact details, but keep it structured.
 FEEDBACK VARIATION RULE:
 - Do NOT always start feedback with the same phrase pattern.
 - Rotate between different coaching angles: practical tip, mindset shift, interview strategy, or confidence builder.
@@ -304,8 +305,9 @@ FEEDBACK STYLE:
 - What you got right: one short sentence
 - Main technical gap: one short sentence
 - How to answer this better: one short coaching sentence
-- Better answer: 2 to 4 grounded technical sentences only, never placeholder text
-
+- The "better_answer" MUST be written in the FIRST PERSON ("I am", "My experience", "I worked on") as a direct script for the candidate to use.
+- NEVER start the better answer with coaching meta-text like "A strong answer would be..." or "You could say...". Just provide the exact script.
+- NEVER invent facts. Use bracketed placeholders like [Project Name] if you don't know the exact details, but keep it structured.
 FEEDBACK VARIATION RULE:
 - Vary your coaching language across evaluations. Avoid reusing the same sentence structure or phrasing patterns.
 - Rotate between angles: technical precision, interview strategy, communication improvement, or depth enhancement.
@@ -414,7 +416,9 @@ FEEDBACK VARIATION RULE:
 - Your coaching must feel premium and individually crafted for THIS answer.
 - Vary the "why_this_matters" angle: sometimes hiring impact, sometimes career growth, sometimes competitive differentiation, sometimes interview psychology.
 - The "answer_blueprint" should offer a unique structural suggestion each time, not always "Start with X, then Y, then Z."
-- The "better_answer" must be written as if you are coaching this specific candidate for this specific role — never generic.
+- The "better_answer" MUST be written in the FIRST PERSON ("I am", "My experience", "I worked on") as a direct script for the candidate to use.
+- NEVER start the better answer with coaching meta-text like "A strong answer would be..." or "You could say...". Just provide the exact script.
+- NEVER invent facts. Use bracketed placeholders like [Project Name] if you don't know the exact details, but keep it structured.
 - Rotate "how_to_improve" between: concrete technique, mindset reframe, preparation strategy, and communication tactic.
 
 {_SPEECH_RECOVERY_BLOCK}
