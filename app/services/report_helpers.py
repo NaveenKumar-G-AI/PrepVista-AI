@@ -252,12 +252,12 @@ def _build_improved_answer(evaluation: dict) -> str:
 
     category = _safe_pdf_text(evaluation.get("rubric_category", "general")).lower()
     if "behavioral" in category:
-        return "I would explain the situation clearly, the action I personally took, and the result it created. That keeps the answer specific and easier for the interviewer to trust."
+        return "In [Project], I faced a situation where [Challenge]. I took action by [Specific Action], which resulted in [Positive Outcome]. This taught me the value of [Lesson Learned]."
     if "communication" in category:
-        return "I would define the concept first, explain it in clear steps, and close with the practical takeaway. That makes the answer sound more controlled and interview-ready."
+        return "I explained the concept to the team by breaking it down simply. This mattered because it helped us align on the decision and move forward to [Result]."
     if "problem" in category:
-        return "I would define the problem first, explain the debugging or decision path, and then describe the fix and final improvement. That gives the interviewer a clearer technical story."
-    return "I would explain the context first, then the technical decision or trade-off, and finish with the final impact. That makes the answer more concrete and easier to evaluate."
+        return "First, I evaluated the problem to understand the root cause. Then, I implemented [Core Method] to fix the issue, which allowed me to achieve [Concrete Result]."
+    return "In [Project], I handled [Specific Task] and decided to [Action Taken]. This directly resulted in [Concrete Result]."
 
 
 def _summary_dimension_labels(evaluations: list[dict]) -> tuple[list[str], list[str]]:
