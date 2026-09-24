@@ -4,6 +4,7 @@ import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
+import { CodeIcon, BrainIcon } from 'lucide-react';
 import {
   BuildingIcon,
   ChartIcon,
@@ -27,8 +28,9 @@ interface RailItem {
   href: string;
   label: string;
   description: string;
-  icon: RailIcon;
+  icon: RailIcon | any;
   onClick?: (e: React.MouseEvent) => void;
+  external?: boolean;
 }
 
 interface MainSideRailProps {
@@ -40,6 +42,7 @@ interface MainSideRailProps {
 }
 
 function isActive(pathname: string, href: string) {
+  if (href.startsWith('http')) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -52,6 +55,8 @@ function RailLink({ item, pathname }: { item: RailItem; pathname: string }) {
       href={item.href}
       title={item.label}
       onClick={item.onClick}
+      target={item.external ? "_blank" : undefined}
+      rel={item.external ? "noopener noreferrer" : undefined}
       className={`group/item flex items-center gap-3 rounded-2xl px-2.5 py-2.5 transition-all ${
         active
           ? 'bg-blue-500/16 text-primary shadow-[0_18px_36px_rgba(37,99,235,0.12)]'
@@ -105,6 +110,20 @@ export function MainSideRail({ startInterviewHref, liveSessionHref, careerHref, 
   ];
 
   const workspaceItems: RailItem[] = [
+    {
+      href: 'https://codeforge.prepvistaai.com',
+      label: 'Coding Workspace',
+      description: 'Practice coding challenges',
+      icon: CodeIcon,
+      external: true,
+    },
+    {
+      href: 'https://aceapt.prepvistaai.com',
+      label: 'Aptitude Workspace',
+      description: 'Practice aptitude tests',
+      icon: BrainIcon,
+      external: true,
+    },
     {
       href: '/analytics',
       label: 'Analytics',

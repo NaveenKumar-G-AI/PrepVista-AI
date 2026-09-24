@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import { CodeIcon, BrainIcon } from 'lucide-react';
 import { BoltIcon, HistoryIcon, PlayIcon, SparklesIcon, TargetIcon } from '@/components/icons';
 import { StudentSideRail } from '@/components/student-side-rail';
 import { api } from '@/lib/api';
@@ -214,6 +215,41 @@ export default function StudentDashboardPage() {
                 Access: <span className="font-semibold text-white">College Managed</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Workspaces Row */}
+        <section className="grid gap-4 md:grid-cols-2 slide-up mb-2">
+          <div className="card relative p-6 flex flex-col justify-between items-start">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                <CodeIcon size={14} />
+                Coding Workspace
+              </div>
+              <h2 className="text-xl font-semibold text-primary mt-2">Practice programming</h2>
+              <p className="mt-2 text-sm text-secondary max-w-sm">
+                Enhance your problem-solving skills with our dedicated coding environment.
+              </p>
+            </div>
+            <a href="https://codeforge.prepvistaai.com" target="_blank" rel="noopener noreferrer" className="btn-primary mt-6 !bg-indigo-600 hover:!bg-indigo-700 !border-indigo-700">
+              Open CodeForge
+            </a>
+          </div>
+
+          <div className="card relative p-6 flex flex-col justify-between items-start">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-fuchsia-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-fuchsia-700 dark:bg-fuchsia-900/20 dark:text-fuchsia-300">
+                <BrainIcon size={14} />
+                Aptitude Workspace
+              </div>
+              <h2 className="text-xl font-semibold text-primary mt-2">Practice aptitude tests</h2>
+              <p className="mt-2 text-sm text-secondary max-w-sm">
+                Sharpen your logical reasoning and quantitative aptitude skills.
+              </p>
+            </div>
+            <a href="https://aceapt.prepvistaai.com" target="_blank" rel="noopener noreferrer" className="btn-primary mt-6 !bg-fuchsia-600 hover:!bg-fuchsia-700 !border-fuchsia-700">
+              Open AceApt
+            </a>
           </div>
         </section>
 
