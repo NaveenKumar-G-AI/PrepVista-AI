@@ -399,7 +399,6 @@ async def _fetch_all_orgs_perf(conn) -> list:
                ON os.organization_id = o.id AND os.status = 'active'
         LEFT JOIN interview_sessions isess
                ON isess.user_id = os.user_id
-              AND isess.organization_id = os.organization_id
               AND isess.state = 'FINISHED'
               AND isess.final_score IS NOT NULL
         WHERE o.category = 'college'
@@ -431,15 +430,14 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
             cd.department_name,
             cy.year_name,
             cb.batch_name,
-            COUNT(isess.id) FILTER (WHERE isess.state = 'FINISHED')
-                AS session_count,
+            os.total_sessions_completed AS session_count,
             ROUND(AVG(isess.final_score)
                   FILTER (WHERE isess.state = 'FINISHED'), 1)
                 AS avg_score,
-            (ARRAY_AGG(isess.final_score ORDER BY isess.created_at ASC)
-             FILTER (WHERE isess.state = 'FINISHED'))[1]   AS first_score,
-            (ARRAY_AGG(isess.final_score ORDER BY isess.created_at DESC)
-             FILTER (WHERE isess.state = 'FINISHED'))[1]   AS latest_score,
+            os.first_overall_score AS first_score,
+            os.latest_overall_score AS latest_score,
+            os.readiness_tier AS cached_tier,
+            os.is_zero_offer_risk AS cached_zero_risk,
             ROUND(AVG((isess.rubric_scores->>'communication')::numeric)
                   FILTER (WHERE isess.state = 'FINISHED'), 1)   AS avg_communication,
             ROUND(AVG((isess.rubric_scores->>'technical_depth')::numeric)
@@ -478,14 +476,15 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
         LEFT JOIN college_years       cy ON cy.id   = os.year_id
         LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
         LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
-                                             AND isess.organization_id = os.organization_id
                                              AND isess.state = 'FINISHED'
                                              AND isess.final_score IS NOT NULL
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
         WHERE os.organization_id = $1 AND os.status = 'active'
         GROUP BY os.user_id, os.department_id, os.student_code,
                  p.full_name, p.email, p.graduation_year,
-                 cd.department_name, cy.year_name, cb.batch_name
+                 cd.department_name, cy.year_name, cb.batch_name,
+                 os.total_sessions_completed, os.first_overall_score, os.latest_overall_score,
+                 os.readiness_tier, os.is_zero_offer_risk
         ORDER BY p.full_name
         """,
         org_id,

@@ -119,11 +119,12 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
         lambda conn: conn.fetch(
             """SELECT
                  os.user_id,
-                 COUNT(isess.id) FILTER (WHERE isess.state = 'FINISHED') AS session_count,
+                 os.total_sessions_completed AS session_count,
                  ROUND(AVG(isess.final_score)
                        FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_score,
-                 (ARRAY_AGG(isess.final_score ORDER BY isess.created_at DESC)
-                       FILTER (WHERE isess.state = 'FINISHED'))[1]  AS latest_score,
+                 os.latest_overall_score AS latest_score,
+                 os.readiness_tier AS cached_tier,
+                 os.is_zero_offer_risk AS cached_zero_risk,
                  ROUND(AVG((isess.rubric_scores->>'communication')::numeric)
                        FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_communication,
                  ROUND(AVG((isess.rubric_scores->>'technical_depth')::numeric)
@@ -154,11 +155,10 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
                        FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_role_fit
                FROM organization_students os
                LEFT JOIN interview_sessions isess ON isess.user_id = os.user_id
-                                                    AND isess.organization_id = os.organization_id
                                                     AND isess.state = 'FINISHED'
                                                     AND isess.final_score IS NOT NULL
                WHERE os.organization_id = $1 AND os.status = 'active'
-               GROUP BY os.user_id""",
+               GROUP BY os.user_id, os.total_sessions_completed, os.latest_overall_score, os.readiness_tier, os.is_zero_offer_risk""",
             org_id,
         ),
     )
@@ -174,10 +174,13 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
+        
+        tier = r["cached_tier"] or _readiness_tier(latest, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(latest, sc, None):
+        
+        if r["cached_zero_risk"]:
             zero_risk_count += 1
+            
         if avg is not None:
             scored_avgs.append(avg)
 
@@ -350,10 +353,13 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
+        
+        tier = r["cached_tier"] or _readiness_tier(latest, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(latest, sc, None):   # slope not available here; growth endpoint has it
+        
+        if r["cached_zero_risk"]:
             zero_risk_count += 1
+            
         if avg is not None:
             scored_avgs.append(avg)
         per_student_cat_scores.append(_extract_cat_scores(r))
@@ -458,8 +464,8 @@ async def analytics_performance(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
-        risk = _zero_offer_risk(latest, sc, None)
+        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        risk = r["cached_zero_risk"]
         pct  = _compute_percentile(float(avg), scored_avgs) if avg is not None else None
 
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
@@ -758,8 +764,8 @@ async def analytics_readiness(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
-        risk = _zero_offer_risk(latest, sc, None)
+        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        risk = r["cached_zero_risk"]
         pct  = _compute_percentile(float(avg), scored_avgs) if avg is not None else None
         ttt  = _time_to_threshold(latest, None)   # slope not available without growth query
 

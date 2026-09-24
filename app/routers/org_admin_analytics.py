@@ -134,10 +134,13 @@ async def get_org_analytics_admin(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
+        
+        tier = r["cached_tier"] or _readiness_tier(latest, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(latest, sc, None):
+        
+        if r["cached_zero_risk"]:
             zero_risk_count += 1
+            
         if avg is not None:
             scored_avgs.append(avg)
         per_student_cats.append(_extract_cat_scores(r))
@@ -417,8 +420,8 @@ async def get_org_performance_admin(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
-        risk = _zero_offer_risk(latest, sc, None)
+        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        risk = r["cached_zero_risk"]
         pct  = (
             round(sum(1 for s in scored_avgs if s <= float(avg)) / len(scored_avgs) * 100, 1)
             if (avg is not None and scored_avgs)
@@ -555,8 +558,8 @@ async def get_org_readiness_admin(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
-        risk = _zero_offer_risk(latest, sc, None)
+        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        risk = r["cached_zero_risk"]
         pct  = (
             round(sum(1 for s in scored_avgs if s <= float(avg)) / len(scored_avgs) * 100, 1)
             if (avg is not None and scored_avgs)

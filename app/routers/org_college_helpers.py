@@ -510,22 +510,19 @@ async def _fetch_perf_aggregate(
             cd.department_name,
             cy.year_name,
             cb.batch_name,
-            -- Session counts
-            COUNT(isess.id) FILTER (WHERE isess.state = 'FINISHED')
-                AS session_count,
-            -- Overall score aggregates
+            -- Session counts and cached performance (source of truth)
+            os.total_sessions_completed AS session_count,
+            os.latest_overall_score AS latest_score,
+            os.first_overall_score AS first_score,
+            os.readiness_tier AS cached_tier,
+            os.is_zero_offer_risk AS cached_zero_risk,
+            
+            -- Overall score aggregates (averages over all historical sessions)
             ROUND(AVG(isess.final_score)
                   FILTER (WHERE isess.state = 'FINISHED'), 1)
                 AS avg_score,
             MAX(isess.final_score) FILTER (WHERE isess.state = 'FINISHED')
                 AS best_score,
-            -- First and latest overall scores (for delta computation in Python)
-            (ARRAY_AGG(isess.final_score ORDER BY isess.created_at ASC)
-             FILTER (WHERE isess.state = 'FINISHED'))[1]
-                AS first_score,
-            (ARRAY_AGG(isess.final_score ORDER BY isess.created_at DESC)
-             FILTER (WHERE isess.state = 'FINISHED'))[1]
-                AS latest_score,
             -- 14 rubric category averages via JSONB key extraction + numeric cast
             ROUND(AVG((isess.rubric_scores->>'communication')::numeric)
                   FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_communication,
@@ -584,7 +581,6 @@ async def _fetch_perf_aggregate(
         LEFT JOIN college_years       cy ON cy.id   = os.year_id
         LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
         LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
-                                             AND isess.organization_id = os.organization_id
                                              AND isess.state = 'FINISHED'
                                              AND isess.final_score IS NOT NULL
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
@@ -593,7 +589,9 @@ async def _fetch_perf_aggregate(
           {extra_clause}
         GROUP BY os.user_id, os.department_id, os.year_id, os.batch_id,
                  os.student_code, p.full_name, p.email, p.graduation_year,
-                 cd.department_name, cy.year_name, cb.batch_name
+                 cd.department_name, cy.year_name, cb.batch_name,
+                 os.total_sessions_completed, os.latest_overall_score, os.first_overall_score,
+                 os.readiness_tier, os.is_zero_offer_risk
         ORDER BY p.full_name
         """,
         *params,
