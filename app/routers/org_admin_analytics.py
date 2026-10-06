@@ -7,6 +7,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+from app.services.score_semantics import org_measurement_rows, project_session, SUMMARY_KEYS
 import statistics as _stats
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -54,9 +55,9 @@ async def get_org_students_admin(
                       cd.department_name, cy.year_name, cb.batch_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
-               LEFT JOIN college_departments cd ON cd.id = os.department_id
-               LEFT JOIN college_years       cy ON cy.id = os.year_id
-               LEFT JOIN college_batches     cb ON cb.id = os.batch_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+               LEFT JOIN college_years       cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
+               LEFT JOIN college_batches     cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status != 'removed'
                ORDER BY os.added_at DESC LIMIT $2 OFFSET $3""",
             org_id, ps, offset,
@@ -66,6 +67,7 @@ async def get_org_students_admin(
             "WHERE organization_id = $1 AND status != 'removed'",
             org_id,
         )
+        rows = await org_measurement_rows(conn, org_id, rows)
     return {"students": [dict(r) for r in rows], "total": total, "page": page, "page_size": ps}
 
 
@@ -105,7 +107,7 @@ async def get_org_analytics_admin(
             """SELECT cd.department_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
-               JOIN college_departments cd ON cd.id = os.department_id
+               JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cd.department_name ORDER BY total DESC""",
             org_id,
@@ -114,7 +116,7 @@ async def get_org_analytics_admin(
             """SELECT cy.year_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
-               JOIN college_years cy ON cy.id = os.year_id
+               JOIN college_years cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cy.year_name ORDER BY total DESC""",
             org_id,
@@ -135,7 +137,7 @@ async def get_org_analytics_admin(
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
         
-        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         
         if r["cached_zero_risk"]:
@@ -420,7 +422,7 @@ async def get_org_performance_admin(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         risk = r["cached_zero_risk"]
         pct  = (
             round(sum(1 for s in scored_avgs if s <= float(avg)) / len(scored_avgs) * 100, 1)
@@ -454,6 +456,7 @@ async def get_org_performance_admin(
             "avg_score":        avg,
             "latest_score":     latest,
             "readiness_tier":   tier,
+            **{key: r.get(key) for key in SUMMARY_KEYS},
             "zero_offer_risk":  risk,
             "cohort_percentile":pct,
             "category_scores":  cat_scores,
@@ -558,7 +561,7 @@ async def get_org_readiness_admin(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         risk = r["cached_zero_risk"]
         pct  = (
             round(sum(1 for s in scored_avgs if s <= float(avg)) / len(scored_avgs) * 100, 1)
@@ -576,10 +579,11 @@ async def get_org_readiness_admin(
             "avg_score":        avg,
             "latest_score":     latest,
             "readiness_tier":   tier,
+            **{key: r.get(key) for key in SUMMARY_KEYS},
             "cohort_percentile":pct,
             "zero_offer_risk":  risk,
         }
-        tier_buckets[tier].append(entry)
+        tier_buckets.setdefault(tier, []).append(entry)
         if risk:
             zero_risk_list.append(entry)
 
@@ -596,6 +600,8 @@ async def get_org_readiness_admin(
             _TIER_ALMOST_READY: tier_buckets[_TIER_ALMOST_READY],
             _TIER_DEVELOPING:   tier_buckets[_TIER_DEVELOPING],
             _TIER_AT_RISK:      tier_buckets[_TIER_AT_RISK],
+            "not_measured": tier_buckets.get("not_measured", []),
+            "partially_measured": tier_buckets.get("partially_measured", []),
         },
         "zero_offer_risk": zero_risk_list,
     }

@@ -211,7 +211,7 @@ interface Dept  { id: string; department_name: string; }
 interface Year  { id: string; year_name: string; }
 interface Batch { id: string; batch_name: string; }
 interface BulkUploadResult {
-  success: number; failed_count: number; career_access_granted: number;
+  success: number; failed_count: number; career_access_granted: number; already_enrolled?: number;
   failed_rows?: { row: number; email?: string; errors?: string[] }[];
 }
 
@@ -561,12 +561,12 @@ export default function StudentsPage() {
 
     setConfirmRemoveId(null);
     setRemovingId(studentId);
-    setData(prev =>
-      prev ? { ...prev, students: prev.students.filter(s => s.id !== studentId), total: Math.max(0, prev.total - 1) } : prev,
-    );
     try {
       await api.removeCollegeStudent(studentId);
       if (!isMountedRef.current) return;
+      setData(prev =>
+        prev ? { ...prev, students: prev.students.filter(s => s.id !== studentId), total: Math.max(0, prev.total - 1) } : prev,
+      );
       showSuccess('Student removed successfully.');
     } catch (err) {
       if (!isMountedRef.current) return;
@@ -633,6 +633,7 @@ export default function StudentsPage() {
       /* SEC-10: validate response shape before rendering */
       const safeResult: BulkUploadResult = {
         success:               typeof res?.success === 'number'               ? res.success               : 0,
+        already_enrolled: typeof res?.already_enrolled === 'number' ? res.already_enrolled : 0,
         failed_count:          typeof res?.failed_count === 'number'          ? res.failed_count          : 0,
         career_access_granted: typeof res?.career_access_granted === 'number' ? res.career_access_granted : 0,
         /* SEC-11: sanitize failed row messages — they contain user-submitted CSV data */
@@ -649,7 +650,7 @@ export default function StudentsPage() {
 
       setBulkResult(safeResult);
       if (fileRef.current) fileRef.current.value = '';
-      showSuccess(`Bulk upload complete: ${safeResult.success} students added.`);
+      showSuccess(`Bulk upload complete: ${safeResult.success} added, ${safeResult.already_enrolled ?? 0} already enrolled, ${safeResult.failed_count} failed.`);
       await loadStudents();
     } catch (err) {
       if (!isMountedRef.current) return;
@@ -896,7 +897,7 @@ export default function StudentsPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-center">
                     <div className="text-lg font-bold text-emerald-400">{bulkResult.success}</div>
-                    <div className="text-[10px] text-emerald-400/70 uppercase">Success</div>
+                    <div className="text-[10px] text-emerald-400/70 uppercase">Added; {bulkResult.already_enrolled ?? 0} already enrolled</div>
                   </div>
                   <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2 text-center">
                     <div className="text-lg font-bold text-rose-400">{bulkResult.failed_count}</div>

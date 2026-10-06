@@ -83,8 +83,8 @@ def test_drive_performance_has_explicit_no_session_values() -> None:
 
     assert performance == {
         "readiness_score": None,
-        "readiness_tier": "at_risk",
-        "is_zero_offer_risk": True,
+        "readiness_tier": "not_measured",
+        "is_zero_offer_risk": False,
         "total_sessions_completed": 0,
         "sessions_without_improvement": 0,
         "score_delta": None,

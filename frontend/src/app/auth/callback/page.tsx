@@ -4,9 +4,10 @@
  * Processes the Supabase OAuth redirect and syncs the session.
  */
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getSupabase } from '@/lib/supabase';
+import { exchangeGoogleCode, getSupabase } from '@/lib/supabase';
+import { createGoogleCallback } from '@/lib/oauth-callback';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -14,66 +15,43 @@ function AuthCallbackLogic() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { refreshUser } = useAuth();
+  const [retryable, setRetryable] = useState(false);
+  const attemptRef = useRef<ReturnType<typeof createGoogleCallback> | null>(null);
 
   useEffect(() => {
-    const handleCallback = async () => {
-      try {
-        const errorParam = searchParams.get('error') || '';
-        const errorDescription = searchParams.get('error_description') || '';
-        if (errorParam) {
-          const suffix = errorDescription ? `&error_description=${encodeURIComponent(errorDescription)}` : '';
-          router.push(`/login?error=google_failed${suffix}`);
-          return;
-        }
-
-        const sb = getSupabase();
-        const code = searchParams.get('code');
-        let session = null;
-        if (code) {
-          const { data, error } = await sb.auth.exchangeCodeForSession(code);
-          if (error) {
-            throw error;
-          }
-          session = data.session || null;
-        } else {
-          const { data: { session: existingSession }, error } = await sb.auth.getSession();
-          if (error) {
-            throw error;
-          }
-          session = existingSession || null;
-        }
-        if (!session) {
-          router.push('/login?error=google_failed');
-          return;
-        }
-        api.setTokens(session.access_token, session.refresh_token || '');
-        await api.completeOAuthLogin();
-        await refreshUser();
-        // Route org admins to their admin workspace, not the interview dashboard
-        // Route org students to their dedicated student workspace
-        try {
-          const me = await api.getMe<{ is_org_admin?: boolean; org_student?: boolean }>();
-          if (me.is_org_admin) {
-            router.push('/org-admin');
-            return;
-          }
-          if (me.org_student) {
-            router.push('/student-dashboard');
-            return;
-          }
-        } catch { /* fall through to default */ }
-        router.push('/dashboard');
-      } catch (error) {
-        try { await getSupabase().auth.signOut(); } catch { /* ignore */ }
-        api.clearTokens();
-        const message = error instanceof Error ? error.message : 'Google sign-in could not be completed.';
-        router.push(`/login?error=google_failed&error_description=${encodeURIComponent(message)}`);
-      }
-    };
-    void handleCallback();
+    if (!attemptRef.current) {
+      const error = searchParams.get('error');
+      attemptRef.current = createGoogleCallback({
+        code: searchParams.get('code'),
+        flowError: error ? { code: error, status: ['server_error', 'temporarily_unavailable'].includes(error) ? 503 : 400 } : undefined,
+        exchangeCode: exchangeGoogleCode,
+        getSession: () => getSupabase().auth.getSession(),
+        setTokens: (access, refresh) => api.setTokens(access, refresh),
+        completeLogin: () => api.completeOAuthLogin(), refreshUser,
+        getMe: () => api.getMe(),
+      });
+    }
+    void attemptRef.current().then(result => {
+      if (result.kind === 'success') router.push(result.path);
+      else if (result.kind === 'fresh-sign-in') router.push('/login?error=google_failed');
+      else setRetryable(true);
+    });
   }, [refreshUser, router, searchParams]);
 
-  return null;
+  return retryable ? (
+    <div role="alert" className="p-4 text-center">
+      Google sign-in is temporarily unavailable. Your session is preserved.{' '}
+      <button onClick={() => {
+        setRetryable(false);
+        void attemptRef.current?.().then(result => {
+          if (result.kind === 'success') router.push(result.path);
+          else if (result.kind === 'fresh-sign-in') router.push('/login?error=google_failed');
+          else setRetryable(true);
+        });
+      }}>Retry</button>{' '}
+      <button onClick={() => router.push('/login')}>Start a fresh sign-in</button>
+    </div>
+  ) : null;
 }
 
 export default function AuthCallbackPage() {

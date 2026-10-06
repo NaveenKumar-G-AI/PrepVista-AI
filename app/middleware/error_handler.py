@@ -27,6 +27,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.database.connection import DatabaseNotReadyError
+from app.services.auth_failures import TEMPORARY_DATABASE_ERRORS
 
 # ── Optional Sentry integration (Rec C) ──────────────────────────────────────
 # No new hard dependency — silently skipped if sentry_sdk is not installed.
@@ -239,8 +240,13 @@ async def build_server_error_response(request: Request, exc: Exception) -> JSONR
         # Logger / scrubber failure must never suppress the HTTP response.
         pass
 
-    body = _build_response(500, _MSG_SERVER_ERROR, request_id, "server_error")
-    return _json_response_with_id(500, body, request_id)
+    unavailable = isinstance(exc, (DatabaseNotReadyError, *TEMPORARY_DATABASE_ERRORS))
+    status = 503 if unavailable else 500
+    body = _build_response(
+        status, _MSG_DB_UNAVAILABLE if unavailable else _MSG_SERVER_ERROR,
+        request_id, "database_unavailable" if unavailable else "server_error",
+    )
+    return _json_response_with_id(status, body, request_id)
 
 
 # ── Handler registration ──────────────────────────────────────────────────────
@@ -268,6 +274,9 @@ def register_error_handlers(app: FastAPI):
         except Exception:
             pass
         return _json_response_with_id(503, body, request_id)
+
+    for error_type in TEMPORARY_DATABASE_ERRORS:
+        app.add_exception_handler(error_type, database_not_ready_handler)
 
     # ------------------------------------------------------------------ #
     # 2. Pydantic / FastAPI request validation — 422                       #

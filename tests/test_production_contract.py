@@ -21,7 +21,7 @@ def _production_settings(**overrides) -> Settings:
         "SUPABASE_ANON_KEY": "anon",
         "SUPABASE_SERVICE_KEY": "service",
         "SUPABASE_JWT_SECRET": "x" * 32,
-        "DATABASE_URL": "postgresql://user:password@example.invalid:5432/db",
+        "DATABASE_URL": "postgresql://user:password@example.invalid:5432/db?sslmode=require",
         "GROQ_API_KEY": "test-provider-key",
         "RAZORPAY_KEY_ID": "rzp_test_public",
         "RAZORPAY_KEY_SECRET": "test-api-secret",

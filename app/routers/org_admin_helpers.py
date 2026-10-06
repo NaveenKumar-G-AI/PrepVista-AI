@@ -162,7 +162,7 @@ def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
     at_risk:      everything else
     """
     if readiness_score is None or total_sessions == 0:
-        return _TIER_AT_RISK
+        return "not_measured"
     if readiness_score >= 75.0 and total_sessions >= 3:
         return _TIER_READY
     if readiness_score >= 60.0 and total_sessions >= 2:
@@ -185,7 +185,7 @@ def _zero_offer_risk(
     4. trend_slope < −2.0 (actively declining).
     """
     if total_sessions == 0 or readiness_score is None:
-        return True
+        return False
     if readiness_score < _ZERO_OFFER_SCORE_HARD:
         return True
     if total_sessions >= 3 and readiness_score < _ZERO_OFFER_SCORE_SOFT:
@@ -231,6 +231,8 @@ def _build_traffic_light(tier_counts: dict[str, int], total: int) -> dict:
         _TIER_ALMOST_READY: {"count": tier_counts.get(_TIER_ALMOST_READY, 0), "pct": _pct(tier_counts.get(_TIER_ALMOST_READY, 0))},
         _TIER_DEVELOPING:   {"count": tier_counts.get(_TIER_DEVELOPING, 0),   "pct": _pct(tier_counts.get(_TIER_DEVELOPING, 0))},
         _TIER_AT_RISK:      {"count": tier_counts.get(_TIER_AT_RISK, 0),      "pct": _pct(tier_counts.get(_TIER_AT_RISK, 0))},
+        "not_measured": {"count": tier_counts.get("not_measured", 0), "pct": _pct(tier_counts.get("not_measured", 0))},
+        "partially_measured": {"count": tier_counts.get("partially_measured", 0), "pct": _pct(tier_counts.get("partially_measured", 0))},
     }
 
 
@@ -316,9 +318,9 @@ def _compute_org_perf_summary(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
-        if _zero_offer_risk(latest, sc, None):
+        if _zero_offer_risk(latest if r.get("readiness_eligible", True) else None, sc, None):
             zero_risk_count += 1
         if avg is not None:
             scored_avgs.append(avg)
@@ -363,9 +365,9 @@ async def _fetch_all_orgs_perf(conn) -> list:
     ASSUMPTION: interview_sessions.state = 'FINISHED' marks a finished session.
     ASSUMPTION: organization_students.status = 'active' marks an enrolled student.
 
-    One query regardless of the number of orgs or students. Zero N+1.
+    Bulk projection uses existing tenant membership and actual evaluations.
     """
-    return await conn.fetch(
+    rows = await conn.fetch(
         """
         SELECT
             o.id           AS org_id,
@@ -398,7 +400,7 @@ async def _fetch_all_orgs_perf(conn) -> list:
         LEFT JOIN organization_students os
                ON os.organization_id = o.id AND os.status = 'active'
         LEFT JOIN interview_sessions isess
-               ON isess.user_id = os.user_id
+               ON isess.user_id = os.user_id AND isess.organization_id = os.organization_id
               AND isess.state = 'FINISHED'
               AND isess.final_score IS NOT NULL
         WHERE o.category = 'college'
@@ -407,6 +409,36 @@ async def _fetch_all_orgs_perf(conn) -> list:
         ORDER BY avg_score DESC NULLS LAST
         """
     )
+    if not rows:
+        return []
+    from app.services.score_semantics import project_sessions
+    sessions = await conn.fetch(
+        """SELECT s.id, s.organization_id, s.plan, s.runtime_state, s.total_turns,
+                  s.final_score, s.rubric_scores
+           FROM interview_sessions s
+           WHERE s.organization_id = ANY($1::uuid[]) AND s.state = 'FINISHED'
+             AND EXISTS (SELECT 1 FROM organization_students os
+                         WHERE os.organization_id = s.organization_id
+                           AND os.user_id = s.user_id AND os.status = 'active')""",
+        [row["org_id"] for row in rows],
+    )
+    sessions = await project_sessions(conn, sessions)
+    by_org = {}
+    for session in sessions:
+        if session["final_score"] is not None:
+            by_org.setdefault(str(session["organization_id"]), []).append(session)
+    result = []
+    for raw in rows:
+        row = dict(raw)
+        measured = by_org.get(str(row["org_id"]), [])
+        row["total_sessions"] = len(measured)
+        row["avg_score"] = round(sum(session["final_score"] for session in measured) / len(measured), 1) if measured else None
+        for category in _RUBRIC_CATEGORIES:
+            values = [session["rubric_scores"].get(category) for session in measured]
+            values = [value for value in values if value is not None]
+            row["avg_" + category] = round(sum(values) / len(values), 1) if values else None
+        result.append(row)
+    return sorted(result, key=lambda row: (row["avg_score"] is None, -(row["avg_score"] or 0)))
 
 
 async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
@@ -418,7 +450,7 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
 
     One query. No N+1.
     """
-    return await conn.fetch(
+    rows = await conn.fetch(
         """
         SELECT
             os.user_id,
@@ -472,10 +504,10 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
                 AND aqf.evasiveness_score >= 5.0) AS evasiveness_count
         FROM organization_students os
         JOIN   profiles             p    ON p.id    = os.user_id
-        LEFT JOIN college_departments cd ON cd.id   = os.department_id
-        LEFT JOIN college_years       cy ON cy.id   = os.year_id
-        LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
-        LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
+        LEFT JOIN college_departments cd ON cd.id   = os.department_id AND cd.organization_id = os.organization_id
+        LEFT JOIN college_years       cy ON cy.id   = os.year_id AND cy.organization_id = os.organization_id
+        LEFT JOIN college_batches     cb ON cb.id   = os.batch_id AND cb.organization_id = os.organization_id
+        LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id AND isess.organization_id = os.organization_id
                                              AND isess.state = 'FINISHED'
                                              AND isess.final_score IS NOT NULL
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
@@ -489,6 +521,9 @@ async def _fetch_org_perf_aggregate(conn, org_id: str) -> list:
         """,
         org_id,
     )
+
+    from app.services.score_semantics import org_measurement_rows
+    return await org_measurement_rows(conn, org_id, rows)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

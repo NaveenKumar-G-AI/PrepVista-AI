@@ -517,6 +517,9 @@ def _render_rubric_row(pdf, category: str, score: float, alternate: bool = False
             safe_category = safe_category[:-1]
         safe_category = safe_category.rstrip() + "..."
 
+    if score is None:
+        pdf.cell(0, 5, "Not measured", ln=1)
+        return
     safe_score = _clamp_score(score)
     ratio = safe_score / 10.0
     bar_rgb = (22, 163, 74) if ratio >= 0.7 else (202, 138, 4) if ratio >= 0.5 else (220, 38, 38)
@@ -553,7 +556,7 @@ def _render_question_block(pdf, index: int, evaluation: dict) -> None:
     improved_answer = _build_improved_answer(evaluation)
     category = _safe_pdf_text(str(evaluation.get("rubric_category", "general") or "general").replace("_", " ").title())
     classification = _safe_pdf_text((evaluation.get("classification", "vague") or "vague").upper())
-    score_text = f"{_clamp_score(evaluation.get('score', 0)):.1f}/10"
+    score_text = f"{_clamp_score(evaluation['score']):.1f}/10" if evaluation.get("score") is not None else "Evaluation pending"
     answer_status = _safe_pdf_text(evaluation.get("answer_status", ""))
     technical_understanding = _safe_pdf_text(evaluation.get("content_understanding", ""))
     depth_quality = _safe_pdf_text(evaluation.get("depth_quality", ""))
@@ -632,6 +635,8 @@ def _render_question_block(pdf, index: int, evaluation: dict) -> None:
         )
     if score_parts:
         signal_lines.append("Score parts: " + " | ".join(score_parts))
+    from app.services.assistance_evidence import provenance_label
+    signal_lines.append("Attempt: " + provenance_label(evaluation.get("assistance_provenance")))
     signal_text = "\n".join(signal_lines)
 
     if plan == "free":

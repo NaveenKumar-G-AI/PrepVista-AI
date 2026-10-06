@@ -42,50 +42,66 @@ class CreateTrainingProgramRequest(BaseModel):
         return self
 
 
+async def _validate_trainer(conn, org_id: str, trainer_id: UUID | None) -> None:
+    if trainer_id is None:
+        return
+    allowed = await conn.fetchval(
+        """SELECT 1 FROM organization_admins WHERE organization_id = $1
+             AND user_id = $2 AND status = 'active'
+           UNION ALL SELECT 1 FROM organization_students WHERE organization_id = $1
+             AND user_id = $2 AND status = 'active'""", org_id, trainer_id,
+    )
+    if not allowed:
+        raise HTTPException(422, "Trainer is not an active member of your organization")
+
+
 @router.post("/programs", status_code=201)
 async def create_program(
     req: CreateTrainingProgramRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     new_id = uuid4()
     async with DatabaseConnection() as conn:
-        season_exists = await conn.fetchval(
-            """SELECT 1 FROM placement_seasons
-               WHERE id = $1 AND organization_id = $2 AND status = 'ACTIVE'""",
-            req.seasonId,
-            admin.organization_id,
-        )
-        if not season_exists:
-            raise HTTPException(422, "Placement season is not active for this organization")
-        category_exists = await conn.fetchval(
-            """SELECT 1 FROM taxonomy_term
-               WHERE id = $1 AND institution_id = $2
-                 AND domain = 'TRAINING_CATEGORY' AND is_active = TRUE""",
-            req.categoryId,
-            admin.organization_id,
-        )
-        if not category_exists:
-            raise HTTPException(422, "Training category is not active for this organization")
+        async with conn.transaction():
+            await conn.fetchval("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", admin.organization_id)
+            await _validate_trainer(conn, admin.organization_id, req.trainerUserId)
+            season_exists = await conn.fetchval(
+                """SELECT 1 FROM placement_seasons
+                   WHERE id = $1 AND organization_id = $2 AND status = 'ACTIVE'""",
+                req.seasonId,
+                admin.organization_id,
+            )
+            if not season_exists:
+                raise HTTPException(422, "Placement season is not active for this organization")
+            category_exists = await conn.fetchval(
+                """SELECT 1 FROM taxonomy_term
+                   WHERE id = $1 AND institution_id = $2
+                     AND domain = 'TRAINING_CATEGORY' AND is_active = TRUE""",
+                req.categoryId,
+                admin.organization_id,
+            )
+            if not category_exists:
+                raise HTTPException(422, "Training category is not active for this organization")
 
-        row = await conn.fetchrow(
-            """INSERT INTO training_program
-               (id, institution_id, season_id, name, description, category_id,
-                target_skill_ids, trainer_user_id, capacity, start_date, end_date, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-               RETURNING *""",
-            new_id,
-            admin.organization_id,
-            req.seasonId,
-            req.name.strip(),
-            req.description,
-            req.categoryId,
-            req.targetSkillIds,
-            req.trainerUserId,
-            req.capacity,
-            req.startDate,
-            req.endDate,
-            admin.user_id,
-        )
+            row = await conn.fetchrow(
+                """INSERT INTO training_program
+                   (id, institution_id, season_id, name, description, category_id,
+                    target_skill_ids, trainer_user_id, capacity, start_date, end_date, created_by)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                   RETURNING *""",
+                new_id,
+                admin.organization_id,
+                req.seasonId,
+                req.name.strip(),
+                req.description,
+                req.categoryId,
+                req.targetSkillIds,
+                req.trainerUserId,
+                req.capacity,
+                req.startDate,
+                req.endDate,
+                admin.user_id,
+            )
     return dict(row)
 
 
@@ -97,7 +113,7 @@ class TransitionProgramRequest(BaseModel):
 async def transition_program(
     program_id: UUID,
     req: TransitionProgramRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     async with DatabaseConnection() as conn:
         async with conn.transaction():
@@ -156,34 +172,37 @@ class CreateSessionRequest(BaseModel):
 async def create_session(
     program_id: UUID,
     req: CreateSessionRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     new_id = uuid4()
     async with DatabaseConnection() as conn:
-        program = await conn.fetchrow(
-            "SELECT status FROM training_program WHERE id = $1 AND institution_id = $2",
-            program_id,
-            admin.organization_id,
-        )
-        if not program:
-            raise HTTPException(404, "Training program not found")
-        if program["status"] in {"COMPLETED", "CANCELLED", "ARCHIVED"}:
-            raise HTTPException(422, f"Cannot schedule sessions for a {program['status']} program")
+        async with conn.transaction():
+            await conn.fetchval("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", admin.organization_id)
+            await _validate_trainer(conn, admin.organization_id, req.trainerUserId)
+            program = await conn.fetchrow(
+                "SELECT status FROM training_program WHERE id = $1 AND institution_id = $2",
+                program_id,
+                admin.organization_id,
+            )
+            if not program:
+                raise HTTPException(404, "Training program not found")
+            if program["status"] in {"COMPLETED", "CANCELLED", "ARCHIVED"}:
+                raise HTTPException(422, f"Cannot schedule sessions for a {program['status']} program")
 
-        row = await conn.fetchrow(
-            """INSERT INTO training_session
-               (id, training_program_id, title, scheduled_at, duration_minutes,
-                location, mode, trainer_user_id, capacity)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-               RETURNING *""",
-            new_id,
-            program_id,
-            req.title.strip(),
-            req.scheduledAt,
-            req.durationMinutes,
-            req.location,
-            req.mode,
-            req.trainerUserId,
-            req.capacity,
-        )
+            row = await conn.fetchrow(
+                """INSERT INTO training_session
+                   (id, training_program_id, title, scheduled_at, duration_minutes,
+                    location, mode, trainer_user_id, capacity)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                   RETURNING *""",
+                new_id,
+                program_id,
+                req.title.strip(),
+                req.scheduledAt,
+                req.durationMinutes,
+                req.location,
+                req.mode,
+                req.trainerUserId,
+                req.capacity,
+            )
     return dict(row)

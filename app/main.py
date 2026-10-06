@@ -20,6 +20,7 @@ from app.config import get_settings, get_cors_origins, get_allowed_hosts
 from app.middleware.error_handler import build_server_error_response, register_error_handlers
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.database.connection import DatabaseConnection, init_db_pool, close_db_pool
+from app.database.readiness import check_schema_readiness
 from app.routers import account, admin, admin_grants, auth, interviews, reports, dashboard, billing, referrals, feedback, support, admin_support, events, org_admin, org_college, outcomes, stt_ws
 from app.routers.recruiter_companies import router as recruiter_companies_router, followup_router as recruiter_followups_router
 from app.routers.placement_drives import router as placement_drives_router
@@ -205,11 +206,15 @@ async def _bootstrap_runtime_services(app: FastAPI):
         try:
             attempt += 1
             await init_db_pool(max_attempts=1, log_failures=False)
+            async with DatabaseConnection() as conn:
+                await check_schema_readiness(conn)
             app.state.db_ready = True
             app.state.db_init_error = None
             app.state.activity_refresh_task = asyncio.create_task(_run_user_activity_refresh_loop())
             from app.services.report_schedules import run_report_schedule_loop
+            from app.services.deletion_worker import run_deletion_worker_loop
             app.state.report_schedule_task = asyncio.create_task(run_report_schedule_loop())
+            app.state.deletion_worker_task = asyncio.create_task(run_deletion_worker_loop())
             try:
                 async with DatabaseConnection() as conn:
                     await refresh_user_activity_stats(conn)
@@ -533,7 +538,7 @@ def create_app() -> FastAPI:
 
         try:
             async with DatabaseConnection() as conn:
-                await conn.fetchval("SELECT 1")
+                await check_schema_readiness(conn)
         except Exception as exc:
             logger.warning("health_ready_failed", error=_describe_startup_error(exc))
             return JSONResponse(

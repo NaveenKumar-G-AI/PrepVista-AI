@@ -36,22 +36,18 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [publicGrowth, setPublicGrowth] = useState<ApiPublicGrowth | null>(null);
-  const { login, signup, loginWithGoogle } = useAuth();
+  const { login, signup, loginWithGoogle, user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    const hasToken = !!(
-      sessionStorage.getItem('pv_access_token') || 
-      localStorage.getItem('pv_refresh_token') || 
-      sessionStorage.getItem('pv_refresh_token')
-    );
-    if (hasToken) {
-      router.replace('/dashboard');
+    if (authLoading) return;
+    if (user) {
+      router.replace(user.is_admin || user.premium_override ? '/admin' : user.is_org_admin ? '/org-admin' : user.org_student ? '/student-dashboard' : '/dashboard');
     } else {
       setCheckingAuth(false);
     }
-  }, [router]);
+  }, [authLoading, user, router]);
 
   useEffect(() => {
     setIsSignup(isSignupMode);

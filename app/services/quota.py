@@ -48,16 +48,7 @@ async def _ensure_current_usage_period(conn, user_id: str):
     if not _period_needs_reset(profile["period_start"]):
         return profile
 
-    # ── Quota reset: profiles UPDATE only ────────────────────────────────────
-    # Previously this function also deleted support_messages >90 days old inside
-    # the same call. That DELETE is an unrelated maintenance concern — coupling it
-    # here means a transient FK constraint violation or lock on support_messages
-    # silently prevents the quota reset from completing. The student then enters
-    # a new interview period with their old used-count still showing, causing a
-    # false quota-exceeded error on a fresh period.
-    #
-    # The support_messages cleanup is now separated into _archive_old_support_messages
-    # and called as a best-effort operation after the quota reset commits.
+    # Quota resets update counters only; user records remain preserved.
     await conn.execute(
         """UPDATE profiles
            SET interviews_used_this_period = 0,
@@ -75,30 +66,6 @@ async def _ensure_current_usage_period(conn, user_id: str):
            WHERE id = $1""",
         user_id,
     )
-
-
-async def _archive_old_support_messages(user_id: str) -> None:
-    """
-    Best-effort deletion of support messages older than 90 days.
-
-    Called after a period reset commits — separated so that a failure here
-    (FK constraint, lock timeout) never rolls back or delays the quota reset
-    itself. Old message cleanup is a maintenance concern, not a quota concern.
-    """
-    try:
-        async with DatabaseConnection() as conn:
-            await conn.execute(
-                """DELETE FROM support_messages
-                   WHERE user_id = $1
-                     AND created_at < NOW() - INTERVAL '90 days'""",
-                user_id,
-            )
-    except Exception as exc:
-        logger.warning(
-            "support_message_archive_failed",
-            user_id=user_id,
-            error=str(exc),
-        )
 
 
 async def _resolve_selected_plan_usage(conn, user_id: str, selected_plan: str):
@@ -183,29 +150,10 @@ async def enforce_quota(user: UserProfile):
         logger.info("quota_unlimited_plan", user_id=user.id, plan=selected_plan)
         return
 
-    period_reset_occurred = False
     async with DatabaseConnection() as conn:
-        profile_before = await conn.fetchrow(
-            "SELECT period_start FROM profiles WHERE id = $1", user.id
-        )
         _, _, used, referral_bonus_interviews, admin_bonus_interviews = (
             await _resolve_selected_plan_usage(conn, user.id, selected_plan)
         )
-        profile_after = await conn.fetchrow(
-            "SELECT period_start FROM profiles WHERE id = $1", user.id
-        )
-        # Detect if _ensure_current_usage_period just reset the period so we
-        # can fire the best-effort archive cleanup outside the connection.
-        if (
-            profile_before
-            and profile_after
-            and str(profile_before["period_start"]) != str(profile_after["period_start"])
-        ):
-            period_reset_occurred = True
-
-    # Best-effort support message archive — outside connection, non-blocking.
-    if period_reset_occurred:
-        asyncio.create_task(_archive_old_support_messages(user.id))
 
     limit = _effective_limit(selected_plan, referral_bonus_interviews, admin_bonus_interviews)
 

@@ -6,7 +6,7 @@
  * No plan switcher, no pricing, no referrals — only interview & workspace links.
  */
 
-import type { ReactElement, SVGProps } from 'react';
+import type { ComponentType, SVGProps } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -24,13 +24,13 @@ import {
   UserIcon,
 } from './icons';
 
-type RailIcon = (props: SVGProps<SVGSVGElement> & { size?: number }) => ReactElement;
+type RailIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 
 interface RailItem {
   href: string;
   label: string;
   description: string;
-  icon: RailIcon | any;
+  icon: RailIcon;
   onClick?: (e: React.MouseEvent) => void;
   external?: boolean;
 }

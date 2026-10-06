@@ -18,9 +18,15 @@ import json
 
 from app.config import get_settings
 from app.services.llm import call_llm_json
-from app.services.assistance_families import classify_question_family, get_fallback_hint
+from app.services.assistance_families import classify_question_family
 
 logger = structlog.get_logger('prepvista.assistance')
+
+
+def valid_content(result):
+    if not isinstance(result, dict) or not isinstance(result.get("content"), str) or not result["content"].strip() or len(result["content"]) > 8000:
+        raise ValueError("Assistance generation unavailable")
+    return result["content"].strip()
 
 class HintResult(TypedDict):
     content: str
@@ -85,9 +91,7 @@ async def generate_hint(
             timeout=5.0,
             use_live_key=True,
         )
-        content = result.get("content", "")
-        if not content:
-            raise ValueError("Empty LLM response")
+        content = valid_content(result)
             
         return {
             "content": content,
@@ -98,16 +102,8 @@ async def generate_hint(
             "safety_passed": True
         }
     except Exception as exc:
-        logger.warning("generate_hint_llm_failed", error=str(exc), question=question_text[:50])
-        fallback = get_fallback_hint(family, level)
-        return {
-            "content": fallback,
-            "question_family": family,
-            "level": level,
-            "model_provider": "fallback",
-            "model_version": "static",
-            "safety_passed": True
-        }
+        logger.warning("generate_hint_llm_failed", exception_type=type(exc).__name__)
+        raise ValueError("Assistance generation unavailable") from None
 
 async def generate_answer_guidance(
     question_text: str, 
@@ -162,51 +158,16 @@ async def generate_answer_guidance(
             use_live_key=True,
         )
         
+        content = valid_content(result)
+        for key in ("grounding_used", "missing_facts", "placeholders_used", "why_it_works"):
+            if not isinstance(result.get(key), list) or any(not isinstance(value, str) or not value.strip() for value in result[key]):
+                raise ValueError("Incomplete assistance response")
+        if not result["why_it_works"] or result.get("confidence") not in {"full", "partial", "insufficient"}:
+            raise ValueError("Incomplete assistance response")
         return {
-            "content": result.get("content", "I am unable to generate a grounded answer at this time."),
-            "question_family": family,
-            "grounding_used": result.get("grounding_used", []),
-            "missing_facts": result.get("missing_facts", []),
-            "placeholders_used": result.get("placeholders_used", []),
-            "confidence": result.get("confidence", "insufficient"),
-            "model_provider": provider,
-            "model_version": model,
-            "safety_passed": True,
-            "why_it_works": result.get("why_it_works", [])
+            **result, "content": content, "question_family": family,
+            "model_provider": provider, "model_version": model, "safety_passed": True,
         }
     except Exception as exc:
-        logger.warning("generate_answer_guidance_failed", error=str(exc), question=question_text[:50])
-        
-        # Provide a question-specific, first-person template as a fallback
-        target_role = "this role"
-        if isinstance(role_context, str) and role_context != "Interview Candidate":
-            target_role = role_context
-            
-        structures = {
-            "intro": "I am [Name] and my strongest area is [Field]. I recently worked on [Project], where I delivered [Concrete Result]. I am targeting roles like this where I can bring practical experience.",
-            "studies_background": "My current focus is [Field of Study], which I applied directly in [Project]. In that work, I handled [Specific Task] and achieved [Concrete Result].",
-            "ownership": "In [Project], I personally owned the [Specific Component] part of the work. I made the decision to [Action Taken] because [Reason], which ultimately resulted in [Concrete Result].",
-            "workflow": "First, I evaluated [Initial Step] to understand the requirements. Then, I implemented [Core Method] to handle the main logic, which allowed me to achieve [Concrete Result].",
-            "tool_method": "I used [Tool or Method] because it was the best fit for handling [Specific Challenge]. By applying it, I was able to deliver [Concrete Result].",
-            "validation": "To validate my work, I checked [Specific Metric] before and after the change. The results showed [Concrete Improvement], confirming the decision was right.",
-            "tradeoff": "I had to choose between [Option A] and [Option B] under a real constraint. I chose [Option] because [Reason], which led to a successful [Result].",
-            "behavioral": "In [Project], I faced a situation where [Challenge]. I took action by [Specific Action], which resulted in [Positive Outcome]. This taught me the value of [Lesson Learned].",
-            "communication": "I explained the concept to the team by breaking it down simply. This mattered because it helped us align on the decision and move forward to [Result].",
-            "role_fit": f"My background makes me a strong fit for {target_role}. For example, in [Project], I proved I can handle this by [Specific Proof Point].",
-            "learning_growth": "One area I am actively improving is [Growth Area]. I am currently working to strengthen it because I know it is critical for success in this field.",
-            "closeout": "You should hire me because I can deliver [Core Strength]. In [Project], I proved this by achieving [Concrete Result], and I want to bring that same impact here.",
-        }
-        fallback_content = structures.get(family, "In [Project], I handled [Specific Task] and decided to [Action Taken]. This directly resulted in [Concrete Result].")
-        
-        return {
-            "content": fallback_content,
-            "question_family": family,
-            "grounding_used": [],
-            "missing_facts": ["LLM generation failed"],
-            "placeholders_used": [],
-            "confidence": "insufficient",
-            "model_provider": "fallback",
-            "model_version": "static",
-            "safety_passed": True,
-            "why_it_works": ["Provides a structured, professional fill-in-the-blank template for this specific question type."]
-        }
+        logger.warning("generate_answer_guidance_failed", exception_type=type(exc).__name__)
+        raise ValueError("Assistance generation unavailable") from None

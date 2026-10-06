@@ -269,7 +269,7 @@ export default function OrgAdminLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return;
     if (!user?.is_org_admin) {
-      router.push('/dashboard');
+      router.push(user?.is_admin || user?.premium_override ? '/admin' : user?.org_student ? '/student-dashboard' : '/dashboard');
     }
   }, [authLoading, user, router]);
 

@@ -49,7 +49,9 @@ export default function AnalyticsCommandCentrePage() {
     const trySend = () => {
       const win = iframeRef.current?.contentWindow;
       if (win && readyRef.current && dataRef.current) {
-        win.postMessage({ __pvcc: 'load', payload: dataRef.current }, window.location.origin);
+        // The sandbox has an opaque origin. Send only to this captured iframe window;
+        // incoming messages still require that exact source. No credentials are included.
+        win.postMessage({ __pvcc: 'load', payload: dataRef.current }, '*');
       }
     };
 

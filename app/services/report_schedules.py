@@ -93,11 +93,42 @@ async def _claim_due_schedules() -> list[Any]:
                 FROM due
                 WHERE schedule.id = due.id
                 RETURNING schedule.id, schedule.organization_id,
+                          schedule.created_by_user_id,
                           schedule.frequency, schedule.recipient_email,
                           schedule.department_id, schedule.year_id,
                           schedule.batch_id, schedule.next_run_at"""
         )
     return list(rows)
+
+
+async def _authorize_schedule(schedule: Any) -> None:
+    """Recheck persisted tenant, creator, recipient and segment authorization.
+
+    A schedule is not a permanent permission grant. Failure happens before
+    export generation and before delivery; a DB outage cannot authorize it.
+    """
+    async with DatabaseConnection() as conn:
+        allowed = await conn.fetchrow(
+            """SELECT s.* FROM org_report_schedules s
+               JOIN organizations o ON o.id = s.organization_id AND o.status = 'active'
+               WHERE s.id = $1 AND s.organization_id = $2 AND s.active = TRUE
+                 AND EXISTS (SELECT 1 FROM organization_admins creator
+                             WHERE creator.user_id = s.created_by_user_id
+                               AND creator.organization_id = s.organization_id AND creator.status = 'active'
+                               AND creator.role = 'org_admin')
+                 AND EXISTS (SELECT 1 FROM organization_admins recipient
+                             WHERE LOWER(recipient.email) = LOWER(s.recipient_email)
+                               AND recipient.organization_id = s.organization_id AND recipient.status = 'active'
+                               AND recipient.role IN ('org_admin', 'placement_officer', 'viewer'))
+                 AND (s.department_id IS NULL OR EXISTS (SELECT 1 FROM college_departments d WHERE d.id = s.department_id AND d.organization_id = s.organization_id))
+                 AND (s.year_id IS NULL OR EXISTS (SELECT 1 FROM college_years y WHERE y.id = s.year_id AND y.organization_id = s.organization_id))
+                 AND (s.batch_id IS NULL OR EXISTS (SELECT 1 FROM college_batches b WHERE b.id = s.batch_id AND b.organization_id = s.organization_id))""",
+            schedule["id"], schedule["organization_id"],
+        )
+    # A claim is a snapshot. Never send its old export or recipient after an edit.
+    binding = ("created_by_user_id", "recipient_email", "frequency", "department_id", "year_id", "batch_id")
+    if not allowed or any(str(allowed[key]) != str(schedule[key]) for key in binding):
+        raise PermissionError("Scheduled report authorization is no longer active")
 
 
 async def _render_schedule_csv(schedule: Any) -> bytes:
@@ -192,7 +223,9 @@ async def process_due_report_schedules() -> int:
     schedules = await _claim_due_schedules()
     for schedule in schedules:
         try:
+            await _authorize_schedule(schedule)
             csv_bytes = await _render_schedule_csv(schedule)
+            await _authorize_schedule(schedule)
             await _send_schedule_email(schedule, csv_bytes)
             await _finish_schedule(schedule)
             logger.info(

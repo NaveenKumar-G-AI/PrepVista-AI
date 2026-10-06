@@ -25,7 +25,7 @@ import asyncio
 
 import httpx
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from app.config import get_settings
 from app.database.connection import DatabaseConnection
@@ -167,8 +167,36 @@ async def _safe_delete_auth_user(
         return auth_user_id, exc
 
 
+import json
+from app.services.storage_cleanup import parse_and_delete_storage_path
+
+async def _run_deletion_saga(request_id: int, auth_user_ids: list[str], storage_paths: list[str]):
+    import asyncio
+    from app.database.connection import DatabaseConnection
+
+    # 1. Auth deletion
+    results = await asyncio.gather(*[_safe_delete_auth_user(aid) for aid in auth_user_ids])
+    failed_auth = [(aid, exc) for aid, exc in results if exc is not None]
+
+    async with DatabaseConnection() as conn:
+        if failed_auth:
+            await conn.execute("UPDATE account_deletion_requests SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1", request_id, f"Auth fail: {failed_auth}")
+            return
+        await conn.execute("UPDATE account_deletion_requests SET status = 'AUTH_DELETED', updated_at = NOW() WHERE id = $1", request_id)
+
+    # 2. Storage deletion
+    storage_results = await asyncio.gather(*[parse_and_delete_storage_path(p) for p in storage_paths])
+    failed_storage = [p for p, success in zip(storage_paths, storage_results) if not success]
+
+    async with DatabaseConnection() as conn:
+        if failed_storage:
+            await conn.execute("UPDATE account_deletion_requests SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1", request_id, f"Storage fail: {failed_storage}")
+            return
+        await conn.execute("UPDATE account_deletion_requests SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1", request_id)
+
+
 @router.delete("/me")
-async def delete_account(user: UserProfile = Depends(get_current_user)):
+async def delete_account(background_tasks: BackgroundTasks, user: UserProfile = Depends(get_current_user)):
     """Delete the current user's live account data and archive minimal identity."""
     if user.premium_override:
         raise HTTPException(
@@ -185,87 +213,37 @@ async def delete_account(user: UserProfile = Depends(get_current_user)):
         )
         linked_auth_user_ids = await list_auth_user_ids_for_profile(conn, user.id)
 
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found.")
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found.")
 
-    auth_user_ids = linked_auth_user_ids or [user.id]
+        auth_user_ids = linked_auth_user_ids or [user.id]
 
-    # ── Pre-irreversible-action audit trail ───────────────────────────────────
-    # Emitted BEFORE any Supabase call. If auth deletion succeeds but the DB
-    # transaction subsequently fails, this log entry is the only forensic record
-    # proving which auth accounts were wiped and when — enabling manual recovery
-    # or DPDP/GDPR compliance reporting without guesswork.
-    logger.info(
-        "account_delete_initiated",
-        user_id=user.id,
-        email=profile["email"],
-        auth_user_count=len(auth_user_ids),
-    )
-
-    # ── Fan-out: delete all linked auth users in parallel ─────────────────────
-    # asyncio.gather runs all deletions concurrently, reducing latency from
-    # O(N × Supabase_RTT) to O(1 × Supabase_RTT) regardless of linked ID count.
-    # _safe_delete_auth_user never raises so gather completes fully and every
-    # result is inspected before deciding whether to abort.
-    results: list[tuple[str, Exception | None]] = await asyncio.gather(
-        *[_safe_delete_auth_user(aid) for aid in auth_user_ids]
-    )
-
-    failed = [(aid, exc) for aid, exc in results if exc is not None]
-    if failed:
-        for auth_user_id, exc in failed:
-            logger.error(
-                "account_delete_auth_cleanup_failed",
-                user_id=user.id,
-                auth_user_id=auth_user_id,
-                error=str(exc),
-            )
-        raise HTTPException(
-            status_code=503,
-            detail="Account deletion is temporarily unavailable. Please try again.",
+        logger.info(
+            "account_delete_initiated",
+            user_id=user.id,
+            email=profile["email"],
+            auth_user_count=len(auth_user_ids),
         )
 
-    logger.info(
-        "account_delete_auth_complete",
-        user_id=user.id,
-        auth_user_count=len(auth_user_ids),
-    )
+        audio_paths_res = await conn.fetch(
+            "SELECT interview_audio_turns.audio_object_path FROM interview_audio_turns JOIN interview_sessions ON interview_sessions.id = interview_audio_turns.session_id WHERE interview_sessions.user_id = $1 AND interview_audio_turns.audio_object_path IS NOT NULL", user.id
+        )
+        pdf_paths_res = await conn.fetch("SELECT pdf_file_path FROM reports WHERE user_id = $1 AND pdf_file_path IS NOT NULL", user.id)
+        support_paths_res = await conn.fetch("SELECT attachment_url FROM support_messages WHERE user_id = $1 AND attachment_url IS NOT NULL", user.id)
+        resume_paths_res = await conn.fetch("SELECT resume_file_path FROM interview_sessions WHERE user_id = $1 AND resume_file_path IS NOT NULL", user.id)
 
-    # ── DB cleanup: transaction covers ONLY the atomic deletion steps ─────────
-    #
-    # WHY refresh_public_growth_metrics IS OUTSIDE THIS TRANSACTION:
-    # ─────────────────────────────────────────────────────────────────
-    # Previously the metrics refresh ran inside this transaction. That created a
-    # critical split-brain risk: if refresh_public_growth_metrics threw for any
-    # reason (aggregation timeout, deadlock, broken view dependency), the ENTIRE
-    # transaction rolled back — leaving the user's Supabase auth accounts deleted
-    # but their profiles row still alive. The user could not log in and could not
-    # re-trigger deletion. Manual DB surgery was the only recovery path.
-    #
-    # Moving it outside means: once DELETE FROM profiles commits, the deletion is
-    # permanent and consistent regardless of what happens to the metrics refresh.
-    # Metrics inconsistency is self-healing — the next successful refresh recomputes
-    # correct counts automatically.
-    #
-    # WHY ON CONFLICT (email) DO NOTHING:
-    # ─────────────────────────────────────
-    # A user who previously deleted their account, re-registered with the same
-    # email, and now deletes again would produce a duplicate row in old_user. If
-    # old_user.email has a UNIQUE constraint (which it should, for data integrity),
-    # a bare INSERT throws a PG unique_violation INSIDE the transaction — causing
-    # the same split-brain scenario described above: auth gone, profile alive.
-    # ON CONFLICT (email) DO NOTHING makes the archive insert idempotent.
-    # REQUIRES: UNIQUE constraint on old_user.email — see migration note at top.
-    #
-    # WHY user_id IS ARCHIVED:
-    # ─────────────────────────
-    # All audit logs (account_delete_initiated, account_deleted, etc.) carry
-    # user_id as their primary correlation key. Without user_id in old_user, a
-    # DSAR (Data Subject Access Request) received after deletion cannot be
-    # connected back to those log entries. user_id in old_user closes that gap.
-    # REQUIRES: old_user.user_id column — see migration note at top.
-    async with DatabaseConnection() as conn:
+        paths = []
+        paths.extend(r["audio_object_path"] for r in audio_paths_res)
+        paths.extend(r["pdf_file_path"] for r in pdf_paths_res)
+        paths.extend(r["attachment_url"] for r in support_paths_res)
+        paths.extend(r["resume_file_path"] for r in resume_paths_res)
+
         async with conn.transaction():
+            request_id = await conn.fetchval(
+                "INSERT INTO account_deletion_requests (user_id, email, auth_user_ids, storage_paths, status) VALUES ($1, $2, $3, $4::jsonb, 'REQUESTED') RETURNING id",
+                user.id, profile["email"], auth_user_ids, json.dumps(paths)
+            )
+
             await conn.execute(
                 """DELETE FROM launch_offer_grants
                    WHERE user_id = $1
@@ -285,12 +263,10 @@ async def delete_account(user: UserProfile = Depends(get_current_user)):
                 "DELETE FROM profiles WHERE id = $1",
                 user.id,
             )
+            await conn.execute("UPDATE account_deletion_requests SET status = 'DB_DELETED' WHERE id = $1", request_id)
 
-    # ── Metrics refresh: best-effort, outside transaction ────────────────────
-    # Runs after the deletion has already committed. A failure here does NOT
-    # undo the deletion — the account is gone, which is correct and irreversible.
-    # The error is logged for monitoring; the next successful refresh will
-    # recompute correct growth counts automatically.
+    background_tasks.add_task(_run_deletion_saga, request_id, auth_user_ids, paths)
+
     try:
         async with DatabaseConnection() as conn:
             await refresh_public_growth_metrics(conn)

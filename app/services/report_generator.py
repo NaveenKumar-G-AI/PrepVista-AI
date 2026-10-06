@@ -51,7 +51,7 @@ logger = structlog.get_logger("prepvista.report_builder")
 # ---------------------------------------------------------------------------
 
 def _build_professional_fpdf_report(
-    score: float,
+    score: float | None,
     rubric_scores: dict,
     strengths: list[str],
     weaknesses: list[str],
@@ -96,8 +96,15 @@ def _build_professional_fpdf_report(
     pdf.set_line_width(0.2)
     pdf.add_page()
 
-    accent_rgb, score_bg_rgb = _score_palette(score)
-    summary_text = _build_overall_summary(plan, score, strengths, weaknesses, evaluations)
+    accent_rgb, score_bg_rgb = _score_palette(score or 0) if score is not None else ((100,116,139),(241,245,249))
+    integrity = (session_summary or {}).get("assessment") or {}
+    eligible = integrity.get("feedback_eligible", score is not None and bool(evaluations))
+    measurement_label = integrity.get("measurement_label", "Measured" if eligible else "Not measured")
+    summary_text = (_build_overall_summary(plan, score, strengths, weaknesses, evaluations)
+                    if eligible else measurement_label + ". Missing measurements are not candidate weaknesses.")
+    coverage = integrity.get("measurement_coverage") or {}
+    if coverage.get("asked"):
+        summary_text += f" Measurement coverage: {coverage['measured']}/{coverage['asked']} assessed; {coverage['intentional']} intentional no-answer/skip."
     completed_label = _format_timestamp(finished_at or date)
     duration_label = _format_duration(duration_seconds)
     summary = session_summary if isinstance(session_summary, dict) else {}
@@ -182,9 +189,9 @@ def _build_professional_fpdf_report(
     pdf.set_x(_score_box_x)
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_text_color(*accent_rgb)
-    pdf.cell(_SCORE_BOX_W, 12, f"{int(round(score))}/100", align="C", ln=1)
+    pdf.cell(_SCORE_BOX_W, 12, f"{int(round(score))}/100" if score is not None else "UNMEASURED", align="C", ln=1)
 
-    interp_short = "EXCELLENT" if score >= 80 else "SOLID" if score >= 60 else "DEVELOPING"
+    interp_short = measurement_label.upper() if not eligible else "EXCELLENT" if score >= 80 else "SOLID" if score >= 60 else "DEVELOPING"
     pdf.set_x(_score_box_x)
     pdf.set_font("Helvetica", "B", 7)
     pdf.set_text_color(*accent_rgb)
@@ -265,7 +272,7 @@ def _build_professional_fpdf_report(
     )
 
     interpretation = (
-        "Excellent readiness" if score >= 80 else
+        measurement_label if not eligible else "Excellent readiness" if score >= 80 else
         "Solid progress with targeted coaching needed" if score >= 60 else
         "Development-focused session with clear next steps"
     )
@@ -276,7 +283,7 @@ def _build_professional_fpdf_report(
         pdf.l_margin, result_y,
         pdf.w - pdf.l_margin - pdf.r_margin,
         "Result Snapshot", interpretation,
-        f"Overall score: {int(round(score))}/100",
+        f"Overall score: {int(round(score))}/100" if score is not None else "Unmeasured",
         fill_rgb=(248, 250, 252),
     )
     pdf.set_y(result_y + score_card_h + 3)
@@ -338,9 +345,17 @@ def _build_professional_fpdf_report(
 
     if evaluations:
         for index, evaluation in enumerate(evaluations, start=1):
-            _render_question_block(pdf, index, evaluation)
+            _render_question_block(pdf, evaluation.get("turn_number", index), evaluation)
     else:
         _render_empty_state(pdf, "No question evaluations were available for this report.")
+
+    for record in summary.get("terminal_answer_records", []):
+        if record.get("outcome") == "EVALUATED" and record.get("evaluation_state", "COMPLETE") == "COMPLETE":
+            continue
+        outcome = str(record.get("evaluation_state") if record.get("outcome") == "EVALUATED" else record.get("outcome") or "ABORTED")
+        note = "Evaluation pending; not scored." if outcome == "PENDING" else "Evaluation unavailable; not scored." if outcome == "UNAVAILABLE" else "Not measured; no candidate performance judgment." if outcome in {"TRANSCRIPTION_FAILED", "UNINTELLIGIBLE", "ABORTED"} else "Candidate no-answer/skip; existing zero policy applies."
+        _section_heading(pdf, f"Question {record['turn']}: {outcome}", _safe_pdf_text(record.get("question_text", "")))
+        _render_empty_state(pdf, note)
 
     # Flush and return bytes
     result = pdf.output()
@@ -362,7 +377,13 @@ async def generate_pdf_report(
     session_summary: dict | None = None,
 ) -> bytes:
     """Generate a PDF report from session data and evaluations."""
-    score = float(session.get("final_score", 0) or 0)
+    from app.services.score_semantics import assessment
+    integrity = assessment(session, evaluations, session.get("asked_questions"))
+    session = {**session, "final_score": integrity["final_score"], "rubric_scores": integrity["category_scores"]}
+    session_summary = {**(session_summary or {}), "assessment": integrity, "terminal_answer_records": integrity["terminal_answer_records"]}
+    if not integrity["feedback_eligible"]:
+        session.update(strengths=[], weaknesses=[], pro_summary=None, career_summary=None)
+    score = integrity["final_score"]
     rubric_scores = _coerce_json_object(session.get("rubric_scores"))
     strengths = _coerce_list(session.get("strengths", []) or [])
     weaknesses = _coerce_list(session.get("weaknesses", []) or [])
@@ -371,6 +392,8 @@ async def generate_pdf_report(
     finished_at = session.get("finished_at")
     date_label = _format_timestamp(finished_at or created)
 
+    from app.services.score_semantics import valid_evaluations
+    evaluations = valid_evaluations(evaluations)
     safe_evaluations = [
         {
             "turn_number": evaluation.get("turn_number", index + 1),
@@ -379,7 +402,7 @@ async def generate_pdf_report(
             "raw_answer": evaluation.get("raw_answer", ""),
             "normalized_answer": evaluation.get("normalized_answer", ""),
             "classification": evaluation.get("classification", "vague"),
-            "score": evaluation.get("score", 0),
+            "score": evaluation.get("score"),
             "scoring_rationale": evaluation.get("scoring_rationale", ""),
             "missing_elements": evaluation.get("missing_elements", []),
             "ideal_answer": evaluation.get("ideal_answer", ""),
@@ -400,6 +423,7 @@ async def generate_pdf_report(
             "corrected_intent": evaluation.get("corrected_intent", ""),
             "answer_duration_seconds": evaluation.get("answer_duration_seconds"),
             "plan": plan,
+            "assistance_provenance": evaluation.get("assistance_provenance", "unknown"),
         }
         for index, evaluation in enumerate(evaluations)
     ]
@@ -440,4 +464,5 @@ async def generate_pdf_report(
             plan=plan,
             email=user_email,
             evaluations=safe_evaluations,
+            assessment_data=integrity,
         )

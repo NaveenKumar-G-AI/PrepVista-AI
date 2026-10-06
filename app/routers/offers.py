@@ -230,7 +230,7 @@ async def list_placement_seasons(
 @router.post("/seasons", status_code=201)
 async def create_placement_season(
     body: CreatePlacementSeasonRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     try:
         async with DatabaseConnection() as conn:
@@ -256,7 +256,7 @@ async def create_placement_season(
 @router.post("/seasons/{season_id:uuid}/close")
 async def close_placement_season(
     season_id: UUID,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     async with DatabaseConnection() as conn:
         async with conn.transaction():
@@ -307,8 +307,9 @@ async def list_offers(
     async with DatabaseConnection() as conn:
         total = await conn.fetchval(
             f"""SELECT COUNT(*) FROM offers o
-                JOIN profiles p ON p.id = o.student_id
-                JOIN recruiter_companies rc ON rc.id = o.company_id
+                JOIN organization_students os ON os.user_id = o.student_id AND os.organization_id = o.institution_id
+                JOIN profiles p ON p.id = os.user_id
+                JOIN recruiter_companies rc ON rc.id = o.company_id AND rc.organization_id = o.institution_id
                 WHERE {where}""",
             *params,
         )
@@ -317,8 +318,9 @@ async def list_offers(
             f"""SELECT o.*, p.full_name AS student_name, p.email AS student_email,
                        rc.name AS company_name, j.status AS joining_status
                 FROM offers o
-                JOIN profiles p ON p.id = o.student_id
-                JOIN recruiter_companies rc ON rc.id = o.company_id
+                JOIN organization_students os ON os.user_id = o.student_id AND os.organization_id = o.institution_id
+                JOIN profiles p ON p.id = os.user_id
+                JOIN recruiter_companies rc ON rc.id = o.company_id AND rc.organization_id = o.institution_id
                 LEFT JOIN joining_records j ON j.offer_id = o.id
                 WHERE {where}
                 ORDER BY o.updated_at DESC
@@ -331,12 +333,13 @@ async def list_offers(
 @router.post("", status_code=201)
 async def create_offer(
     body: CreateOfferRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     offer_id = uuid4()
     try:
         async with DatabaseConnection() as conn:
             async with conn.transaction():
+                await conn.fetchval("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", admin.organization_id)
                 student_exists = await conn.fetchval(
                     """SELECT 1 FROM organization_students
                        WHERE organization_id = $1 AND user_id = $2 AND status = 'active'""",
@@ -409,9 +412,10 @@ async def get_offer(
             """SELECT o.*, p.full_name AS student_name, p.email AS student_email,
                       rc.name AS company_name, pd.title AS drive_title
                FROM offers o
-               JOIN profiles p ON p.id = o.student_id
-               JOIN recruiter_companies rc ON rc.id = o.company_id
-               JOIN placement_drives pd ON pd.id = o.drive_id
+               JOIN organization_students os ON os.user_id = o.student_id AND os.organization_id = o.institution_id
+                JOIN profiles p ON p.id = os.user_id
+               JOIN recruiter_companies rc ON rc.id = o.company_id AND rc.organization_id = o.institution_id
+               JOIN placement_drives pd ON pd.id = o.drive_id AND pd.organization_id = o.institution_id
                WHERE o.id = $1 AND o.institution_id = $2""",
             offer_id, admin.organization_id,
         )
@@ -441,7 +445,7 @@ async def get_offer(
 async def transition_offer(
     offer_id: UUID,
     body: TransitionOfferRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     async with DatabaseConnection() as conn:
         async with conn.transaction():
@@ -514,7 +518,7 @@ async def transition_offer(
 async def update_joining(
     offer_id: UUID,
     body: UpdateJoiningRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     async with DatabaseConnection() as conn:
         async with conn.transaction():
@@ -571,7 +575,7 @@ async def upload_offer_evidence(
         "OFFER_LETTER", "APPOINTMENT_DOCUMENT", "EMPLOYMENT_CONFIRMATION", "JOINING_LETTER", "OTHER"
     ] = Form(...),
     file: UploadFile = File(...),
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Upload a PDF to private storage and register immutable offer metadata."""
     filename = (file.filename or "").strip()
@@ -624,7 +628,7 @@ async def upload_offer_evidence(
 async def verify_offer_evidence(
     offer_id: UUID,
     document_id: UUID,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     async with DatabaseConnection() as conn:
         async with conn.transaction():
@@ -758,7 +762,7 @@ async def get_offers_insights(
                FROM offers o
                LEFT JOIN recruiter_companies rc
                  ON rc.id = o.company_id AND rc.organization_id = o.institution_id
-               LEFT JOIN placement_drives pd ON pd.id = o.drive_id
+               LEFT JOIN placement_drives pd ON pd.id = o.drive_id AND pd.organization_id = o.institution_id
                LEFT JOIN joining_records j ON j.offer_id = o.id
                WHERE o.institution_id = $1
                GROUP BY o.company_id, COALESCE(rc.name, pd.company_name, o.company_id::text)

@@ -63,11 +63,7 @@ function toSafeError(err: unknown, fallback: string): string {
 
 // SEC-4 — Auth error detection
 function isAuthError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  return msg.includes('unauthorized') || msg.includes('forbidden') ||
-    msg.includes('unauthenticated') || msg.includes('401') ||
-    msg.includes('403') || msg.includes('session expired') || msg.includes('invalid token');
+  return typeof err === 'object' && err !== null && 'status' in err && err.status === 401;
 }
 
 // SEC-5 — Action cooldown
@@ -436,7 +432,7 @@ export default function StudentDetailPage() {
               </button>
             ) : (
               <div className="flex items-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5">
-                <span className="text-sm text-rose-300 font-medium">Remove this student permanently?</span>
+                <span className="text-sm text-rose-300 font-medium">Remove this college membership? Interview history is preserved.</span>
                 <button type="button" onClick={handleRemove} disabled={removeLoading}
                   className="rounded-xl bg-rose-600 px-3 py-1 text-xs font-bold text-white hover:bg-rose-500 transition-colors disabled:opacity-50">
                   {removeLoading ? 'Removing…' : 'Yes, Remove'}

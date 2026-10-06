@@ -1,4 +1,6 @@
 'use client';
+import { ScoreSummary } from '@/components/score-summary';
+import type { ScoreMeasurement } from '@/lib/score-semantics';
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -16,6 +18,8 @@ interface HistoryResponse {
     id: string;
     plan: string;
     score: number | null;
+    evaluation_state?: ScoreMeasurement["evaluation_state"];
+    measurement_coverage?: ScoreMeasurement["measurement_coverage"];
     state: string;
     total_turns: number;
     duration: number | null;
@@ -270,7 +274,7 @@ export default function HistoryPage() {
             </div>
 
             {history.sessions.map(session => {
-              const scoreColor = session.score != null && session.score >= 70
+              const scoreColor = session.score == null ? 'text-secondary' : session.score >= 70
                 ? 'text-emerald-600'
                 : session.score != null && session.score >= 50
                   ? 'text-amber-600'
@@ -308,7 +312,7 @@ export default function HistoryPage() {
                   <div className="flex items-center justify-between gap-3 sm:justify-end">
                     <div className="text-right">
                       {session.state === 'FINISHED' ? (
-                        <div className={`text-2xl font-bold ${scoreColor}`}>{Math.round(session.score || 0)}%</div>
+                        <div className={`text-2xl font-bold ${scoreColor}`}><ScoreSummary value={session.score} measurement={session} suffix="%" /></div>
                       ) : (
                         <div className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                           {session.state}

@@ -24,6 +24,7 @@ from app.config import (
     normalize_difficulty_mode,
 )
 from app.database.connection import DatabaseConnection
+from app.services.interview_terminal import connection_scope
 from app.dependencies import UserProfile, get_current_user
 from app.middleware.rate_limiter import rate_limit_session, rate_limit_user
 from app.services.evaluator import evaluate_single_question, normalize_rubric_category
@@ -334,7 +335,7 @@ async def _cache_client_response(
     if not client_request_id:
         return
     try:
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             await conn.execute(
                 """UPDATE interview_sessions
                    SET last_client_request_id = $2,
@@ -365,7 +366,7 @@ async def _get_cached_client_response(
     if not client_request_id:
         return None
     try:
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             row = await conn.fetchrow(
                 """SELECT last_client_response
                    FROM interview_sessions
@@ -394,7 +395,7 @@ async def _get_cached_client_response(
 async def _session_is_active(session_id: str, access_token: str) -> bool:
     """Single-field DB check: True only when session.state == 'ACTIVE'."""
     try:
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             state = await conn.fetchval(
                 "SELECT state FROM interview_sessions WHERE id = $1 AND access_token = $2",
                 session_id,

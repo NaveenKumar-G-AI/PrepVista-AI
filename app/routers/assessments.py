@@ -18,7 +18,7 @@ class CreateAssessmentRequest(BaseModel):
 @router.post("/", status_code=201)
 async def create_assessment(
     req: CreateAssessmentRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     new_id = uuid4()
     async with DatabaseConnection() as conn:
@@ -62,7 +62,7 @@ class CreateVersionRequest(BaseModel):
 async def create_assessment_version(
     assessment_id: UUID,
     req: CreateVersionRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     new_id = uuid4()
     async with DatabaseConnection() as conn:
@@ -99,7 +99,7 @@ async def create_assessment_version(
 @router.post("/versions/{version_id:uuid}/publish")
 async def publish_version(
     version_id: UUID,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     async with DatabaseConnection() as conn:
         async with conn.transaction():

@@ -13,6 +13,10 @@ contact a real service or fail nondeterministically.
 """
 
 import os
+import socket
+import sys
+
+import pytest
 
 _REQUIRED_TEST_ENV = {
     # Not production: relaxes the config's HTTPS/CORS production guards so the
@@ -30,3 +34,25 @@ for _key, _value in _REQUIRED_TEST_ENV.items():
     # Unit tests must never inherit production credentials or machine-wide
     # values (Windows tooling may define DEBUG to a non-boolean like "release").
     os.environ[_key] = _value
+
+
+@pytest.fixture(autouse=True)
+def block_external_connections(monkeypatch):
+    """Backend unit tests must never contact production or other live services."""
+    def blocked(*args, **kwargs):
+        raise AssertionError("Live network connections are disabled in backend unit tests.")
+
+    original_connect = socket.socket.connect
+    socketpair_code = getattr(socket.socketpair, "__code__", None)
+
+    def guarded_connect(sock, address):
+        # Windows implements asyncio's internal wake-up socketpair through a
+        # loopback connect. Allow that exact stdlib caller, no DB/HTTP callers.
+        if socketpair_code is not None and sys._getframe(1).f_code is socketpair_code:
+            return original_connect(sock, address)
+        return blocked()
+
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", blocked)
+    monkeypatch.setattr(socket, "create_connection", blocked)
+    monkeypatch.setattr(socket, "getaddrinfo", blocked)

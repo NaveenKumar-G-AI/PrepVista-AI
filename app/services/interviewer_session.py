@@ -25,6 +25,7 @@ from app.config import (
     normalize_difficulty_mode,
 )
 from app.database.connection import DatabaseConnection
+from app.services.interview_terminal import connection_scope, intent, register_question, terminalize, terminal_records, UNMEASURED
 from app.services.technical_taxonomy import get_technical_categories
 from app.services.llm import call_llm_json
 from app.services.prompts import (
@@ -204,7 +205,7 @@ async def create_session(
     access_token = secrets.token_urlsafe(32)
     sanitized_resume = sanitize_resume_text(resume_text)
 
-    async with DatabaseConnection() as conn:
+    async with connection_scope(DatabaseConnection) as conn:
         # Fix 8 — recompute fresh at session creation and repopulate the Redis
         # cache so this interview's turns reuse it (and it reflects every finished
         # session up to now).
@@ -307,6 +308,8 @@ async def create_session(
             0,
             _safe_json_dumps(
                 {
+                    "terminal_contract_version": 1,
+                    "question_records": {},
                     "question_state": TURN_STATE_QUESTION_CLOSED,
                     "clarification_count": 0,
                     "timeout_count": 0,
@@ -425,7 +428,7 @@ async def process_answer(
         )
         user_text = user_text[:_MAX_USER_TEXT_CHARS]
 
-    async with DatabaseConnection() as conn:
+    async with connection_scope(DatabaseConnection) as conn:
         session = await conn.fetchrow(
             """SELECT id, user_id, plan, difficulty_mode, resume_text, resume_summary, question_plan,
                       state, total_turns, silence_count, consecutive_followups, skip_topics,
@@ -564,6 +567,20 @@ async def process_answer(
         should_finish_after_close = False
         closed_outcome: str | None = None
 
+        answer_intent = intent.get()
+        terminal_outcome = (answer_intent or {}).get("outcome")
+        if runtime_state.get("terminal_contract_version") == 1 and question_for_eval:
+            instance = register_question(runtime_state, session_id, turn_for_eval, question_for_eval,
+                                         runtime_state.get("active_question_id"))
+            runtime_state["active_question_id"] = instance
+        if answer_intent and terminal_outcome != "EVALUATED" and not is_greeting:
+            # Reuse the existing closed-timeout progression, without retrying a
+            # terminal system failure or feeding failure tokens to the evaluator.
+            is_timeout = True
+            is_repeat_request = False
+            is_exit_request = False
+            is_time_up = False
+
         if is_repeat_request and question_for_eval:
             repeat_category = str((current_plan_item or {}).get("category") or "communication")
             repeat_text = _build_clarification_question(plan, question_for_eval, repeat_category, raw_user_text)
@@ -590,6 +607,9 @@ async def process_answer(
                 "turn_for_eval": None,
                 "question_instance_id": runtime_state.get("active_question_id"),
             }
+
+        if (is_exit_request or is_time_up) and runtime_state.get("terminal_contract_version") == 1 and question_for_eval:
+            terminalize(runtime_state, runtime_state["active_question_id"], "ABORTED")
 
         if is_exit_request:
             if raw_user_text:
@@ -650,6 +670,8 @@ async def process_answer(
 
         normalized_user_text = ""
         retry_limit = _question_retry_limit(plan, difficulty_mode)
+        if answer_intent and terminal_outcome != "EVALUATED":
+            question_retry_count = retry_limit
 
         if raw_user_text and not is_greeting and not is_timeout:
             normalized_user_text = normalize_transcript(raw_user_text)
@@ -750,9 +772,17 @@ async def process_answer(
             turn_closed_for_eval = turn_for_eval
             question_instance_id_closed_for_eval = runtime_state.get("active_question_id")
             closed_outcome = TURN_OUTCOME_TIMEOUT
+            counter_outcome = TURN_OUTCOME_TIMEOUT
+            if answer_intent and terminal_outcome in UNMEASURED:
+                counter_outcome = "unmeasured"
+                closed_outcome = None
+            elif terminal_outcome == "SKIPPED":
+                counter_outcome = "skipped"
+                closed_outcome = "skipped"
+                runtime_state["skipped_count"] = int(runtime_state.get("skipped_count") or 0) + 1
             runtime_state = _record_turn_outcome(
                 runtime_state,
-                TURN_OUTCOME_TIMEOUT,
+                counter_outcome,
                 question_state=TURN_STATE_QUESTION_CLOSED,
             )
             previous_topic = _normalize_topic_label(question_for_eval or "")
@@ -774,6 +804,20 @@ async def process_answer(
                 "turn_for_eval": None,
                 "question_instance_id": runtime_state.get("active_question_id"),
             }
+
+        if question_closed_for_eval and runtime_state.get("terminal_contract_version") == 1:
+            outcome = terminal_outcome or ("NO_ANSWER" if is_timeout else "EVALUATED")
+            terminalize(runtime_state, runtime_state["active_question_id"], outcome,
+                        (answer_intent or {}).get("text", normalized_user_text),
+                        (answer_intent or {}).get("evidence"))
+            if outcome != "EVALUATED":
+                # Preserve the explicit empty/non-scored response in the terminal
+                # ledger; it is not a question_evaluations row.
+                question_closed_for_eval = None
+                turn_closed_for_eval = None
+                question_instance_id_closed_for_eval = None
+            if (answer_intent or {}).get("end_after_answer") or outcome == "ABORTED":
+                should_finish_after_close = True
 
         if should_finish_after_close:
             await conn.execute(
@@ -1194,6 +1238,8 @@ async def process_answer(
         runtime_state["question_state"] = TURN_STATE_ACTIVE_QUESTION_OPEN
         new_question_instance_id = str(uuid.uuid4())
         runtime_state["active_question_id"] = new_question_instance_id
+        if runtime_state.get("terminal_contract_version") == 1:
+            register_question(runtime_state, session_id, new_turn, ai_response, new_question_instance_id)
 
         await conn.execute(
             """UPDATE interview_sessions
@@ -1239,12 +1285,11 @@ async def _ensure_pending_evaluations(
     resume_summary,
     question_plan,
 ) -> None:
-    """Backfill any missing question evaluations before final scoring.
+    """Validate current synchronous evaluation writes before scoring.
 
-    Reads conversation messages and existing evaluations inside the supplied
-    connection, then closes it before calling the LLM so the connection is
-    not held open during potentially slow AI calls.  Each INSERT uses
-    ON CONFLICT DO NOTHING to safely handle concurrent finish calls.
+    Current ledger sessions never backfill an unmeasured turn as an empty
+    scored answer. A missing measured row fails closed. The legacy fallback is
+    retained only for pre-contract sessions, without historical row rewrites.
     """
     from app.services.evaluator import evaluate_single_question, normalize_rubric_category
 
@@ -1274,10 +1319,14 @@ async def _ensure_pending_evaluations(
         elif row["role"] == "user" and turn_number not in answer_by_turn:
             answer_by_turn[turn_number] = content
 
+    ledger_row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+    ledger = coerce_runtime_state(ledger_row["runtime_state"] if ledger_row else {})
+    measured_turns = {record["turn"] for record in terminal_records(ledger) if record.get("outcome") == "EVALUATED"}
+
     # Collect turns that still need evaluation (outside DB connection)
     pending: list[tuple[int, str, str, str]] = []
     for turn_number, question_text in sorted(question_by_turn.items()):
-        if turn_number in evaluated_turns:
+        if turn_number in evaluated_turns or (ledger.get("terminal_contract_version") == 1 and turn_number not in measured_turns):
             continue
 
         rubric_category = "technical_depth"
@@ -1312,7 +1361,7 @@ async def _ensure_pending_evaluations(
             )
             if not isinstance(eval_result, dict):
                 return
-            async with DatabaseConnection() as write_conn:
+            async with connection_scope(DatabaseConnection) as write_conn:
                 await write_conn.execute(
                     """INSERT INTO question_evaluations
                        (session_id, turn_number, rubric_category, question_text,
@@ -1368,18 +1417,69 @@ async def _ensure_pending_evaluations(
 
     # Fire all evaluations simultaneously — gather waits for the slowest one.
     # return_exceptions=True ensures one LLM failure does not cancel the others.
+    if ledger.get("terminal_contract_version") == 1:
+        # New answer writes are synchronous; missing evaluated rows are a
+        # persistence failure, never an invitation to score an empty answer.
+        if pending:
+            raise RuntimeError("Committed answer evaluation is missing")
+        return
     await asyncio.gather(
         *[_eval_and_write(t, q, r, a) for t, q, r, a in pending],
         return_exceptions=True,
     )
 
 
-async def finish_session(session_id: str, access_token: str, duration_actual: int | None = None) -> dict:
-    """Finalize the interview session and compute the final score.
+async def adopt_active_terminal_contract(conn, session_id: str, runtime_state: dict, *, ending: bool = False) -> dict:
+    """Attach terminal metadata to the ACTIVE session being processed only.
 
-    Structured so the DB connection is closed before analytics/LLM calls
-    (build_interview_neural_feedback) to avoid holding the connection open
-    during potentially slow external calls.
+    Stored nonempty answers are evaluated before becoming EVALUATED. Missing
+    capture evidence is never retrospectively asserted to be candidate silence.
+    Finalization aborts unresolved assessment; finished histories are untouched.
+    """
+    from app.routers.interviews_answer import _evaluate_and_store
+    row = await conn.fetchrow("SELECT state, total_turns FROM interview_sessions WHERE id = $1", session_id)
+    if not row or row["state"] != "ACTIVE":
+        return runtime_state
+    messages = await conn.fetch("SELECT role, content, turn_number FROM conversation_messages WHERE session_id = $1 ORDER BY turn_number ASC, id ASC", session_id)
+    evaluations = await conn.fetch("SELECT turn_number, raw_answer, normalized_answer, question_instance_id FROM question_evaluations WHERE session_id = $1", session_id)
+    measured = {int(value["turn_number"]): dict(value) for value in evaluations}
+    answers_by_turn = {int(value["turn_number"]): str(value["content"] or "") for value in messages if value["role"] == "user"}
+    questions = {int(value["turn_number"]): str(value["content"] or "") for value in messages if value["role"] == "assistant" and int(value["turn_number"] or 0) > 0}
+    current_turn = int(row["total_turns"] or 0)
+    runtime_state["terminal_contract_version"] = 1
+    for turn, question in sorted(questions.items()):
+        evaluation = measured.get(turn)
+        old_instance = (evaluation or {}).get("question_instance_id") or (runtime_state.get("active_question_id") if turn == current_turn else None)
+        instance = register_question(runtime_state, session_id, turn, question, old_instance)
+        if turn == current_turn:
+            runtime_state["active_question_id"] = instance
+        if runtime_state["question_records"][instance].get("outcome"):
+            continue
+        raw = str((evaluation or {}).get("raw_answer") or (evaluation or {}).get("normalized_answer") or answers_by_turn.get(turn) or "")
+        has_answer = bool(raw.strip() and not raw.startswith('['))
+        if has_answer and (evaluation or ending or turn < current_turn):
+            if not evaluation:
+                marker = intent.set({"outcome": "EVALUATED"})
+                try:
+                    await _evaluate_and_store(session_id, turn, question, raw, question_instance_id=instance, assistance_provenance="unknown")
+                finally:
+                    intent.reset(marker)
+            terminalize(runtime_state, instance, "EVALUATED", raw, {"source": "stored_legacy_answer"})
+        elif ending or turn < current_turn:
+            # A persisted explicit timeout is verified silence. Otherwise the
+            # finalization aborts an unresolved assessment, without guessing why
+            # no valid transcript/evaluation was persisted.
+            outcome = "NO_ANSWER" if raw == NO_ANSWER_TOKEN else "ABORTED"
+            terminalize(runtime_state, instance, outcome, raw, {"capture_evidence_unavailable": True})
+    await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, _safe_json_dumps(runtime_state))
+    return runtime_state
+
+
+async def _finish_session(session_id: str, access_token: str, duration_actual: int | None = None) -> dict:
+    """Close asked questions and compute the session result.
+
+    Current-contract operations borrow a transaction held through the response
+    cache write. Finalization and retry visibility therefore commit together.
     """
     # ✅ SEC: Validate session_id is a UUID — same reason as process_answer.
     try:
@@ -1392,11 +1492,10 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
     access_token = (access_token or "").strip()
     from app.services.analytics import build_interview_neural_feedback, sync_session_skill_scores
     from app.services.evaluator import compute_final_score, get_score_interpretation
-    from app.services.history_retention import enforce_history_retention
     from app.services.plan_access import sync_profile_plan_state
 
     # --- Phase 1: read, backfill evals, compute scores, write result --------
-    async with DatabaseConnection() as conn:
+    async with connection_scope(DatabaseConnection) as conn:
         session = await conn.fetchrow(
             """SELECT id, user_id, plan, state, resume_summary, question_plan,
                       total_turns, duration_actual_seconds, runtime_state
@@ -1410,12 +1509,30 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
             logger.warning("finish_session_invalid", session_id=session_id)
             return {"error": "Invalid session."}  # original shape preserved — callers check this key
         if session["state"] != "ACTIVE":
+            cached_finish = coerce_runtime_state(session["runtime_state"] or {}).get("finish_response")
+            if cached_finish:
+                return cached_finish
             logger.warning(
                 "finish_session_already_finished",
                 session_id=session_id,
                 state=session["state"],
             )
             return {"error": "Session already finished."}  # original shape preserved
+
+        runtime_state = coerce_runtime_state(session["runtime_state"] or {})
+        reliable = runtime_state.get("terminal_contract_version") == 1
+        if reliable:
+            asked_rows = await conn.fetch("SELECT turn_number FROM conversation_messages WHERE session_id = $1 AND role = 'assistant' AND turn_number > 0", session_id)
+            asked_turns = {int(row["turn_number"]) for row in asked_rows}
+            ledger_turns = {record["turn"] for record in terminal_records(runtime_state)}
+            if asked_turns != ledger_turns or len(asked_rows) != len(ledger_turns):
+                raise RuntimeError("Question terminal contract is inconsistent")
+            for record in terminal_records(runtime_state):
+                if not record.get("outcome"):
+                    terminalize(runtime_state, record["question_instance_id"], "ABORTED")
+            # Save before the backfill reads it. No historical rows are touched.
+            await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1",
+                               session_id, _safe_json_dumps(runtime_state))
 
         await _ensure_pending_evaluations(
             conn,
@@ -1433,6 +1550,9 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
             session_id,
         )
         evaluations = [dict(row) for row in eval_rows]
+        if reliable:
+            measured_turns = {r["turn"] for r in terminal_records(runtime_state) if r.get("outcome") == "EVALUATED"}
+            evaluations = [evaluation for evaluation in evaluations if int(evaluation["turn_number"]) in measured_turns]
 
         # Coerce duration safely to avoid TypeError on non-int values
         if isinstance(duration_actual, int):
@@ -1453,18 +1573,42 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
             duration_seconds=effective_duration,
             runtime_state=session["runtime_state"],
         )
+        scoring_evaluations = evaluations
+        if reliable:
+            records = terminal_records(runtime_state)
+            scoring_evaluations = list(evaluations)
+            # Preserve the existing zero policy for intentional no-answer/skip,
+            # without calling the normal evaluator or inventing stored rows.
+            scoring_evaluations += [dict(turn_number=r["turn"], rubric_category="communication", score=0,
+                                         classification="silent", communication_score=0, answer_status=r["outcome"].lower(), terminal_outcome=r["outcome"])
+                                    for r in records if r.get("outcome") in {"NO_ANSWER", "SKIPPED"}]
+            summary["closed_questions"] = len(records)
+            summary["completion_rate"] = round(100 * len(records) / summary["planned_questions"], 1) if summary["planned_questions"] else 0
+            summary["answered_questions"] = sum(r.get("outcome") == "EVALUATED" for r in records)
+            summary["unmeasured_questions"] = sum(r.get("outcome") in UNMEASURED for r in records)
+            summary["terminal_answer_records"] = records
+            summary["question_state"] = TURN_STATE_QUESTION_CLOSED
         result = compute_final_score(
-            evaluations,
+            scoring_evaluations,
             plan=session["plan"],
-            expected_questions=summary["planned_questions"] or len(evaluations) or 0,
+            expected_questions=(len(scoring_evaluations) if reliable else summary["planned_questions"] or len(evaluations) or 0),
         )
-        interpretation = get_score_interpretation(result["final_score"], session["plan"])
+        if reliable and not scoring_evaluations:
+            result["final_score"] = None
+            result["strengths"] = []
+            result["weaknesses"] = []
+        from app.services.score_semantics import assessment, interpretation_for
+        integrity = assessment({**dict(session), "runtime_state": runtime_state,
+                                "final_score": result["final_score"], "rubric_scores": result["category_scores"]}, evaluations)
+        if not integrity["feedback_eligible"]:
+            result["strengths"], result["weaknesses"] = [], []
+        summary["assessment"] = integrity
+        interpretation = interpretation_for(integrity, session["plan"])
         if summary["completion_rate"] < 100 and summary["planned_questions"]:
             interpretation = (
                 f"{interpretation} This result reflects {summary['closed_questions']} of "
                 f"{summary['planned_questions']} planned questions completed."
             )
-        runtime_state = coerce_runtime_state(session["runtime_state"] or {})
         runtime_state["question_state"] = summary["question_state"]
         runtime_state["final_summary"] = summary
 
@@ -1506,18 +1650,12 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
             and get_settings().ADMIN_EMAIL
             and str(profile_row["email"]).lower() == get_settings().ADMIN_EMAIL.lower()
         )
-        plan_state = await sync_profile_plan_state(
+        await sync_profile_plan_state(
             conn,
             session["user_id"],
             (profile_row["plan"] if profile_row else None) or session["plan"],
             premium_override=premium_override,
         )
-        if not premium_override:
-            await enforce_history_retention(
-                conn,
-                session["user_id"],
-                plan_state["highest_owned_plan"],
-            )
 
     # --- Phase 2: analytics / neural feedback (outside DB connection) -------
     neural_feedback = build_interview_neural_feedback(
@@ -1525,10 +1663,11 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
         question_evaluations=evaluations,
         strengths=result["strengths"],
         weaknesses=result["weaknesses"],
-        final_score=float(result["final_score"]),
-    )
+        final_score=float(result["final_score"] or 0),
+    ) if integrity["feedback_eligible"] else {}
 
     return {
+        **{key: integrity[key] for key in ("evaluation_state", "measurement_label", "measurement_coverage", "readiness_eligible")},
         "final_score":        result["final_score"],
         "interpretation":     interpretation,
         "category_scores":    result["category_scores"],
@@ -1545,3 +1684,43 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
         "weakest_category":   result["weakest_category"],
         "report_url":         f"/reports/{session_id}",
     }
+
+
+async def finish_session(session_id: str, access_token: str, duration_actual: int | None = None) -> dict:
+    try:
+        uuid.UUID(str(session_id or ""))
+    except (ValueError, AttributeError):
+        return {"error": "Invalid session ID format."}
+    access_token = (access_token or "").strip()
+    from app.services.interview_terminal import connection
+    if connection.get() is not None:
+        return await _finish_session(session_id, access_token, duration_actual)
+    async with DatabaseConnection() as conn:
+        row = await conn.fetchrow("SELECT runtime_state, state, total_turns FROM interview_sessions WHERE id = $1 AND access_token = $2",
+                                  session_id, access_token)
+        state = coerce_runtime_state(row["runtime_state"] if row else {})
+        if state.get("terminal_contract_version") != 1 and (not row or int(row["total_turns"] or 0) == 0):
+            # Old non-transactional writes could insert a question before their
+            # turn counter was updated. Do not backfill that missing text as zero.
+            asked = await conn.fetchval("SELECT 1 FROM conversation_messages WHERE session_id = $1 AND role = 'assistant' AND turn_number > 0 LIMIT 1", session_id) if row else None
+            if not asked:
+                return await _finish_session(session_id, access_token, duration_actual)
+        async with conn.transaction():
+            row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1 AND access_token = $2 FOR UPDATE",
+                                      session_id, access_token)
+            state = coerce_runtime_state(row["runtime_state"] if row else {})
+            if state.get("finish_response"):
+                return state["finish_response"]
+            marker = connection.set(conn)
+            try:
+                if state.get("terminal_contract_version") != 1:
+                    state = await adopt_active_terminal_contract(conn, session_id, state, ending=True)
+                result = await _finish_session(session_id, access_token, duration_actual)
+                if "error" not in result:
+                    row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+                    state = coerce_runtime_state(row["runtime_state"])
+                    state["finish_response"] = result
+                    await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, _safe_json_dumps(state))
+                return result
+            finally:
+                connection.reset(marker)

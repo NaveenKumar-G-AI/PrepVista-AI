@@ -194,8 +194,8 @@
 let DEPTS=[];
 let YEARS=[];
 const SERIES=['#6366F1','#22D3EE','#34D399','#FBBF24','#FB7185','#A78BFA'];
-const TIER_COLOR={'Ready':'#34D399','Almost':'#38BDF8','Developing':'#FBBF24','At Risk':'#FB7185','Not started':'#565C6E'};
-const TIER_CLASS={'Ready':'Ready','Almost':'Almost','Developing':'Developing','At Risk':'AtRisk','Not started':'NotStarted'};
+const TIER_COLOR={'Ready':'#34D399','Almost':'#38BDF8','Developing':'#FBBF24','At Risk':'#FB7185','Not started':'#565C6E','Not measured':'#94A3B8','Partially measured':'#94A3B8'};
+const TIER_CLASS={'Ready':'Ready','Almost':'Almost','Developing':'Developing','At Risk':'AtRisk','Not started':'NotStarted','Not measured':'NotStarted','Partially measured':'NotStarted'};
 const round=(v,d=0)=>{const f=10**d;return Math.round(v*f)/f;};
 const avg=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
 const esc=v=>String(v==null?'':v).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
@@ -224,7 +224,7 @@ const SAMPLE_PAYLOAD={
   ]
 };
 const state={depts:new Set(DEPTS.map(d=>d.code)),year:'all',tiers:new Set(['Ready','Almost','Developing','At Risk']),search:'',sortKey:'score',sortDir:-1};
-function passTier(s){if(s.started)return state.tiers.has(s.tier);return state.tiers.size===4;}
+function passTier(s){if(s.score==null||s.tier==='Partially measured')return true;if(s.started)return state.tiers.has(s.tier);return state.tiers.size===4;}
 function filtered(){const q=state.search.trim().toLowerCase();
   return STUDENTS.filter(s=>state.depts.has(s.dept)&&(state.year==='all'||String(s.year)===state.year)&&passTier(s)&&(!q||s.name.toLowerCase().includes(q)||s.dept.toLowerCase().includes(q)));}
 function rankList(list){const scored=list.filter(s=>s.started&&s.score!=null);const not=list.filter(s=>!(s.started&&s.score!=null));
@@ -244,10 +244,10 @@ function grad(a,b){return new echarts.graphic.LinearGradient(1,0,0,0,[{offset:0,
 function render(){
   const list=filtered();const r=rankList(list);const scored=r.scored;
   /* KPIs */
-  const top=scored[0];const readyN=scored.filter(s=>s.tier==='Ready').length;const avgScore=scored.length?round(avg(scored.map(s=>s.score)),1):0;
+  const top=scored[0];const readyN=scored.filter(s=>s.tier==='Ready').length;const avgScore=scored.length?round(avg(scored.map(s=>s.score)),1):null;
   document.getElementById('kpis').innerHTML=[
-    {l:'Students shown',v:list.length,s:scored.length+' scored · '+(list.length-scored.length)+' not started'},
-    {l:'Average readiness',v:avgScore+'<small>/100</small>',s:'across scored students'},
+    {l:'Students shown',v:list.length,s:scored.length+' scored · '+(list.length-scored.length)+' not measured'},
+    {l:'Average readiness',v:avgScore==null?'Not measured':avgScore+'<small>/100</small>',s:'across scored students'},
     {l:'Top scorer',v:top?top.score+'<small>/100</small>':'—',s:top?esc(top.name)+' · '+esc(top.dept):'no data'},
     {l:'Placement-ready',v:readyN,s:scored.length?round(readyN/scored.length*100)+'% of scored':'—'}
   ].map(k=>'<div class="kpi"><div class="kl">'+k.l+'</div><div class="kv tnum">'+k.v+'</div><div class="ks">'+k.s+'</div></div>').join('');
@@ -289,7 +289,7 @@ function renderTable(list,scoredN){const body=document.getElementById('lbBody');
   body.innerHTML=list.map(s=>{
     const rank=s._rank;const medal=rank&&rank<=3;const rkHtml=rank==null?'<span class="rk none">—</span>':medal?'<span class="rk medal m'+rank+'">'+rank+'</span>':'<span class="rk">'+rank+'</span>';
     const tc=TIER_COLOR[s.tier];
-    const scoreHtml=s.score==null?'<span style="color:var(--faint)">—</span>':'<div class="scorecell"><span class="v">'+s.score+'</span><div class="bar"><i style="width:'+s.score+'%;background:linear-gradient(90deg,'+tc+'cc,'+tc+')"></i></div></div>';
+    const scoreHtml=s.score==null?'<span style="color:var(--faint)">'+esc(s.measurement_label||'Not measured')+'—</span>':'<div class="scorecell"><span class="v">'+s.score+'</span><div class="bar"><i style="width:'+s.score+'%;background:linear-gradient(90deg,'+tc+'cc,'+tc+')"></i></div></div>';
     const m=s.started?s.slope:null;const momCls=m==null?'flat':m>0.3?'up':m<-0.1?'down':'flat';const momHtml=m==null?'<span class="mom flat">—</span>':'<span class="mom '+momCls+'">'+(m>0?'▲ +':m<0?'▼ ':'')+m.toFixed(2)+'</span>';
     return '<tr class="'+(medal&&rank===1?'top1':'')+'" data-student-id="'+esc(s.id)+'" style="cursor:pointer"><td>'+rkHtml+'</td><td><div class="who"><div class="av">'+esc(initials(s.name))+'</div><div><div class="nm">'+esc(s.name)+'</div><div class="sb">'+esc(s.targetRole||'Target role not set')+'</div></div></div></td><td><span class="deptbadge">'+esc(s.dept)+'</span></td><td><span class="yr">'+(s.year==null?'—':esc(s.year))+'</span></td><td>'+scoreHtml+'</td><td>'+momHtml+'</td><td class="tnum">'+s.sessions+'</td><td><span class="tier '+TIER_CLASS[s.tier]+'"><span class="d"></span>'+esc(s.tier)+'</span></td></tr>';
   }).join('');

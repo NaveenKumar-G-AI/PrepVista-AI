@@ -68,6 +68,9 @@ from app.services.manual_signup_verification import (
 )
 from app.services.plan_access import sync_profile_plan_state
 from app.services.public_growth import refresh_public_growth_metrics
+from app.services.auth_failures import (
+    TEMPORARY_DATABASE_ERRORS, auth_provider_request, check_auth_response,
+)
 from app.services.quota import get_usage_stats
 from app.services.referrals import apply_joined_referral_reward, ensure_referral_identity
 
@@ -252,19 +255,18 @@ async def _get_supabase_identity(request: Request) -> dict[str, str]:
         raise HTTPException(status_code=401, detail="Not authenticated. Please log in.")
 
     client = _get_supabase_client()
-    resp = await client.get(
+    resp = await auth_provider_request(client, "get",
         f"{settings.SUPABASE_URL}/auth/v1/user",
         headers={
             "Authorization": f"Bearer {token}",
             "apikey": settings.SUPABASE_ANON_KEY,
         },
     )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    check_auth_response(resp)
 
     identity = extract_auth_identity(resp.json())
     if not identity["auth_user_id"] or not identity["email"]:
-        raise HTTPException(status_code=401, detail="Invalid token payload.")
+        raise HTTPException(status_code=502, detail="Invalid authentication provider response.")
 
     return identity
 
@@ -325,7 +327,9 @@ async def request_signup_code(req: SignupCodeRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("signup_code_request_error", error=str(e))
+        if isinstance(e, TEMPORARY_DATABASE_ERRORS):
+            raise HTTPException(503, "Authentication database temporarily unavailable.") from e
+        logger.error("signup_code_request_error", error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Verification code could not be sent.")
 
 
@@ -357,7 +361,7 @@ async def signup(req: SignupRequest):
                 ) from exc
 
         client = _get_supabase_client()
-        resp = await client.post(
+        resp = await auth_provider_request(client, "post",
             f"{settings.SUPABASE_URL}/auth/v1/signup",
             json={"email": signup_email, "password": req.password},
             headers={
@@ -365,6 +369,8 @@ async def signup(req: SignupRequest):
                 "Content-Type": "application/json",
             },
         )
+        if resp.status_code >= 500 or resp.status_code in (408, 429):
+            check_auth_response(resp)
         data = resp.json()
 
         if resp.status_code >= 400:
@@ -474,7 +480,9 @@ async def signup(req: SignupRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("signup_error", error=str(e))
+        if isinstance(e, TEMPORARY_DATABASE_ERRORS):
+            raise HTTPException(503, "Authentication database temporarily unavailable.") from e
+        logger.error("signup_error", error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Signup service unavailable.")
 
 
@@ -499,7 +507,7 @@ async def login(req: LoginRequest, request: Request):
             )
 
         client = _get_supabase_client()
-        resp = await client.post(
+        resp = await auth_provider_request(client, "post",
             f"{settings.SUPABASE_URL}/auth/v1/token?grant_type=password",
             json={"email": req.email, "password": req.password},
             headers={
@@ -507,13 +515,13 @@ async def login(req: LoginRequest, request: Request):
                 "Content-Type": "application/json",
             },
         )
+        try:
+            check_auth_response(resp)
+        except HTTPException as exc:
+            if exc.status_code == 401:
+                _record_login_failure(request, str(req.email))
+            raise
         data = resp.json()
-
-        if resp.status_code >= 400:
-            # Record failure before raising — rate limiter needs this count.
-            _record_login_failure(request, str(req.email))
-            detail = data.get("error_description") or data.get("msg") or "Invalid credentials."
-            raise HTTPException(status_code=401, detail=detail)
 
         user = data.get("user", {})
         user_id = user.get("id")
@@ -632,7 +640,9 @@ async def login(req: LoginRequest, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("login_error", error=str(e))
+        if isinstance(e, TEMPORARY_DATABASE_ERRORS):
+            raise HTTPException(503, "Authentication database temporarily unavailable.") from e
+        logger.error("login_error", error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Login service unavailable.")
 
 
@@ -804,7 +814,7 @@ async def refresh_token(request: Request):
 
     try:
         client = _get_supabase_client()
-        resp = await client.post(
+        resp = await auth_provider_request(client, "post",
             f"{settings.SUPABASE_URL}/auth/v1/token?grant_type=refresh_token",
             json={"refresh_token": refresh},
             headers={
@@ -812,13 +822,10 @@ async def refresh_token(request: Request):
                 "Content-Type": "application/json",
             },
         )
+        check_auth_response(resp)
         data = resp.json()
-
-        if resp.status_code >= 400:
-            raise HTTPException(
-                status_code=401,
-                detail="Token refresh failed. Please log in again.",
-            )
+        if not data.get("access_token") or not data.get("refresh_token"):
+            raise HTTPException(502, "Invalid authentication provider response.")
 
         return {
             "access_token": data.get("access_token"),
@@ -828,7 +835,7 @@ async def refresh_token(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("refresh_error", error=str(e))
+        logger.error("refresh_error", error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Auth service unavailable.")
 
 
@@ -870,7 +877,17 @@ async def get_me(
         row = await conn.fetchrow(
             """SELECT full_name, email, plan, subscription_status, onboarding_completed,
                       prep_goal, interviews_used_this_period, theme_preference, created_at,
-                      is_org_admin, org_student, organization_id
+                      EXISTS (SELECT 1 FROM organization_admins oa JOIN organizations o ON o.id = oa.organization_id
+                              WHERE oa.user_id = profiles.id AND oa.status = 'active' AND o.status = 'active') AS is_org_admin,
+                      EXISTS (SELECT 1 FROM organization_students os JOIN organizations o ON o.id = os.organization_id
+                              WHERE os.user_id = profiles.id AND os.status = 'active' AND o.status = 'active') AS org_student,
+                      COALESCE(
+                          (SELECT oa.organization_id FROM organization_admins oa JOIN organizations o ON o.id = oa.organization_id
+                           WHERE oa.user_id = profiles.id AND oa.status = 'active' AND o.status = 'active'
+                           ORDER BY oa.id LIMIT 1),
+                          (SELECT os.organization_id FROM organization_students os JOIN organizations o ON o.id = os.organization_id
+                           WHERE os.user_id = profiles.id AND os.status = 'active' AND o.status = 'active'
+                           ORDER BY os.id LIMIT 1)) AS organization_id
                FROM profiles WHERE id = $1""",
             user.id,
         )

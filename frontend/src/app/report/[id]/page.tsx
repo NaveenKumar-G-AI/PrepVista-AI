@@ -1,4 +1,6 @@
 'use client';
+import { ScoreSummary } from '@/components/score-summary';
+import type { ScoreMeasurement } from '@/lib/score-semantics';
 /**
  * PrepVista - Report Page
  * Displays interview report with scores, rubric breakdown, per-question feedback.
@@ -11,6 +13,7 @@ import { useParams, useRouter } from 'next/navigation';
 
 import { BrandLogo } from '@/components/brand-logo';
 import { useAuth } from '@/lib/auth-context';
+import { provenanceLabel } from '@/lib/assistance-views';
 import { api } from '@/lib/api';
 import { IntelDashboard } from './_intel/dashboard';
 
@@ -104,10 +107,10 @@ interface InterviewSummary {
 }
 
 interface ReportData {
-  session: {
+  session: ScoreMeasurement & {
     id: string;
     plan: string;
-    final_score: number;
+    final_score: number | null;
     total_turns: number;
     created_at: string;
     finished_at?: string | null;
@@ -118,8 +121,9 @@ interface ReportData {
     summary?: InterviewSummary;
     strengths: string[];
     weaknesses: string[];
-    rubric_scores: Record<string, number>;
+    rubric_scores: Record<string, number | null>;
   };
+  terminal_answer_records?: Array<{ question_instance_id: string; turn: number; question_text: string; outcome: string; raw_answer: string; evaluation_state?: string }>;
   evaluations: Evaluation[];
   user_plan: string;
   has_premium_access: boolean;
@@ -249,7 +253,7 @@ export default function ReportPage() {
   const isCareerSession = session.plan === 'career';
   const showProReview = isProSession && has_premium_access;
   const showCareerReview = isCareerSession && has_premium_access;
-  const scoreColor = session.final_score >= 70 ? '#22c55e' : session.final_score >= 50 ? '#eab308' : '#ef4444';
+  const scoreColor = session.final_score === null ? '#64748b' : session.final_score >= 70 ? '#22c55e' : session.final_score >= 50 ? '#eab308' : '#ef4444';
   const summary = session.summary ?? data.summary;
   const expectedQuestions = summary?.planned_questions ?? session.expected_questions ?? data.expected_questions ?? evaluations.length;
   const answeredQuestions = summary?.answered_questions ?? session.answered_questions ?? data.answered_questions ?? evaluations.filter(item => item.classification !== 'silent').length;
@@ -313,6 +317,17 @@ export default function ReportPage() {
       </nav>
 
       <div className="max-w-3xl mx-auto px-6 py-10">
+        {data.terminal_answer_records?.filter(record => record.outcome !== 'EVALUATED' || record.evaluation_state !== 'COMPLETE').map(record => (
+          <div key={record.question_instance_id} className="mb-4 rounded-xl border p-4 text-sm">
+            <p className="font-semibold">Question {record.turn}: {record.question_text}</p>
+            <p>{record.evaluation_state === 'PENDING' ? 'Evaluation pending. This answer has not been scored.'
+              : record.evaluation_state === 'UNAVAILABLE' ? 'Evaluation unavailable. This answer has not been scored.'
+              : record.outcome === 'TRANSCRIPTION_FAILED' ? 'Transcription could not be completed. This question was not scored.'
+              : record.outcome === 'UNINTELLIGIBLE' ? 'No usable transcript was available. This question was not scored.'
+              : record.outcome === 'ABORTED' ? 'The interview ended before this answer was completed. This question was not scored.'
+              : record.outcome === 'SKIPPED' ? 'Question skipped.' : 'No answer provided.'}</p>
+          </div>
+        ))}
         <div className="text-center mb-10 fade-in">
           <p className="text-sm text-secondary mb-2">
             {session.plan.toUpperCase()} Interview - {new Date(session.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -321,12 +336,12 @@ export default function ReportPage() {
             className="inline-flex items-center justify-center w-28 h-28 rounded-full mb-4"
             style={{ background: `${scoreColor}15`, border: `3px solid ${scoreColor}` }}
           >
-            <span className="text-4xl font-bold" style={{ color: scoreColor }}>
-              {Math.round(session.final_score)}
+            <span className={session.final_score === null ? "text-sm font-semibold" : "text-4xl font-bold"} style={{ color: scoreColor }}>
+              <ScoreSummary value={session.final_score} measurement={session} suffix="" />
             </span>
           </div>
           <p className="text-sm text-secondary">
-            out of 100 - {answeredQuestions} answered out of {expectedQuestions} planned questions
+            {session.final_score === null ? 'No score available' : 'out of 100'} - {answeredQuestions} answered out of {expectedQuestions} planned questions
           </p>
           <p className="mt-2 text-sm text-secondary">
             Total time: {durationLabel}{averageAnswerTime ? ` | Avg response: ${averageAnswerTime}s` : ''}
@@ -390,8 +405,8 @@ export default function ReportPage() {
           <section className="card p-6 mb-6 slide-up">
             <h2 className="text-lg font-semibold text-primary mb-4">Category Breakdown</h2>
             {Object.entries(session.rubric_scores).map(([category, score]) => {
-              const pct = Math.min(100, Number(score) * 10);
-              const barColor = pct >= 70 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444';
+              const pct = score === null ? null : Math.min(100, Number(score) * 10);
+              const barColor = pct === null ? '#64748b' : pct >= 70 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444';
 
               return (
                 <div key={category} className="rubric-bar-container">
@@ -399,20 +414,20 @@ export default function ReportPage() {
                     {category.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase())}
                   </span>
                   <div className="rubric-bar-bg">
-                    <div className="rubric-bar-fill" style={{ width: `${pct}%`, background: barColor }} />
+                    <div className="rubric-bar-fill" style={{ width: `${pct ?? 0}%`, background: barColor }} />
                   </div>
-                  <span className="text-sm font-semibold text-secondary w-12 text-right">{score}/10</span>
+                  <span className="text-sm font-semibold text-secondary w-12 text-right">{score === null ? "Not measured" : `${score}/10`}</span>
                 </div>
               );
             })}
           </section>
         ) : null}
 
-        {has_premium_access ? (
+        {has_premium_access && session.final_score !== null && !data.terminal_answer_records?.some(record => ['TRANSCRIPTION_FAILED', 'UNINTELLIGIBLE', 'ABORTED'].includes(record.outcome)) ? (
           <section className="mb-6 slide-up">
             <h2 className="text-lg font-semibold text-primary mb-1">Interview Intelligence</h2>
             <p className="text-sm text-secondary mb-4">Premium analytics derived from this session&apos;s per-question evaluator data.</p>
-            <IntelDashboard report={data} />
+            <IntelDashboard report={{ ...data, session: { ...session, final_score: session.final_score, rubric_scores: Object.fromEntries(Object.entries(session.rubric_scores).filter((entry): entry is [string, number] => entry[1] !== null)) } }} />
           </section>
         ) : null}
 
@@ -429,7 +444,7 @@ export default function ReportPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-secondary">Complete more interviews to see strengths.</p>
+              <p className="text-sm text-secondary">Not enough measured evidence to identify strengths.</p>
             )}
           </div>
 
@@ -445,7 +460,7 @@ export default function ReportPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-secondary">Great job! Keep practicing.</p>
+              <p className="text-sm text-secondary">Not enough measured evidence to identify an improvement area.</p>
             )}
           </div>
         </div>
@@ -494,27 +509,7 @@ export default function ReportPage() {
                     <span className="text-sm font-semibold ml-auto">{evaluation.score}/10</span>
                   </div>
 
-                  {/* Per-question assistance label */}
-                  {data.assistance_summary?.enabled && evaluation.assistance_provenance && evaluation.assistance_provenance !== 'unknown' ? (
-                    <div className="mb-2 flex items-center gap-2">
-                      <div className={`px-2 py-0.5 rounded-full text-[11px] font-medium tracking-wide flex items-center gap-1.5 ${
-                        evaluation.assistance_provenance === 'independent'
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                          : evaluation.assistance_provenance === 'hint_assisted'
-                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
-                          : 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
-                      }`}>
-                        {evaluation.assistance_provenance === 'independent'
-                          ? '✅ Independent Attempt'
-                          : evaluation.assistance_provenance === 'hint_assisted'
-                          ? '💡 Hint Used'
-                          : '📝 Answer Guided'}
-                      </div>
-                      {evaluation.assistance_provenance !== 'independent' ? (
-                        <span className="text-xs text-secondary">Retry without assistance to verify independently</span>
-                      ) : null}
-                    </div>
-                  ) : null}
+                  <div className="mb-2 text-xs text-secondary">{provenanceLabel(evaluation.assistance_provenance)}</div>
 
                   <p className="text-sm text-primary mb-2"><strong>Question:</strong> {evaluation.question_text}</p>
                   <p className="text-sm text-secondary mb-2"><strong>Your answer:</strong> {evaluation.normalized_answer || evaluation.raw_answer || 'No answer'}</p>

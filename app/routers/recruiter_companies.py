@@ -263,7 +263,7 @@ async def list_recruiter_companies(
 @router.post("")
 async def create_recruiter_company(
     body: CreateCompanyRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Create a company. Duplicate name/domain detection raises 409."""
     org_id  = admin.organization_id
@@ -350,7 +350,7 @@ async def get_recruiter_company(
 async def change_company_stage(
     company_id: UUID,
     body: ChangeStageRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Move a company to a new relationship stage."""
     if body.stage not in VALID_STAGES:
@@ -387,7 +387,7 @@ async def change_company_stage(
 async def add_recruiter_contact(
     company_id: UUID,
     body: AddContactRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Add a contact to a company."""
     org_id = admin.organization_id
@@ -422,7 +422,7 @@ async def add_recruiter_contact(
 async def log_recruiter_activity(
     company_id: UUID,
     body: LogActivityRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Log an activity against a company."""
     org_id = admin.organization_id
@@ -451,7 +451,7 @@ async def log_recruiter_activity(
 async def create_recruiter_followup(
     company_id: UUID,
     body: CreateFollowupRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Create a follow-up task."""
     org_id = admin.organization_id
@@ -478,7 +478,7 @@ async def create_recruiter_followup(
 async def add_company_note(
     company_id: UUID,
     body: AddCompanyNoteRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Append a tenant-scoped note to the company dossier."""
     org_id = admin.organization_id
@@ -540,7 +540,7 @@ async def followup_command_centre(admin: OrgAdminProfile = Depends(require_org_a
 @followup_router.patch("/{followup_id}/complete")
 async def complete_followup(
     followup_id: UUID,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Mark a follow-up as completed."""
     async with DatabaseConnection() as conn:

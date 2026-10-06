@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Plus, RefreshCw, Target } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -106,6 +106,9 @@ export default function PlacementDrivesPage() {
   const [ruleText, setRuleText] = useState(STARTER_RULE);
   const [ruleReason, setRuleReason] = useState("");
 
+  const createInFlight = useRef(false);
+  const pendingCreate = useRef<Record<string, unknown> | null>(null);
+
   const loadDrives = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -155,16 +158,18 @@ export default function PlacementDrivesPage() {
 
   async function createDrive(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (createInFlight.current) return;
+    createInFlight.current = true;
     setBusy(true);
     setError(null);
     setSuccess(null);
     try {
-      const created = await api.createPlacementDrive<Drive>({
-        title,
-        company_name: company,
-        role,
+      pendingCreate.current ??= {
+        client_request_id: crypto.randomUUID(), title, company_name: company, role,
         description: description || undefined,
-      });
+      };
+      const created = await api.createPlacementDrive<Drive>(pendingCreate.current);
+      pendingCreate.current = null;
       setTitle("");
       setCompany("");
       setRole("");
@@ -177,6 +182,7 @@ export default function PlacementDrivesPage() {
     } catch (createError) {
       setError(errorMessage(createError, "Unable to create the placement drive."));
     } finally {
+      createInFlight.current = false;
       setBusy(false);
     }
   }
@@ -272,10 +278,11 @@ export default function PlacementDrivesPage() {
 
         {showCreate && (
           <form onSubmit={createDrive} className="grid gap-4 rounded-xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-2">
-            <label className="text-sm">Drive title<input required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
-            <label className="text-sm">Company<input required maxLength={200} value={company} onChange={(event) => setCompany(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
-            <label className="text-sm">Role<input required maxLength={200} value={role} onChange={(event) => setRole(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
-            <label className="text-sm">Description<input maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
+            <label className="text-sm">Drive title<input disabled={busy || !!pendingCreate.current} required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
+            <label className="text-sm">Company<input disabled={busy || !!pendingCreate.current} required maxLength={200} value={company} onChange={(event) => setCompany(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
+            <label className="text-sm">Role<input disabled={busy || !!pendingCreate.current} required maxLength={200} value={role} onChange={(event) => setRole(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
+            <label className="text-sm">Description<input disabled={busy || !!pendingCreate.current} maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label>
+            {pendingCreate.current && !busy && <p className="text-sm text-slate-400 md:col-span-2">Retry saves the original drive details.</p>}
             <button disabled={busy} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-500 disabled:opacity-50 md:col-span-2">{busy ? "Creating…" : "Create drive"}</button>
           </form>
         )}

@@ -31,6 +31,7 @@ from app.services.auth_identity import (
     extract_auth_identity,
     get_profile_id_for_auth_user,
 )
+from app.services.auth_failures import auth_provider_request, check_auth_response
 from app.services.plan_access import highest_plan, sync_profile_plan_state
 from app.services.referrals import apply_joined_referral_reward, ensure_referral_identity
 from app.services.user_activity import record_user_presence
@@ -63,7 +64,7 @@ _MIN_TOKEN_LENGTH = 40
 # lookup, not privilege escalation.
 _EXPECTED_CACHE_FIELDS = frozenset({
     "id", "email", "plan", "owned_plans", "expired_plans",
-    "is_admin", "premium_override", "interviews_used", "subscription_status",
+    "is_admin", "premium_override", "is_org_student", "interviews_used", "subscription_status",
 })
 
 # Plan tier numeric mapping — module-level constant.
@@ -129,6 +130,13 @@ def _set_cached_user(token: str, user: "UserProfile") -> None:
     _AUTH_USER_CACHE[cache_key] = (time.monotonic() + AUTH_CACHE_TTL_SECONDS, user)
 
 
+def invalidate_local_user_context(user_id: str) -> None:
+    """Evict this worker's snapshots; other workers/Redis retain the bounded TTL."""
+    for key, (_, user) in list(_AUTH_USER_CACHE.items()):
+        if user.id == str(user_id):
+            _AUTH_USER_CACHE.pop(key, None)
+
+
 # ---------------------------------------------------------------------------
 # Redis cache helpers
 # ---------------------------------------------------------------------------
@@ -185,12 +193,21 @@ async def _get_cached_user_redis(token: str) -> "UserProfile | None":
         # Security: validate that Redis returned only expected keys.
         # Unexpected keys signal either data corruption or a Redis injection
         # attack — in both cases the safe action is a fresh DB lookup.
-        unexpected_keys = set(user_dict.keys()) - _EXPECTED_CACHE_FIELDS
-        if unexpected_keys:
-            logger.warning(
-                "redis_cache_unexpected_fields",
-                keys=sorted(unexpected_keys),
-            )
+        if not isinstance(user_dict, dict) or set(user_dict) != _EXPECTED_CACHE_FIELDS:
+            # Older entries lack membership context. Recompute; never default
+            # missing authorization fields or flush shared Redis state.
+            return None
+        if any(type(user_dict[field]) is not bool for field in (
+            "is_admin", "premium_override", "is_org_student",
+        )):
+            return None
+        if any(not isinstance(user_dict[field], list) or any(
+            plan not in PLAN_HIERARCHY for plan in user_dict[field]
+        ) for field in ("owned_plans", "expired_plans")):
+            return None
+        if user_dict["plan"] not in PLAN_HIERARCHY:
+            return None
+        if type(user_dict["interviews_used"]) is not int or user_dict["interviews_used"] < 0:
             return None
 
         # Construct UserProfile with explicit field extraction — never
@@ -203,6 +220,7 @@ async def _get_cached_user_redis(token: str) -> "UserProfile | None":
             expired_plans=user_dict.get("expired_plans") if isinstance(user_dict.get("expired_plans"), list) else [],
             is_admin=bool(user_dict.get("is_admin", False)),
             premium_override=bool(user_dict.get("premium_override", False)),
+            is_org_student=user_dict["is_org_student"],
             interviews_used=int(user_dict.get("interviews_used") or 0),
             subscription_status=str(user_dict.get("subscription_status") or "none"),
         )
@@ -218,7 +236,7 @@ async def _get_cached_user_redis(token: str) -> "UserProfile | None":
         return user
 
     except Exception as exc:
-        logger.debug("redis_cache_read_failed", error=str(exc))
+        logger.debug("redis_cache_read_failed", error_type=type(exc).__name__)
 
     return None
 
@@ -242,6 +260,7 @@ async def _set_cached_user_redis(token: str, user: "UserProfile") -> None:
         "expired_plans":       user.expired_plans,
         "is_admin":            user.is_admin,
         "premium_override":    user.premium_override,
+        "is_org_student":      user.is_org_student,
         "interviews_used":     user.interviews_used,
         "subscription_status": user.subscription_status,
     })
@@ -368,7 +387,7 @@ class UserProfile:
     @property
     def effective_plan(self) -> str:
         """Highest owned plan unless admin override is active."""
-        if self.premium_override or self.is_org_student:
+        if self.premium_override:
             return "career"
         return highest_plan(self.owned_plans)
 
@@ -439,6 +458,8 @@ async def get_current_user(request: Request) -> UserProfile:
         raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
 
     # ── Layer 1: In-memory cache ───────────────────────────────────────────
+    # A cached profile must not extend a locally verifiable token's lifetime.
+    decoded_identity = _decode_token_identity(token, settings)
     cached_user = _get_cached_user(token)
     if cached_user:
         return cached_user
@@ -449,7 +470,6 @@ async def get_current_user(request: Request) -> UserProfile:
         return cached_user
 
     # ── Layer 3 + 4: JWT decode → Supabase API ────────────────────────────
-    decoded_identity = _decode_token_identity(token, settings)
     try:
         if decoded_identity:
             auth_user_id = decoded_identity["auth_user_id"]
@@ -463,7 +483,7 @@ async def get_current_user(request: Request) -> UserProfile:
                     if _supabase_http_client is None:
                         _supabase_http_client = httpx.AsyncClient(timeout=10.0)
 
-            resp = await _supabase_http_client.get(
+            resp = await auth_provider_request(_supabase_http_client, "get",
                 f"{settings.SUPABASE_URL}/auth/v1/user",
                 headers={
                     "Authorization": f"Bearer {token}",
@@ -471,32 +491,20 @@ async def get_current_user(request: Request) -> UserProfile:
                 },
             )
 
-            if resp.status_code != 200:
-                # Sanitize resp.text before logging — the response body is
-                # attacker-influenced and may contain newlines or escape sequences
-                # designed to inject fake log entries (log injection attack).
-                logger.error(
-                    "supabase_auth_rejected",
-                    status=resp.status_code,
-                    body=_safe_log_snippet(resp.text),
-                )
-                raise HTTPException(
-                    status_code=401,
-                    detail="Invalid or expired authentication token.",
-                )
+            check_auth_response(resp)
 
             identity     = extract_auth_identity(resp.json())
             auth_user_id = identity["auth_user_id"]
             email        = identity["email"]
             provider     = identity["provider"]
 
-            if not auth_user_id:
-                raise HTTPException(status_code=401, detail="Invalid token payload.")
+            if not auth_user_id or not email:
+                raise HTTPException(status_code=502, detail="Invalid authentication provider response.")
 
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("auth_verification_failed", error=str(exc))
+        logger.error("auth_verification_failed", error_type=type(exc).__name__)
         raise HTTPException(status_code=500, detail="Authentication service unavailable.")
 
     db = await get_db()
@@ -521,7 +529,17 @@ async def get_current_user(request: Request) -> UserProfile:
 
         row = await db.fetchrow(
             """SELECT plan, is_admin, interviews_used_this_period,
-                      subscription_status, referral_code, org_student
+                      subscription_status, referral_code,
+                      EXISTS (SELECT 1 FROM organization_students os
+                              JOIN organizations o ON o.id = os.organization_id
+                              WHERE os.user_id = profiles.id AND os.organization_id = profiles.organization_id
+                                AND os.status = 'active' AND o.status = 'active') AS org_student,
+                      EXISTS (SELECT 1 FROM organization_students os
+                              JOIN organizations o ON o.id = os.organization_id
+                              WHERE os.user_id = profiles.id AND os.organization_id = profiles.organization_id
+                                AND os.status = 'active' AND o.status = 'active'
+                                AND os.has_career_access = TRUE
+                                AND (os.access_expires_at IS NULL OR os.access_expires_at > now())) AS org_career_access
                FROM profiles WHERE id = $1""",
             profile_id,
         )
@@ -554,7 +572,7 @@ async def get_current_user(request: Request) -> UserProfile:
             profile_id,
             plan,
             premium_override=premium_override,
-            is_org_student=is_org_student,
+            is_org_student=bool(row.get("org_career_access")),
         )
 
         try:
@@ -704,6 +722,10 @@ async def get_org_admin(
                FROM organization_admins oa
                JOIN organizations o ON o.id = oa.organization_id
                WHERE oa.user_id = $1
+                 AND NOT EXISTS (SELECT 1 FROM organization_admins other
+                                 WHERE other.user_id = oa.user_id AND other.status = 'active'
+                                   AND other.organization_id != oa.organization_id)
+               ORDER BY (oa.status = 'active') DESC, oa.id
                LIMIT 1""",
             user.id,
         )
@@ -745,7 +767,7 @@ async def get_org_admin(
     )
 
 
-def require_org_admin():
+def require_org_admin(*, write: bool = False):
     """Dependency that gates routes to verified, active org admins only."""
 
     async def dependency(
@@ -756,6 +778,11 @@ def require_org_admin():
                 status_code=403,
                 detail="Organization admin access is not active.",
             )
+        # These endpoints return organization-wide data. Department-limited
+        # admins need an explicitly scoped endpoint; they cannot use this gate.
+        allowed_roles = {"org_admin"} if write else {"org_admin", "viewer", "placement_officer"}
+        if org_admin.admin_role not in allowed_roles:
+            raise HTTPException(403, "Organization role does not permit this action.")
         return org_admin
 
     return dependency

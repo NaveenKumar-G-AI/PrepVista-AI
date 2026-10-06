@@ -13,7 +13,8 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+from uuid import uuid4
 
 from app.config import (
     can_access_plan,
@@ -23,6 +24,8 @@ from app.config import (
     normalize_difficulty_mode,
 )
 from app.database.connection import DatabaseConnection
+from app.services.interview_terminal import connection_scope, connection, terminalize, register_question
+from app.services.interview_summary import coerce_runtime_state
 from app.dependencies import UserProfile, get_current_user
 from app.routers.interviews_helpers import (
     _normalize_plan, _MAX_PDF_SIZE_BYTES, _SETUP_SEMAPHORE,
@@ -175,7 +178,7 @@ async def setup_interview(
     # Track that setup was initiated — allows us to measure how many sessions
     # drop out during PDF processing vs after (setup started / mock started ratio).
     try:
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             await track_funnel_event(
                 conn, "setup_started",
                 user_id=user.id,
@@ -199,7 +202,7 @@ async def setup_interview(
 
     assistance_enabled = guided_assistance.lower() == 'true'
     try:
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             await conn.execute(
                 """INSERT INTO interview_assistance_policy
                    (session_id, enabled, hints_enabled, answer_guidance_enabled)
@@ -211,7 +214,8 @@ async def setup_interview(
                 assistance_enabled,
             )
     except Exception as exc:
-        logger.warning("assistance_policy_create_failed", error=str(exc))
+        assistance_enabled = False
+        logger.warning("assistance_policy_create_failed", exception_type=type(exc).__name__)
 
     logger.info(
         "interview_setup_complete",
@@ -230,7 +234,7 @@ async def setup_interview(
     # independent.  A fingerprint write failure must NOT prevent funnel events
     # from firing, and a funnel event failure must NOT prevent fingerprint storage.
     try:
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             await conn.execute(
                 """UPDATE interview_sessions
                    SET resume_fingerprint = $2
@@ -249,7 +253,7 @@ async def setup_interview(
     # Non-critical funnel tracking — in its own try/except so that a tracking
     # failure never blocks or corrupts the session response.
     try:
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             await track_funnel_event(
                 conn, "resume uploaded",
                 user_id=user.id,
@@ -298,6 +302,10 @@ async def end_interview(
     layer returns an error payload instead of crashing.
     """
     _validate_session_id(session_id)
+    async with connection_scope(DatabaseConnection) as conn:
+        owner = await conn.fetchval("SELECT user_id FROM interview_sessions WHERE id = $1 AND access_token = $2", session_id, req.access_token)
+    if not owner or str(owner) != str(user.id):
+        raise HTTPException(404, "Session not found.")
     was_active = await _session_is_active(session_id, req.access_token)
     result = await finish_session(
         session_id=session_id,
@@ -312,7 +320,7 @@ async def end_interview(
 
     if was_active:
         try:
-            async with DatabaseConnection() as conn:
+            async with connection_scope(DatabaseConnection) as conn:
                 await track_funnel_event(
                     conn, "mock completed",
                     user_id=user.id,
@@ -325,14 +333,52 @@ async def end_interview(
 
 
 @router.post("/{session_id}/terminate")
-async def terminate_interview(
+async def terminate_interview(session_id: str, req: TerminateRequest, user: UserProfile = Depends(get_current_user)):
+    _validate_session_id(session_id)
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow("SELECT user_id, total_turns, runtime_state FROM interview_sessions WHERE id = $1 AND access_token = $2 FOR UPDATE",
+                                      session_id, req.access_token)
+            if not row or str(row["user_id"]) != str(user.id):
+                raise HTTPException(404, "Session not found.")
+            state = coerce_runtime_state(row["runtime_state"])
+            if state.get("termination_response"):
+                return state["termination_response"]
+            if state.get("finish_response"):
+                return {"action": "finish", **state["finish_response"]}
+            marker = connection.set(conn)
+            try:
+                if state.get("terminal_contract_version") != 1:
+                    from app.services.interviewer_session import adopt_active_terminal_contract
+                    state = await adopt_active_terminal_contract(conn, session_id, state)
+                current = state.get("active_question_id")
+                if req.question_instance_id and str(req.question_instance_id) != str(current):
+                    raise HTTPException(409, "The answer belongs to a different question.")
+                if current and not state["question_records"][current].get("outcome"):
+                    terminalize(state, current, "ABORTED", req.user_text[:8000], req.capture_evidence)
+                    if req.user_text:
+                        await conn.execute("INSERT INTO conversation_messages (session_id, role, content, turn_number) VALUES ($1, 'user', $2, $3)",
+                                           session_id, req.user_text[:8000], row["total_turns"])
+                    await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, _safe_json_dumps(state))
+                result = await _terminate_interview_impl(session_id, req, user)
+                row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+                state = coerce_runtime_state(row["runtime_state"])
+                state["termination_response"] = result
+                state["finish_response"] = {k:v for k,v in result.items() if k not in {"action","termination_reason"}}
+                await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, _safe_json_dumps(state))
+                return result
+            finally:
+                connection.reset(marker)
+
+
+async def _terminate_interview_impl(
     session_id: str,
     req: TerminateRequest,
     user: UserProfile = Depends(get_current_user),
 ):
     """Force-end the interview due to a hard client-side proctoring violation."""
     _validate_session_id(session_id)
-    async with DatabaseConnection() as conn:
+    async with connection_scope(DatabaseConnection) as conn:
         session = await conn.fetchrow(
             """SELECT id, state, proctoring_violations
                FROM interview_sessions
@@ -410,7 +456,7 @@ async def log_proctoring_violation(
     )
     event_json = _safe_json_dumps(event)
 
-    async with DatabaseConnection() as conn:
+    async with connection_scope(DatabaseConnection) as conn:
         # Two-phase: fast state check, then atomic JSONB append.
         # The atomic || append eliminates the Python-side read-modify-write
         # race condition that occurred when multiple tab-switch events fired
@@ -484,3 +530,70 @@ async def log_proctoring_violation(
 # ---------------------------------------------------------------------------
 # Background evaluation task
 # ---------------------------------------------------------------------------
+
+
+class RetryQuestionRequest(BaseModel):
+    access_token: str = Field(min_length=32, max_length=256)
+    client_request_id: str = Field(min_length=1, max_length=200)
+    expected_turn: int = Field(ge=1)
+    question_instance_id: str
+    active_question_instance_id: str
+    captured_text: str = Field(default="", max_length=10000)
+    capture_evidence: dict = Field(default_factory=dict)
+
+
+@router.post("/{session_id}/retry-question")
+async def retry_question(session_id: str, req: RetryQuestionRequest,
+                         user: UserProfile = Depends(get_current_user)):
+    """Ask the same question as a new attempt; original evidence is immutable."""
+    from app.config import PLAN_CONFIG
+    from app.services.interviewer_session import _question_signature
+    for value in (session_id, req.question_instance_id, req.active_question_instance_id):
+        _validate_session_id(value)
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow("""SELECT user_id, state, total_turns, plan, runtime_state
+                FROM interview_sessions WHERE id = $1 AND access_token = $2 FOR UPDATE""",
+                session_id, req.access_token)
+            if not row or str(row["user_id"]) != str(user.id):
+                raise HTTPException(404, "Interview not found.")
+            runtime = coerce_runtime_state(row["runtime_state"])
+            previous = runtime.get("retry_responses", {}).get(req.client_request_id)
+            if previous:
+                return previous
+            if (row["state"] != "ACTIVE" or runtime.get("terminal_contract_version") != 1
+                    or int(row["total_turns"] or 0) != req.expected_turn
+                    or str(runtime.get("active_question_id")) != req.active_question_instance_id):
+                raise HTTPException(409, "Refresh the interview before asking again.")
+            records = runtime.get("question_records", {})
+            original = records.get(req.question_instance_id)
+            current = records.get(req.active_question_instance_id)
+            if not original or not current or not original.get("question_text"):
+                raise HTTPException(409, "The original question is unavailable.")
+            maximum = PLAN_CONFIG[_normalize_plan(row["plan"])]["max_turns"]
+            if req.expected_turn >= maximum:
+                raise HTTPException(409, "The interview question limit is reached. Finish this session.")
+            if not current.get("outcome"):
+                terminalize(runtime, req.active_question_instance_id, "ABORTED",
+                            req.captured_text, {**req.capture_evidence, "reason": "ask_me_again"})
+            turn = req.expected_turn + 1
+            instance = register_question(runtime, session_id, turn, original["question_text"], str(uuid4()))
+            retry_record = records[instance]
+            retry_record["retry_of_question_instance_id"] = req.question_instance_id
+            category = await conn.fetchval("SELECT rubric_category FROM question_evaluations WHERE session_id = $1 AND question_instance_id = $2",
+                                          session_id, req.question_instance_id)
+            if category or original.get("rubric_category"):
+                retry_record["rubric_category"] = category or original["rubric_category"]
+            runtime["active_question_id"] = instance
+            runtime["question_state"] = "active_question_open"
+            payload = {"action": "continue", "question": original["question_text"],
+                       "turn": turn, "max_turns": maximum, "remaining_turns": maximum-turn,
+                       "question_instance_id": instance, "retry_of_question_instance_id": req.question_instance_id}
+            runtime.setdefault("retry_responses", {})[req.client_request_id] = payload
+            await conn.execute("INSERT INTO conversation_messages (session_id, role, content, turn_number) VALUES ($1, 'assistant', $2, $3)",
+                               session_id, original["question_text"], turn)
+            await conn.execute("""UPDATE interview_sessions SET total_turns = $2, runtime_state = $3,
+                active_question_turn = $2, active_question_signature = $4, question_retry_count = 0,
+                last_answer_status = NULL WHERE id = $1""", session_id, turn, json.dumps(runtime),
+                _question_signature(original["question_text"]))
+            return payload

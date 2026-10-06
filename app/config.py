@@ -311,6 +311,11 @@ class Settings(BaseSettings):
                 if not value.startswith("https://"):
                     raise ValueError(f"{field_name} must use HTTPS in production")
 
+            if self.DATABASE_URL:
+                if "localhost" not in self.DATABASE_URL and "127.0.0.1" not in self.DATABASE_URL:
+                    if "?sslmode=" not in self.DATABASE_URL and "&sslmode=" not in self.DATABASE_URL:
+                        raise ValueError("Production DATABASE_URL to a remote host must explicitly specify an sslmode (e.g. ?sslmode=require)")
+
             # Older Render services may retain ALLOWED_HOSTS=* or
             # CORS_ALLOWED_ORIGINS=* even after render.yaml is updated. Never
             # pass that wildcard to either middleware: remove it and derive a

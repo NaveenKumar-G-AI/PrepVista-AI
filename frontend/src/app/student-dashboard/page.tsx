@@ -1,4 +1,6 @@
 'use client';
+import { ScoreSummary } from '@/components/score-summary';
+import type { ScoreMeasurement } from '@/lib/score-semantics';
 /**
  * PrepVista — Student Dashboard Page
  * Dedicated workspace for org_student users.
@@ -31,7 +33,9 @@ interface StudentDashboardData {
   recent_sessions?: Array<{
     id: string;
     plan: string;
-    final_score: number;
+    final_score: number | null;
+    evaluation_state?: ScoreMeasurement["evaluation_state"];
+    measurement_coverage?: ScoreMeasurement["measurement_coverage"];
     state: string;
     total_turns: number;
     duration: number | null;
@@ -333,7 +337,7 @@ export default function StudentDashboardPage() {
                 >
                   <div>
                     <div className="text-sm font-medium text-primary">
-                      {session.state === 'FINISHED' ? `Score: ${session.final_score}/100` : 'In Progress'}
+                      {session.state === 'FINISHED' ? <ScoreSummary value={session.final_score} measurement={session} /> : 'In Progress'}
                     </div>
                     <div className="mt-0.5 text-xs text-secondary">
                       {formatDateTime(session.created_at)}

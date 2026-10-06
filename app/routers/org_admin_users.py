@@ -28,38 +28,41 @@ async def create_org_admin(
     row existed in organization_admins but the profile was never flagged is_org_admin,
     leaving the account in a broken half-admin state.
     """
+    _validate_uuid(body.organization_id, "organization ID")
     async with DatabaseConnection() as conn:
-        org = await conn.fetchrow(
-            "SELECT id FROM organizations WHERE id = $1", body.organization_id
-        )
-        if not org:
-            raise HTTPException(404, "Organization not found.")
-        profile = await conn.fetchrow(
-            "SELECT id FROM profiles WHERE LOWER(email) = LOWER($1)", body.email
-        )
-        if not profile:
-            raise HTTPException(
-                404,
-                f"No PrepVista account found for {body.email}. User must sign up first.",
-            )
-        existing = await conn.fetchrow(
-            "SELECT id FROM organization_admins WHERE organization_id = $1 AND user_id = $2",
-            body.organization_id, str(profile["id"]),
-        )
-        if existing:
-            raise HTTPException(400, "This user is already an admin for this organization.")
-        # ✅ FIXED: Both writes inside a transaction
         async with conn.transaction():
+            org = await conn.fetchrow("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", body.organization_id)
+            if not org:
+                raise HTTPException(404, "Organization not found.")
+            profiles = await conn.fetch(
+                "SELECT id FROM profiles WHERE LOWER(email) = LOWER($1) ORDER BY id FOR UPDATE", body.email.strip(),
+            )
+            if len(profiles) != 1:
+                raise HTTPException(409 if profiles else 404, "An unambiguous existing PrepVista account is required.")
+            user_id = str(profiles[0]["id"])
+            conflict = await conn.fetchval(
+                """SELECT 1 FROM organization_admins WHERE user_id = $1
+                   AND organization_id != $2 AND status = 'active'
+                   UNION ALL SELECT 1 FROM organization_students WHERE user_id = $1
+                   AND organization_id != $2 AND status != 'removed'""", user_id, body.organization_id,
+            )
+            if conflict:
+                raise HTTPException(409, "User already has a role in another organization.")
+            existing = await conn.fetchrow(
+                "SELECT * FROM organization_admins WHERE organization_id = $1 AND user_id = $2 FOR UPDATE",
+                body.organization_id, user_id,
+            )
+            if existing:
+                # Creation retries must not reactivate a subsequently disabled admin.
+                return {"status": "already_assigned", "admin": dict(existing)}
             row = await conn.fetchrow(
-                """INSERT INTO organization_admins
-                   (organization_id, user_id, email, full_name, phone)
+                """INSERT INTO organization_admins (organization_id, user_id, email, full_name, phone)
                    VALUES ($1, $2, $3, $4, $5) RETURNING *""",
-                body.organization_id, str(profile["id"]),
-                body.email, body.full_name, body.phone,
+                body.organization_id, user_id, body.email.strip().lower(), body.full_name, body.phone,
             )
             await conn.execute(
                 "UPDATE profiles SET is_org_admin = TRUE, organization_id = $1 WHERE id = $2",
-                body.organization_id, str(profile["id"]),
+                body.organization_id, user_id,
             )
     return {"status": "created", "admin": dict(row)}
 
@@ -138,32 +141,45 @@ async def update_org_admin(
     return {"status": "updated"}
 
 
-@router.post("/admins/{admin_id}/disable")
-async def disable_org_admin(
-    admin_id: str,
-    admin: UserProfile = Depends(require_main_admin()),
-):
-    _validate_uuid(admin_id, "admin ID")   # ✅ SEC
+async def _set_admin_status(admin_id: str, enabled: bool):
+    _validate_uuid(admin_id, "admin ID")
     async with DatabaseConnection() as conn:
-        await conn.execute(
-            "UPDATE organization_admins SET status = 'suspended', updated_at = NOW() WHERE id = $1",
-            admin_id,
-        )
-    return {"status": "disabled"}
+        async with conn.transaction():
+            row = await conn.fetchrow("SELECT * FROM organization_admins WHERE id = $1", admin_id)
+            if not row:
+                raise HTTPException(404, "Organization admin not found.")
+            await conn.fetchval("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", row["organization_id"])
+            await conn.fetchval("SELECT id FROM profiles WHERE id = $1 FOR UPDATE", row["user_id"])
+            row = await conn.fetchrow("SELECT * FROM organization_admins WHERE id = $1 FOR UPDATE", admin_id)
+            if enabled:
+                conflict = await conn.fetchval(
+                    """SELECT 1 FROM organization_admins WHERE user_id = $1
+                       AND organization_id != $2 AND status = 'active'
+                       UNION ALL SELECT 1 FROM organization_students WHERE user_id = $1
+                       AND organization_id != $2 AND status != 'removed'""", row["user_id"], row["organization_id"],
+                )
+                if conflict:
+                    raise HTTPException(409, "User already administers another organization.")
+            await conn.execute(
+                "UPDATE organization_admins SET status = $1, updated_at = NOW() WHERE id = $2",
+                "active" if enabled else "suspended", admin_id,
+            )
+            await conn.execute(
+                """UPDATE profiles SET is_org_admin = EXISTS(
+                     SELECT 1 FROM organization_admins oa WHERE oa.user_id = profiles.id AND oa.status = 'active')
+                   WHERE id = $1""", row["user_id"],
+            )
+    return {"status": "enabled" if enabled else "disabled"}
+
+
+@router.post("/admins/{admin_id}/disable")
+async def disable_org_admin(admin_id: str, admin: UserProfile = Depends(require_main_admin())):
+    return await _set_admin_status(admin_id, False)
 
 
 @router.post("/admins/{admin_id}/enable")
-async def enable_org_admin(
-    admin_id: str,
-    admin: UserProfile = Depends(require_main_admin()),
-):
-    _validate_uuid(admin_id, "admin ID")   # ✅ SEC
-    async with DatabaseConnection() as conn:
-        await conn.execute(
-            "UPDATE organization_admins SET status = 'active', updated_at = NOW() WHERE id = $1",
-            admin_id,
-        )
-    return {"status": "enabled"}
+async def enable_org_admin(admin_id: str, admin: UserProfile = Depends(require_main_admin())):
+    return await _set_admin_status(admin_id, True)
 
 
 @router.post("/admins/{admin_id}/reset-password")

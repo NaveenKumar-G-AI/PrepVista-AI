@@ -415,14 +415,14 @@ class TestLiveDifficultySignal:
 
 class TestFinalScoreComputation:
 
-    def test_score_scales_by_expected_questions(self):
+    def test_score_quality_is_separate_from_expected_question_coverage(self):
         result = compute_final_score(
             question_evaluations=[_make_evaluation(score=8.0, classification="strong")],
             plan="free",
             expected_questions=5,
         )
-        assert result["final_score"] < 80, \
-            "Score for 1 answered of 5 expected must be below 80"
+        full = compute_final_score([_make_evaluation(score=8.0, classification="strong")], plan="free", expected_questions=1)
+        assert result["final_score"] == full["final_score"], "Coverage must not penalize measured answer quality"
         assert result["completion_rate"] == 20.0, \
             "Completion rate must be 20% for 1 of 5 questions"
         assert result["answered_questions"] == 1
@@ -468,8 +468,7 @@ class TestFinalScoreComputation:
 
     def test_no_division_by_zero_with_empty_evaluations(self):
         result = compute_final_score([], plan="free", expected_questions=5)
-        assert result["final_score"] == 0.0, \
-            "Empty evaluations must produce a score of 0 without crashing"
+        assert result["final_score"] is None, "Empty evaluations are not measured zero"
         assert result["completion_rate"] == 0.0
 
     def test_short_precise_answer_not_penalized_vs_long_vague(self):

@@ -15,12 +15,15 @@ from app.dependencies import get_current_user, require_plan, UserProfile
 from app.config import PLAN_CONFIG, get_settings
 from app.database.connection import DatabaseConnection
 from app.services.audio_storage import create_signed_url
+from app.services.history_retention import require_history_access
 from app.services.evaluator import (
     build_career_readiness_summary,
     build_pro_readiness_summary,
     get_score_interpretation,
 )
-from app.services.interview_summary import compute_interview_summary
+from app.services.interview_summary import compute_interview_summary, coerce_runtime_state
+from app.services.interview_terminal import terminal_records, UNMEASURED
+from app.services.score_semantics import assessment, interpretation_for, numeric_score, object_value
 from app.routers.interviews_helpers import _validate_session_id
 
 router = APIRouter()
@@ -30,19 +33,6 @@ logger = structlog.get_logger("prepvista.reports")
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-async def _is_latest_finished_session(conn, user_id: str, session_id: str) -> bool:
-    latest_finished_session_id = await conn.fetchval(
-        """SELECT id
-           FROM interview_sessions
-           WHERE user_id = $1
-             AND state = 'FINISHED'
-           ORDER BY COALESCE(finished_at, created_at) DESC
-           LIMIT 1""",
-        user_id,
-    )
-    return bool(latest_finished_session_id and str(latest_finished_session_id) == str(session_id))
-
 
 def _build_pdf_filename(session_id: str, plan: str | None) -> str:
     """Build a clean, human-readable PDF filename."""
@@ -96,20 +86,11 @@ async def get_report(
         if session["state"] != "FINISHED":
             raise HTTPException(status_code=400, detail="Interview not yet completed.")
 
-        if not user.premium_override and user.effective_plan == "free":
-            is_current_feedback = await _is_latest_finished_session(conn, user.id, session_id)
-            if not is_current_feedback:
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "error": "session_history_locked",
-                        "message": "Session history is available on Pro",
-                        "required": "pro",
-                        "upgrade_url": "/pricing",
-                    },
-                )
+        await require_history_access(conn, user, session_id)
 
         session_data = dict(session)
+
+        runtime = coerce_runtime_state(session_data.get("runtime_state"))
 
         # Fetch per-question evaluations
         # Defensive: assistance_provenance may not exist yet if migration 036 hasn't run.
@@ -122,7 +103,7 @@ async def get_report(
                           answer_status, content_understanding, depth_quality, communication_clarity,
                           what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
                           answer_duration_seconds, repaired_answer,
-                          COALESCE(assistance_provenance, 'unknown') AS assistance_provenance
+                          COALESCE(assistance_provenance, 'unknown') AS assistance_provenance, question_instance_id
                    FROM question_evaluations
                    WHERE session_id = $1
                    ORDER BY turn_number""",
@@ -138,7 +119,7 @@ async def get_report(
                           answer_status, content_understanding, depth_quality, communication_clarity,
                           what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
                           answer_duration_seconds, repaired_answer,
-                          'unknown' AS assistance_provenance
+                          'unknown' AS assistance_provenance, NULL AS question_instance_id
                    FROM question_evaluations
                    WHERE session_id = $1
                    ORDER BY turn_number""",
@@ -167,6 +148,7 @@ async def get_report(
         # Per-turn audio audit records (Fix 7) — present only when server-side STT
         # was enabled for the session. Used to re-mint signed playback URLs and
         # surface transcription confidence in the report's audit trail.
+        question_rows = await conn.fetch("SELECT role, turn_number, content FROM conversation_messages WHERE session_id = $1 ORDER BY turn_number", session_id)
         audio_rows = await conn.fetch(
             """SELECT turn_number, audio_object_path, stt_confidence, stt_provider
                FROM interview_audio_turns
@@ -180,7 +162,12 @@ async def get_report(
     has_premium_access = effective_cfg["has_ideal_answers"]
     has_free_guidance = plan == "free"
     expose_guidance = has_premium_access or has_free_guidance
-    score = float(session_data["final_score"]) if session_data["final_score"] else 0
+    integrity = assessment(session_data, [dict(row) for row in eval_rows], question_rows)
+    score = integrity["final_score"]
+
+    if runtime.get("terminal_contract_version") == 1:
+        measured_turns = {r["turn"] for r in terminal_records(runtime) if r.get("outcome") == "EVALUATED"}
+        eval_rows = [row for row in eval_rows if int(row["turn_number"]) in measured_turns]
 
     # Build per-question data with plan-based gating
     evaluations = []
@@ -192,16 +179,16 @@ async def get_report(
             "raw_answer": row["raw_answer"] or "",
             "normalized_answer": row["normalized_answer"] or row["raw_answer"] or "",
             "classification": row["classification"],
-            "score": float(row["score"]),
+            "score": numeric_score(row["score"], 10),
             "scoring_rationale": row["scoring_rationale"] if expose_guidance else None,
             "missing_elements": (row["missing_elements"] or []) if expose_guidance else [],
             "ideal_answer": row["ideal_answer"] if expose_guidance else None,
-            "communication_score": float(row["communication_score"]) if row["communication_score"] and expose_guidance else 0,
+            "communication_score": numeric_score(row["communication_score"], 10) if expose_guidance else None,
             "communication_notes": row["communication_notes"] if expose_guidance else None,
-            "relevance_score": float(row["relevance_score"]) if row["relevance_score"] is not None and expose_guidance else 0,
-            "clarity_score": float(row["clarity_score"]) if row["clarity_score"] is not None and expose_guidance else 0,
-            "specificity_score": float(row["specificity_score"]) if row["specificity_score"] is not None and expose_guidance else 0,
-            "structure_score": float(row["structure_score"]) if row["structure_score"] is not None and expose_guidance else 0,
+            "relevance_score": numeric_score(row["relevance_score"], 10) if expose_guidance else None,
+            "clarity_score": numeric_score(row["clarity_score"], 10) if expose_guidance else None,
+            "specificity_score": numeric_score(row["specificity_score"], 10) if expose_guidance else None,
+            "structure_score": numeric_score(row["structure_score"], 10) if expose_guidance else None,
             "answer_status": row["answer_status"] if expose_guidance else None,
             "content_understanding": row["content_understanding"] if expose_guidance else None,
             "depth_quality": row["depth_quality"] if expose_guidance else None,
@@ -213,7 +200,10 @@ async def get_report(
             "corrected_intent": row["corrected_intent"] if expose_guidance else None,
             "answer_duration_seconds": row["answer_duration_seconds"],
             "assistance_provenance": row["assistance_provenance"] if "assistance_provenance" in row.keys() else "unknown",
+            "question_instance_id": str(row["question_instance_id"]) if row.get("question_instance_id") else None,
         }
+        q["evaluation_state"] = "COMPLETE" if q["score"] is not None else "PENDING"
+        q["terminal_outcome"] = next((r.get("outcome") for r in integrity["terminal_answer_records"] if r["turn"] == q["turn_number"]), "EVALUATED")
         evaluations.append(q)
 
     # --- Fix 7: audit trail (corrected transcript, signed audio, confidence) ----
@@ -226,7 +216,7 @@ async def get_report(
         evaluations, eval_rows, audio_rows, created_at=session_data["created_at"]
     )
 
-    rubric_scores = json.loads(session_data["rubric_scores"]) if session_data["rubric_scores"] else {}
+    rubric_scores = integrity["category_scores"]
     violations = json.loads(session_data["proctoring_violations"]) if session_data["proctoring_violations"] else []
 
     summary = compute_interview_summary(
@@ -237,6 +227,10 @@ async def get_report(
         duration_seconds=session_data["duration_actual_seconds"],
         runtime_state=session_data.get("runtime_state"),
     )
+    runtime = coerce_runtime_state(session_data.get("runtime_state"))
+    if runtime.get("terminal_contract_version") == 1:
+        summary.update(runtime.get("final_summary") or {})
+    summary["assessment"] = integrity
     expected_questions = summary["planned_questions"]
     answered_questions = summary["answered_questions"]
     average_answer_time_seconds = summary["average_response_seconds"]
@@ -247,16 +241,16 @@ async def get_report(
             session_data["resume_summary"],
             expected_questions=expected_questions,
         )
-        if plan == "career" and has_premium_access
+        if plan == "career" and has_premium_access and integrity["feedback_eligible"]
         else None
     )
     pro_summary = (
         build_pro_readiness_summary(evaluations, expected_questions=expected_questions)
-        if plan == "pro" and has_premium_access
+        if plan == "pro" and has_premium_access and integrity["feedback_eligible"]
         else None
     )
 
-    interpretation = get_score_interpretation(int(score), plan)
+    interpretation = interpretation_for(integrity, plan)
     if expected_questions and summary["closed_questions"] < expected_questions:
         interpretation = (
             f"{interpretation} This report reflects {summary['closed_questions']} of "
@@ -265,24 +259,20 @@ async def get_report(
 
     assistance_summary = None
     if assistance_policy and assistance_policy['enabled']:
-        per_turn_provenance = {}
-        for ev in assistance_events:
-            tn = ev['turn_number']
-            if ev['assistance_type'] == 'answer_guidance':
-                per_turn_provenance[tn] = 'answer_guided'
-            elif tn not in per_turn_provenance or per_turn_provenance[tn] == 'independent':
-                per_turn_provenance[tn] = 'hint_assisted'
-        
-        total = len(evaluations) if evaluations else 0
-        guided_count = sum(1 for v in per_turn_provenance.values() if v != 'independent')
-        hint_count = sum(1 for v in per_turn_provenance.values() if v == 'hint_assisted')
-        answer_guided_count = sum(1 for v in per_turn_provenance.values() if v == 'answer_guided')
-        independent_count = total - guided_count
-        
+        # Persisted answer attribution observes the strict viewed-before-answer
+        # boundary; event presence alone must not relabel a scored answer.
+        per_turn_provenance = {q["turn_number"]: q.get("assistance_provenance") or "unknown" for q in evaluations}
+        total = len(evaluations)
+        hint_count = sum(v == 'hint_assisted' for v in per_turn_provenance.values())
+        answer_guided_count = sum(v == 'answer_guided' for v in per_turn_provenance.values())
+        independent_count = sum(v == 'independent' for v in per_turn_provenance.values())
+        unknown_count = sum(v not in {'hint_assisted', 'answer_guided', 'independent'} for v in per_turn_provenance.values())
+
         assistance_summary = {
             'enabled': True,
             'total_questions': total,
             'independent': independent_count,
+            'unknown': unknown_count,
             'hint_assisted': hint_count,
             'answer_guided': answer_guided_count,
             'independent_coverage_pct': round(independent_count / max(total, 1) * 100),
@@ -292,13 +282,14 @@ async def get_report(
         "session": {
             "id": session_id,
             "plan": plan,
+            **{key: integrity[key] for key in ("evaluation_state", "measurement_label", "measurement_coverage", "readiness_eligible", "score_contributions")},
             "final_score": score,
             "total_turns": session_data["total_turns"],
             "expected_questions": expected_questions,
             "answered_questions": answered_questions,
             "closed_questions": summary["closed_questions"],
-            "strengths": session_data["strengths"] or [],
-            "weaknesses": session_data["weaknesses"] or [],
+            "strengths": (session_data["strengths"] or []) if integrity["feedback_eligible"] else [],
+            "weaknesses": (session_data["weaknesses"] or []) if integrity["feedback_eligible"] else [],
             "rubric_scores": rubric_scores if effective_cfg["has_rubric_breakdown"] else {},
             "created_at": str(session_data["created_at"]),
             "finished_at": str(session_data["finished_at"]) if session_data["finished_at"] else None,
@@ -307,6 +298,7 @@ async def get_report(
             "summary": summary,
         },
         "evaluations": evaluations,
+        "terminal_answer_records": integrity["terminal_answer_records"],
         "user_plan": user.plan,
         "has_premium_access": has_premium_access,
         "premium_lock_reason": (
@@ -467,6 +459,7 @@ async def download_pdf(
                 detail="Report not found or interview not completed.",
             )
 
+        await require_history_access(conn, user, session_id)
         eval_rows = await conn.fetch(
             """SELECT turn_number, rubric_category, question_text, raw_answer,
                       normalized_answer, classification, score, scoring_rationale,
@@ -474,12 +467,15 @@ async def download_pdf(
                       relevance_score, clarity_score, specificity_score, structure_score,
                       answer_status, content_understanding, depth_quality, communication_clarity,
                       what_worked, what_was_missing, how_to_improve, answer_blueprint, corrected_intent,
-                      communication_score, answer_duration_seconds
+                      communication_score, answer_duration_seconds,
+                      COALESCE(assistance_provenance, 'unknown') AS assistance_provenance, question_instance_id
                FROM question_evaluations
                WHERE session_id = $1
                ORDER BY turn_number""",
             session_id,
         )
+
+        question_rows = await conn.fetch("SELECT role, turn_number, content FROM conversation_messages WHERE session_id = $1", session_id)
 
     # Build PDF payload
     from app.services.report_builder import generate_pdf_report
@@ -495,15 +491,27 @@ async def download_pdf(
         duration_seconds=session_payload.get("duration_actual_seconds"),
         runtime_state=session_payload.get("runtime_state"),
     )
+    runtime = coerce_runtime_state(session_payload.get("runtime_state"))
+    if runtime.get("terminal_contract_version") == 1:
+        summary.update(runtime.get("final_summary") or {})
+    if runtime.get("terminal_contract_version") == 1:
+        measured_turns = {r["turn"] for r in terminal_records(runtime) if r.get("outcome") == "EVALUATED"}
+        eval_dicts = [row for row in eval_dicts if int(row["turn_number"]) in measured_turns]
+    integrity = assessment(session_payload, eval_dicts, question_rows)
+    session_payload.update(final_score=integrity["final_score"], rubric_scores=integrity["category_scores"], assessment=integrity, asked_questions=question_rows)
+    summary["assessment"] = integrity
+    if not integrity["feedback_eligible"]:
+        session_payload.update(strengths=[], weaknesses=[])
+    unmeasured = not integrity["feedback_eligible"]
     expected_questions = summary["planned_questions"]
 
     # Inject plan-specific coaching summaries into the session payload
-    if session_payload.get("plan") == "pro":
+    if session_payload.get("plan") == "pro" and not unmeasured:
         session_payload["pro_summary"] = build_pro_readiness_summary(
             eval_dicts,
             expected_questions=expected_questions,
         )
-    if session_payload.get("plan") == "career":
+    if session_payload.get("plan") == "career" and not unmeasured:
         session_payload["career_summary"] = build_career_readiness_summary(
             eval_dicts,
             session_payload.get("resume_summary"),
@@ -584,6 +592,8 @@ async def create_share_link(
         if session["state"] != "FINISHED":
             raise HTTPException(status_code=400, detail="Only finished interviews can be shared.")
 
+        await require_history_access(conn, user, session_id)
+
         # Return existing token if already shared
         if session["share_token"]:
             share_url = f"{settings.FRONTEND_URL or 'https://prepvista.in'}/report/shared/{session['share_token']}"
@@ -622,15 +632,19 @@ async def get_shared_report(share_token: str):
 
         eval_rows = await conn.fetch(
             """SELECT turn_number, rubric_category, question_text,
-                      classification, score, answer_status
+                      classification, score, answer_status, communication_score,
+                      relevance_score, clarity_score, specificity_score, structure_score
                FROM question_evaluations
                WHERE session_id = $1
                ORDER BY turn_number""",
             str(session["id"]),
         )
 
-    rubric_scores = json.loads(session["rubric_scores"]) if session["rubric_scores"] else {}
-    score = float(session["final_score"]) if session["final_score"] else 0
+        question_rows = await conn.fetch("SELECT role, turn_number, content FROM conversation_messages WHERE session_id = $1", str(session["id"]))
+
+    integrity = assessment(dict(session), [dict(row) for row in eval_rows], question_rows)
+    rubric_scores = integrity["category_scores"]
+    score = integrity["final_score"]
 
     # Limited per-question data — no answers, no ideal answers
     evaluations_limited = [
@@ -639,9 +653,13 @@ async def get_shared_report(share_token: str):
             "rubric_category": row["rubric_category"],
             "question_text": row["question_text"],
             "classification": row["classification"],
-            "score": float(row["score"]),
+            "score": numeric_score(row["score"], 10),
+            "evaluation_state": "COMPLETE" if numeric_score(row["score"], 10) is not None else "PENDING",
+            "terminal_outcome": "EVALUATED",
         }
         for row in eval_rows
+        if any(record["turn"] == row["turn_number"] and record["evaluation_state"] == "COMPLETE"
+               and record.get("outcome") == "EVALUATED" for record in integrity["terminal_answer_records"])
     ]
 
     summary = compute_interview_summary(
@@ -656,9 +674,10 @@ async def get_shared_report(share_token: str):
     return {
         "session": {
             "plan": session["plan"],
+            **{key: integrity[key] for key in ("evaluation_state", "measurement_label", "measurement_coverage", "readiness_eligible", "score_contributions")},
             "final_score": score,
-            "strengths": session["strengths"] or [],
-            "weaknesses": session["weaknesses"] or [],
+            "strengths": (session["strengths"] or []) if integrity["feedback_eligible"] else [],
+            "weaknesses": (session["weaknesses"] or []) if integrity["feedback_eligible"] else [],
             "rubric_scores": rubric_scores,
             "total_turns": session["total_turns"],
             "completed_at": str(session["finished_at"]) if session["finished_at"] else None,
@@ -666,6 +685,9 @@ async def get_shared_report(share_token: str):
             "summary": summary,
         },
         "evaluations": evaluations_limited,
-        "interpretation": get_score_interpretation(int(score), str(session["plan"])),
+        "interpretation": interpretation_for(integrity, str(session["plan"])),
+        "terminal_answer_records": [{key: record.get(key) for key in
+            ("turn", "question_text", "outcome", "evaluation_state", "score")}
+            for record in integrity["terminal_answer_records"]],
         "is_shared": True,
     }

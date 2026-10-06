@@ -260,27 +260,12 @@ export function buildExplanations(m: IntelModel): Record<string, ChartExplain | 
   }
 
   // ── 12 waterfall ─────────────────────────────────────────────────────────────
-  if (turns === 0) out['12'] = null;
-  else {
-    const idxPos = m.waterfall.kinds
-      .map((k, i) => ({ k, i }))
-      .filter(x => x.k === 'pos')
-      .sort((a, b) => m.waterfall.values[b.i] - m.waterfall.values[a.i])[0];
-    const biggest = idxPos ? { label: m.waterfall.labels[idxPos.i].replace('+', ''), v: m.waterfall.values[idxPos.i] } : null;
-    const penalty = m.waterfall.kinds.reduce((s, k, i) => (k === 'neg' ? s + m.waterfall.values[i] : s), 0);
-    out['12'] = {
-      whatItShows: `This breaks down exactly how your ${m.finalScore} was built: a base, each category's positive contribution stacked on top, then any penalties subtracted, ending on your final score.`,
-      talent: biggest
-        ? `${biggest.label} was your biggest single contribution (+${biggest.v}) — that's the strength carrying your score, and the pattern worth repeating across more answers.`
-        : `Your score was built evenly across categories rather than propped up by one — balanced performance is a stable foundation.`,
-      drawback: penalty > 0
-        ? `Penalties pulled about ${r0(penalty)} points off your total — these are avoidable losses (timeouts, skips, vague answers) rather than knowledge gaps, so they're costing you a grade you've otherwise earned.`
-        : `No penalties dragged your total down — every point you earned, you kept, which is exactly how it should look.`,
-      attention: penalty > 0
-        ? `Eliminate the avoidable penalties first: giving even a partial answer instead of silence, and finishing within time, is the cleanest path past 70 — you recover those points without learning anything new.`
-        : `With no penalties to recover, your next gain comes purely from raising contributions — add one concrete result to each answer to grow the positive bars.`,
-    };
-  }
+  out['12'] = m.waterfall.values.length ? {
+    whatItShows: 'Exact category averages weighted by the backend scoring formula. The final score is rounded; measurement coverage is separate.',
+    talent: 'Only categories with valid score evidence contribute.',
+    drawback: 'Missing measurements carry no synthetic score penalty.',
+    attention: 'Use the per-answer evaluation and coverage to interpret this score.',
+  } : null;
 
   return out;
 }

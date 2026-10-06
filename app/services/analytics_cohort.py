@@ -557,9 +557,8 @@ def compute_zero_offer_risk_roster(overall_snapshot: list[dict]) -> list[dict]:
         risk_reasons: list[str] = []
         at_risk = False
 
-        if session_count == 0:
-            at_risk = True
-            risk_reasons.append("No completed mock interviews yet.")
+        if session_count == 0 or latest is None:
+            continue
         elif tier == READINESS_TIER_AT_RISK:
             if session_count >= _MIN_SESSIONS_FOR_RISK_EVAL and approx_is_stuck:
                 at_risk = True

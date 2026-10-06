@@ -147,7 +147,7 @@ async def get_placement_config(admin: OrgAdminProfile = Depends(require_org_admi
 @router.put("/placement-config")
 async def update_placement_config(
     body: PlacementConfigRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Create or update the college's placement config (upsert, one row per org)."""
     org_id = admin.organization_id

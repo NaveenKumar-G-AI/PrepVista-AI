@@ -268,7 +268,7 @@ async def list_rounds(
 async def create_round(
     drive_id: UUID,
     body: CreateRoundRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
@@ -349,7 +349,7 @@ async def list_interviews(
                 JOIN placement_drives pd ON pd.id = pi.drive_id
                 LEFT JOIN organization_students os
                   ON os.user_id = pi.student_id AND os.organization_id = pi.organization_id
-                LEFT JOIN college_departments cd ON cd.id = os.department_id
+                LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
                 LEFT JOIN drive_round_executions dre ON dre.id = pi.round_execution_id
                 LEFT JOIN placement_interview_results pir
                   ON pir.interview_id = pi.id AND pir.is_current = TRUE
@@ -369,7 +369,7 @@ async def list_interviews(
 @router.post("")
 async def schedule_interview(
     body: ScheduleInterviewRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     org_id = admin.organization_id
     drive_id = body.drive_id
@@ -493,7 +493,7 @@ async def pending_review(
 @router.post("/results/import")
 async def import_results(
     body: ImportResultsRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Validate or atomically import recruiter results by student code.
 
@@ -616,7 +616,7 @@ async def import_results(
 @router.post("/results/publish-batch")
 async def publish_results_batch(
     body: PublishBatchRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Review and publish a set of current results in one transaction."""
     interview_ids = list(dict.fromkeys(body.interview_ids))
@@ -715,7 +715,7 @@ async def get_interview(
                JOIN placement_drives pd ON pd.id = pi.drive_id
                LEFT JOIN organization_students os
                  ON os.user_id = pi.student_id AND os.organization_id = pi.organization_id
-               LEFT JOIN college_departments cd ON cd.id = os.department_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
                LEFT JOIN drive_round_executions dre ON dre.id = pi.round_execution_id
                WHERE pi.id = $1 AND pi.organization_id = $2""",
             interview_id, org_id,
@@ -756,7 +756,7 @@ async def get_interview(
 async def record_attendance(
     interview_id: UUID,
     body: AttendanceRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     att = body.attendance_status.upper()
     if att not in VALID_ATTENDANCE:
@@ -806,7 +806,7 @@ async def record_attendance(
 async def transition_interview_status(
     interview_id: UUID,
     body: TransitionStatusRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     to_s = body.to_status.upper()
     if to_s not in VALID_INTERVIEW_STATUSES:
@@ -848,7 +848,7 @@ async def transition_interview_status(
 async def enter_result(
     interview_id: UUID,
     body: EnterResultRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Enter or update a result. Always INTERNAL_RESULT — never visible
     to student until reviewed + published (Part 5 sections 30/34)."""
@@ -885,7 +885,7 @@ async def enter_result(
 async def review_result(
     interview_id: UUID,
     body: ReviewResultRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Advance publication_state from INTERNAL_RESULT -> TPO_REVIEWED."""
     org_id = admin.organization_id
@@ -927,7 +927,7 @@ async def review_result(
 @router.post("/{interview_id:uuid}/results/publish")
 async def publish_result(
     interview_id: UUID,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Publish result to student. TPO_REVIEWED -> PUBLISHED_TO_STUDENT.
     Idempotent — re-publishing an already-published result is a safe no-op."""
@@ -1064,7 +1064,7 @@ async def resolve_issue(
     interview_id: UUID,
     issue_id: UUID,
     body: ResolveIssueRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:

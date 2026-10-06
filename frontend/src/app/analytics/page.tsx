@@ -129,7 +129,7 @@ export default function AnalyticsPage() {
     );
   }
 
-  const skillEntries = Object.entries(dashboard?.skill_scores || {}).sort((left, right) => right[1].score - left[1].score);
+  const skillEntries = Object.entries(dashboard?.skill_scores || {}).filter(([, row]) => typeof row.score === "number" && Number.isFinite(row.score)).sort((left, right) => right[1].score - left[1].score);
   const strongestSkill = skillEntries[0];
   const weakestSkill = skillEntries[skillEntries.length - 1];
   const activePlan = dashboard?.user.active_plan || user.active_plan || user.plan || 'free';
@@ -213,9 +213,10 @@ export default function AnalyticsPage() {
     const latest = trendSeries[trendSeries.length - 1];
     const first = trendSeries[0];
     const fallbackSkillScore = skillKey ? dashboard?.skill_scores?.[skillKey]?.score : null;
-    const score = Math.round(latest?.score ?? fallbackSkillScore ?? 0);
+    const measuredScore = latest?.score ?? fallbackSkillScore;
+    const score = measuredScore == null ? null : Math.round(measuredScore);
     const checkpoints = trendSeries.length || (fallbackSkillScore != null ? 1 : 0);
-    const delta = latest && first ? Math.round(latest.score - first.score) : 0;
+    const delta = trendSeries.length >= 2 && latest && first ? Math.round(latest.score - first.score) : null;
 
     return {
       title: config.title,
@@ -384,19 +385,19 @@ export default function AnalyticsPage() {
               {categorySnapshots.map(snapshot => (
                 <div key={snapshot.title} className="card p-5 interactive-card">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">{snapshot.title}</div>
-                  <div className="mt-3 text-3xl font-bold tracking-[-0.03em] text-primary">{snapshot.score}%</div>
+                  <div className="mt-3 text-3xl font-bold tracking-[-0.03em] text-primary">{snapshot.score == null ? "Not measured" : `${snapshot.score}%`}</div>
                   <div className="mt-2 text-sm text-secondary">
                     {snapshot.checkpoints} recorded checkpoint{snapshot.checkpoints === 1 ? '' : 's'}
                   </div>
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
                     <div
                       className="h-full rounded-full bg-[linear-gradient(90deg,#38bdf8,#3b82f6,#6366f1)]"
-                      style={{ width: `${Math.max(12, Math.min(100, snapshot.score))}%` }}
+                      style={{ width: `${snapshot.score == null ? 0 : Math.max(0, Math.min(100, snapshot.score))}%` }}
                     />
                   </div>
                   <div className="mt-4 text-sm">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${snapshot.delta >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'}`}>
-                      {snapshot.hasData ? (snapshot.delta >= 0 ? `+${snapshot.delta}% trend` : `${snapshot.delta}% trend`) : 'Trend pending'}
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${(snapshot.delta ?? 0) >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'}`}>
+                      {snapshot.delta !== null ? ((snapshot.delta ?? 0) >= 0 ? `+${snapshot.delta}% trend` : `${snapshot.delta}% trend`) : 'Trend pending'}
                     </span>
                   </div>
                 </div>

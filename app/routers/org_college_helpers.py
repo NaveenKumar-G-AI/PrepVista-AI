@@ -177,7 +177,7 @@ def _readiness_tier(readiness_score: float | None, total_sessions: int) -> str:
     at_risk:      everything else (zero sessions or very low score)
     """
     if readiness_score is None or total_sessions == 0:
-        return _TIER_AT_RISK
+        return "not_measured"
     if readiness_score >= 75.0 and total_sessions >= 3:
         return _TIER_READY
     if readiness_score >= 60.0 and total_sessions >= 2:
@@ -203,10 +203,8 @@ def _zero_offer_risk(
       3. latest readiness score < 50 with ≥ 3 sessions.
       4. trend_slope < −2.0 — actively declining ≥ 2 pts/session.
     """
-    if total_sessions == 0:
-        return True
-    if readiness_score is None:
-        return True
+    if total_sessions == 0 or readiness_score is None:
+        return False
     if readiness_score < _ZERO_OFFER_SCORE_HARD:
         return True
     if total_sessions >= 3 and readiness_score < _ZERO_OFFER_SCORE_SOFT:
@@ -415,6 +413,8 @@ def _build_traffic_light(tier_counts: dict[str, int], total: int) -> dict:
         _TIER_ALMOST_READY: {"count": tier_counts.get(_TIER_ALMOST_READY, 0), "pct": _pct(tier_counts.get(_TIER_ALMOST_READY, 0))},
         _TIER_DEVELOPING:   {"count": tier_counts.get(_TIER_DEVELOPING, 0),   "pct": _pct(tier_counts.get(_TIER_DEVELOPING, 0))},
         _TIER_AT_RISK:      {"count": tier_counts.get(_TIER_AT_RISK, 0),      "pct": _pct(tier_counts.get(_TIER_AT_RISK, 0))},
+        "not_measured": {"count": tier_counts.get("not_measured", 0), "pct": _pct(tier_counts.get("not_measured", 0))},
+        "partially_measured": {"count": tier_counts.get("partially_measured", 0), "pct": _pct(tier_counts.get("partially_measured", 0))},
     }
 
 
@@ -577,10 +577,10 @@ async def _fetch_perf_aggregate(
                 AS example_usage_count
         FROM organization_students os
         JOIN   profiles             p    ON p.id    = os.user_id
-        LEFT JOIN college_departments cd ON cd.id   = os.department_id
-        LEFT JOIN college_years       cy ON cy.id   = os.year_id
-        LEFT JOIN college_batches     cb ON cb.id   = os.batch_id
-        LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id
+        LEFT JOIN college_departments cd ON cd.id   = os.department_id AND cd.organization_id = os.organization_id
+        LEFT JOIN college_years       cy ON cy.id   = os.year_id AND cy.organization_id = os.organization_id
+        LEFT JOIN college_batches     cb ON cb.id   = os.batch_id AND cb.organization_id = os.organization_id
+        LEFT JOIN interview_sessions  isess ON isess.user_id = os.user_id AND isess.organization_id = os.organization_id
                                              AND isess.state = 'FINISHED'
                                              AND isess.final_score IS NOT NULL
         LEFT JOIN answer_quality_flags aqf ON aqf.session_id = isess.id
@@ -596,7 +596,8 @@ async def _fetch_perf_aggregate(
         """,
         *params,
     )
-    return rows
+    from app.services.score_semantics import org_measurement_rows
+    return await org_measurement_rows(conn, org_id, rows)
 
 
 async def _fetch_session_series(
@@ -615,7 +616,8 @@ async def _fetch_session_series(
     rows = await conn.fetch(
         f"""
         SELECT
-            os.user_id,
+            os.user_id, isess.id,
+            isess.plan, isess.runtime_state, isess.total_turns,
             isess.final_score,
             isess.created_at,
             isess.rubric_scores
@@ -623,7 +625,6 @@ async def _fetch_session_series(
         JOIN interview_sessions isess ON isess.user_id = os.user_id
                                      AND isess.organization_id = os.organization_id
                                      AND isess.state = 'FINISHED'
-                                     AND isess.final_score IS NOT NULL
         WHERE os.organization_id = $1
           AND os.status = 'active'
           {extra_clause}
@@ -631,7 +632,8 @@ async def _fetch_session_series(
         """,
         *params,
     )
-    return rows
+    from app.services.score_semantics import project_sessions
+    return await project_sessions(conn, rows)
 
 
 def _compute_student_growth_map(series_rows: list[Any]) -> dict[str, dict]:
@@ -662,7 +664,7 @@ def _compute_student_growth_map(series_rows: list[Any]) -> dict[str, dict]:
         # Overall score series (guard against NULL final_score)
         scores = [float(s["final_score"]) for s in sessions if s["final_score"] is not None]
         first   = scores[0]  if scores else None
-        latest  = scores[-1] if scores else None
+        latest  = sessions[-1]["final_score"] if sessions else None
         delta   = _safe_round(latest - first) if (first is not None and latest is not None) else None
         slope   = _compute_slope(scores)
 
@@ -689,12 +691,15 @@ def _compute_student_growth_map(series_rows: list[Any]) -> dict[str, dict]:
 
         result[uid] = {
             "scores":            scores,
+            "readiness_eligible": sessions[-1].get("readiness_eligible", True),
+            "measurement_coverage": sessions[-1].get("measurement_coverage"),
+            "evaluation_state": sessions[-1].get("evaluation_state"),
             "first_score":       first,
             "latest_score":      latest,
             "overall_delta":     delta,
             "trend_slope":       slope,
-            "is_stuck":          _is_stuck(len(scores), slope),
-            "time_to_threshold": _time_to_threshold(latest, slope),
+            "is_stuck":          _is_stuck(len(scores), slope) if sessions[-1].get("readiness_eligible", True) else False,
+            "time_to_threshold": _time_to_threshold(latest, slope) if sessions[-1].get("readiness_eligible", True) else None,
             "category_series":   cat_series,
             "category_deltas":   cat_deltas,
             "category_slopes":   cat_slopes,
@@ -768,8 +773,9 @@ def _render_cohort_summary_export(
         for r in rows:
             sc  = int(r["session_count"] or 0)
             latest = _safe_round(r["latest_score"])
-            tc[_readiness_tier(latest, sc)] = tc.get(_readiness_tier(latest, sc), 0) + 1
-            if _zero_offer_risk(latest, sc, None):
+            tier = r.get("cached_tier") or _readiness_tier(latest, sc)
+            tc[tier] = tc.get(tier, 0) + 1
+            if r.get("readiness_eligible", True) and _zero_offer_risk(latest, sc, None):
                 zero_risk_count += 1
         cat_avgs = _cohort_category_averages([_extract_cat_scores(r) for r in rows])
         seg_avg  = _safe_round(_stats.mean(avg_list)) if avg_list else None

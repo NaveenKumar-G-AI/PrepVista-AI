@@ -2,13 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { ScoreSummary } from '@/components/score-summary';
+import type { ScoreMeasurement } from '@/lib/score-semantics';
 import { useParams, useRouter } from 'next/navigation';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAuth } from '@/lib/auth-context';
+import { AssistanceViews, provenanceLabel, type AssistanceProvenance, type ViewedEvent } from '@/lib/assistance-views';
 import { api } from '@/lib/api';
-import { ServerSttSession, serverSttSupported, transcribeBlobViaRest, type StopResult } from '@/lib/serverStt';
+import { ServerSttSession, serverSttSupported, type StopResult } from '@/lib/serverStt';
 
+import { bounded, outcomeForCapture, type CaptureResult } from '@/lib/interview-capture';
 import styles from './page.module.css';
 
 // Fix 1 — server-side STT feature flag. Default OFF: while off, the interview
@@ -23,6 +27,9 @@ type InterviewUiState =
   | 'INIT'
   | 'AI_SPEAKING'
   | 'USER_LISTENING'
+  | 'STOPPING'
+  | 'TRANSCRIBING'
+  | 'FINALIZING'
   | 'SUBMITTING'
   | 'FINISHED'
   | 'TERMINATED'
@@ -73,9 +80,9 @@ interface NeuralFeedback {
   focus_category: string;
 }
 
-interface CompletedResponse {
+interface CompletedResponse extends ScoreMeasurement {
   action: 'finish' | 'terminated';
-  final_score: number;
+  final_score: number | null;
   interpretation: string;
   strengths: string[];
   weaknesses: string[];
@@ -574,6 +581,14 @@ export default function LiveInterviewPage() {
   const lastAudioActivityAtRef = useRef(0);
   const globalSecondsRef = useRef(0);
   const isSubmittingRef = useRef(false);
+  const captureSettlingRef = useRef(false);
+  const captureFailedRef = useRef(false);
+  const captureSpeechRef = useRef(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [terminationRetry, setTerminationRetry] = useState('');
+  const pendingAnswerRef = useRef<{
+    text: string; key: string; terminal: NonNullable<Parameters<typeof api.submitAnswer>[6]>;
+  } | null>(null);
   const submitRetryCountRef = useRef(0);
   const pendingSubmitKeyRef = useRef('');
   const terminationPendingRef = useRef(false);
@@ -604,7 +619,7 @@ export default function LiveInterviewPage() {
   const [guidanceContent, setGuidanceContent] = useState<string | null>(null);
   const [guidanceWhyItWorks, setGuidanceWhyItWorks] = useState<string[]>([]);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
-  const [assistanceStatus, setAssistanceStatus] = useState<'independent' | 'hint' | 'guided'>('independent');
+  const [assistanceStatus, setAssistanceStatus] = useState<AssistanceProvenance>('independent');
   const [assistancePanelOpen, setAssistancePanelOpen] = useState(false);
   const assistanceTurnRef = useRef<number>(0); // stale response protection fallback
   const assistanceInstanceRef = useRef<string | null>(null); // stale response protection main
@@ -618,99 +633,104 @@ export default function LiveInterviewPage() {
     setAssistanceStatus('independent');
     setAssistancePanelOpen(false);
     setAssistanceLoading(false);
+    setAssistanceError('');
+    setDisplayedAssistance(null);
     assistanceTurnRef.current = currentTurn;
     assistanceInstanceRef.current = currentQuestionInstanceId;
   }, [currentQuestionInstanceId, currentTurn]);
 
-  /** Request a hint for the current question from the backend. */
-  async function requestHint() {
+  const [assistanceError, setAssistanceError] = useState('');
+  const [displayedAssistance, setDisplayedAssistance] = useState<ViewedEvent | null>(null);
+  const assistanceBusyRef = useRef<string | null>(null);
+  const assistanceViewsRef = useRef<AssistanceViews | null>(null);
+  if (!assistanceViewsRef.current) assistanceViewsRef.current = new AssistanceViews(async event => {
     const session = sessionDataRef.current;
-    if (!session || !assistanceEnabled || assistanceLoading) return;
-    const requestedLevel = hintLevel + 1;
-    if (requestedLevel > 2) return; // max 2 levels
+    if (!session) throw new Error('Session is unavailable.');
+    return api.markAssistanceViewed(session.session_id, session.access_token, event.id);
+  });
+  const lastCompletedQuestionRef = useRef<string | null>(null);
+  const pendingRetryRef = useRef<Parameters<typeof api.retryQuestion>[1] | null>(null);
 
-    setAssistanceLoading(true);
-    setAssistancePanelOpen(true);
-    const turnAtRequest = currentTurn;
-    const instanceAtRequest = currentQuestionInstanceId;
+  // Only visible content acquires a view; generation alone never does.
+  useEffect(() => {
+    if (!assistanceEnabled || !assistancePanelOpen || assistanceLoading || uiState !== 'USER_LISTENING'
+        || !displayedAssistance || displayedAssistance.instance !== currentQuestionInstanceId) return;
+    void acknowledgeDisplayedAssistance(displayedAssistance);
+  }, [assistanceEnabled, assistancePanelOpen, assistanceLoading, uiState, displayedAssistance, currentQuestionInstanceId]);
 
+  async function acknowledgeDisplayedAssistance(event: ViewedEvent) {
     try {
-      const resp = await api.requestHint<{
-        content: string;
-        level: number;
-        turn_number: number;
-        event_id: string;
-      }>(
-        session.session_id,
-        session.access_token,
-        `hint-${session.session_id}-${currentTurn}-${requestedLevel}`,
-        lastQuestionRef.current || '',
-        instanceAtRequest || '',
-        requestedLevel,
-      );
-
-      // Stale protection: discard if question instance advanced while we were waiting
-      if (instanceAtRequest && instanceAtRequest !== assistanceInstanceRef.current) return;
-      if (!instanceAtRequest && turnAtRequest !== assistanceTurnRef.current) return;
-
-      setHintContent(resp.content);
-      setHintLevel(resp.level);
-      setGuidanceContent(null); // Make mutually exclusive with Answer Guidance
-      setAssistanceStatus((prev) => prev === 'guided' ? 'guided' : 'hint');
-
-      // Mark as viewed
-      try {
-        await api.markAssistanceViewed(session.session_id, session.access_token, resp.event_id);
-      } catch { /* best effort */ }
+      const acknowledgement = assistanceViewsRef.current!.show(event);
+      setAssistanceStatus(assistanceViewsRef.current!.provenance(event.instance));
+      await acknowledgement;
+      if (assistanceInstanceRef.current !== event.instance) return;
+      setAssistanceStatus(assistanceViewsRef.current!.provenance(event.instance));
+      setAssistanceError('');
     } catch {
-      setHintContent('Unable to generate a hint right now. Try structuring your answer as: Situation → Action → Result.');
-    } finally {
-      setAssistanceLoading(false);
+      if (assistanceInstanceRef.current !== event.instance) return;
+      setAssistanceStatus(assistanceViewsRef.current!.provenance(event.instance));
+      setAssistanceError('Guidance view could not be saved. Retry before submitting your answer.');
     }
   }
 
-  /** Request answer guidance for the current question. */
-  async function requestAnswerGuidance() {
+  async function requestAssistance(kind: 'hint' | 'answer_guidance') {
     const session = sessionDataRef.current;
-    if (!session || !assistanceEnabled || assistanceLoading) return;
-
+    const instance = currentQuestionInstanceId;
+    if (!session || !assistanceEnabled || !instance || assistanceBusyRef.current === instance
+        || isSubmittingRef.current || pendingRetryRef.current || uiStateRef.current !== 'USER_LISTENING') return;
+    const level = kind === 'hint' ? hintLevel + 1 : 1;
+    if (level > 2) return;
+    assistanceBusyRef.current = instance;
     setAssistanceLoading(true);
+    setAssistanceError('');
     setAssistancePanelOpen(true);
-    const turnAtRequest = currentTurn;
-    const instanceAtRequest = currentQuestionInstanceId;
-
     try {
-      const resp = await api.requestAnswerGuidance<{
-        content: string;
-        turn_number: number;
-        event_id: string;
-        why_it_works?: string[];
-      }>(
-        session.session_id,
-        session.access_token,
-        `guidance-${session.session_id}-${currentTurn}`,
-        lastQuestionRef.current || '',
-        instanceAtRequest || '',
-      );
-
-      // Stale protection
-      if (instanceAtRequest && instanceAtRequest !== assistanceInstanceRef.current) return;
-      if (!instanceAtRequest && turnAtRequest !== assistanceTurnRef.current) return;
-
-      setGuidanceContent(resp.content);
-      setGuidanceWhyItWorks(resp.why_it_works || []);
-      setHintContent(null); // Make mutually exclusive with Hint
-      setAssistanceStatus('guided');
-
-      // Mark as viewed
-      try {
-        await api.markAssistanceViewed(session.session_id, session.access_token, resp.event_id);
-      } catch { /* best effort */ }
+      const key = `${kind}-${session.session_id}-${instance}-${level}`;
+      const resp = kind === 'hint'
+        ? await api.requestHint<{content: string; event_id: string; level: number}>(session.session_id, session.access_token, key, lastQuestionRef.current || '', instance, level)
+        : await api.requestAnswerGuidance<{content: string; event_id: string; why_it_works?: string[]}>(session.session_id, session.access_token, key, lastQuestionRef.current || '', instance);
+      if (instance !== assistanceInstanceRef.current || uiStateRef.current !== 'USER_LISTENING') return;
+      if (!resp.content?.trim() || !resp.event_id) throw new Error('Assistance unavailable.');
+      if (kind === 'hint') {
+        setHintContent(resp.content); setHintLevel(level); setGuidanceContent(null);
+      } else {
+        setGuidanceContent(resp.content); setGuidanceWhyItWorks('why_it_works' in resp ? resp.why_it_works || [] : []); setHintContent(null);
+      }
+      setDisplayedAssistance({id: resp.event_id, instance, kind});
     } catch {
-      setGuidanceContent('Professional answer guidance is temporarily unavailable. Try structuring your answer as: Situation → Your responsibility → Decision → Why → Result.');
+      if (instance === assistanceInstanceRef.current) setAssistanceError('Assistance is temporarily unavailable. You can answer independently or retry.');
     } finally {
-      setAssistanceLoading(false);
+      if (assistanceBusyRef.current === instance) assistanceBusyRef.current = null;
+      if (instance === assistanceInstanceRef.current) setAssistanceLoading(false);
     }
+  }
+  async function requestHint() { await requestAssistance('hint'); }
+  async function requestAnswerGuidance() { await requestAssistance('answer_guidance'); }
+
+  async function handleAskMeAgain() {
+    const session = sessionDataRef.current;
+    if (!session || !currentQuestionInstanceId || isSubmittingRef.current || pendingAnswerRef.current
+        || assistanceBusyRef.current || uiStateRef.current !== 'USER_LISTENING') return;
+    isSubmittingRef.current = true;
+    try {
+      if (!pendingRetryRef.current) {
+        const capture = await settleCapture();
+        pendingRetryRef.current = {access_token: session.access_token, client_request_id: createSubmissionKey(),
+          expected_turn: currentTurn, question_instance_id: lastCompletedQuestionRef.current || currentQuestionInstanceId,
+          active_question_instance_id: currentQuestionInstanceId, captured_text: capture.transcript, capture_evidence: capture.evidence};
+      }
+      transitionTo('SUBMITTING');
+      await assistanceViewsRef.current!.settle(currentQuestionInstanceId);
+      const result = await api.retryQuestion<{question: string; turn: number; max_turns: number; question_instance_id: string}>(session.session_id, pendingRetryRef.current);
+      pendingRetryRef.current = null;
+      assistanceInstanceRef.current = result.question_instance_id;
+      setCurrentQuestionInstanceId(result.question_instance_id); setCurrentTurn(result.turn); setMaxTurns(result.max_turns);
+      appendTranscript('ai', result.question);
+      speak(result.question);
+    } catch {
+      setStatusText('Retry could not be saved. Your captured text is preserved.');
+      transitionTo('USER_LISTENING');
+    } finally { isSubmittingRef.current = false; }
   }
 
   useEffect(() => {
@@ -1020,6 +1040,7 @@ export default function LiveInterviewPage() {
           const now = getTimestamp();
           if (now - lastAudioActivityAtRef.current >= AUDIO_ACTIVITY_REFRESH_MS) {
             lastAudioActivityAtRef.current = now;
+            captureSpeechRef.current = true;
             noteAnswerActivity(false);
           }
         }
@@ -1193,8 +1214,8 @@ export default function LiveInterviewPage() {
 
     const RecognitionCtor = window.webkitSpeechRecognition || window.SpeechRecognition;
     if (!RecognitionCtor) {
-      setPageError('Speech recognition is not supported in this browser. Please use Chrome.');
-      setUiState('ERROR');
+      captureFailedRef.current = true;
+      setTimerMessage('Transcription could not be started. You can save an unmeasured answer or end this interview.');
       return null;
     }
 
@@ -1213,6 +1234,7 @@ export default function LiveInterviewPage() {
     };
 
     recognition.onspeechstart = () => {
+      captureSpeechRef.current = true;
       if (uiStateRef.current === 'USER_LISTENING') {
         noteAnswerActivity(true, 'Listening...');
       }
@@ -1229,7 +1251,7 @@ export default function LiveInterviewPage() {
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      if (uiStateRef.current !== 'USER_LISTENING') {
+      if (uiStateRef.current !== 'USER_LISTENING' && !captureSettlingRef.current) {
         return;
       }
 
@@ -1268,7 +1290,9 @@ export default function LiveInterviewPage() {
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: Event) => {
+      const code = (event as Event & { error?: string }).error;
+      if (code !== 'no-speech' && code !== 'aborted') captureFailedRef.current = true;
       if (uiStateRef.current === 'USER_LISTENING') {
         setTimerMessage('Microphone issue detected. We will keep listening. Press Submit Answer when ready, or wait for 20 seconds of silence.');
       }
@@ -1297,11 +1321,10 @@ export default function LiveInterviewPage() {
       // A session is already running for this turn.
       return;
     }
-    const activeSession = sessionDataRef.current;
-    const token = activeSession?.access_token || '';
+    const token = api.getToken() || '';
     if (!token || !STT_BACKEND_URL || !serverSttSupported()) {
-      setPageError('Audio capture is not available in this browser. Please try Chrome, Firefox, Edge, or Safari.');
-      setUiState('ERROR');
+      captureFailedRef.current = true;
+      setTimerMessage('Audio capture is unavailable. You can save an unmeasured answer or end this interview.');
       return;
     }
 
@@ -1312,7 +1335,7 @@ export default function LiveInterviewPage() {
       turnNumber: currentTurn || 0,
       language: 'en-IN',
       onTranscript: (full) => {
-        if (uiStateRef.current !== 'USER_LISTENING') return;
+        if (uiStateRef.current !== 'USER_LISTENING' && !captureSettlingRef.current) return;
         accumulatedTranscriptRef.current = full;
         currentTranscriptRef.current = normalizeLiveTranscript(full);
         setLiveTranscript(currentTranscriptRef.current ? `"${currentTranscriptRef.current}"` : '');
@@ -1323,7 +1346,7 @@ export default function LiveInterviewPage() {
       onStatus: (status) => {
         if (uiStateRef.current !== 'USER_LISTENING') return;
         if (status === 'listening') {
-          noteAnswerActivity(true, 'Listening...');
+          setStatusText('Listening...');
         }
       },
       onError: (message) => {
@@ -1333,39 +1356,26 @@ export default function LiveInterviewPage() {
       },
     });
     serverSttRef.current = session;
-    session.start().catch((err) => {
+    session.start().catch(() => {
+      if (serverSttRef.current !== session) return;
       serverSttRef.current = null;
 
-      // Distinguish mic permission denial from WebSocket connection failure.
-      // Mic denial is fatal — the user must grant permission.
-      // WS failure is recoverable — the session's internal REST fallback can
-      // still transcribe if the user retries or the next window succeeds.
-      const isMicError = err instanceof DOMException && (
-        err.name === 'NotAllowedError' || err.name === 'NotFoundError'
-      );
-      if (isMicError) {
-        setPageError('Could not access the microphone. Please allow mic access and reload.');
-        setUiState('ERROR');
-      } else {
-        // WebSocket connection failed — warn but don't block the interview.
-        // The user can still speak and submit; audio will attempt REST fallback
-        // on subsequent windows if the session is retried.
-        setTimerMessage('Live transcription unavailable. Your answer will still be recorded when you press Submit Answer.');
-        console.warn('[Interview] ServerSTT WebSocket failed to connect:', err);
-      }
+      captureFailedRef.current = true;
+      // Keep closure/submission available if capture fails after a question was
+      // already asked. This question is saved as unmeasured, never scored empty.
+      setTimerMessage('Audio capture could not be started. You can save an unmeasured answer or end this interview.');
     });
   }
 
   async function stopServerStt(): Promise<StopResult | null> {
     const session = serverSttRef.current;
     if (!session) return null;
-    serverSttRef.current = null;
-
     // Await the final flush — stop() properly awaits in-flight sendWindow and
     // pendingFinal with a bounded timeout, so we capture the last recording
     // window's transcript instead of discarding it.
     try {
       const result = await session.stop();
+      if (serverSttRef.current === session) serverSttRef.current = null;
 
       // Write the final flushed transcript into the refs so it's available
       // for submission. This is critical: without this, the last ~3s of
@@ -1387,6 +1397,8 @@ export default function LiveInterviewPage() {
   }
 
   function startListeningLoop(promptOverride = '', resetQuestionTimer = true) {
+    captureFailedRef.current = false;
+    captureSpeechRef.current = false;
     // The Web Speech path needs a recognition object up front; the server path
     // does not. Validate the active capture path before doing turn bookkeeping.
     if (!STT_SERVER_ENABLED) {
@@ -1564,14 +1576,16 @@ export default function LiveInterviewPage() {
     appendTranscript('ai', farewellMessage);
     stopAllMedia();
     
+    let navigated = false;
+    const complete = () => { if (!navigated) { navigated = true; finishInterviewLocally(data); } };
     // Quick farewell: redirect after speech ends or 3s max (whichever is first)
     const fallbackTimer = window.setTimeout(() => {
-      finishInterviewLocally(data);
+      complete();
     }, 3000);
 
     speak(farewellMessage, () => {
       window.clearTimeout(fallbackTimer);
-      finishInterviewLocally(data);
+      complete();
     });
   }
 
@@ -1596,13 +1610,59 @@ export default function LiveInterviewPage() {
     }
   }
 
-  async function submitToBackend(text: string, requestKey = createSubmissionKey(), attempt = 0) {
+  async function settleCapture(): Promise<CaptureResult> {
+    captureSettlingRef.current = true;
+    transitionTo('STOPPING');
+    setStatusText('Stopping recording...');
+    clearSilenceTimers();
+    try {
+      transitionTo('TRANSCRIBING');
+      setStatusText('Completing transcription...');
+      if (STT_SERVER_ENABLED) {
+        const result = await stopServerStt();
+        if (result) return { transcript: normalizeLiveTranscript(result.transcript), evidence: result.evidence };
+        return { transcript: currentTranscriptRef.current, evidence: { audio_bytes: 0, speech_detected: captureSpeechRef.current,
+          failed: true, unintelligible: false, flush_status: 'timeout' } };
+      }
+      const recognition = recognitionRef.current;
+      if (recognition) {
+        try {
+          await bounded(new Promise<void>(resolve => {
+            recognition.onend = () => resolve();
+            try { recognition.stop(); } catch { resolve(); }
+          }), 5000);
+        } catch { captureFailedRef.current = true; }
+        recognition.onresult = null;
+        recognitionRef.current = null;
+      }
+      // Browser final results are authoritative; interim text remains UI text.
+      return { transcript: normalizeLiveTranscript(accumulatedTranscriptRef.current), evidence: {
+        audio_bytes: 0, speech_detected: captureSpeechRef.current, failed: captureFailedRef.current,
+        unintelligible: false, flush_status: captureFailedRef.current ? 'timeout' : 'ok' } };
+    } finally { captureSettlingRef.current = false; clearWaveformMonitor(); setHardwareActive(false); }
+  }
+
+  async function submitToBackend(text: string, requestKey = createSubmissionKey(), attempt = 0, endAfter = false, action?: 'SKIPPED' | 'ABORTED') {
     const activeSession = sessionDataRef.current;
-    if (!activeSession || isSubmittingRef.current || uiStateRef.current === 'FINISHED' || uiStateRef.current === 'TERMINATED') {
+    if (!activeSession || pendingRetryRef.current || isSubmittingRef.current || (pendingAnswerRef.current && pendingAnswerRef.current.key !== requestKey) || uiStateRef.current === 'FINISHED' || uiStateRef.current === 'TERMINATED') {
       return;
     }
 
-    const normalizedText = text.startsWith('[') ? text : normalizeLiveTranscript(text);
+    isSubmittingRef.current = true;
+    let normalizedText = text.startsWith('[') ? text : normalizeLiveTranscript(text);
+    if (!pendingAnswerRef.current) {
+      const capture = currentTurn > 0 ? await settleCapture() : null;
+      if (capture) normalizedText = capture.transcript;
+      const outcome = capture ? outcomeForCapture(capture, action) : undefined;
+      pendingAnswerRef.current = { key: requestKey, text: normalizedText, terminal: {
+        expected_turn: currentTurn, question_instance_id: currentQuestionInstanceId,
+        terminal_outcome: outcome === 'EVALUATED' ? undefined : outcome,
+        capture_evidence: capture?.evidence, end_after_answer: endAfter,
+      } };
+      if (outcome === 'TRANSCRIPTION_FAILED') setTimerMessage('Transcription could not be completed. This answer will remain unmeasured.');
+    }
+    normalizedText = pendingAnswerRef.current.text;
+    endAfter = pendingAnswerRef.current.terminal.end_after_answer || false;
 
     // --- Repeat-request intercept (before any state mutation) ---
     // If the student is asking to repeat or clarify the question, re-speak it
@@ -1613,8 +1673,10 @@ export default function LiveInterviewPage() {
       normalizedText &&
       !normalizedText.startsWith('[') &&
       attempt === 0 &&
-      isRepeatRequest(normalizedText)
+      !endAfter && !action && isRepeatRequest(normalizedText)
     ) {
+      isSubmittingRef.current = false;
+      pendingAnswerRef.current = null;
       setLiveTranscript('');
       accumulatedTranscriptRef.current = '';
       currentTranscriptRef.current = '';
@@ -1632,13 +1694,19 @@ export default function LiveInterviewPage() {
 
     isSubmittingRef.current = true;
     pendingSubmitKeyRef.current = requestKey;
-    transitionTo('SUBMITTING');
-
+    transitionTo(endAfter ? 'FINALIZING' : 'SUBMITTING');
+    setFinalizing(endAfter);
+    if (endAfter) setStatusText('Finalizing interview...');
+    if (pendingAnswerRef.current.terminal.terminal_outcome === 'TRANSCRIPTION_FAILED') {
+      setStatusText(endAfter ? 'Finalizing interview...' : 'Saving unmeasured answer...');
+      setTimerMessage('Transcription could not be completed. This question will not be scored.');
+    }
     if (normalizedText && !normalizedText.startsWith('[') && attempt === 0 && !isRepeatRequest(normalizedText)) {
       appendTranscript('user', normalizedText);
     }
 
     try {
+      await assistanceViewsRef.current!.settle(pendingAnswerRef.current.terminal.question_instance_id);
       const elapsedSeconds = Math.floor((getTimestamp() - startTimeRef.current) / 1000);
       const answerDurationSeconds = questionStartAtRef.current
         ? Math.max(0, Math.round((getTimestamp() - questionStartAtRef.current) / 1000))
@@ -1650,16 +1718,21 @@ export default function LiveInterviewPage() {
         elapsedSeconds,
         requestKey,
         answerDurationSeconds,
+        pendingAnswerRef.current.terminal,
       );
 
       isSubmittingRef.current = false;
       pendingSubmitKeyRef.current = '';
+      lastCompletedQuestionRef.current = pendingAnswerRef.current.terminal.question_instance_id || null;
+      pendingAnswerRef.current = null;
+      setFinalizing(false);
       submitRetryCountRef.current = 0;
 
       if (response.action === 'continue') {
         setCurrentTurn(response.turn);
         setMaxTurns(response.max_turns);
         if (response.question_instance_id) {
+          assistanceInstanceRef.current = response.question_instance_id;
           setCurrentQuestionInstanceId(response.question_instance_id);
         }
         appendTranscript('ai', response.text);
@@ -1688,6 +1761,7 @@ export default function LiveInterviewPage() {
       const isNonRetryable = status === 402 || status === 401 || status === 403;
 
       if (isNonRetryable || isClientError) {
+        setFinalizing(false);
         pendingSubmitKeyRef.current = '';
         setStatusText(error instanceof Error ? error.message : 'Submission failed.');
         setTimerMessage('');
@@ -1712,7 +1786,7 @@ export default function LiveInterviewPage() {
         setStatusText(`Network slow. Retrying your answer (${attempt + 1}/${MAX_SUBMIT_RETRIES})...`);
         setTimerMessage('Holding your answer and retrying now...');
         window.setTimeout(() => {
-          void submitToBackend(normalizedText, requestKey, attempt + 1);
+          void submitToBackend(normalizedText, requestKey, attempt + 1, endAfter, action);
         }, delay);
         return;
       }
@@ -1721,11 +1795,11 @@ export default function LiveInterviewPage() {
       pendingSubmitKeyRef.current = '';
       setStatusText('Response delayed. Restoring your answer now...');
       setTimerMessage(error instanceof Error ? error.message : 'Network error. Your answer is preserved.');
+      setFinalizing(false);
       transitionTo('USER_LISTENING');
       currentTranscriptRef.current = normalizedText;
       accumulatedTranscriptRef.current = normalizedText;
       setLiveTranscript(normalizedText ? `"${normalizedText}"` : '');
-      resetSilenceTimer();
     }
   }
 
@@ -1741,6 +1815,8 @@ export default function LiveInterviewPage() {
     }
 
     terminationPendingRef.current = true;
+    setFinalizing(true);
+    const capture = await settleCapture();
 
     clearSilenceTimers();
     stopRecognition();
@@ -1752,24 +1828,23 @@ export default function LiveInterviewPage() {
     setTimerMessage('');
 
     try {
+      await assistanceViewsRef.current!.settle(currentQuestionInstanceId);
       const elapsedSeconds = Math.floor((getTimestamp() - startTimeRef.current) / 1000);
       const response = await api.terminateInterview<CompletedResponse>(
         activeSession.session_id,
         activeSession.access_token,
         reason,
         elapsedSeconds,
+        { user_text: capture.transcript, question_instance_id: currentQuestionInstanceId, capture_evidence: capture.evidence },
       );
       terminateInterviewLocally(response);
     } catch {
-      uiStateRef.current = 'TERMINATED';
-      setUiState('TERMINATED');
-      setEndInterviewOpen(false);
-      stopAllMedia();
-      clearStoredInterviewSession();
-      setResultData(null);
-      setStatusText('Session terminated.');
-      setTimerMessage('');
-      setLiveTranscript('');
+      // Keep the frozen session recoverable until the server confirms closure.
+      setFinalizing(false);
+      setTerminationRetry(reason);
+      transitionTo('FINALIZING');
+      setStatusText('Session closure could not be saved.');
+      setTimerMessage('Retry to finish saving this session.');
     }
   }
   function runGlobalClock() {
@@ -2027,7 +2102,7 @@ export default function LiveInterviewPage() {
   const handleManualSubmit = () => {
     const spokenText = normalizeLiveTranscript(currentTranscriptRef.current.trim());
     setTimerMessage('Answer captured. Moving to the next question...');
-    void submitToBackend(spokenText || '');
+    void submitToBackend(pendingAnswerRef.current?.text ?? spokenText, pendingAnswerRef.current?.key || createSubmissionKey());
   };
 
   const handleEndInterview = () => {
@@ -2035,87 +2110,12 @@ export default function LiveInterviewPage() {
   };
 
   const handleConfirmEndInterview = async () => {
+    if (isSubmittingRef.current || pendingAnswerRef.current || pendingRetryRef.current) return;
     setEndInterviewOpen(false);
-
-    // ── Step 1: Finalize audio capture BEFORE reading transcript ──────────
-    // Critical fix: await the server STT flush so the final recording window's
-    // transcript is written into the refs BEFORE we read them for submission.
-    // Previously, stopAllMedia() fire-and-forgot the STT stop, and the transcript
-    // was read immediately — losing the last ~3 seconds of speech.
-    await stopServerStt();
-
-    // Now stop remaining media (Web Speech, waveform, timers, TTS)
-    clearWaveformMonitor();
-    clearSilenceTimers();
+    setFinalizing(true);
     clearGlobalClock();
-    const recognition = recognitionRef.current;
-    if (recognition) {
-      if (rafPendingRef.current !== null) {
-        cancelAnimationFrame(rafPendingRef.current);
-        rafPendingRef.current = null;
-      }
-      recognition.onend = null;
-      try { recognition.stop(); } catch { /* no-op */ }
-      recognitionRef.current = null;
-    }
-    if (typeof window !== 'undefined') {
-      window.speechSynthesis?.cancel();
-    }
-    setHardwareActive(false);
-
-    // ── Step 2: Show farewell UI ──────────────────────────────────────────
-    const farewellName = getClosingName(sessionDataRef.current?.candidate_name, user?.full_name);
-    const farewellMessage = `Thank you ${farewellName}. It was great to interview you. Your report is being prepared now.`;
-
-    setStatusText('Interview ended.');
-    setTimerMessage('Generating your report...');
-    appendTranscript('ai', farewellMessage);
-
-    // Speak farewell immediately (non-blocking)
-    speak(farewellMessage, () => {});
-
-    // ── Step 3: Read transcript (now contains flushed final window) ───────
-    const activeSession = sessionDataRef.current;
-    if (!activeSession) {
-      router.push('/dashboard');
-      return;
-    }
-
-    try {
-      const elapsedSeconds = Math.floor((getTimestamp() - startTimeRef.current) / 1000);
-
-      // Submit any captured text as the final answer first
-      const capturedText = normalizeLiveTranscript(currentTranscriptRef.current.trim());
-      if (capturedText) {
-        appendTranscript('user', capturedText);
-      }
-
-      // Use the answer endpoint with [USER_REQUESTED_END] so the backend
-      // properly finishes the session and generates the report
-      const response = await api.submitAnswer<SubmitResponse>(
-        activeSession.session_id,
-        '[USER_REQUESTED_END]',
-        activeSession.access_token,
-        elapsedSeconds,
-        createSubmissionKey(),
-      );
-
-      if (response.action === 'finish' || response.action === 'terminated') {
-        // Cancel any ongoing speech and redirect immediately
-        if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
-        finishInterviewLocally(response as CompletedResponse);
-      } else {
-        // Fallback: force navigate to report
-        if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
-        clearStoredInterviewSession();
-        router.push(`/report/${activeSession.session_id}`);
-      }
-    } catch {
-      // Even if the API call fails, navigate away — the session is done
-      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
-      clearStoredInterviewSession();
-      router.push(`/report/${activeSession.session_id}`);
-    }
+    // Capture settles before the final answer is persisted and the session ends.
+    await submitToBackend(currentTranscriptRef.current, createSubmissionKey(), 0, true);
   };
 
   const showLoading = booting || authLoading;
@@ -2183,7 +2183,7 @@ export default function LiveInterviewPage() {
           <div className={styles.resultsStage}>
             <div className={styles.privacyBanner}>Hardware forcefully disconnected. Privacy secured.</div>
             <h2>Evaluation Report</h2>
-            <div className={styles.scoreBox}>{resultData.final_score}/100</div>
+            <div className={styles.scoreBox}><ScoreSummary value={resultData.final_score} measurement={resultData} /></div>
             <p className={styles.resultText}>{resultData.interpretation}</p>
             {resultSummaryBits.length ? (
               <p className={styles.resultText}>{resultSummaryBits.join(' | ')}</p>
@@ -2205,7 +2205,7 @@ export default function LiveInterviewPage() {
                   <ul className={styles.resultList}>
                     {([
                       ...(resultData.neural_feedback?.strength_signal ? [resultData.neural_feedback.strength_signal] : []),
-                      ...(resultData.strengths.length ? resultData.strengths : ['Keep practicing to surface your strongest areas.']),
+                      ...(resultData.strengths.length ? resultData.strengths : ['Not enough measured evidence to identify strengths.']),
                     ].filter((item, index, array) => array.indexOf(item) === index)).map(item => (
                       <li key={`strength-${item}`}>{item}</li>
                     ))}
@@ -2216,7 +2216,7 @@ export default function LiveInterviewPage() {
                   <ul className={styles.resultList}>
                     {([
                       ...(resultData.neural_feedback?.growth_focus ? [resultData.neural_feedback.growth_focus] : []),
-                      ...(resultData.weaknesses.length ? resultData.weaknesses : ['Good work so far. Keep building consistency.']),
+                      ...(resultData.weaknesses.length ? resultData.weaknesses : ['Not enough measured evidence to identify an improvement area.']),
                     ].filter((item, index, array) => array.indexOf(item) === index)).map(item => (
                       <li key={`weakness-${item}`}>{item}</li>
                     ))}
@@ -2254,7 +2254,7 @@ export default function LiveInterviewPage() {
               </div>
               {resultData ? (
                 <>
-                  <div className={styles.scoreBox}>{resultData.final_score}/100</div>
+                  <div className={styles.scoreBox}><ScoreSummary value={resultData.final_score} measurement={resultData} /></div>
                   <p className={styles.resultText}>{resultData.interpretation}</p>
                 </>
               ) : null}
@@ -2319,14 +2319,16 @@ export default function LiveInterviewPage() {
                 </button>
                 {uiState === 'USER_LISTENING' ? (
                   <>
-                    <button type="button" className={styles.forceButton} onClick={handleManualSubmit}>Submit Answer</button>
+                    <button type="button" className={styles.forceButton} disabled={finalizing || !!pendingRetryRef.current} onClick={handleManualSubmit}>{pendingAnswerRef.current ? 'Retry saved answer' : 'Submit Answer'}</button>
+                    <button type="button" className={styles.forceButton} disabled={finalizing || !!pendingRetryRef.current || uiState !== 'USER_LISTENING'} onClick={() => void submitToBackend('', createSubmissionKey(), 0, false, 'SKIPPED')}>Skip question</button>
+                    <button type="button" className={styles.forceButton} disabled={finalizing || assistanceLoading || !!pendingAnswerRef.current} onClick={() => void handleAskMeAgain()}>{pendingRetryRef.current ? 'Retry Ask Me Again' : 'Ask Me Again'}</button>
                     {assistanceEnabled ? (
                       <>
                         <button
                           type="button"
                           className={styles.endButton}
                           style={{ opacity: assistanceLoading ? 0.6 : 1 }}
-                          disabled={assistanceLoading || hintLevel >= 2}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || hintLevel >= 2}
                           onClick={requestHint}
                           aria-label="Show contextual hint for current interview question"
                         >
@@ -2336,7 +2338,7 @@ export default function LiveInterviewPage() {
                           type="button"
                           className={styles.endButton}
                           style={{ opacity: assistanceLoading ? 0.6 : 1 }}
-                          disabled={assistanceLoading || !!guidanceContent}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || !!guidanceContent}
                           onClick={requestAnswerGuidance}
                           aria-label="Show professional answer guidance for current interview question"
                         >
@@ -2344,7 +2346,7 @@ export default function LiveInterviewPage() {
                         </button>
                       </>
                     ) : null}
-                    <button type="button" className={styles.endButton} onClick={handleEndInterview}>End Interview</button>
+                    <button type="button" className={styles.endButton} disabled={finalizing || !!pendingRetryRef.current} onClick={handleEndInterview}>End Interview</button>
                   </>
                 ) : null}
               </div>
@@ -2369,7 +2371,7 @@ export default function LiveInterviewPage() {
                       PrepVista Guidance
                     </span>
                     <span style={{ fontSize: '11px', color: 'rgba(100,116,139,0.8)' }}>
-                      {assistanceStatus === 'independent' ? 'Independent so far' : assistanceStatus === 'hint' ? 'Guided · Hint used' : 'Guided · Answer guidance viewed'}
+                      {provenanceLabel(assistanceStatus)}
                     </span>
                   </div>
 
@@ -2379,6 +2381,7 @@ export default function LiveInterviewPage() {
                     </div>
                   ) : null}
 
+                  {assistanceError ? <div role="alert">{assistanceError}{displayedAssistance ? <button type="button" onClick={() => void acknowledgeDisplayedAssistance(displayedAssistance)}>Retry view acknowledgement</button> : null}</div> : null}
                   {/* Hint content */}
                   {hintContent && !assistanceLoading ? (
                     <div>
@@ -2475,12 +2478,23 @@ export default function LiveInterviewPage() {
 
         
 
+        {terminationRetry ? (
+          <div role="alert">
+            <p>Session closure could not be saved. Your session is preserved.</p>
+            <button type="button" disabled={finalizing} onClick={() => {
+              terminationPendingRef.current = false;
+              setTerminationRetry('');
+              void hardTerminate(terminationRetry);
+            }}>Retry session closure</button>
+          </div>
+        ) : null}
         <ConfirmDialog
           open={endInterviewOpen}
           title="End interview early?"
           description="You can stop now and PrepVista will evaluate the answers completed so far. If you want a fuller report, continue with the interview."
           confirmLabel="End interview now"
           confirmTone="danger"
+          loading={finalizing}
           onCancel={() => setEndInterviewOpen(false)}
           onConfirm={handleConfirmEndInterview}
         />

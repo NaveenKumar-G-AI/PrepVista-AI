@@ -79,11 +79,13 @@ const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / who
 const heatClass = (v: number) => (v >= 7.5 ? 'c-s' : v >= 6 ? 'c-d' : v >= 4.5 ? 'c-w' : 'c-c');
 
 export function IntelDashboard({ report, explain = true }: { report: IntelReport; explain?: boolean }) {
-  const m: IntelModel = useMemo(() => buildIntel(report), [report]);
+  const m: IntelModel | null = useMemo(() => buildIntel(report), [report]);
   // Full per-chart student coaching write-ups, recomputed from the live model so
   // the words always match (and change with) the numbers on screen.
-  const ex = useMemo(() => buildExplanations(m), [m]);
+  const ex = useMemo(() => m ? buildExplanations(m) : {}, [m]);
   const xp = (id: string): ChartExplain | null => (explain ? ex[id] ?? null : null);
+
+  if (!m) return <p className="text-sm text-secondary">Not enough measured evidence for readiness or dimension charts. Missing measurements are not zero.</p>;
 
   // Always render all 12 cards; each shows an honest empty state when its source
   // data is missing, so a sparse or abandoned session still shows the full layout.
@@ -267,12 +269,12 @@ export function IntelDashboard({ report, explain = true }: { report: IntelReport
         </Card>
 
         {/* 12 waterfall */}
-        <Card n="12" explain={xp('12')} tone="blue" title={`Score contribution waterfall — what built your ${m.finalScore}`} full
-          sub="Each dimension's positive contribution and each penalty's drag on the final score"
-          pills={['rubric_scores', 'timeout_count', 'skipped_count', 'classification']}
-          height={300} empty={noTurns}
-          legend={<><LDot c={COLORS.purple}>Base / Final</LDot><LDot c={COLORS.teal}>Contribution</LDot><LDot c={COLORS.red}>Penalty</LDot></>}
-          note={biggestPos ? { tone: 'blue', text: <><strong>Performance insight — </strong>{biggestPos.l.replace('+', '')} was your biggest positive (+{biggestPos.v}). Eliminating avoidable penalties — giving even a partial answer instead of silence — is the cleanest path past 70.</> } : undefined}>
+        <Card n="12" explain={xp('12')} tone="blue" empty={!m.waterfall.values.length} emptyText="Exact weighted contributions are unavailable for this historical report." title={`Score contribution waterfall — what built your ${m.finalScore}`} full
+          sub="Measured category averages weighted by the backend formula; coverage is separate."
+          pills={['rubric_scores', 'score_contributions']}
+          height={300}
+          legend={<><LDot c={COLORS.teal}>Weighted contribution</LDot><LDot c={COLORS.purple}>Rounded final score</LDot></>}
+          note={biggestPos ? { tone: 'blue', text: <>{biggestPos.l} contributed {biggestPos.v} weighted points.</> } : undefined}>
           <EChart option={waterfallOption(m)} />
         </Card>
       </div>

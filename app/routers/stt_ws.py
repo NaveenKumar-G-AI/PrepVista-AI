@@ -70,7 +70,7 @@ async def _resolve_session_owner(session_id: str, auth_user_id: str, email: str)
         async with DatabaseConnection() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT s.user_id, p.email
+                SELECT s.user_id, p.email, s.state
                 FROM interview_sessions s
                 JOIN profiles p ON p.id = s.user_id
                 WHERE s.id = $1
@@ -78,9 +78,9 @@ async def _resolve_session_owner(session_id: str, auth_user_id: str, email: str)
                 session_id,
             )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("stt_ws_owner_lookup_failed", error=str(exc))
-        return False
-    if not row:
+        logger.warning("stt_ws_owner_lookup_failed", error_type=type(exc).__name__)
+        raise
+    if not row or row["state"] != "ACTIVE":
         return False
     return str(row["user_id"]) == str(auth_user_id) or (
         bool(email) and str(row["email"]).lower() == str(email).lower()
@@ -102,7 +102,12 @@ async def stt_websocket(websocket: WebSocket, session_id: str):
     if not identity:
         await websocket.close(code=4401, reason="Unauthorized")
         return
-    if not await _resolve_session_owner(session_id, identity["auth_user_id"], identity["email"]):
+    try:
+        owns_session = await _resolve_session_owner(session_id, identity["auth_user_id"], identity["email"])
+    except Exception:
+        await websocket.close(code=1013, reason="Transcription temporarily unavailable")
+        return
+    if not owns_session:
         await websocket.close(code=4403, reason="Forbidden")
         return
 
@@ -134,7 +139,7 @@ async def stt_websocket(websocket: WebSocket, session_id: str):
                 data: bytes = message["bytes"]
                 if buffered_bytes + len(data) > _MAX_TURN_BYTES:
                     await websocket.send_json(
-                        {"type": "error", "message": "Turn audio too large; transcribing partial audio."}
+                        {"type": "error", "turn_id": current_turn, "message": "Transcription could not be completed."}
                     )
                     await _finalize_turn(
                         websocket, session_id, current_turn, buffer,
@@ -181,10 +186,10 @@ async def stt_websocket(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         pass
     except Exception as exc:  # noqa: BLE001
-        logger.warning("stt_ws_error", error=str(exc), session_id=session_id)
+        logger.warning("stt_ws_error", error_type=type(exc).__name__, session_id=session_id)
         try:
             await websocket.send_json(
-                {"type": "error", "message": "Could not process audio, please try again."}
+                {"type": "error", "turn_id": current_turn, "message": "Transcription could not be completed."}
             )
         except Exception:
             pass
@@ -202,7 +207,7 @@ async def _finalize_turn(
     full_audio = b"".join(buffer)
     if not full_audio:
         await websocket.send_json(
-            {"type": "error", "message": "Could not process audio, please try again."}
+            {"type": "error", "turn_id": turn_id, "message": "Transcription could not be completed."}
         )
         return
 
@@ -227,7 +232,7 @@ async def _finalize_turn(
 
     if result["provider"] == "none":
         await websocket.send_json(
-            {"type": "error", "message": "Could not process audio, please try again."}
+            {"type": "error", "turn_id": turn_id, "message": "Transcription could not be completed."}
         )
         return
 
@@ -266,10 +271,13 @@ async def stt_transcribe_rest(
 
     async with DatabaseConnection() as conn:
         row = await conn.fetchrow(
-            "SELECT user_id FROM interview_sessions WHERE id = $1", session_id
+            "SELECT user_id, state FROM interview_sessions WHERE id = $1", session_id
         )
     if not row or str(row["user_id"]) != str(user.id):
         raise HTTPException(status_code=404, detail="Interview session not found.")
+
+    if row["state"] != "ACTIVE":
+        raise HTTPException(409, "This interview is already closed.")
 
     audio_bytes = await audio.read()
     if not audio_bytes:
@@ -280,19 +288,17 @@ async def stt_transcribe_rest(
     result = await transcribe_audio(
         audio_bytes, language_hint=language_hint, resume_context=resume_context
     )
-    if result["provider"] == "none":
-        raise HTTPException(
-            status_code=502, detail="Could not process audio, please try again."
-        )
-
     object_path = await store_audio_chunk(session_id, turn_id, "full", audio_bytes)
     audio_url = await create_signed_url(object_path) if object_path else None
 
     # Persist the per-turn audio audit record for the report's audit trail (Fix 7).
     await record_audio_turn(
-        session_id, turn_id, object_path, result["confidence"], result["provider"]
+        session_id, turn_id, object_path, result["confidence"], result["provider"],
+        transcription_status="failed" if result["provider"] == "none" else "success"
     )
 
+    if result["provider"] == "none":
+        raise HTTPException(502, "Transcription could not be completed.")
     return {
         "final_transcript": result["transcript"],
         "raw_transcript": result["raw_transcript"],

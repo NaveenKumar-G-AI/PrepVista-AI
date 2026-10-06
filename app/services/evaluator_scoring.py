@@ -16,6 +16,8 @@ import structlog
 
 from app.config import CATEGORY_WEIGHTS, PLAN_CONFIG, get_settings
 from app.services.llm import call_llm_json
+from app.services.interview_terminal import intent
+from app.services.score_semantics import numeric_score, valid_evaluations, feedback_evidence
 from app.services.placement_readiness import (
     build_placement_readiness,
     category_averages_from_evaluations,
@@ -219,6 +221,20 @@ async def evaluate_single_question(
     return result
 
 
+def _require_provider_measurement(result, plan):
+    """Current atomic answers cannot turn an incomplete provider reply into a score."""
+    if intent.get() is None:
+        return
+    fields = {
+        "free": ("relevance_score", "clarity_score", "specificity_score", "structure_score", "communication_score"),
+        "pro": ("question_match_score", "technical_accuracy_score", "specificity_score", "structure_score", "communication_score"),
+        "career": ("relevance_score", "depth_score", "specificity_score", "structure_score", "communication_score"),
+    }.get(plan, ("score", "communication_score"))
+    maximum = 2 if plan in {"free", "pro", "career"} else 10
+    if not isinstance(result, dict) or any(numeric_score(result.get(field), maximum) is None for field in fields):
+        raise ValueError("Evaluation measurement unavailable")
+
+
 async def _evaluate_question_core(
     question_text: str,
     raw_answer: str,
@@ -323,6 +339,7 @@ async def _evaluate_question_core(
                 retry_delay=0.12,
                 allow_provider_fallback=False,
             )
+            _require_provider_measurement(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_free_result(
                     raw_answer=raw_answer,
@@ -339,6 +356,8 @@ async def _evaluate_question_core(
                 rubric_category=rubric_category,
             )
         except Exception as exc:
+            if intent.get() is not None:
+                raise
             logger.warning("free_question_evaluation_failed", error=str(exc), question=question_text[:100])
             return _fallback_free_evaluation(
                 question_text=question_text,
@@ -367,6 +386,7 @@ async def _evaluate_question_core(
                 retry_delay=0.12,
                 allow_provider_fallback=False,
             )
+            _require_provider_measurement(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_pro_result(
                     raw_answer=raw_answer,
@@ -383,6 +403,8 @@ async def _evaluate_question_core(
                 rubric_category=rubric_category,
             )
         except Exception as exc:
+            if intent.get() is not None:
+                raise
             logger.warning("pro_question_evaluation_failed", error=str(exc), question=question_text[:100])
             return _fallback_pro_evaluation(
                 question_text=question_text,
@@ -411,6 +433,7 @@ async def _evaluate_question_core(
                 retry_delay=0.12,
                 allow_provider_fallback=True,
             )
+            _require_provider_measurement(result, plan)
             return await _maybe_rewrite_ideal_answer(
                 _normalize_career_result(
                     raw_answer=raw_answer,
@@ -427,6 +450,8 @@ async def _evaluate_question_core(
                 rubric_category=rubric_category,
             )
         except Exception as exc:
+            if intent.get() is not None:
+                raise
             logger.warning("career_question_evaluation_failed", error=str(exc), question=question_text[:100])
             return _fallback_career_evaluation(
                 question_text=question_text,
@@ -456,6 +481,7 @@ async def _evaluate_question_core(
             allow_provider_fallback=False,
         )
 
+        _require_provider_measurement(result, plan)
         score = _clamp_score(result.get("score", 0), 10.0)
         comm_score = _clamp_score(result.get("communication_score", 0), 10.0)
 
@@ -485,6 +511,8 @@ async def _evaluate_question_core(
         }
 
     except Exception as exc:
+        if intent.get() is not None:
+            raise
         logger.error("question_evaluation_failed", error=str(exc), question=question_text[:100])
         fallback = _fallback_evaluation(raw_answer, normalized_answer)
         fallback["corrected_intent"] = ""
@@ -627,6 +655,8 @@ def _best_answer_style_for_evaluations(question_evaluations: list[dict], plan: s
 
 
 def _derive_free_strengths_and_improvements(question_evaluations: list[dict]) -> tuple[list[str], list[str]]:
+    if not feedback_evidence(question_evaluations):
+        return [], []
     strengths: list[str] = []
     improvements: list[str] = []
     categories = [str(item.get("rubric_category") or "") for item in question_evaluations]
@@ -690,6 +720,8 @@ def _derive_free_strengths_and_improvements(question_evaluations: list[dict]) ->
 
 
 def _derive_pro_strengths_and_improvements(question_evaluations: list[dict]) -> tuple[list[str], list[str]]:
+    if not feedback_evidence(question_evaluations):
+        return [], []
     strengths: list[str] = []
     improvements: list[str] = []
 
@@ -863,6 +895,8 @@ def _is_valid_career_strength(text: str) -> bool:
 
 
 def _derive_career_strengths_and_improvements(question_evaluations: list[dict]) -> tuple[list[str], list[str]]:
+    if not feedback_evidence(question_evaluations):
+        return [], []
     strengths: list[str] = []
     improvements: list[str] = []
 
@@ -1075,9 +1109,10 @@ def compute_final_score(
     Deterministic final score aggregation from per-question evaluations.
     The LLM does not generate this score. This is computed by the backend.
     """
+    question_evaluations = valid_evaluations(question_evaluations)
     if not question_evaluations:
         return {
-            "final_score": 0,
+            "final_score": None,
             "category_scores": {},
             "total_questions": 0,
             "answered_questions": 0,
@@ -1097,11 +1132,14 @@ def compute_final_score(
     all_scores = []
 
     for q in question_evaluations:
-        score = float(q.get("score", 0))
-        category = q.get("rubric_category", "technical_depth")
-        category_scores[category].append(score)
+        score = numeric_score(q.get("score"), 10)
+        category = q.get("rubric_category")
+        if category:
+            category_scores[category].append(score)
         all_scores.append(score)
-        comm_scores.append(float(q.get("communication_score", 0)))
+        communication = numeric_score(q.get("communication_score"), 10)
+        if communication is not None:
+            comm_scores.append(communication)
 
     category_averages = {
         cat: round(sum(scores) / len(scores), 1)
@@ -1121,14 +1159,15 @@ def compute_final_score(
     if total_weight > 0:
         base_score = round((weighted_sum / total_weight) * 10)
     else:
-        base_score = round(sum(all_scores) / len(all_scores) * 10) if all_scores else 0
+        base_score = round(sum(all_scores) / len(all_scores) * 10)
 
     coverage_ratio = (
         min(1.0, observed_questions / resolved_expected_questions)
         if resolved_expected_questions > 0
         else 1.0
     )
-    final_score = round(base_score * coverage_ratio)
+    # Coverage is reported separately; missing evidence is not an ability penalty.
+    final_score = base_score
 
     final_score = max(0, min(100, final_score))
 
@@ -1137,12 +1176,15 @@ def compute_final_score(
     weakest = sorted_cats[-1][0] if sorted_cats else None
     answered = len([q for q in question_evaluations if q.get("classification") != "silent"])
 
-    if plan == "free":
-        strengths, weaknesses = _derive_free_strengths_and_improvements(question_evaluations)
+    measured_evaluations = [q for q in question_evaluations if q.get("terminal_outcome") not in {"NO_ANSWER", "SKIPPED"}]
+    if not measured_evaluations:
+        strengths, weaknesses = [], []
+    elif plan == "free":
+        strengths, weaknesses = _derive_free_strengths_and_improvements(measured_evaluations)
     elif plan == "pro":
-        strengths, weaknesses = _derive_pro_strengths_and_improvements(question_evaluations)
+        strengths, weaknesses = _derive_pro_strengths_and_improvements(measured_evaluations)
     elif plan == "career":
-        strengths, weaknesses = _derive_career_strengths_and_improvements(question_evaluations)
+        strengths, weaknesses = _derive_career_strengths_and_improvements(measured_evaluations)
     else:
         strengths = [f"Strong in {cat.replace('_', ' ')}" for cat, score in sorted_cats if score >= 7][:3]
         weaknesses = [f"Improve {cat.replace('_', ' ')}" for cat, score in sorted_cats if score < 5][:3]

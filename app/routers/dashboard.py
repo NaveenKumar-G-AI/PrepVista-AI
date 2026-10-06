@@ -38,7 +38,10 @@ from app.config import PLAN_CONFIG
 from app.database.connection import DatabaseConnection
 from app.dependencies import UserProfile, get_current_user
 from app.services.analytics import backfill_missing_skill_scores, build_dashboard_feedback
-from app.services.history_retention import enforce_history_retention, get_history_limit
+from app.services.score_semantics import assessment, SUMMARY_KEYS, numeric_score, project_sessions, project_skill_rows
+from app.services.history_retention import (
+    VISIBLE_FINISHED_HISTORY_SQL, get_visible_history_limit,
+)
 from app.services.launch_offer import get_launch_offer_state
 from app.services.plan_access import get_plan_expiry_map
 from app.services.public_growth import get_public_growth_metrics
@@ -111,11 +114,9 @@ class BulkDeleteSessionsRequest(BaseModel):
         return deduped
 
 
-def _score_to_percent(value) -> float:
-    try:
-        return round(max(0.0, min(100.0, float(value) * 10)), 1)
-    except (TypeError, ValueError):
-        return 0.0
+def _score_to_percent(value) -> float | None:
+    score = numeric_score(value, 10)
+    return round(score * 10, 1) if score is not None else None
 
 
 @router.get("")
@@ -135,44 +136,47 @@ async def get_dashboard(user: UserProfile = Depends(get_current_user)):
             user.id,
         )
 
-        if has_session_history_access:
-            sessions = await conn.fetch(
-                """SELECT id, plan, final_score, rubric_scores, state,
-                          total_turns, duration_actual_seconds, created_at, finished_at
-                   FROM interview_sessions
-                   WHERE user_id = $1
-                   ORDER BY created_at DESC
-                   LIMIT 10""",
-                user.id,
-            )
-        else:
-            sessions = await conn.fetch(
-                """SELECT id, plan, final_score, rubric_scores, state,
-                          total_turns, duration_actual_seconds, created_at, finished_at
-                   FROM interview_sessions
-                   WHERE user_id = $1 AND state = 'FINISHED'
-                   ORDER BY created_at DESC
-                   LIMIT 1""",
-                user.id,
-            )
-
-        stats_row = await conn.fetchrow(
-            """SELECT AVG(final_score)  AS avg_score,
-                      MAX(final_score)  AS best_score,
-                      COUNT(*)          AS total_sessions,
-                      SUM(total_turns)  AS total_questions
-               FROM interview_sessions
-               WHERE user_id = $1 AND state = 'FINISHED'""",
+        sessions = await conn.fetch(
+            f"""WITH visible_finished AS ({VISIBLE_FINISHED_HISTORY_SQL})
+                SELECT id, plan, final_score, rubric_scores, state,
+                       total_turns, duration_actual_seconds, created_at, finished_at, runtime_state
+                FROM interview_sessions
+                WHERE user_id = $1 AND (
+                    id IN (SELECT id FROM visible_finished)
+                    OR ($3::boolean AND state <> 'FINISHED')
+                )
+                ORDER BY COALESCE(finished_at, created_at) DESC NULLS LAST,
+                         created_at DESC NULLS LAST, id DESC
+                LIMIT 10""",
             user.id,
+            get_visible_history_limit(user),
+            has_session_history_access,
         )
 
+        sessions = await project_sessions(conn, sessions)
+
+        # Aggregate the same read-only evidence projection used by report cards.
+        # Stored legacy values remain, but a conclusive failed ledger cannot add
+        # a fake zero to average/best when a historical cached score is stale.
+        stats_sessions = await conn.fetch(
+            "SELECT id, plan, final_score, rubric_scores, runtime_state, total_turns FROM interview_sessions WHERE user_id = $1 AND state = 'FINISHED'",
+            user.id)
+        stats_sessions = await project_sessions(conn, stats_sessions)
+        scores = [row["final_score"] for row in stats_sessions if row["final_score"] is not None]
+        stats_row = {"avg_score": sum(scores)/len(scores) if scores else None,
+                     "best_score": max(scores) if scores else None,
+                     "total_sessions": len(stats_sessions),
+                     "total_questions": sum(int(row["total_turns"] or 0) for row in stats_sessions)}
+
         skills = await conn.fetch(
-            """SELECT DISTINCT ON (category) category, average_score, recorded_at
+            """SELECT DISTINCT ON (category) category, average_score, session_id, recorded_at
                FROM skill_scores
                WHERE user_id = $1
                ORDER BY category, recorded_at DESC""",
             user.id,
         )
+
+        skills = project_skill_rows(skills, stats_sessions)
 
         plan_expiry_map = await get_plan_expiry_map(
             conn, user.id, premium_override=user.premium_override
@@ -225,7 +229,8 @@ async def get_dashboard(user: UserProfile = Depends(get_current_user)):
         {
             "id":          str(s["id"]),
             "plan":        s["plan"],
-            "final_score": float(s["final_score"]) if s["final_score"] else 0,
+            "final_score": assessment(dict(s))["final_score"],
+            **{key: assessment(dict(s))[key] for key in SUMMARY_KEYS},
             "state":       s["state"],
             "total_turns": s["total_turns"],
             "duration":    s["duration_actual_seconds"],
@@ -244,16 +249,16 @@ async def get_dashboard(user: UserProfile = Depends(get_current_user)):
             "score":        _score_to_percent(sk["average_score"]),
             "last_updated": str(sk["recorded_at"]),
         }
-        for sk in skills
+        for sk in skills if _score_to_percent(sk["average_score"]) is not None
     }
 
     avg_score = (
         round(float(stats_row["avg_score"]), 1)
-        if stats_row and stats_row["avg_score"] else None
+        if stats_row and stats_row["avg_score"] is not None else None
     )
     best_score = (
         round(float(stats_row["best_score"]), 1)
-        if stats_row and stats_row["best_score"] else None
+        if stats_row and stats_row["best_score"] is not None else None
     )
     total_sessions  = stats_row["total_sessions"]  if stats_row else 0
     total_questions = (
@@ -372,10 +377,9 @@ async def get_session_history(
     if not plan_cfg["has_session_history"]:
         async with DatabaseConnection() as conn:
             latest_finished_session_id = await conn.fetchval(
-                """SELECT id FROM interview_sessions
-                   WHERE user_id = $1 AND state = 'FINISHED'
-                   ORDER BY created_at DESC LIMIT 1""",
+                f"SELECT id FROM ({VISIBLE_FINISHED_HISTORY_SQL}) visible",
                 user.id,
+                1,
             )
         return {
             "sessions":    [],
@@ -391,38 +395,30 @@ async def get_session_history(
         }
 
     # ── Page size resolution ──────────────────────────────────────────────────
-    # Original: min(limit, history_limit or 50, 50)
-    # Bug: history_limit=None (premium_override users) caused `None or 50` → 50,
-    # capping premium users at 50 sessions despite paying for unlimited.
-    # Fix: explicit None check preserves the "no DB cap" intent for premium users.
-    if user.premium_override:
-        effective_limit = min(limit, _PREMIUM_SESSION_PAGE_CAP)
-    else:
-        history_limit = get_history_limit(user.effective_plan)
-        effective_limit = (
-            min(limit, history_limit, 50) if history_limit is not None
-            else min(limit, 50)
-        )
+    # Apply the plan window before pagination so offsets cannot bypass it.
+    history_limit = get_visible_history_limit(user)
+    effective_limit = min(limit, _PREMIUM_SESSION_PAGE_CAP if user.premium_override else 50)
 
     async with DatabaseConnection() as conn:
-        if not user.premium_override:
-            await enforce_history_retention(conn, user.id, user.effective_plan)
-
         # ── Single query: rows + total count via window function ──────────────
         # Previously two separate round-trips: COUNT(*) then SELECT.
         # COUNT(*) OVER () computes the total in one scan alongside the rows.
         sessions = await conn.fetch(
-            """SELECT id, plan, final_score, state, total_turns,
+            f"""WITH visible_finished AS ({VISIBLE_FINISHED_HISTORY_SQL})
+               SELECT id, plan, final_score, state, total_turns, runtime_state,
                       duration_actual_seconds, created_at, finished_at,
                       COUNT(*) OVER () AS total_all
-               FROM interview_sessions
-               WHERE user_id = $1
-               ORDER BY created_at DESC
-               LIMIT $2 OFFSET $3""",
+               FROM visible_finished
+               ORDER BY COALESCE(finished_at, created_at) DESC NULLS LAST,
+                        created_at DESC NULLS LAST, id DESC
+               LIMIT $3 OFFSET $4""",
             user.id,
+            history_limit,
             effective_limit,
             offset,
         )
+
+        sessions = await project_sessions(conn, sessions)
 
     total_count = int(sessions[0]["total_all"]) if sessions else 0
 
@@ -431,7 +427,8 @@ async def get_session_history(
             {
                 "id":          str(s["id"]),
                 "plan":        s["plan"],
-                "score":       float(s["final_score"]) if s["final_score"] else None,
+                "score":       assessment(dict(s))["final_score"],
+                **{key: assessment(dict(s))[key] for key in SUMMARY_KEYS},
                 "state":       s["state"],
                 "total_turns": s["total_turns"],
                 "duration":    s["duration_actual_seconds"],
@@ -564,8 +561,14 @@ async def get_skill_breakdown(user: UserProfile = Depends(get_current_user)):
             _SKILLS_ROWS_PER_CATEGORY,
         )
 
+        skill_sessions = await conn.fetch("SELECT id, plan, runtime_state, final_score, rubric_scores, total_turns FROM interview_sessions WHERE user_id = $1 AND state = 'FINISHED'", user.id)
+        skill_sessions = await project_sessions(conn, skill_sessions)
+        skills = project_skill_rows(skills, skill_sessions)
+
     category_trends: dict[str, list] = {}
     for sk in skills:
+        if _score_to_percent(sk["average_score"]) is None:
+            continue
         cat = sk["category"]
         if cat not in category_trends:
             category_trends[cat] = []

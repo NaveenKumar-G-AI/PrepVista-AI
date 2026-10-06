@@ -55,7 +55,7 @@ def build_dashboard_feedback(
     """Create beginner-friendly analytics coaching text, with stronger Free-plan guidance."""
     normalized_plan = str(plan or "free").lower().strip()
     sorted_skills = sorted(
-        skill_scores.items(),
+        [(key, value) for key, value in skill_scores.items() if _to_float(value.get("score")) is not None],
         key=lambda item: float(item[1].get("score") or 0),
         reverse=True,
     )
@@ -110,7 +110,7 @@ def build_dashboard_feedback(
     else:
         coach_insight = "Your finished interviews are starting to form beginner coaching patterns. Complete one more round to make the recommendations sharper."
 
-    score_text = f"{round(average_score)}" if average_score is not None else "0"
+    score_text = f"{round(average_score)}/100" if average_score is not None else "Not measured"
     strongest_signal = (
         f"{strongest_name} is your strongest free-plan signal right now. Keep repeating the same clear answer style that already works there."
         if strongest
@@ -128,7 +128,7 @@ def build_dashboard_feedback(
         "strongest_signal": strongest_signal,
         "improvement_signal": improvement_signal,
         "next_step": (
-            f"Current average: {score_text}/100 across {total_questions or 0} answered question signals. "
+            f"Current average: {score_text} across {total_questions or 0} answered question signals. "
             f"Next round, focus on {weakest_name.lower() if weakest else 'clear structure'} first."
         ),
     }
@@ -149,7 +149,7 @@ def build_interview_neural_feedback(
     category_scores: dict[str, list[float]] = defaultdict(list)
     for evaluation in question_evaluations:
         category = str(evaluation.get("rubric_category") or "communication").strip() or "communication"
-        score = _to_float(evaluation.get("score"))
+        score = numeric_score(evaluation.get("score"), 10)
         if score is not None:
             category_scores[category].append(score)
 
@@ -201,19 +201,11 @@ def derive_skill_score_rows(evaluations: list[dict]) -> list[dict]:
     """Aggregate per-question evaluations into category-level skill rows."""
     category_scores: dict[str, list[float]] = defaultdict(list)
 
-    for evaluation in evaluations:
-        raw_category = str(evaluation.get("rubric_category") or "technical_depth").strip() or "technical_depth"
-        # ✅ SEC: Validate category against allowlist before accumulating.
-        # Without this, any string from the evaluator (including malformed output
-        # from a runaway model) gets persisted in skill_scores and returned in
-        # analytics API responses. Unknown categories fall back to "technical_depth".
-        category = raw_category if raw_category in VALID_RUBRIC_CATEGORIES else "technical_depth"
-        if raw_category != category:
-            logger.warning(
-                "invalid_rubric_category_coerced",
-                raw_category=raw_category[:64],
-                coerced_to="technical_depth",
-            )
+    from app.services.score_semantics import numeric_score, valid_evaluations
+    for evaluation in valid_evaluations(evaluations):
+        category = str(evaluation.get("rubric_category") or "").strip()
+        if category not in VALID_RUBRIC_CATEGORIES:
+            continue
 
         score = _to_float(evaluation.get("score"))
         if score is not None:
@@ -232,8 +224,8 @@ def derive_skill_score_rows(evaluations: list[dict]) -> list[dict]:
         # moves on). Fix: merge communication_score samples into the SAME
         # "delivery" bucket as any rubric_category="delivery" samples, so
         # there is at most one "delivery" row per session either way.
-        communication_score = _to_float(evaluation.get("communication_score"))
-        if communication_score is not None and communication_score > 0:
+        communication_score = numeric_score(evaluation.get("communication_score"), 10)
+        if communication_score is not None:
             category_scores["delivery"].append(communication_score)
 
     return [
@@ -547,9 +539,8 @@ def compute_student_readiness(overall_growth: dict) -> dict:
     risk_reasons: list[str] = []
     at_risk = False
 
-    if session_count == 0:
-        at_risk = True
-        risk_reasons.append("No completed mock interviews yet.")
+    if session_count == 0 or latest_score is None:
+        risk_reasons.append("Not enough measured evidence for a readiness judgment.")
     elif tier == READINESS_TIER_AT_RISK:
         if session_count >= _MIN_SESSIONS_FOR_RISK_EVAL and is_stuck:
             at_risk = True

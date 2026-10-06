@@ -36,60 +36,44 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
   const initDone = useRef(false);
   const userRef = useRef<User | null>(null);
   const refreshingRef = useRef(false);
   const router = useRouter();
 
   // Derived auth state for pages that need granular checks
-  const authState: AuthState = loading ? 'loading' : user ? 'authenticated' : 'unauthenticated';
-
-  const buildMinimalUser = (id: string, email: string): User => ({
-    id,
-    email,
-    full_name: null,
-    plan: 'free',
-    active_plan: 'free',
-    owned_plans: ['free'],
-    expired_plans: [],
-    highest_owned_plan: 'free',
-    effective_plan: 'free',
-    is_admin: false,
-    is_org_admin: false,
-    org_student: false,
-    organization_id: null,
-    premium_override: false,
-    subscription_status: 'none',
-    onboarding_completed: false,
-    prep_goal: null,
-    theme_preference: 'system',
-    usage: {
-      plan: 'free',
-      used: 0,
-      limit: 2,
-      remaining: 2,
-      is_unlimited: false,
-      period_start: null,
-    },
-  });
+  const awaitingProfile = loading || (!!authError && !user);
+  const authState: AuthState = awaitingProfile ? 'loading' : user ? 'authenticated' : 'unauthenticated';
 
   const refreshUser = useCallback(async () => {
     // Prevent duplicate concurrent refresh calls
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     try {
-      api.loadTokens();
-      if (!api.getToken()) {
+      if (!await api.restoreSession()) {
+        userRef.current = null;
         setUser(null);
+        setAuthError('');
         setLoading(false);
         return;
       }
       const data = await api.getMe<User>();
       userRef.current = data;
       setUser(data);
-    } catch {
-      setUser(null);
-      api.clearTokens();
+      setAuthError('');
+    } catch (error) {
+      if ((error as { status?: number })?.status === 401) {
+        userRef.current = null;
+        setUser(null);
+        api.clearTokens();
+        setAuthError('');
+      } else {
+        // Keep the last authoritative role context. During cold start, keep
+        // protected-page guards waiting rather than inventing a free profile.
+        setAuthError('Your account could not be loaded. Please retry.');
+      }
+      throw error;
     } finally {
       setLoading(false);
       refreshingRef.current = false;
@@ -131,12 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!userRef.current) {
               setLoading(true);
             }
-            void refreshUser();
+            void refreshUser().catch(() => { /* The provider displays retry. */ });
           } else if (event === 'TOKEN_REFRESHED' && session) {
             // Silently update tokens without triggering any re-render
             api.setTokens(session.access_token, session.refresh_token || '');
           } else if (event === 'SIGNED_OUT') {
             api.clearTokens();
+            userRef.current = null;
+            setAuthError('');
             setUser(null);
             setLoading(false);
           }
@@ -153,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userRef.current = null;
       setUser(null);
       setLoading(false);
+      setAuthError('');
       router.replace('/login');
     };
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthenticationRequired);
@@ -165,6 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initDone.current = true;
 
     const initAuth = async () => {
+      if (window.location.pathname === '/auth/callback') {
+        setLoading(false);
+        return;
+      }
       try {
         const sb = getSupabase();
         const { data: { session } } = await sb.auth.getSession();
@@ -180,44 +171,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // Always try to load stored tokens (incl. localStorage refresh_token for session restore)
       api.loadTokens();
-      await refreshUser();
+      await refreshUser().catch(() => { /* The provider displays retry. */ });
     };
     initAuth();
   }, [refreshUser]);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    const data = await api.login(email, password);
-    if (data.user?.id && data.user?.email) {
-      setUser(buildMinimalUser(data.user.id, data.user.email));
-    }
-    // Fetch full role data before navigating
-    await refreshUser();
-    // Route to the correct workspace based on role (use ref to avoid second API call)
-    if (userRef.current?.is_org_admin) {
+  const routeToWorkspace = () => {
+    const profile = userRef.current;
+    if (!profile) return;
+    if (profile.is_admin || profile.premium_override) {
+      router.push('/admin');
+    } else if (profile.is_org_admin) {
       router.push('/org-admin');
-    } else if (userRef.current?.org_student) {
+    } else if (profile.org_student) {
       router.push('/student-dashboard');
     } else {
       router.push('/dashboard');
     }
   };
 
+  const login = async (email: string, password: string) => {
+    setLoading(true);
+    await api.login(email, password);
+    userRef.current = null;
+    setUser(null);
+    await refreshUser();
+    routeToWorkspace();
+  };
+
   const signup = async (email: string, password: string, fullName: string, verificationCode: string) => {
     setLoading(true);
-    const data = await api.signup(email, password, fullName, verificationCode);
-    if (data.user?.id && data.user?.email) {
-      setUser(buildMinimalUser(data.user.id, data.user.email));
-    }
+    await api.signup(email, password, fullName, verificationCode);
+    userRef.current = null;
+    setUser(null);
     await refreshUser();
-    // Route to the correct workspace based on role (use ref to avoid second API call)
-    if (userRef.current?.is_org_admin) {
-      router.push('/org-admin');
-    } else if (userRef.current?.org_student) {
-      router.push('/student-dashboard');
-    } else {
-      router.push('/dashboard');
-    }
+    routeToWorkspace();
   };
 
   const loginWithGoogle = async () => {
@@ -238,12 +226,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.logout();
     try { getSupabase().auth.signOut(); } catch { /* ok */ }
     setUser(null);
+    userRef.current = null;
+    setAuthError('');
     setLoading(false);
     router.push('/');
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, authState, login, signup, loginWithGoogle, logout, refreshUser, applyOptimisticPlan }}>
+    <AuthContext.Provider value={{ user, loading: awaitingProfile, authState, login, signup, loginWithGoogle, logout, refreshUser, applyOptimisticPlan }}>
+      {authError && (
+        <div role="alert" className="p-4 text-center">
+          {authError}{' '}
+          <button onClick={() => { void refreshUser().catch(() => { /* Keep retry available. */ }); }}>Retry</button>
+        </div>
+      )}
       {children}
     </AuthContext.Provider>
   );

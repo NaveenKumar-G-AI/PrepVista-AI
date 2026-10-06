@@ -77,11 +77,7 @@ function toSafeError(err: unknown, fallback: string): string {
 
 // SEC-5 — Auth error detection
 function isAuthError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  return msg.includes('unauthorized') || msg.includes('forbidden') ||
-    msg.includes('unauthenticated') || msg.includes('401') || msg.includes('403') ||
-    msg.includes('session expired') || msg.includes('invalid token');
+  return typeof err === 'object' && err !== null && 'status' in err && err.status === 401;
 }
 
 // SEC-6 — Numeric bounds for seat counts

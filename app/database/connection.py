@@ -1,6 +1,7 @@
 """
 PrepVista - Database Connection Pool
 Uses asyncpg for high-performance async PostgreSQL access.
+Pool startup never runs migrations. Migration helpers are release/admin only.
 
 Hardening applied:
   - asyncio.Lock prevents double-init on concurrent startup (race condition)
@@ -20,7 +21,7 @@ Hardening applied:
     command_timeout — a large multi-table migration can no longer be aborted
     mid-statement by a 30s limit sized for API queries
   - schema_migrations tracks a content checksum per applied migration — if a
-    migration file is edited in place after being applied, startup logs a
+    migration file is edited in place after being applied, the admin runner logs a
     warning instead of silently leaving the database on the old schema forever
   - A separate analytics connection pool (init_analytics_pool / get_analytics_db
     / AnalyticsConnection) isolates long-running cohort-aggregation queries from
@@ -299,8 +300,8 @@ async def init_db_pool(
                     attempt=attempt,
                 )
 
-                async with _pool.acquire() as conn:
-                    await _run_migrations(conn)
+                # Runtime startup only opens a pool. Schema changes belong to
+                # an explicit, separately reviewed release/admin operation.
 
                 # NOTE: the separate analytics pool is intentionally NOT initialized.
                 # Nothing in the app acquires from it (org/college analytics use the
@@ -776,6 +777,41 @@ async def _run_migrations(conn: asyncpg.Connection):
         # carry their own outer BEGIN/COMMIT are unwrapped only for execution;
         # checksums continue to cover the original, immutable file content.
         execution_sql, stripped_outer_transaction = _strip_outer_transaction(sql)
+
+        # OLD-PUSH MIGRATION COMPATIBILITY BOOTSTRAP
+        # The 005_user_activity.sql patch contains an invalid nested DO $$ block
+        # that fails PostgreSQL syntax parsing. The original file cannot be edited
+        # because historical checksums are immutable. We apply a safe in-memory
+        # substitution only to the execution_sql before it hits the database.
+        if version == "005_user_activity":
+            if current_checksum != "0cc889dc8e71728bf485147c874726158f7cab238420d50d30e9a4fe9dc59219":
+                logger.error("migration_005_checksum_mismatch", detail="Transform aborted due to unrecognized 005 content.")
+                raise Exception("migration 005 transform requires strict checksum match")
+            execution_sql = execution_sql.replace(
+                "DO $$\n        DECLARE",
+                "DO $partition_body$\n        DECLARE"
+            )
+            execution_sql = execution_sql.replace(
+                "END $$;\n        $job$",
+                "END $partition_body$;\n        $job$"
+            )
+
+        # OLD-PUSH MIGRATION COMPATIBILITY BOOTSTRAP
+        # 008_public_growth.sql has the exact same nested dollar-quote pg_cron collision as 005.
+        if version == "008_public_growth":
+            if current_checksum != "702e9c03cd2375e183e676782d6cb6306cbb7b48566b1cd22b7cfb0255fdeb2b":
+                logger.error("migration_008_checksum_mismatch", detail="Transform aborted due to unrecognized 008 content.")
+                raise Exception("migration 008 transform requires strict checksum match")
+
+            execution_sql = execution_sql.replace(
+                "DO $$\n        DECLARE",
+                "DO $public_growth_job$\n        DECLARE"
+            )
+            execution_sql = execution_sql.replace(
+                "END $$;\n        $job$",
+                "END $public_growth_job$;\n        $job$"
+            )
+
         use_transaction = "concurrently" not in execution_sql.lower()
 
         try:

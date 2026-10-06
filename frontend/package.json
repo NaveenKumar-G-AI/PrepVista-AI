@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:auth": "node --test tests/auth-reliability.test.mjs",
+    "test:interview": "node --test tests/interview-stt.test.mjs",
+    "test:report": "node --test tests/report-integrity.test.mjs",
+    "test:assistance": "node --test tests/assistance-provenance.test.mjs",
+    "test:college": "node --test tests/college-flow.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.20",

@@ -38,7 +38,9 @@ export interface IntelSummary {
 }
 export interface IntelReport {
   session: {
-    final_score: number;
+    final_score: number | null;
+    readiness_eligible?: boolean;
+    score_contributions?: Record<string, number>;
     rubric_scores: Record<string, number>;
     summary?: IntelSummary;
   };
@@ -131,7 +133,11 @@ export interface IntelModel {
   waterfall: { labels: string[]; offsets: number[]; values: number[]; kinds: ('base' | 'pos' | 'neg' | 'final')[] };
 }
 
-export function buildIntel(report: IntelReport): IntelModel {
+export function buildIntel(report: IntelReport): IntelModel | null {
+  const supplied = report.evaluations ?? [];
+  const measured = (value: unknown) => typeof value === "number" && Number.isFinite(value);
+  if (!measured(report.session?.final_score) || report.session?.readiness_eligible === false || !supplied.length
+      || supplied.some(e => ![e.score, e.communication_score, e.relevance_score, e.clarity_score, e.specificity_score, e.structure_score].every(measured))) return null;
   const evals = [...(report.evaluations ?? [])].sort((a, b) => a.turn_number - b.turn_number);
   const finalScore = Math.max(0, Math.min(100, round(num(report.session?.final_score))));
   const summary = report.session?.summary ?? {};
@@ -166,11 +172,11 @@ export function buildIntel(report: IntelReport): IntelModel {
   // ── 04 confidence decay ─────────────────────────────────────────────────────
   const perTurnTimes = evals.map(e => e.answer_duration_seconds);
   const summaryTimes = summary.per_question_response_times ?? [];
-  const decayVals = perTurnTimes.every(t => t == null) && summaryTimes.length
-    ? summaryTimes.map(t => round(num(t), 1))
-    : perTurnTimes.map(t => (t == null ? 0 : round(num(t), 1)));
-  const decay = { labels: turnLabels.length ? turnLabels : summaryTimes.map((_, i) => 'Q' + (i + 1)), values: decayVals };
-  const hasDecay = decayVals.some(v => v > 0);
+  const timingRows = perTurnTimes.every(t => t == null) && summaryTimes.length
+    ? summaryTimes.map((t, i) => ({ label: 'Q' + (i + 1), value: t })).filter(row => measured(row.value))
+    : evals.map(e => ({ label: 'Q' + e.turn_number, value: e.answer_duration_seconds })).filter(row => measured(row.value));
+  const decay = { labels: timingRows.map(row => row.label), values: timingRows.map(row => round(Number(row.value), 1)) };
+  const hasDecay = timingRows.length > 0;
 
   // ── 05 heatmap (category × dim) ─────────────────────────────────────────────
   const byCat: Record<string, IntelEvaluation[]> = {};
@@ -221,7 +227,7 @@ export function buildIntel(report: IntelReport): IntelModel {
   };
 
   // ── 09 fear vs reality (skip count vs score-when-attempted per category) ─────
-  const fearTopics = heatTopics;
+  const fearTopics = heatTopics.filter(t => byCat[t].some(e => e.classification !== 'silent'));
   const fearSkipped = fearTopics.map(t => byCat[t].filter(e => e.classification === 'silent').length);
   const fearScore = fearTopics.map(t => {
     const attempted = byCat[t].filter(e => e.classification !== 'silent');
@@ -245,52 +251,16 @@ export function buildIntel(report: IntelReport): IntelModel {
   // ── 12 score contribution waterfall ─────────────────────────────────────────
   // Real decomposition: rubric-category contributions (share of final, weighted by
   // each category's mean score) minus explicit session penalties, ending at final.
-  const rubric = report.session?.rubric_scores ?? {};
-  const rubricEntries = Object.entries(rubric).filter(([, v]) => num(v) > 0);
-  const timeouts = num(summary.timeout_count);
-  const skips = num(summary.skipped_count);
-  const cutoffs = num(summary.system_cutoff_count);
-  const vague = evals.filter(e => e.classification === 'vague' || e.classification === 'wrong').length;
-
-  // Penalty points (illustrative but data-driven: each adverse event costs a fixed
-  // weight, capped so positives + base still reconcile to finalScore).
-  const PEN = { timeout: 4, skip: 3, cutoff: 3, vague: 2 };
-  const rawPenalty = timeouts * PEN.timeout + skips * PEN.skip + cutoffs * PEN.cutoff + vague * PEN.vague;
-  const penalty = Math.min(rawPenalty, Math.max(0, finalScore)); // never drive total below 0
-  const positivesTarget = finalScore + penalty;                  // base + contributions = this
-
-  // Distribute positivesTarget across rubric categories by their score share; the
-  // leftover is a "Base" pillar so the running total ends exactly on finalScore.
-  const totalRubric = rubricEntries.reduce((s, [, v]) => s + num(v), 0) || 1;
-  const contribs = rubricEntries.map(([cat, v]) => ({
-    cat, pts: round((num(v) / totalRubric) * positivesTarget * 0.78),
-  }));
-  const contribSum = contribs.reduce((s, c) => s + c.pts, 0);
-  const base = Math.max(0, round(positivesTarget - contribSum));
-
-  const wfLabels: string[] = ['Base'];
-  const wfValues: number[] = [base];
-  const wfKinds: ('base' | 'pos' | 'neg' | 'final')[] = ['base'];
-  const wfOffsets: number[] = [0];
-  let running = base;
-  contribs.forEach(c => {
-    wfLabels.push('+' + c.cat); wfOffsets.push(running); wfValues.push(c.pts); wfKinds.push('pos');
-    running += c.pts;
-  });
-  const penaltyBars: [string, number][] = [];
-  if (timeouts) penaltyBars.push(['−Timeouts', timeouts * PEN.timeout]);
-  if (skips) penaltyBars.push(['−Skips', skips * PEN.skip]);
-  if (cutoffs) penaltyBars.push(['−Cut-offs', cutoffs * PEN.cutoff]);
-  if (vague) penaltyBars.push(['−Vague', vague * PEN.vague]);
-  // Scale penalty bars so their sum equals the capped `penalty`.
-  const penBarSum = penaltyBars.reduce((s, [, v]) => s + v, 0) || 1;
-  penaltyBars.forEach(([label, v]) => {
-    const scaled = round(v * (penalty / penBarSum));
-    running -= scaled;
-    wfLabels.push(label); wfOffsets.push(running); wfValues.push(scaled); wfKinds.push('neg');
-  });
-  wfLabels.push('Final'); wfOffsets.push(0); wfValues.push(finalScore); wfKinds.push('final');
-  const waterfall = { labels: wfLabels, offsets: wfOffsets, values: wfValues, kinds: wfKinds };
+  // Backend weighted contributions only. No illustrative penalties/base.
+  const contributions = Object.entries(report.session?.score_contributions ?? {}).filter(([,value]) => Number.isFinite(value));
+  let running = 0;
+  const wfOffsets = contributions.map(([,value]) => { const previous = running; running += value; return previous; });
+  const waterfall: IntelModel['waterfall'] = {
+    labels: contributions.length ? [...contributions.map(([key]) => key), 'Final'] : [],
+    offsets: contributions.length ? [...wfOffsets, 0] : [],
+    values: contributions.length ? [...contributions.map(([,value]) => value), finalScore] : [],
+    kinds: contributions.length ? [...contributions.map(() => 'pos' as const), 'final'] : [],
+  };
 
   const readinessBand: IntelModel['readinessBand'] = finalScore >= 70 ? 'Strong' : finalScore >= 40 ? 'Moderate' : 'Early';
 

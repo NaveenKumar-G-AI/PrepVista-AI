@@ -6,8 +6,8 @@ Lets a TPO record real hiring outcomes for their students' interview sessions
 fits the per-company hiring-probability curve from real data instead of
 hardcoded heuristics.
 
-Mounted at /api/outcomes (see app/main.py). All endpoints require the org-admin
-(TPO) role via require_org_admin(); the outcome's college_id is taken from the
+Mounted at /api/outcomes (see app/main.py). Submission requires the org-admin
+(TPO) write role; global calibration requires a platform admin; the outcome's college_id is taken from the
 authenticated admin's organization, never from the request body.
 
 NOTE on path: the rest of this codebase mounts routers at root-level prefixes
@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
 from app.database.connection import DatabaseConnection
-from app.dependencies import OrgAdminProfile, require_org_admin
+from app.dependencies import OrgAdminProfile, UserProfile, require_org_admin, require_main_admin
 from app.services.calibration import calibrate_company_parameters
 
 logger = structlog.get_logger("prepvista.outcomes")
@@ -57,7 +57,7 @@ class OutcomeSubmission(BaseModel):
 @router.post("/submit")
 async def submit_outcome(
     body: OutcomeSubmission,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Record (or update) a placement outcome for one student session.
 
@@ -68,41 +68,44 @@ async def submit_outcome(
     org_id = admin.organization_id
 
     async with DatabaseConnection() as conn:
-        # Verify the session belongs to a student in this TPO's organization.
-        owner = await conn.fetchrow(
-            """
-            SELECT s.id
-            FROM interview_sessions s
-            JOIN organization_students os ON os.user_id = s.user_id
-                                         AND os.organization_id = s.organization_id
-            WHERE s.id = $1 AND os.organization_id = $2
-            """,
-            body.session_id,
-            org_id,
-        )
-        if not owner:
-            # Do not leak whether the session exists for another org.
-            raise HTTPException(
-                status_code=404,
-                detail="Interview session not found for your organization.",
+        async with conn.transaction():
+            # Serialize against college membership removal.
+            await conn.fetchval("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", org_id)
+            # Verify the session belongs to a student in this TPO's organization.
+            owner = await conn.fetchrow(
+                """
+                SELECT s.id
+                FROM interview_sessions s
+                JOIN organization_students os ON os.user_id = s.user_id
+                                             AND os.organization_id = s.organization_id
+                WHERE s.id = $1 AND os.organization_id = $2 AND os.status = 'active'
+                """,
+                body.session_id,
+                org_id,
             )
+            if not owner:
+                # Do not leak whether the session exists for another org.
+                raise HTTPException(
+                    status_code=404,
+                    detail="Interview session not found for your organization.",
+                )
 
-        await conn.execute(
-            """
-            INSERT INTO placement_outcomes
-                (session_id, college_id, company_name, placed, interview_round)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (session_id, company_name) DO UPDATE
-                SET placed = EXCLUDED.placed,
-                    interview_round = EXCLUDED.interview_round,
-                    created_at = now()
-            """,
-            body.session_id,
-            org_id,
-            body.company_name,
-            body.placed,
-            body.round,
-        )
+            await conn.execute(
+                """
+                INSERT INTO placement_outcomes
+                    (session_id, college_id, company_name, placed, interview_round)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (session_id, company_name) DO UPDATE
+                    SET placed = EXCLUDED.placed,
+                        interview_round = EXCLUDED.interview_round,
+                        created_at = now()
+                """,
+                body.session_id,
+                org_id,
+                body.company_name,
+                body.placed,
+                body.round,
+            )
 
     logger.info(
         "placement_outcome_submitted",
@@ -116,14 +119,14 @@ async def submit_outcome(
 @router.post("/calibrate/{company_name}")
 async def calibrate_company(
     company_name: str,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: UserProfile = Depends(require_main_admin()),
 ):
     """Trigger a recalibration of one company's hiring-probability curve.
 
     Returns the calibration status (calibrated / insufficient_data / ...). Below
     the minimum sample size the company keeps its heuristic curve. Available to
-    TPOs so they can refresh after submitting a batch of outcomes; calibration
-    also runs at startup and is cached for an hour.
+    platform admins only: the existing parameters are shared across all colleges,
+    so a college administrator cannot read or update this global calibration.
     """
     result = await calibrate_company_parameters(company_name)
     return result

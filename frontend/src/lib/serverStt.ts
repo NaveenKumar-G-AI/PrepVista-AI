@@ -1,506 +1,203 @@
-/**
- * PrepVista AI — Server-side STT client (Fix 1, step 1)
- * =====================================================
- * Replaces the browser Web Speech API with cross-browser audio capture
- * (MediaRecorder) streamed to the FastAPI backend over a WebSocket, with a REST
- * fallback. Works on Chrome, Firefox, Safari, and Edge — MediaRecorder + Opus is
- * supported on all of them.
- *
- * This module is GATED by NEXT_PUBLIC_STT_SERVER_ENABLED in the interview page.
- * When the flag is off, the page keeps using its existing client-side
- * recognition and this module is never constructed.
- *
- * Design — "rolling windows":
- * MediaRecorder timeslice chunks after the first do NOT carry the WebM header,
- * so chunks 2..N are not independently decodable. To get a reliable, near-live
- * transcript we instead record short, COMPLETE clips: a fresh MediaRecorder per
- * ~3s window. Each window's full (header-included) blob is sent over the
- * WebSocket as one turn; the server transcribes it and returns the text, which
- * we append to a rolling transcript and surface via onTranscript(). The hosting
- * component writes that straight into the same refs it already uses for Web
- * Speech, so the synchronous "read transcript at submit" path is unchanged.
- *
- * Every window's audio is retained server-side for the dispute/audit trail.
- *
- * Bug-fix notes:
- * - Per-window state machine prevents duplicate transcript append from late WS + REST.
- * - stop() properly awaits in-flight operations instead of sleeping.
- * - WS drop and guard timeout surface debounced errors instead of silent loss.
- * - Audio blobs are preserved for REST fallback when WS fails.
+/** Complete MediaRecorder windows; WS first, one REST retry per failed window.
+ * The window promise is installed before recording starts. It covers final
+ * dataavailable, onstop, transmission and transcript settlement.
  */
-
-export type ServerSttStatus =
-  | 'idle'
-  | 'connecting'
-  | 'listening'
-  | 'processing'
-  | 'error';
-
-/** Per-window lifecycle state — exactly one transcript result is accepted. */
-type WindowState = 'PENDING' | 'WS_SUCCEEDED' | 'REST_FALLBACK' | 'FAILED';
-
+import { bounded, type CaptureEvidence } from './interview-capture';
+export type ServerSttStatus = 'idle' | 'connecting' | 'listening' | 'processing' | 'error';
 export interface ServerSttOptions {
-  sessionId: string;
-  /** Supabase access token — passed as ?token= since browsers can't set WS headers. */
-  token: string;
-  /** Backend origin, e.g. https://api.prepvista.ai (no trailing slash). */
-  backendUrl: string;
-  /** Interview turn number, used to namespace retained audio. */
-  turnNumber: number;
-  language?: string;
-  /** ~milliseconds per recording window. */
-  windowMs?: number;
-  /** Called with the full rolling transcript whenever it grows. */
+  sessionId: string; token: string; backendUrl: string; turnNumber: number;
+  language?: string; windowMs?: number;
   onTranscript: (fullTranscript: string) => void;
-  /** Coarse lifecycle status for "listening..." UI. */
   onStatus?: (status: ServerSttStatus) => void;
-  /** Non-fatal errors (the caller decides whether to show them). */
   onError?: (message: string) => void;
 }
-
-/** Flush result returned by stop() so callers know if the final window was captured. */
 export interface StopResult {
   transcript: string;
   flush_status: 'ok' | 'timeout' | 'no_inflight';
+  evidence: CaptureEvidence;
 }
-
-/** True only when the runtime can actually do server STT (browser + APIs present). */
+interface SttResponse { final_transcript: string; transcription_status?: string }
 export function serverSttSupported(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof navigator !== 'undefined' &&
-    !!navigator.mediaDevices?.getUserMedia &&
-    typeof MediaRecorder !== 'undefined' &&
-    'WebSocket' in window
-  );
+  return typeof window !== 'undefined' && typeof navigator !== 'undefined'
+    && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined' && 'WebSocket' in window;
 }
-
 function pickMimeType(): string {
-  const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/ogg;codecs=opus',
-    'audio/mp4',
-  ];
-  for (const mt of candidates) {
-    try {
-      if (MediaRecorder.isTypeSupported(mt)) return mt;
-    } catch {
-      /* ignore */
-    }
-  }
-  return '';
+  return ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
+    .find(type => { try { return MediaRecorder.isTypeSupported(type); } catch { return false; } }) || '';
 }
-
 export class ServerSttSession {
-  private opts: Required<Pick<ServerSttOptions, 'language' | 'windowMs'>> & ServerSttOptions;
+  private opts: ServerSttOptions;
   private ws: WebSocket | null = null;
   private stream: MediaStream | null = null;
   private recorder: MediaRecorder | null = null;
-  private windowChunks: BlobPart[] = [];
-  private rolling = '';
-  private windowIdx = 0;
+  private windowDone: Promise<void> | null = null;
+  private transmissionQueue: Promise<void> = Promise.resolve();
+  private startDone: Promise<void> | null = null;
+  private stopDone: Promise<StopResult> | null = null;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private pending: { id: string; resolve: (result: SttResponse | null) => void } | null = null;
+  private abort = new AbortController();
   private active = false;
-  private mimeType = '';
-
-  /** Resolver for the in-flight window's server 'final' frame. */
-  private pendingFinal: ((text: string) => void) | null = null;
-
-  /** Promise that resolves when the current in-flight sendWindow completes. */
-  private inflightSend: Promise<string> | null = null;
-
-  /** Per-window state: prevents duplicate transcript from late WS + REST. */
-  private currentWindowState: WindowState = 'PENDING';
-
-  /** Last Blob from the most recent recording window — preserved for REST fallback. */
-  private lastWindowBlob: Blob | null = null;
-  private lastWindowTurnId: string = '';
-
-  /** Debounce: timestamp of last user-facing error surfaced. */
-  private lastErrorSurfacedAt = 0;
-  /** Minimum ms between user-facing error messages. */
-  private static readonly ERROR_DEBOUNCE_MS = 10_000;
-
-  /** Count of consecutive failed windows (for internal tracking). */
-  private consecutiveFailures = 0;
-
-  constructor(options: ServerSttOptions) {
-    this.opts = {
-      language: 'en-IN',
-      windowMs: 3000,
-      ...options,
-    };
-  }
-
-  get transcript(): string {
-    return this.rolling.trim();
-  }
-
-  private status(s: ServerSttStatus) {
-    this.opts.onStatus?.(s);
-  }
-
-  /** Surface an error to the user, debounced to avoid spam on flaky networks. */
-  private surfaceError(code: string, message: string) {
-    // Always log internally (caller can wire to analytics)
-    console.warn(`[ServerSTT] ${code}:`, message);
-
-    const now = Date.now();
-    if (now - this.lastErrorSurfacedAt < ServerSttSession.ERROR_DEBOUNCE_MS) {
-      return; // Suppress — too soon since last user-facing error
-    }
-    this.lastErrorSurfacedAt = now;
-    this.opts.onError?.(message);
-  }
-
-  private wsUrl(): string {
-    const base = this.opts.backendUrl.replace(/^http/, 'ws').replace(/\/$/, '');
-    const token = encodeURIComponent(this.opts.token);
-    return `${base}/ws/stt/${encodeURIComponent(this.opts.sessionId)}?token=${token}`;
-  }
-
-  /** Open mic + WebSocket and begin recording windows. */
-  async start(): Promise<void> {
-    if (this.active) return;
+  private sealed = false;
+  private rolling = '';
+  private index = 0;
+  private prefix = crypto.randomUUID();
+  private evidence: CaptureEvidence = { audio_bytes: 0, speech_detected: false, failed: false, unintelligible: false, flush_status: 'no_inflight' };
+  constructor(options: ServerSttOptions) { this.opts = options; }
+  get transcript() { return this.rolling.trim(); }
+  start(): Promise<void> {
+    if (this.startDone) return this.startDone;
     this.active = true;
-    this.status('connecting');
-
-    if (!serverSttSupported()) {
-      this.status('error');
-      this.opts.onError?.('Your browser cannot capture audio. Please try a different browser.');
-      this.active = false;
-      throw new Error('server STT unsupported');
-    }
-
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    this.mimeType = pickMimeType();
-
-    await this.openSocket();
-    this.status('listening');
-    this.recordNextWindow();
+    this.startDone = this.begin();
+    return this.startDone;
   }
-
+  private async begin() {
+    this.opts.onStatus?.('connecting');
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!this.active) { this.stream.getTracks().forEach(track => track.stop()); return; }
+      try { await bounded(this.openSocket(), 5000); } catch { this.ws?.close(); this.ws = null; }
+      if (this.active) { this.opts.onStatus?.('listening'); this.recordWindow(); }
+    } catch {
+      this.evidence.failed = true;
+      this.opts.onStatus?.('error');
+      this.opts.onError?.('Audio capture could not be started.');
+      throw new Error('Audio capture unavailable');
+    }
+  }
   private openSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
-      try {
-        this.ws = new WebSocket(this.wsUrl());
-      } catch (e) {
-        reject(e);
-        return;
-      }
-      this.ws.binaryType = 'arraybuffer';
-      this.ws.onopen = () => resolve();
-      this.ws.onerror = () => {
-        // Surface as a connect failure; caller may fall back to REST.
-        this.opts.onError?.('Live transcription connection failed.');
-        reject(new Error('ws error'));
+      const ws = new WebSocket(`${this.opts.backendUrl.replace(/^http/, 'ws').replace(/\/$/, '')}/ws/stt/${encodeURIComponent(this.opts.sessionId)}?token=${encodeURIComponent(this.opts.token)}`);
+      this.ws = ws;
+      ws.onopen = () => resolve();
+      ws.onerror = () => { this.pending?.resolve(null); reject(new Error('Transcription connection unavailable')); };
+      ws.onclose = () => this.pending?.resolve(null);
+      ws.onmessage = event => {
+        let message: Record<string, unknown>;
+        try { message = JSON.parse(String(event.data)); } catch { return; }
+        if (!message || typeof message !== 'object' || Array.isArray(message)) return;
+        const pending = this.pending;
+        if (!pending || this.sealed || message.turn_id !== pending.id) return;
+        if (message.type === 'error') pending.resolve(null);
+        if (message.type === 'final') {
+          const valid = typeof message.final_transcript === 'string' && message.transcription_status !== 'partial_max_buffer' && message.transcription_status !== 'failed';
+          pending.resolve(valid ? message as unknown as SttResponse : null);
+        }
       };
-      this.ws.onclose = () => {
-        if (this.active) this.surfaceError('STT_SOCKET_DROPPED', 'Some speech could not be transcribed. Please retry this answer if needed.');
-      };
-      this.ws.onmessage = (ev) => this.onSocketMessage(ev);
     });
   }
-
-  private onSocketMessage(ev: MessageEvent) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
-    } catch {
-      return;
-    }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
-    const msg = parsed as Record<string, unknown>;
-    if (msg.type === 'final') {
-      const text = typeof msg.final_transcript === 'string' ? msg.final_transcript.trim() : '';
-      if (this.pendingFinal) {
-        const resolve = this.pendingFinal;
-        this.pendingFinal = null;
-        resolve(text);
-      }
-    } else if (msg.type === 'error') {
-      this.surfaceError(
-        'STT_SERVER_ERROR',
-        typeof msg.message === 'string' ? msg.message : 'Could not process audio, please try again.',
-      );
-      if (this.pendingFinal) {
-        const resolve = this.pendingFinal;
-        this.pendingFinal = null;
-        resolve('');
-      }
-    }
-  }
-
-  /** Record one ~windowMs clip, send it, await its transcript, then loop. */
-  private recordNextWindow() {
+  private recordWindow() {
     if (!this.active || !this.stream) return;
-
-    this.windowChunks = [];
-    this.currentWindowState = 'PENDING';
-    const turnId = `${this.opts.turnNumber}-${this.windowIdx++}`;
-    this.lastWindowTurnId = turnId;
-
-    let recorder: MediaRecorder;
+    const chunks: BlobPart[] = [];
+    const id = `${this.opts.turnNumber}-${this.prefix}-${this.index++}`;
+    const mime = pickMimeType();
+    let complete!: () => void;
+    this.windowDone = new Promise<void>(resolve => { complete = resolve; });
     try {
-      recorder = this.mimeType
-        ? new MediaRecorder(this.stream, { mimeType: this.mimeType })
-        : new MediaRecorder(this.stream);
-    } catch {
-      this.surfaceError('STT_RECORDER_FAILED', 'Audio recording failed to start.');
-      this.status('error');
-      return;
-    }
-    this.recorder = recorder;
-
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) this.windowChunks.push(e.data);
-    };
-
-    recorder.onstop = async () => {
-      const blob = new Blob(this.windowChunks, { type: this.mimeType || 'audio/webm' });
-      // Preserve blob for potential REST fallback
-      this.lastWindowBlob = blob;
-
-      if (blob.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
-        const sendPromise = this.sendWindow(turnId, blob);
-        this.inflightSend = sendPromise;
-        const text = await sendPromise;
-        this.inflightSend = null;
-
-        // Only accept transcript if this window is still PENDING (no REST fallback raced us)
-        if (text && this.currentWindowState === 'PENDING') {
-          this.currentWindowState = 'WS_SUCCEEDED';
-          this.rolling = `${this.rolling} ${text}`.trim();
-          this.opts.onTranscript(this.rolling);
-          this.consecutiveFailures = 0;
-        } else if (!text && this.currentWindowState === 'PENDING') {
-          this.currentWindowState = 'FAILED';
-          this.consecutiveFailures++;
-        }
-      } else if (blob.size > 0) {
-        // WebSocket not available — attempt REST fallback
-        this.currentWindowState = 'FAILED';
-        this.consecutiveFailures++;
-        await this.attemptRestFallback(turnId, blob);
-      }
-
-      // Loop the next window if still listening.
-      if (this.active) {
-        this.recordNextWindow();
-      }
-    };
-
-    recorder.start();
-    // Close this window after windowMs — produces a complete, decodable clip.
-    window.setTimeout(() => {
-      if (recorder.state !== 'inactive') {
-        try {
-          recorder.stop();
-        } catch {
-          /* ignore */
-        }
-      }
-    }, this.opts.windowMs);
-  }
-
-  /** Attempt REST fallback transcription for a window whose WS path failed. */
-  private async attemptRestFallback(turnId: string, blob: Blob): Promise<void> {
-    // Don't attempt if window already succeeded via WS
-    if (this.currentWindowState === 'WS_SUCCEEDED') return;
-
-    try {
-      const result = await transcribeBlobViaRest({
-        backendUrl: this.opts.backendUrl,
-        token: this.opts.token,
-        sessionId: this.opts.sessionId,
-        turnNumber: this.opts.turnNumber,
-        blob,
-        language: this.opts.language,
-      });
-
-      // Only accept if still no transcript for this window
-      if (result?.final_transcript) {
-        this.currentWindowState = 'REST_FALLBACK';
-        const text = result.final_transcript.trim();
-        if (text) {
-          this.rolling = `${this.rolling} ${text}`.trim();
-          this.opts.onTranscript(this.rolling);
-          this.consecutiveFailures = 0;
-        }
-      }
-    } catch {
-      // REST fallback also failed — window is truly lost
-      console.warn('[ServerSTT] REST fallback also failed for window', turnId);
-    }
-  }
-
-  /** Send one window over the WS and resolve with its server transcript. */
-  private sendWindow(turnId: string, blob: Blob): Promise<string> {
-    return new Promise<string>((resolve) => {
-      const ws = this.ws;
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        this.surfaceError('STT_SOCKET_DROPPED', 'Some speech could not be transcribed. Please retry this answer if needed.');
-        resolve('');
-        return;
-      }
-      this.status('processing');
-      this.pendingFinal = (text) => {
-        this.status(this.active ? 'listening' : 'idle');
-        resolve(text);
+      const recorder = mime ? new MediaRecorder(this.stream, { mimeType: mime }) : new MediaRecorder(this.stream);
+      this.recorder = recorder;
+      recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+      recorder.onerror = () => { this.evidence.failed = true; complete(); };
+      recorder.onstop = () => {
+        if (this.timer) clearTimeout(this.timer);
+        const blob = new Blob(chunks, { type: mime || 'audio/webm' });
+        this.transmissionQueue = this.transmissionQueue.then(() => this.settleWindow(id, blob))
+          .catch(() => { this.evidence.failed = true; });
+        void this.transmissionQueue.finally(complete);
+        // Capture the next complete clip while earlier clips are transcribed.
+        if (this.active && !this.sealed) this.recordWindow();
       };
-      // Guard: if the server never answers, don't hang the window loop.
-      const guard = window.setTimeout(() => {
-        if (this.pendingFinal) {
-          this.pendingFinal = null;
-          this.surfaceError('STT_WINDOW_TIMEOUT', 'Some speech could not be transcribed. Please retry this answer if needed.');
-          resolve('');
-        }
-      }, 12000);
-
-      ws.send(JSON.stringify({ type: 'turn_start', turn_id: turnId }));
-      blob.arrayBuffer().then((buf) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(buf);
-          ws.send(JSON.stringify({ type: 'turn_end' }));
-        } else {
-          window.clearTimeout(guard);
-          this.surfaceError('STT_SOCKET_DROPPED', 'Some speech could not be transcribed. Please retry this answer if needed.');
-          resolve('');
-        }
-      });
+      recorder.start();
+      this.timer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, this.opts.windowMs || 3000);
+    } catch { this.evidence.failed = true; complete(); }
+  }
+  private async settleWindow(id: string, blob: Blob) {
+    if (this.sealed || !blob.size) return;
+    this.evidence.audio_bytes += blob.size;
+    this.evidence.flush_status = 'ok';
+    this.opts.onStatus?.('processing');
+    let result: SttResponse | null = null;
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      try { result = await bounded(this.sendWindow(id, blob), 55000); } catch { /* REST once */ }
+      this.pending = null;
+    }
+    if (!result && !this.sealed) {
+      result = await transcribeBlobViaRest({ ...this.opts, blob, turnId: id, signal: this.abort.signal });
+    }
+    if (this.sealed) return;
+    if (!result) {
+      this.evidence.failed = true;
+      this.opts.onError?.('Transcription could not be completed.');
+    } else if (!result.final_transcript.trim()) {
+      this.evidence.unintelligible = true;
+    } else {
+      this.rolling = `${this.rolling} ${result.final_transcript.trim()}`.trim();
+      this.opts.onTranscript(this.rolling);
+    }
+    this.opts.onStatus?.(this.active ? 'listening' : 'idle');
+  }
+  private async sendWindow(id: string, blob: Blob): Promise<SttResponse | null> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return null;
+    const bytes = await blob.arrayBuffer();
+    return new Promise(resolve => {
+      this.pending = { id, resolve };
+      try {
+        ws.send(JSON.stringify({ type: 'turn_start', turn_id: id }));
+        ws.send(bytes);
+        ws.send(JSON.stringify({ type: 'turn_end', turn_id: id }));
+      } catch { resolve(null); }
     });
   }
-
-  /**
-   * Stop recording + close the socket. Returns the full rolling transcript and
-   * a flush_status indicating whether the final in-flight window was captured.
-   *
-   * Flow:
-   * 1. Stop accepting new windows (this.active = false)
-   * 2. Finalize current MediaRecorder window
-   * 3. Await any in-flight sendWindow()
-   * 4. Await pendingFinal (bounded timeout)
-   * 5. Return accumulated transcript + flush status
-   */
-  async stop(): Promise<StopResult> {
+  stop(): Promise<StopResult> {
+    if (this.stopDone) return this.stopDone;
     this.active = false;
-    let flushStatus: StopResult['flush_status'] = 'no_inflight';
-
-    // Step 1: Stop the current MediaRecorder so its onstop fires and
-    // produces the final blob + sendWindow call.
+    this.stopDone = this.finish();
+    return this.stopDone;
+  }
+  private async finish(): Promise<StopResult> {
     try {
-      if (this.recorder && this.recorder.state !== 'inactive') {
-        this.recorder.stop();
-      }
+      // If stop races microphone initialization, begin() releases a late stream.
+      if (this.startDone) await bounded(this.startDone, 6000);
+      if (this.timer) clearTimeout(this.timer);
+      if (this.recorder?.state !== 'inactive') this.recorder?.stop();
+      if (this.windowDone) await bounded(this.windowDone, 65000);
     } catch {
-      /* ignore */
-    }
-
-    // Step 2: Await the in-flight sendWindow (set by recorder.onstop).
-    // The recorder.onstop handler is async and sets this.inflightSend.
-    // We need a brief moment for onstop to fire first (it's event-driven).
-    await new Promise((r) => window.setTimeout(r, 50));
-
-    if (this.inflightSend) {
-      flushStatus = 'ok';
-      try {
-        // Bounded wait for the in-flight send to complete
-        const result = await Promise.race([
-          this.inflightSend,
-          new Promise<string>((resolve) =>
-            window.setTimeout(() => resolve('__timeout__'), 8000)
-          ),
-        ]);
-        if (result === '__timeout__') {
-          flushStatus = 'timeout';
-          console.warn('[ServerSTT] Final window flush timed out after 8s');
-        }
-      } catch {
-        flushStatus = 'timeout';
-      }
-    } else if (this.pendingFinal) {
-      // There's a pendingFinal but no tracked inflightSend — wait for it directly
-      flushStatus = 'ok';
-      try {
-        await Promise.race([
-          new Promise<void>((resolve) => {
-            const originalResolve = this.pendingFinal;
-            if (!originalResolve) {
-              resolve();
-              return;
-            }
-            this.pendingFinal = (text: string) => {
-              originalResolve(text);
-              resolve();
-            };
-          }),
-          new Promise<void>((resolve) =>
-            window.setTimeout(() => {
-              // Force-resolve pendingFinal if still waiting
-              if (this.pendingFinal) {
-                const pf = this.pendingFinal;
-                this.pendingFinal = null;
-                pf('');
-              }
-              resolve();
-            }, 8000)
-          ),
-        ]);
-      } catch {
-        flushStatus = 'timeout';
-      }
-    }
-
-    // Step 3: Clean up resources
-    try {
-      this.ws?.send(JSON.stringify({ type: 'close' }));
-    } catch {
-      /* ignore */
-    }
-    try {
+      this.evidence.failed = true;
+      this.evidence.flush_status = 'timeout';
+    } finally {
+      this.sealed = true;
+      this.abort.abort();
+      this.pending?.resolve(null);
+      this.pending = null;
       this.ws?.close();
-    } catch {
-      /* ignore */
+      this.stream?.getTracks().forEach(track => track.stop());
+      this.opts.onStatus?.('idle');
     }
-    this.ws = null;
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.stream = null;
-    this.recorder = null;
-    this.inflightSend = null;
-    this.lastWindowBlob = null;
-    this.status('idle');
-
-    return { transcript: this.transcript, flush_status: flushStatus };
+    return { transcript: this.transcript, flush_status: this.evidence.flush_status, evidence: { ...this.evidence } };
   }
 }
-
-/**
- * REST fallback (Fix 1, step 5): POST a complete audio blob to /api/stt/transcribe.
- * Used when the WebSocket cannot be established. Same JSON shape as the WS final.
- */
 export async function transcribeBlobViaRest(params: {
-  backendUrl: string;
-  token: string;
-  sessionId: string;
-  turnNumber: number;
-  blob: Blob;
-  language?: string;
-}): Promise<{ final_transcript: string; confidence: number; audio_url: string | null } | null> {
+  backendUrl: string; token: string; sessionId: string; turnNumber: number;
+  blob: Blob; language?: string; turnId?: string; signal?: AbortSignal;
+}): Promise<SttResponse | null> {
   const form = new FormData();
   form.append('audio', params.blob, 'answer.webm');
   form.append('session_id', params.sessionId);
-  form.append('turn_id', String(params.turnNumber));
+  form.append('turn_id', params.turnId || String(params.turnNumber));
   form.append('language_hint', params.language || 'en-IN');
-
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  params.signal?.addEventListener('abort', abort, { once: true });
+  if (params.signal?.aborted) abort();
+  const timer = setTimeout(abort, 55000);
   try {
-    const resp = await fetch(`${params.backendUrl.replace(/\/$/, '')}/api/stt/transcribe`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${params.token}` },
-      body: form,
+    const response = await fetch(`${params.backendUrl.replace(/\/$/, '')}/api/stt/transcribe`, {
+      method: 'POST', headers: { Authorization: `Bearer ${params.token}` }, body: form, signal: controller.signal,
     });
-    if (!resp.ok) return null;
-    return await resp.json();
-  } catch {
-    return null;
-  }
+    if (!response.ok) return null;
+    const result = await response.json();
+    return typeof result?.final_transcript === 'string' && result.transcription_status !== 'failed' ? result : null;
+  } catch { return null; }
+  finally { clearTimeout(timer); params.signal?.removeEventListener('abort', abort); }
 }

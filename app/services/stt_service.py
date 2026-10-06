@@ -27,6 +27,7 @@ The heavy resume-grounded LLM repair (Fix 2) runs later in the scoring path
 
 from __future__ import annotations
 
+import asyncio
 import io
 import uuid
 
@@ -70,20 +71,23 @@ async def _transcribe_groq(audio_bytes: bytes, language: str) -> tuple[str, floa
         client = _get_groq()
         buf = io.BytesIO(audio_bytes)
         # The SDK accepts a (filename, fileobj) tuple; the extension hints format.
-        resp = await client.audio.transcriptions.create(
+        resp = await asyncio.wait_for(client.audio.transcriptions.create(
             file=("chunk.webm", buf),
             model=settings.GROQ_WHISPER_MODEL,
             language=language,
             response_format="verbose_json",
             temperature=0.0,
-        )
-        text = (getattr(resp, "text", None) or "").strip()
+        ), timeout=_GROQ_TIMEOUT)
+        text = getattr(resp, "text", None)
+        if not isinstance(text, str):
+            return None
+        text = text.strip()
         # Whisper exposes per-segment avg_logprob; convert to a rough 0-1
         # confidence. Absent that, assume a solid-but-not-certain 0.8.
         confidence = _confidence_from_groq(resp)
         return text, confidence
     except Exception as exc:  # noqa: BLE001
-        logger.warning("stt_groq_failed", error=str(exc))
+        logger.warning("stt_groq_failed", error_type=type(exc).__name__)
         return None
 
 
@@ -130,11 +134,14 @@ async def _transcribe_deepgram(audio_bytes: bytes, language: str) -> tuple[str, 
             .get("channels", [{}])[0]
             .get("alternatives", [{}])[0]
         )
-        text = (alt.get("transcript") or "").strip()
+        text = alt.get("transcript")
+        if not isinstance(text, str):
+            return None
+        text = text.strip()
         confidence = float(alt.get("confidence") or 0.0)
         return text, confidence
     except Exception as exc:  # noqa: BLE001
-        logger.warning("stt_deepgram_failed", error=str(exc))
+        logger.warning("stt_deepgram_failed", error_type=type(exc).__name__)
         return None
 
 
@@ -156,10 +163,16 @@ async def transcribe_audio(
     audio_id = audio_id or str(uuid.uuid4())
     language = _normalize_language(language_hint)
 
-    result = await _transcribe_groq(audio_bytes, language)
+    try:
+        result = await asyncio.wait_for(_transcribe_groq(audio_bytes, language), _GROQ_TIMEOUT)
+    except Exception:
+        result = None
     provider = "groq"
     if result is None:
-        result = await _transcribe_deepgram(audio_bytes, language)
+        try:
+            result = await asyncio.wait_for(_transcribe_deepgram(audio_bytes, language), _DEEPGRAM_TIMEOUT)
+        except Exception:
+            result = None
         provider = "deepgram"
 
     if result is None:

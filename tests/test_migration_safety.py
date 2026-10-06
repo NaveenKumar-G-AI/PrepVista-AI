@@ -15,9 +15,11 @@ def test_migration_reader_removes_optional_utf8_bom(tmp_path: Path) -> None:
     assert _read_migration_sql(migration) == "SELECT 1;\n"
 
 
-def test_repository_migrations_do_not_contain_utf8_bom() -> None:
+def test_repository_migrations_are_read_without_utf8_bom() -> None:
+    # Historical SQL must stay byte-for-byte intact. The reader supports BOMs
+    # (including the existing migration 036) and must never send one to Postgres.
     for migration in MIGRATIONS_DIR.glob("*.sql"):
-        assert not migration.read_bytes().startswith(b"\xef\xbb\xbf"), migration.name
+        assert not _read_migration_sql(migration).startswith("\ufeff"), migration.name
 
 
 def test_strips_outer_transaction_after_leading_comments() -> None:

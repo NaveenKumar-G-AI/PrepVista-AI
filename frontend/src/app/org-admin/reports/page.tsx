@@ -1,4 +1,6 @@
 'use client';
+import { ScoreSummary } from '@/components/score-summary';
+import type { ScoreMeasurement } from '@/lib/score-semantics';
 /**
  * PrepVista — College Admin: Reports Export
  * Preview student data, filter, and export as JSON or CSV.
@@ -210,7 +212,8 @@ const PREVIEW_LIMIT_DEFAULT = 100;
    DOMAIN INTERFACES (unchanged)
 ═══════════════════════════════════════════════════════════════════════════ */
 
-interface StudentReport {
+interface StudentReport extends ScoreMeasurement {
+  latest_score?: number | null;
   full_name: string | null; email: string; student_code: string | null;
   department_name: string | null; year_name: string | null; batch_name: string | null;
   section: string | null; has_career_access: boolean; status: string;
@@ -229,6 +232,7 @@ type SortDir = 'asc' | 'desc';
 ═══════════════════════════════════════════════════════════════════════════ */
 
 function formatScore(v: number | null | undefined): string {
+  if (v == null) return "Not measured";
   const n = safeNum(v, -1, -1, 100);
   return n >= 0 ? n.toFixed(1) : '—';
 }
@@ -374,7 +378,7 @@ export default function ReportsPage() {
       if (yearFilter  && isValidUUID(yearFilter))  params.set('year_id',       yearFilter);
       if (batchFilter && isValidUUID(batchFilter)) params.set('batch_id',      batchFilter);
 
-      params.set('format', 'json');
+      params.set('export_format', 'json');
       /* SEC-10: allowlist the limit value */
       params.set('limit', String(PREVIEW_LIMIT_DEFAULT));
 
@@ -400,6 +404,9 @@ export default function ReportsPage() {
         total_interviews:  safeNum(s.total_interviews, 0, 0, 100_000),
         avg_score:         s.avg_score  != null ? safeNum(s.avg_score,  null as unknown as number, 0, 100) : null,
         best_score:        s.best_score != null ? safeNum(s.best_score, null as unknown as number, 0, 100) : null,
+        latest_score: s.latest_score == null ? null : safeNum(s.latest_score, null as unknown as number, 0, 100),
+        evaluation_state: s.evaluation_state, measurement_coverage: s.measurement_coverage,
+        readiness_eligible: s.readiness_eligible,
       }));
 
       setStudents(safeStudents);
@@ -442,7 +449,7 @@ export default function ReportsPage() {
       if (deptFilter  && isValidUUID(deptFilter))  params.set('department_id', deptFilter);
       if (yearFilter  && isValidUUID(yearFilter))  params.set('year_id',       yearFilter);
       if (batchFilter && isValidUUID(batchFilter)) params.set('batch_id',      batchFilter);
-      params.set('format', 'csv');
+      params.set('export_format', 'csv');
 
       const blob = await api.exportCollegeReportsCSV(params.toString());
       if (!isMountedRef.current) return;
@@ -562,7 +569,7 @@ export default function ReportsPage() {
     .slice(0, 5);
 
   const needsAttention = [...students]
-    .filter(s => s.total_interviews >= 1 && s.avg_score != null)
+    .filter(s => s.total_interviews >= 1 && s.avg_score != null && s.readiness_eligible !== false)
     .sort((a, b) => (a.avg_score ?? 100) - (b.avg_score ?? 100))
     .slice(0, 5);
 
@@ -590,8 +597,9 @@ export default function ReportsPage() {
   const kpiAvg       = scoredRows.length > 0
     ? scoredRows.reduce((s, r) => s + (r.avg_score ?? 0), 0) / scoredRows.length
     : null;
-  const kpiBest      = students.length > 0
-    ? Math.max(...students.map(r => safeNum(r.best_score, 0, 0, 100)))
+  const bestRows = students.filter(r => r.best_score != null);
+  const kpiBest      = bestRows.length > 0
+    ? Math.max(...bestRows.map(r => Number(r.best_score)))
     : null;
   const kpiCareerPct = students.length > 0
     ? Math.round((students.filter(r => r.has_career_access).length / students.length) * 100)
@@ -718,7 +726,7 @@ export default function ReportsPage() {
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-5 py-4">
             <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Best Score</div>
             <div className={`mt-1 text-2xl font-bold ${scoreColour(kpiBest)}`}>
-              {kpiBest != null && kpiBest > 0 ? kpiBest.toFixed(1) : '—'}
+              {kpiBest != null ? kpiBest.toFixed(1) : 'Not measured'}
             </div>
             <div className="text-[10px] text-slate-600 mt-0.5">highest individual</div>
           </div>
@@ -856,6 +864,7 @@ export default function ReportsPage() {
                   <SortableTh col="total_interviews"  label="Sessions" />
                   <SortableTh col="avg_score"         label="Avg"      />
                   <SortableTh col="best_score"        label="Best"     />
+                  <th className="px-4 py-3">Latest measurement</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
@@ -878,6 +887,7 @@ export default function ReportsPage() {
                     <td className="px-4 py-2.5 text-white font-semibold">{s.total_interviews}</td>
                     <td className={`px-4 py-2.5 ${scoreColour(s.avg_score)}`}>{formatScore(s.avg_score)}</td>
                     <td className={`px-4 py-2.5 ${scoreColour(s.best_score)}`}>{formatScore(s.best_score)}</td>
+                    <td className="px-4 py-2.5"><ScoreSummary value={s.latest_score} measurement={s} /></td>
                   </tr>
                 ))}
               </tbody>

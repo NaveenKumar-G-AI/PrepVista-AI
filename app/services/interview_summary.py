@@ -908,7 +908,7 @@ def _assess_communication_style(evaluations: list[dict], quality_rows: list[dict
     """
     if not evaluations:
         return {
-            "average_communication_score": 0.0,
+            "average_communication_score": None,
             "clarity_level": "unknown",
             "communication_summary": "No answers were recorded to assess communication quality.",
         }
@@ -923,12 +923,13 @@ def _assess_communication_style(evaluations: list[dict], quality_rows: list[dict
     # "part", so the raw stored value MUST be divided by COMMUNICATION_PART_DIVISOR
     # first. Without this every real interview averaged ~5-10 → always
     # >= 1.5 → every candidate was misclassified as "clear_and_structured".
-    comm_scores = [
-        _safe_float(ev.get("communication_score")) / COMMUNICATION_PART_DIVISOR
-        for ev in evaluations
-        if isinstance(ev, dict) and _safe_float(ev.get("communication_score")) > 0
-    ]
-    avg_comm = round(sum(comm_scores) / len(comm_scores), 2) if comm_scores else 0.0
+    from app.services.score_semantics import numeric_score
+    comm_scores = [numeric_score(ev.get("communication_score"), 10) / COMMUNICATION_PART_DIVISOR
+                   for ev in evaluations if isinstance(ev, dict) and numeric_score(ev.get("communication_score"), 10) is not None]
+    avg_comm = round(sum(comm_scores) / len(comm_scores), 2) if comm_scores else None
+    if avg_comm is None:
+        return {"average_communication_score": None, "clarity_level": "unknown",
+                "communication_summary": "Communication was not measured."}
 
     valid_answers = len(quality_rows)
     if valid_answers == 0:
@@ -1294,10 +1295,21 @@ def compute_interview_summary(
     strength_counts: dict[str, int] = {
         "strong": 0, "good": 0, "partial": 0, "weak": 0, "silent": 0
     }
-    for ev in evaluations:
-        if isinstance(ev, dict):
-            level = _classify_answer_strength(ev)
-            strength_counts[level] = strength_counts.get(level, 0) + 1
+    from app.services.score_semantics import valid_evaluations, numeric_score
+    from app.services.interview_terminal import terminal_records
+    measured_evaluations = valid_evaluations(evaluations)
+    if runtime.get("terminal_contract_version") == 1:
+        records = terminal_records(runtime)
+        measured_turns = {record["turn"] for record in records if record.get("outcome") == "EVALUATED"}
+        measured_evaluations = [ev for ev in measured_evaluations if ev.get("turn_number") in measured_turns]
+        answered_questions = len(measured_turns)
+    for ev in measured_evaluations:
+        level = _classify_answer_strength(ev)
+        # Shared reports intentionally omit answer text. A genuine measured
+        # zero still reflects performance, rather than absence of that text.
+        if level == "silent" and numeric_score(ev.get("score"), 10) == 0 and ev.get("classification") != "silent" and ev.get("answer_status") not in _NON_ANSWER_STATUSES:
+            level = "weak"
+        strength_counts[level] = strength_counts.get(level, 0) + 1
 
     return {
         # ---- Original keys (preserved exactly) ----
@@ -1343,6 +1355,22 @@ def compute_premium_interview_report(
 
     All sections are answer-specific and non-generic.
     """
+    from app.services.score_semantics import assessment, valid_evaluations, SUMMARY_KEYS
+    integrity = assessment({"plan": plan, "final_score": final_score, "rubric_scores": category_scores,
+                            "total_turns": total_turns, "runtime_state": runtime_state}, evaluations)
+    if not integrity["readiness_eligible"]:
+        return {"plan": plan, "final_score": integrity["final_score"],
+                **{key: integrity[key] for key in SUMMARY_KEYS},
+                "score_band": integrity["measurement_label"], "hr_readiness_level": None,
+                "hr_readiness_label": integrity["measurement_label"], "hr_readiness_description": "Not enough measured evidence.",
+                "completion_rate": None, "planned_questions": len(coerce_question_plan_items(question_plan)),
+                "answered_questions": 0, "closed_questions": 0, "answer_strength_distribution": {},
+                "category_scores": integrity["category_scores"], "category_feedback": [],
+                "strong_categories": [], "weak_categories": [], "partial_categories": [],
+                "strengths": [], "weaknesses": [], "hiring_assessment": None, "placement_readiness": None,
+                "communication_assessment": {"average_communication_score": None, "clarity_level": "unknown"},
+                "per_question_insights": [], "improvement_roadmap": [], "integrity_and_ownership_signals": {}}
+    evaluations = valid_evaluations(evaluations)
     summary = compute_interview_summary(
         plan=plan, question_plan=question_plan, total_turns=total_turns,
         evaluations=evaluations, duration_seconds=duration_seconds,
@@ -1387,7 +1415,7 @@ def compute_premium_interview_report(
 
     tier_priority = ["strong", "good", "partial", "weak", "silent"]
     for cat, cat_evals in by_category.items():
-        scores = [_safe_float(ev.get("score")) for ev in cat_evals if _safe_float(ev.get("score")) > 0]
+        scores = [float(ev["score"]) for ev in cat_evals]
         avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
         levels = [_classify_answer_strength(ev) for ev in cat_evals]
         dominant = next((l for l in tier_priority if l in levels), "silent")

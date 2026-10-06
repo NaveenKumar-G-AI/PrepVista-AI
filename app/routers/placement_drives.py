@@ -20,10 +20,12 @@ Eligibility engine (Python port of Part 3 TypeScript):
 
 from __future__ import annotations
 
+from app.services.score_semantics import project_sessions
+
 import json
 from datetime import datetime, timezone
 from typing import Any, Optional
-from uuid import UUID
+from uuid import UUID, uuid4, uuid5
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -169,7 +171,7 @@ def _tenant_performance(scores: list[float]) -> dict[str, Any]:
     current enrollment. Drive eligibility must instead use the same
     tenant-scoped, finished-and-scored sessions as the college analytics pages.
     """
-    clean_scores = [float(score) for score in scores]
+    clean_scores = [float(score) for score in scores if score is not None]
     session_count = len(clean_scores)
     latest_score = clean_scores[-1] if clean_scores else None
     trend_slope = _compute_slope(clean_scores)
@@ -203,6 +205,7 @@ def _tenant_performance(scores: list[float]) -> dict[str, Any]:
 # ── Pydantic models ────────────────────────────────────────────────────────────
 
 class CreateDriveRequest(BaseModel):
+    client_request_id: UUID | None = None
     title: str = Field(min_length=1, max_length=200)
     company_name: str = Field(min_length=1, max_length=200)
     company_id: UUID | None = None
@@ -341,12 +344,20 @@ async def list_drives(
 @router.post("")
 async def create_drive(
     body: CreateDriveRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Create a new placement drive in DRAFT status."""
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         async with conn.transaction():
+            await conn.fetchval("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", org_id)
+            drive_id = uuid5(UUID(str(org_id)), f"drive:{admin.user_id}:{body.client_request_id}") if body.client_request_id else uuid4()
+            existing = await conn.fetchrow("SELECT * FROM placement_drives WHERE id = $1 AND organization_id = $2", drive_id, org_id)
+            if existing:
+                fields = ("title", "company_name", "role", "description")
+                if any(existing[field] != getattr(body, field) for field in fields) or str(existing["company_id"] or "") != str(body.company_id or ""):
+                    raise HTTPException(409, "Drive request ID was already used with different settings")
+                return dict(existing)
             if body.company_id:
                 company_exists = await conn.fetchval(
                     "SELECT 1 FROM recruiter_companies WHERE id = $1 AND organization_id = $2 AND status = 'ACTIVE'",
@@ -357,11 +368,11 @@ async def create_drive(
                     raise HTTPException(422, "Recruiter company is not active for this organization")
             row = await conn.fetchrow(
                 """INSERT INTO placement_drives
-                   (organization_id, title, company_name, company_id, role, description, created_by)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7)
+                   (organization_id, title, company_name, company_id, role, description, created_by, id)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
                    RETURNING *""",
                 org_id, body.title, body.company_name, body.company_id,
-                body.role, body.description, admin.user_id,
+                body.role, body.description, admin.user_id, drive_id,
             )
             await conn.execute(
                 """INSERT INTO drive_audit_log (drive_id, actor_id, actor_label, event_type, to_status, detail)
@@ -413,7 +424,7 @@ async def get_drive(
 async def transition_drive_status(
     drive_id: UUID,
     body: TransitionRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Transition drive to a new lifecycle status."""
     org_id = admin.organization_id
@@ -429,6 +440,8 @@ async def transition_drive_status(
                 raise HTTPException(404, "Drive not found")
 
             from_status = drive["status"]
+            if from_status == to_status:
+                return {"ok": True, "from_status": from_status, "to_status": to_status, "idempotent": True}
             if not can_transition(from_status, to_status):
                 raise HTTPException(422, f"Cannot transition from {from_status} to {to_status}")
 
@@ -467,7 +480,7 @@ async def transition_drive_status(
 async def add_rule_version(
     drive_id: UUID,
     body: AddRuleVersionRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Add a new versioned eligibility rule tree to a drive."""
     org_id = admin.organization_id
@@ -512,7 +525,7 @@ async def add_rule_version(
 @router.post("/{drive_id}/snapshot")
 async def compute_snapshot(
     drive_id: UUID,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     """Run eligibility engine against current active cohort and save an immutable snapshot."""
     org_id = admin.organization_id
@@ -552,15 +565,16 @@ async def compute_snapshot(
                      p.target_role
                    FROM organization_students os
                    JOIN profiles p ON p.id = os.user_id
-                   LEFT JOIN college_departments cd ON cd.id = os.department_id
-                   LEFT JOIN college_years cy ON cy.id = os.year_id
-                   LEFT JOIN college_batches cb ON cb.id = os.batch_id
+                   LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+                   LEFT JOIN college_years cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
+                   LEFT JOIN college_batches cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
                    WHERE os.organization_id = $1 AND os.status = 'active'""",
                 org_id,
             )
 
             session_rows = await conn.fetch(
-                """SELECT isess.user_id,
+                """SELECT isess.id, isess.user_id, isess.plan, isess.runtime_state,
+                          isess.rubric_scores, isess.total_turns,
                           isess.final_score::double precision AS final_score
                    FROM interview_sessions isess
                    JOIN organization_students os
@@ -569,7 +583,6 @@ async def compute_snapshot(
                     AND os.status = 'active'
                    WHERE isess.organization_id = $1
                      AND isess.state = 'FINISHED'
-                     AND isess.final_score IS NOT NULL
                    ORDER BY isess.user_id,
                             COALESCE(isess.finished_at, isess.created_at) ASC NULLS LAST,
                             isess.created_at ASC NULLS LAST,
@@ -577,9 +590,12 @@ async def compute_snapshot(
                 org_id,
             )
             scores_by_user: dict[str, list[float]] = {}
+            session_rows = await project_sessions(conn, session_rows)
+            integrity_by_user = {}
             for session in session_rows:
+                integrity_by_user[str(session["user_id"])] = session
                 scores_by_user.setdefault(str(session["user_id"]), []).append(
-                    float(session["final_score"])
+                    session["final_score"]
                 )
 
             students: list[dict[str, Any]] = []
@@ -588,6 +604,9 @@ async def compute_snapshot(
                 student.update(
                     _tenant_performance(scores_by_user.get(str(row["id"]), []))
                 )
+                latest = integrity_by_user.get(str(row["id"]))
+                if not latest or not latest["readiness_eligible"]:
+                    student.update(readiness_score=None, readiness_tier="partially_measured" if latest and latest["final_score"] is not None else "not_measured", is_zero_offer_risk=False)
                 students.append(student)
 
             summary = _summarize_cohort(students, rule_tree)

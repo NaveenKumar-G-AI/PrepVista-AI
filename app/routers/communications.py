@@ -135,13 +135,15 @@ async def _active_memberships(conn, user_id: str, organization_id: UUID | None =
     if organization_id:
         return await conn.fetch(
             """SELECT organization_id FROM organization_students
-               WHERE user_id = $1 AND organization_id = $2 AND status = 'active'""",
+               WHERE user_id = $1 AND organization_id = $2 AND status = 'active'
+                 AND EXISTS (SELECT 1 FROM organizations o WHERE o.id = organization_students.organization_id AND o.status = 'active')""",
             user_id,
             organization_id,
         )
     return await conn.fetch(
         """SELECT organization_id FROM organization_students
-           WHERE user_id = $1 AND status = 'active' ORDER BY added_at DESC""",
+           WHERE user_id = $1 AND status = 'active'
+                 AND EXISTS (SELECT 1 FROM organizations o WHERE o.id = organization_students.organization_id AND o.status = 'active') ORDER BY added_at DESC""",
         user_id,
     )
 
@@ -168,7 +170,7 @@ async def list_messages(
                       pd.company_name, pd.role
                FROM org_communications oc
                LEFT JOIN org_communication_recipients ocr ON ocr.message_id = oc.id
-               LEFT JOIN placement_drives pd ON pd.id = oc.drive_id
+               LEFT JOIN placement_drives pd ON pd.id = oc.drive_id AND pd.organization_id = oc.organization_id
                WHERE oc.organization_id = $1
                GROUP BY oc.id, pd.company_name, pd.role
                ORDER BY oc.sent_at DESC
@@ -183,7 +185,7 @@ async def list_messages(
 @router.post("/messages", status_code=201)
 async def send_message(
     body: SendMessageRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     subject = body.subject.strip()
     message_body = body.body.strip()
@@ -265,7 +267,7 @@ async def send_message(
 @router.post("/draft")
 async def draft_message(
     body: DraftMessageRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     facts: dict[str, object] = {
         "organization": admin.organization_name,
@@ -335,7 +337,7 @@ async def list_issues(
                 JOIN profiles p ON p.id = oci.student_id
                 LEFT JOIN organization_students os
                   ON os.user_id = oci.student_id AND os.organization_id = oci.organization_id
-                LEFT JOIN college_departments cd ON cd.id = os.department_id
+                LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
                 WHERE {' AND '.join(where)}
                 ORDER BY CASE oci.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 ELSE 4 END,
                          oci.created_at DESC
@@ -351,7 +353,7 @@ async def list_issues(
 async def respond_to_issue(
     issue_id: UUID,
     body: RespondIssueRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     async with DatabaseConnection() as conn:
         row = await conn.fetchrow(
@@ -380,7 +382,7 @@ async def list_my_communication_memberships(
         rows = await conn.fetch(
             """SELECT os.organization_id, o.name AS organization_name
                FROM organization_students os
-               JOIN organizations o ON o.id = os.organization_id
+               JOIN organizations o ON o.id = os.organization_id AND o.status = 'active'
                WHERE os.user_id = $1 AND os.status = 'active'
                ORDER BY o.name""",
             current_user.id,
@@ -404,12 +406,12 @@ async def get_inbox(
                       p.full_name AS student_name
                FROM org_communication_recipients ocr
                JOIN org_communications oc ON oc.id = ocr.message_id
-               JOIN organizations o ON o.id = oc.organization_id
+               JOIN organizations o ON o.id = oc.organization_id AND o.status = 'active'
                JOIN profiles p ON p.id = ocr.student_id
                JOIN organization_students os
                  ON os.organization_id = oc.organization_id
                 AND os.user_id = ocr.student_id AND os.status = 'active'
-               LEFT JOIN placement_drives pd ON pd.id = oc.drive_id
+               LEFT JOIN placement_drives pd ON pd.id = oc.drive_id AND pd.organization_id = oc.organization_id
                WHERE ocr.student_id = $1 AND ocr.delivery_status = 'DELIVERED'
                ORDER BY oc.sent_at DESC
                LIMIT $2 OFFSET $3""",
@@ -445,7 +447,12 @@ async def mark_opened(
         result = await conn.execute(
             """UPDATE org_communication_recipients
                SET opened_at = COALESCE(opened_at, now())
-               WHERE message_id = $1 AND student_id = $2 AND delivery_status = 'DELIVERED'""",
+               WHERE message_id = $1 AND student_id = $2 AND delivery_status = 'DELIVERED'
+                 AND EXISTS (SELECT 1 FROM org_communications oc
+                   JOIN organizations o ON o.id = oc.organization_id AND o.status = 'active'
+                   JOIN organization_students os ON os.organization_id = oc.organization_id
+                     AND os.user_id = $2 AND os.status = 'active'
+                   WHERE oc.id = $1)""",
             message_id,
             current_user.id,
         )
@@ -467,6 +474,10 @@ async def acknowledge_message(
                FROM org_communications oc
                WHERE ocr.message_id = $1 AND ocr.student_id = $2
                  AND oc.id = ocr.message_id AND oc.requires_ack = TRUE
+                 AND ocr.delivery_status = 'DELIVERED'
+                 AND EXISTS (SELECT 1 FROM organization_students os
+                   JOIN organizations o ON o.id = os.organization_id AND o.status = 'active'
+                   WHERE os.organization_id = oc.organization_id AND os.user_id = $2 AND os.status = 'active')
                RETURNING ocr.message_id""",
             message_id,
             current_user.id,

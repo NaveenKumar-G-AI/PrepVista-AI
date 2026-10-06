@@ -23,6 +23,9 @@ from app.config import (
     normalize_difficulty_mode,
 )
 from app.database.connection import DatabaseConnection
+from app.services.interview_terminal import connection_scope, connection, intent, classify, terminal_records
+from app.services.interview_summary import coerce_runtime_state
+from app.services.assistance_evidence import resolve_provenance
 from app.dependencies import UserProfile, get_current_user
 from app.routers.interviews_helpers import (
     _validate_session_id, _pre_validate_answer, _check_prompt_injection,
@@ -42,7 +45,66 @@ logger = structlog.get_logger("prepvista.interviews")
 
 
 @router.post("/{session_id}/answer")
-async def submit_answer(
+async def submit_answer(session_id: str, req: AnswerRequest, request: Request,
+                        background_tasks: BackgroundTasks, user: UserProfile = Depends(get_current_user)):
+    _validate_session_id(session_id)
+    if req.expected_turn is None:
+        # Historical clients/sessions retain their contract. New ledger sessions
+        # require the turn/instance precondition before accepting an answer.
+        async with DatabaseConnection() as conn:
+            row = await conn.fetchrow("SELECT runtime_state, total_turns, user_id FROM interview_sessions WHERE id = $1 AND access_token = $2", session_id, req.access_token)
+        if row and str(row["user_id"]) != str(user.id):
+            raise HTTPException(404, "Interview not found.")
+        state = coerce_runtime_state(row["runtime_state"] if row else {})
+        if state.get("terminal_contract_version") == 1 or (row and int(row["total_turns"] or 0) > 0):
+            raise HTTPException(409, "Refresh the interview before submitting this answer.")
+        return await _submit_answer_impl(session_id, req, request, background_tasks, user)
+    if not req.client_request_id:
+        raise HTTPException(422, "An answer request ID is required.")
+    # Row lock works across processes. One transaction contains transcript,
+    # terminal state, evaluation, advance/finalization and retry response.
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT user_id, state, total_turns, runtime_state FROM interview_sessions WHERE id = $1 AND access_token = $2 FOR UPDATE",
+                session_id, req.access_token)
+            if not row or str(row["user_id"]) != str(user.id):
+                raise HTTPException(404, "Interview not found.")
+            state = coerce_runtime_state(row["runtime_state"])
+            previous = state.get("answer_responses", {}).get(req.client_request_id)
+            if previous:
+                return previous
+            if row["state"] != "ACTIVE" or int(row["total_turns"] or 0) != req.expected_turn:
+                raise HTTPException(409, "This question has already advanced.")
+            if req.expected_turn and str(req.question_instance_id or "") != str(state.get("active_question_id", "")):
+                raise HTTPException(409, "The answer belongs to a different question.")
+            outcome = classify(req.user_text, req.terminal_outcome, req.capture_evidence)
+            answered_at = await conn.fetchval("SELECT clock_timestamp() AS answered_at")
+            marker = connection.set(conn)
+            answer_marker = intent.set(dict(outcome=outcome, text=req.user_text, evidence=req.capture_evidence,
+                                           end_after_answer=req.end_after_answer, answered_at=answered_at))
+            try:
+                if state.get("terminal_contract_version") != 1:
+                    from app.services.interviewer_session import adopt_active_terminal_contract
+                    state = await adopt_active_terminal_contract(conn, session_id, state)
+                current_record = state.get("question_records", {}).get(str(state.get("active_question_id")), {})
+                if req.expected_turn and current_record.get("outcome"):
+                    raise HTTPException(409, "This question already has a terminal answer. Finish the session to retain its result.")
+                payload = await _submit_answer_impl(session_id, req, request, background_tasks, user)
+                row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+                state = coerce_runtime_state(row["runtime_state"])
+                state.setdefault("answer_responses", {})[req.client_request_id] = payload
+                if payload.get("action") == "finish":
+                    state["finish_response"] = {k: v for k, v in payload.items() if k != "action"}
+                await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1",
+                                   session_id, json.dumps(state))
+                return payload
+            finally:
+                intent.reset(answer_marker)
+                connection.reset(marker)
+
+
+async def _submit_answer_impl(
     session_id: str,
     req: AnswerRequest,
     request: Request,
@@ -62,7 +124,7 @@ async def submit_answer(
     do not recognise this field can safely ignore it — it is purely
     informational.
     """
-    answer_submitted_at = datetime.now(timezone.utc)
+    answer_submitted_at = (intent.get() or {}).get("answered_at") or datetime.now(timezone.utc)
     # UUID format check before any DB query — eliminates path-traversal probes
     _validate_session_id(session_id)
     await rate_limit_session(session_id)
@@ -75,6 +137,8 @@ async def submit_answer(
         req.user_text, max_answer_length
     )
     answer_word_count = len(normalized_text.split()) if normalized_text else 0
+    if intent.get() is not None and intent.get()["outcome"] != "EVALUATED":
+        pre_validation_warning = None
 
     if pre_validation_warning:
         logger.info(
@@ -128,19 +192,9 @@ async def submit_answer(
             question_preview=next_question_text[:80],
         )
 
-    # Determine the terminal state for this turn
-    is_verified_silence = (
-        normalized_text == '[NO_ANSWER_TIMEOUT]'
-        or (not normalized_text.strip() and pre_validation_warning == 'empty_answer')
-    )
-    is_stt_failure = (
-        not normalized_text.strip()
-        and pre_validation_warning == 'empty_answer'
-        and normalized_text not in {'[NO_ANSWER_TIMEOUT]'}
-    )
-
     should_evaluate = bool(
-        normalized_text
+        (intent.get() is None or intent.get()["outcome"] == "EVALUATED")
+        and normalized_text
         and normalized_text.strip()
         and question_for_eval
         and turn_for_eval is not None
@@ -150,37 +204,24 @@ async def submit_answer(
 
     question_instance_id_for_eval = result.get("question_instance_id_for_eval")
 
-    # Derive assistance provenance for this turn
-    assistance_provenance = 'independent'
-    if question_instance_id_for_eval is not None:
+    # Answer and view operations share the session lock and the database clock.
+    assistance_provenance = "unknown"
+    if should_evaluate:
         try:
-            async with DatabaseConnection() as conn:
-                events = await conn.fetch(
-                    """SELECT assistance_type, viewed_at FROM interview_assistance_event
-                       WHERE session_id = $1 AND question_instance_id = $2 
-                         AND viewed_at IS NOT NULL AND viewed_at < $3
-                       ORDER BY viewed_at""",
-                    session_id, question_instance_id_for_eval, answer_submitted_at,
-                )
-            if events:
-                for ev in events:
-                    if ev['assistance_type'] == 'answer_guidance':
-                        assistance_provenance = 'answer_guided'
-                    elif ev['assistance_type'] == 'hint' and assistance_provenance != 'answer_guided':
-                        assistance_provenance = 'hint_assisted'
-                
-                # Mark events as used_before_answer
-                try:
-                    async with DatabaseConnection() as conn:
-                        await conn.execute(
-                            """UPDATE interview_assistance_event SET used_before_answer = TRUE
-                               WHERE session_id = $1 AND question_instance_id = $2 AND viewed_at IS NOT NULL AND viewed_at < $3""",
-                            session_id, question_instance_id_for_eval, answer_submitted_at,
-                        )
-                except Exception:
-                    pass
+            async with connection_scope(DatabaseConnection) as conn:
+                assistance_provenance = await resolve_provenance(
+                    conn, session_id, question_instance_id_for_eval, user.id, answer_submitted_at, turn_for_eval)
+                if intent.get() is not None:
+                    row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+                    runtime = coerce_runtime_state(row["runtime_state"])
+                    record = runtime["question_records"][str(question_instance_id_for_eval)]
+                    record["assistance_provenance"] = assistance_provenance
+                    record["answered_at"] = answer_submitted_at.isoformat()
+                    await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, json.dumps(runtime))
         except Exception as exc:
-            logger.warning("assistance_provenance_lookup_failed", error=str(exc))
+            if intent.get() is not None:
+                raise
+            logger.warning("assistance_provenance_lookup_failed", exception_type=type(exc).__name__)
 
     # --- Final answer → synchronous eval + finish ---
     if result.get("action") == "finish":
@@ -199,6 +240,8 @@ async def submit_answer(
                     question_instance_id=question_instance_id_for_eval,
                 )
             except Exception as exc:
+                if intent.get() is not None:
+                    raise
                 logger.error(
                     "final_eval_failed",
                     session_id=session_id,
@@ -237,7 +280,7 @@ async def submit_answer(
 
         if was_active:
             try:
-                async with DatabaseConnection() as conn:
+                async with connection_scope(DatabaseConnection) as conn:
                     await track_funnel_event(
                         conn, "mock completed",
                         user_id=user.id,
@@ -247,6 +290,8 @@ async def submit_answer(
                 logger.warning("funnel_tracking_finish_failed", session_id=session_id, error=str(exc))
 
         payload = {"action": "finish", **final_result}
+        if should_evaluate:
+            payload["assistance_provenance"] = assistance_provenance
         # Additive: surface quality hint to frontend on the finish path too
         if pre_validation_warning:
             payload["answer_quality_hint"] = pre_validation_warning
@@ -255,17 +300,24 @@ async def submit_answer(
 
     # --- Mid-interview → background evaluation ---
     if should_evaluate:
-        background_tasks.add_task(
-            _evaluate_and_store,
-            session_id=session_id,
-            turn_number=int(turn_for_eval),
-            question_text=str(question_for_eval),
-            raw_answer=normalized_text,
-            answer_duration_seconds=req.answer_duration_seconds,
-            answer_word_count=answer_word_count,
-            assistance_provenance=assistance_provenance,
-            question_instance_id=question_instance_id_for_eval,
-        )
+        if intent.get() is not None:
+            await _evaluate_and_store(
+                session_id=session_id, turn_number=int(turn_for_eval),
+                question_text=str(question_for_eval), raw_answer=normalized_text,
+                answer_duration_seconds=req.answer_duration_seconds, answer_word_count=answer_word_count,
+                assistance_provenance=assistance_provenance, question_instance_id=question_instance_id_for_eval)
+        else:
+            background_tasks.add_task(
+                _evaluate_and_store,
+                session_id=session_id,
+                turn_number=int(turn_for_eval),
+                question_text=str(question_for_eval),
+                raw_answer=normalized_text,
+                answer_duration_seconds=req.answer_duration_seconds,
+                answer_word_count=answer_word_count,
+                assistance_provenance=assistance_provenance,
+                question_instance_id=question_instance_id_for_eval,
+            )
     elif question_for_eval and turn_for_eval is not None:
         if normalized_text == '[NO_ANSWER_TIMEOUT]' or (not normalized_text.strip() and pre_validation_warning == 'empty_answer'):
             answer_status = 'no_answer' if normalized_text == '[NO_ANSWER_TIMEOUT]' else 'transcription_failed'
@@ -286,6 +338,8 @@ async def submit_answer(
     if pre_validation_warning:
         result = {**result, "answer_quality_hint": pre_validation_warning}
 
+    if should_evaluate:
+        result = {**result, "assistance_provenance": assistance_provenance}
     await _cache_client_response(session_id, req.client_request_id, result)
     return result
 
@@ -298,51 +352,13 @@ async def _record_unevaluated_turn(
     answer_duration_seconds: int | None = None,
     question_instance_id: str | None = None,
 ) -> None:
-    # Insert a minimal record so every turn has an evaluation row
-    # NO_ANSWER = candidate chose not to answer (score 0)
-    # TRANSCRIPTION_FAILED = system failure (score null, not_measured)
-    try:
-        score = 0 if answer_status == 'no_answer' else None
-        rationale = (
-            'Candidate did not provide an answer within the allotted time.'
-            if answer_status == 'no_answer'
-            else 'Audio transcription failed — this turn cannot be evaluated. System failure; not a reflection of candidate performance.'
-        )
-        async with DatabaseConnection() as conn:
-            await conn.execute(
-                """INSERT INTO question_evaluations
-                   (session_id, turn_number, rubric_category, question_text,
-                    raw_answer, normalized_answer, classification, score,
-                    scoring_rationale, answer_status,
-                    answer_duration_seconds, question_instance_id)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-                   ON CONFLICT (session_id, turn_number) DO NOTHING""",
-                session_id,
-                turn_number,
-                'unevaluated',
-                question_text,
-                raw_answer,
-                raw_answer,
-                '',
-                score,
-                rationale,
-                answer_status,
-                answer_duration_seconds,
-                question_instance_id,
-            )
-        logger.info(
-            'unevaluated_turn_recorded',
-            session_id=session_id,
-            turn=turn_number,
-            answer_status=answer_status,
-        )
-    except Exception as exc:
-        logger.error(
-            'unevaluated_turn_record_failed',
-            session_id=session_id,
-            turn=turn_number,
-            error=str(exc),
-        )
+    from app.services.interview_terminal import register_question, terminalize
+    async with connection_scope(DatabaseConnection) as conn:
+        row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+        runtime = coerce_runtime_state(row["runtime_state"] if row else {})
+        instance = register_question(runtime, session_id, turn_number, question_text, question_instance_id)
+        terminalize(runtime, instance, answer_status.upper(), raw_answer)
+        await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, json.dumps(runtime))
 
 
 async def _evaluate_and_store(
@@ -352,28 +368,19 @@ async def _evaluate_and_store(
     raw_answer: str,
     answer_duration_seconds: int | None = None,
     answer_word_count: int | None = None,
-    assistance_provenance: str = 'independent',
+    assistance_provenance: str = 'unknown',
     question_instance_id: str | None = None,
 ) -> None:
-    """Run per-question AI evaluation and persist the result.
+    """Persist a measured answer, preserving assistance and instance attribution.
 
-    Structured in three DB-separated phases so the connection is never
-    held open during the LLM evaluation call:
-
-      Phase 1 — Read session data; early-exit if already evaluated.
-      Phase 2 — Run the LLM evaluator (outside any DB connection).
-      Phase 3 — Write the result with a post-eval double-insert guard.
-
-    The Phase 3 INSERT uses ON CONFLICT DO NOTHING so concurrent finish
-    calls cannot create duplicate rows.
-
-    answer_word_count is an optional performance hint for the evaluator —
-    a 3-word answer should be scored differently from a 300-word answer
-    even when the AI evaluator sees similar content quality.
+    Current-contract requests borrow the enclosing session transaction and run
+    synchronously before advance becomes visible. An evaluator/write failure
+    rolls back the answer and advance for a safe retry. Legacy background calls
+    retain separate connections and the existing unique turn guard.
     """
     try:
         # ---- Phase 1: read ------------------------------------------------
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             existing = await conn.fetchrow(
                 "SELECT id FROM question_evaluations WHERE session_id = $1 AND turn_number = $2",
                 session_id,
@@ -388,7 +395,7 @@ async def _evaluate_and_store(
                 return  # Already evaluated — skip
 
             session = await conn.fetchrow(
-                "SELECT plan, resume_summary, question_plan FROM interview_sessions WHERE id = $1",
+                "SELECT plan, resume_summary, question_plan, runtime_state FROM interview_sessions WHERE id = $1",
                 session_id,
             )
             if not session:
@@ -407,6 +414,9 @@ async def _evaluate_and_store(
             if isinstance(item, dict) and int(item.get("turn", 0) or 0) == int(turn_number):
                 rubric_category = str(item.get("category") or "technical_depth")
                 break
+        runtime = coerce_runtime_state(session.get("runtime_state"))
+        retry_record = runtime.get("question_records", {}).get(str(question_instance_id), {})
+        rubric_category = retry_record.get("rubric_category") or rubric_category
         rubric_category = normalize_rubric_category(question_text, rubric_category, plan)
 
         # ---- Phase 2: LLM evaluation (no DB connection) -------------------
@@ -427,6 +437,8 @@ async def _evaluate_and_store(
                 turn_id=turn_number,
             )
         if not isinstance(eval_result, dict):
+            if intent.get() is not None:
+                raise RuntimeError("Evaluation unavailable")
             logger.warning(
                 "invalid_eval_result_type",
                 session_id=session_id,
@@ -436,7 +448,7 @@ async def _evaluate_and_store(
             return
 
         # ---- Phase 3: write (new connection, double-insert guard) ---------
-        async with DatabaseConnection() as conn:
+        async with connection_scope(DatabaseConnection) as conn:
             existing = await conn.fetchrow(
                 "SELECT id FROM question_evaluations WHERE session_id = $1 AND turn_number = $2",
                 session_id,
@@ -506,6 +518,8 @@ async def _evaluate_and_store(
         )
 
     except Exception as exc:
+        if intent.get() is not None:
+            raise
         logger.error(
             "background_eval_failed",
             session_id=session_id,

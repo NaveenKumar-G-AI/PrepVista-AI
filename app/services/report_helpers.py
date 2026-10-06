@@ -378,18 +378,34 @@ def _wrap_raw_lines(text: str, max_chars: int = 92) -> list[str]:
     return lines or [clean[:max_chars]]
 
 
-def _minimal_pdf_report(score: float, plan: str, email: str, evaluations: list[dict]) -> bytes:
+def _minimal_pdf_report(score: float | None, plan: str, email: str, evaluations: list[dict], assessment_data=None) -> bytes:
     lines = [
         "PrepVista Interview Report",
         f"Plan: {plan.upper()}",
-        f"Score: {int(round(score))}/100",
+        f"Score: {int(round(score))}/100" if score is not None else "Score: Unmeasured",
+        (assessment_data or {}).get("measurement_label", "Measured" if score is not None else "Not measured"),
         f"Candidate: {_safe_pdf_text(email)}",
         f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
         "",
     ]
 
+    coverage = (assessment_data or {}).get("measurement_coverage", {})
+    lines.append(f"Measurement coverage: {coverage.get('measured', 0)}/{coverage.get('asked', 0)} measured; {coverage.get('intentional', 0)} intentional outcomes")
+    for record in (assessment_data or {}).get("terminal_answer_records", []):
+        if record.get("outcome") != "EVALUATED" or record.get("evaluation_state") != "COMPLETE":
+            lines.extend(_wrap_raw_lines(f"Q{record.get('turn')}: {record.get('question_text', 'Question unavailable')} - {record.get('outcome')} - {record.get('evaluation_state', 'NOT_MEASURED').replace('_', ' ').title()}"))
+
+    coverage = (assessment_data or {}).get("measurement_coverage", {})
+    lines.append(f"Measurement coverage: {coverage.get('measured', 0)}/{coverage.get('asked', 0)} measured; {coverage.get('intentional', 0)} intentional outcomes")
+    for record in (assessment_data or {}).get("terminal_answer_records", []):
+        if record.get("outcome") != "EVALUATED" or record.get("evaluation_state") != "COMPLETE":
+            status = {"PENDING": "Evaluation pending", "UNAVAILABLE": "Evaluation unavailable", "NOT_MEASURED": "Not measured"}.get(record.get("evaluation_state"), record.get("evaluation_state"))
+            lines.extend(_wrap_raw_lines(f"Q{record.get('turn')}: {record.get('question_text', 'Question unavailable')} - {record.get('outcome')} - {status}"))
+
     for index, evaluation in enumerate(evaluations[:4], start=1):
-        lines.append(f"Q{index}: {_safe_pdf_text(evaluation.get('question_text', 'Question unavailable'))}")
+        from app.services.assistance_evidence import provenance_label
+        lines.append("Attempt: " + provenance_label(evaluation.get("assistance_provenance")))
+        lines.append(f"Q{evaluation.get('turn_number', index)}: {_safe_pdf_text(evaluation.get('question_text', 'Question unavailable'))}")
         lines.extend(_wrap_raw_lines(f"User answer: {_safe_pdf_text(evaluation.get('normalized_answer') or evaluation.get('raw_answer') or 'No answer provided.')}", 88))
         lines.extend(_wrap_raw_lines(f"Improve: {' | '.join(_build_improvement_points(evaluation))}", 88))
         lines.extend(_wrap_raw_lines(f"Improved answer: {_build_improved_answer(evaluation)}", 88))

@@ -8,6 +8,7 @@ import asyncio
 import csv
 import io
 import json
+from app.services.score_semantics import org_measurement_rows, project_session, project_sessions, SUMMARY_KEYS
 import math
 import re
 import statistics as _stats
@@ -154,7 +155,7 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
                  ROUND(AVG((isess.rubric_scores->>'role_fit')::numeric)
                        FILTER (WHERE isess.state = 'FINISHED'), 1)  AS avg_role_fit
                FROM organization_students os
-               LEFT JOIN interview_sessions isess ON isess.user_id = os.user_id
+               LEFT JOIN interview_sessions isess ON isess.user_id = os.user_id AND isess.organization_id = os.organization_id
                                                     AND isess.state = 'FINISHED'
                                                     AND isess.final_score IS NOT NULL
                WHERE os.organization_id = $1 AND os.status = 'active'
@@ -170,12 +171,15 @@ async def college_dashboard(admin: OrgAdminProfile = Depends(require_org_admin()
     zero_risk_count = 0
     scored_avgs: list[float] = []
 
+    async with DatabaseConnection() as conn:
+        perf_rows = await org_measurement_rows(conn, org_id, perf_rows)
+
     for r in perf_rows:
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
         
-        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         
         if r["cached_zero_risk"]:
@@ -313,7 +317,7 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
             """SELECT cd.department_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
-               JOIN college_departments cd ON cd.id = os.department_id
+               JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cd.department_name ORDER BY total DESC""",
             org_id,
@@ -322,7 +326,7 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
             """SELECT cy.year_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
-               JOIN college_years cy ON cy.id = os.year_id
+               JOIN college_years cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cy.year_name ORDER BY total DESC""",
             org_id,
@@ -331,7 +335,7 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
             """SELECT cb.batch_name, COUNT(os.id) AS total,
                       COUNT(os.id) FILTER (WHERE os.has_career_access) AS with_access
                FROM organization_students os
-               JOIN college_batches cb ON cb.id = os.batch_id
+               JOIN college_batches cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                GROUP BY cb.batch_name ORDER BY total DESC""",
             org_id,
@@ -354,7 +358,7 @@ async def college_analytics(admin: OrgAdminProfile = Depends(require_org_admin()
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
         
-        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         
         if r["cached_zero_risk"]:
@@ -464,7 +468,7 @@ async def analytics_performance(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         risk = r["cached_zero_risk"]
         pct  = _compute_percentile(float(avg), scored_avgs) if avg is not None else None
 
@@ -491,6 +495,7 @@ async def analytics_performance(
             "latest_score":     latest,
             "best_score":       _safe_round(r["best_score"]),
             "readiness_tier":   tier,
+            **{key: r.get(key) for key in SUMMARY_KEYS},
             "zero_offer_risk":  risk,
             "cohort_percentile":pct,
             "category_scores":  cat_scores,
@@ -644,10 +649,11 @@ async def analytics_growth(
         slope     = g["trend_slope"]
         is_stuck  = g["is_stuck"]
         latest_score = _safe_round(g["latest_score"])
-        zero_risk = _zero_offer_risk(latest_score, sessions, slope)
+        zero_risk = _zero_offer_risk(latest_score if g.get("readiness_eligible", True) else None, sessions, slope)
 
         entry = {
             "user_id":           uid,
+            **{key: g.get(key) for key in SUMMARY_KEYS},
             "sessions":          sessions,
             "first_score":       _safe_round(g["first_score"]),
             "latest_score":      _safe_round(g["latest_score"]),
@@ -764,10 +770,10 @@ async def analytics_readiness(
         sc   = int(r["session_count"] or 0)
         avg  = _safe_round(r["avg_score"])
         latest = _safe_round(r["latest_score"])
-        tier = r["cached_tier"] or _readiness_tier(latest, sc)
+        tier = r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)
         risk = r["cached_zero_risk"]
         pct  = _compute_percentile(float(avg), scored_avgs) if avg is not None else None
-        ttt  = _time_to_threshold(latest, None)   # slope not available without growth query
+        ttt  = _time_to_threshold(latest, None) if r.get("readiness_eligible", False) else None   # slope not available without growth query
 
         entry = {
             "user_id":          str(r["user_id"]),
@@ -782,11 +788,12 @@ async def analytics_readiness(
             "avg_score":        avg,
             "latest_score":     latest,
             "readiness_tier":   tier,
+            **{key: r.get(key) for key in SUMMARY_KEYS},
             "cohort_percentile":pct,
             "time_to_threshold":ttt,
             "zero_offer_risk":  risk,
         }
-        tier_buckets[tier].append(entry)
+        tier_buckets.setdefault(tier, []).append(entry)
         if risk:
             zero_risk_list.append(entry)
 
@@ -810,6 +817,8 @@ async def analytics_readiness(
             _TIER_ALMOST_READY: tier_buckets[_TIER_ALMOST_READY],
             _TIER_DEVELOPING:   tier_buckets[_TIER_DEVELOPING],
             _TIER_AT_RISK:      tier_buckets[_TIER_AT_RISK],
+            "not_measured": tier_buckets.get("not_measured", []),
+            "partially_measured": tier_buckets.get("partially_measured", []),
         },
         "zero_offer_risk": zero_risk_list,
     }
@@ -844,10 +853,10 @@ async def student_performance(
                       cd.department_name, cy.year_name, cb.batch_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
-               LEFT JOIN college_departments cd ON cd.id = os.department_id
-               LEFT JOIN college_years       cy ON cy.id = os.year_id
-               LEFT JOIN college_batches     cb ON cb.id = os.batch_id
-               WHERE os.id = $1 AND os.organization_id = $2""",
+               LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+               LEFT JOIN college_years       cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
+               LEFT JOIN college_batches     cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
+               WHERE os.id = $1 AND os.organization_id = $2 AND os.status = 'active'""",
             student_id, org_id,
         )
         if not org_student:
@@ -858,7 +867,7 @@ async def student_performance(
         # Query 1: Complete chronological session history with rubric scores
         # ASSUMPTION: interview_sessions has target_role, interview_type, duration_actual_seconds columns.
         session_rows = await conn.fetch(
-            """SELECT isess.id, isess.final_score, isess.created_at, isess.target_role AS job_role, isess.interview_type,
+            """SELECT isess.id, isess.plan, isess.runtime_state, isess.total_turns, isess.final_score, isess.created_at, isess.target_role AS job_role, isess.interview_type,
                       isess.duration_actual_seconds AS duration_seconds, isess.rubric_scores, 
                       jsonb_build_object(
                           'filler_ratio', aqf.filler_word_ratio,
@@ -876,30 +885,23 @@ async def student_performance(
                WHERE isess.user_id = $1
                  AND isess.organization_id = $2
                  AND isess.state = 'FINISHED'
-                 AND isess.final_score IS NOT NULL
                ORDER BY isess.created_at ASC""",
             user_id,
             org_id,
         )
 
-        # Query 2: All cohort avg scores for percentile rank computation
-        cohort_avgs = await conn.fetch(
-            """SELECT ROUND(AVG(isess.final_score)::numeric, 1) AS avg_score
-               FROM organization_students os
-               JOIN interview_sessions isess ON isess.user_id = os.user_id
-                                            AND isess.organization_id = os.organization_id
-                                            AND isess.state = 'FINISHED'
-                                            AND isess.final_score IS NOT NULL
-               WHERE os.organization_id = $1 AND os.status = 'active'
-               GROUP BY os.user_id""",
-            org_id,
-        )
+        # Read projected cohort evidence rather than stale stored-zero rollups.
+        cohort_avgs = await _fetch_perf_aggregate(conn, org_id)
+
+        session_rows = await project_sessions(conn, session_rows)
+        org_student = (await org_measurement_rows(conn, org_id, [org_student]))[0]
 
     # Build session history + extract category series
     sessions_list: list[dict] = []
     overall_scores: list[float] = []
     cat_series: dict[str, list[float]] = {cat: [] for cat in _RUBRIC_CATEGORIES}
 
+    # Rows were projected while the owner/tenant-filtered connection was held.
     for i, s in enumerate(session_rows, 1):
         fs = float(s["final_score"]) if s["final_score"] is not None else None
         if fs is not None:
@@ -925,18 +927,24 @@ async def student_performance(
             "interview_type":   s["interview_type"],
             "duration_seconds": s["duration_seconds"],
             "category_scores":  session_cats,
+            **{key: s.get(key) for key in SUMMARY_KEYS},
         })
 
     # Compute growth metrics
     slope  = _compute_slope(overall_scores)
     avg    = _safe_round(_stats.mean(overall_scores)) if overall_scores else None
     first  = _safe_round(overall_scores[0])  if overall_scores else None
-    latest = _safe_round(overall_scores[-1]) if overall_scores else None
+    latest = _safe_round(session_rows[-1]["final_score"]) if session_rows else None
     delta  = _safe_round(latest - first) if (first is not None and latest is not None) else None
-    tier   = _readiness_tier(latest, len(overall_scores))
-    risk   = _zero_offer_risk(latest, len(overall_scores), slope)
-    ttt    = _time_to_threshold(latest, slope)
-    stuck  = _is_stuck(len(overall_scores), slope)
+    latest_integrity = session_rows[-1] if session_rows else {}
+    eligible = latest_integrity.get("readiness_eligible", False)
+    evidence_count = sum(bool(row.get("readiness_eligible")) for row in session_rows)
+    tier   = _readiness_tier(latest if eligible else None, evidence_count)
+    if not eligible and latest is not None:
+        tier = "partially_measured"
+    risk   = _zero_offer_risk(latest if eligible else None, evidence_count, slope)
+    ttt    = _time_to_threshold(latest, slope) if eligible else None
+    stuck  = _is_stuck(evidence_count, slope) if eligible else False
 
     # Cohort percentile
     all_cohort_avgs = [float(r["avg_score"]) for r in cohort_avgs if r["avg_score"] is not None]
@@ -955,6 +963,7 @@ async def student_performance(
     return {
         "student": dict(org_student),
         "performance": {
+            **{key: latest_integrity.get(key) for key in SUMMARY_KEYS},
             "session_count":     len(overall_scores),
             "avg_score":         avg,
             "best_score":        _safe_round(max(overall_scores)) if overall_scores else None,
@@ -1013,9 +1022,9 @@ async def access_control_summary(
                       cd.department_name, cy.year_name, cb.batch_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
-               LEFT JOIN college_departments cd ON cd.id = os.department_id
-               LEFT JOIN college_years       cy ON cy.id = os.year_id
-               LEFT JOIN college_batches     cb ON cb.id = os.batch_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+               LEFT JOIN college_years       cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
+               LEFT JOIN college_batches     cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
                WHERE os.organization_id=$1 AND os.has_career_access=FALSE AND os.status='active'
                ORDER BY os.added_at DESC LIMIT $2 OFFSET $3""",
             org_id, ps, offset,
@@ -1025,9 +1034,9 @@ async def access_control_summary(
                       p.email, p.full_name, cd.department_name, cy.year_name, cb.batch_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
-               LEFT JOIN college_departments cd ON cd.id = os.department_id
-               LEFT JOIN college_years       cy ON cy.id = os.year_id
-               LEFT JOIN college_batches     cb ON cb.id = os.batch_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+               LEFT JOIN college_years       cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
+               LEFT JOIN college_batches     cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
                WHERE os.organization_id=$1 AND os.has_career_access=TRUE AND os.status='active'
                ORDER BY os.access_granted_at DESC LIMIT $2 OFFSET $3""",
             org_id, ps, offset,
@@ -1066,8 +1075,8 @@ async def export_student_reports(
     department_id: str | None = None,
     year_id:       str | None = None,
     batch_id:      str | None = None,
-    export_format: str = "json",       # ✅ FIXED: renamed from 'format' — shadows Python built-in
-    export_type:   str = "students",   # "students" (default, backward-compat) | "cohort_summary"
+    export_format: Literal["json", "csv"] = "json",       # ✅ FIXED: renamed from 'format' — shadows Python built-in
+    export_type:   Literal["students", "cohort_summary"] = "students",   # "students" (default, backward-compat) | "cohort_summary"
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
     """Student or cohort-level export with full performance data.
@@ -1137,9 +1146,9 @@ async def export_student_reports(
                        si.star_usage_count
                 FROM organization_students os
                 JOIN profiles p ON p.id = os.user_id
-                LEFT JOIN college_departments cd ON cd.id = os.department_id
-                LEFT JOIN college_years       cy ON cy.id = os.year_id
-                LEFT JOIN college_batches     cb ON cb.id = os.batch_id
+                LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+                LEFT JOIN college_years       cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
+                LEFT JOIN college_batches     cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
                 LEFT JOIN (
                     SELECT
                         isess.user_id,
@@ -1194,6 +1203,7 @@ async def export_student_reports(
 
         # Query 2: Session series for OLS slope computation
         series_rows = await _fetch_session_series(conn, org_id, extra_clause, extra_params)
+        rows = await org_measurement_rows(conn, org_id, rows)
 
     growth_map = _compute_student_growth_map(series_rows)
 
@@ -1221,6 +1231,7 @@ async def export_student_reports(
             "Avg Reasoning", "Avg Conciseness", "Avg Professionalism", "Avg Role Fit",
             # Quality flags
             "Avg Filler Ratio", "STAR Usage Sessions",
+            "Evaluation State", "Measurement Label", "Measured Questions", "Asked Questions",
         ])
         for r in rows:
             uid    = str(r["user_id"])
@@ -1231,11 +1242,11 @@ async def export_student_reports(
             first  = _safe_round(r["first_score"])
             latest = _safe_round(r["latest_score"])
             delta  = _safe_round(latest - first) if (first is not None and latest is not None) else None
-            tier   = _readiness_tier(latest, sc)
-            risk   = _zero_offer_risk(latest, sc, slope)
+            tier   = (r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc))
+            risk   = _zero_offer_risk(latest if r.get("readiness_eligible", True) else None, sc, slope)
             stuck  = _is_stuck(sc, slope)
             pct    = _compute_percentile(float(avg), all_cohort_avgs) if avg is not None else None
-            ttt    = _time_to_threshold(latest, slope)
+            ttt    = _time_to_threshold(latest, slope) if r.get("readiness_eligible", False) else None
             # ✅ SEC: _sanitize_csv_cell() on every user-controlled field
             writer.writerow([
                 _sanitize_csv_cell(r["full_name"]),
@@ -1282,6 +1293,8 @@ async def export_student_reports(
                 # Quality flags
                 _sanitize_csv_cell(_safe_round(r["avg_filler_ratio"], 3)),
                 _sanitize_csv_cell(r["star_usage_count"]),
+                r["evaluation_state"], r["measurement_label"],
+                r["measurement_coverage"]["measured"], r["measurement_coverage"]["asked"],
             ])
         output.seek(0)
         return StreamingResponse(
@@ -1323,11 +1336,12 @@ async def export_student_reports(
             "latest_score":     latest,
             "growth_delta":     delta,
             "trend_slope":      slope,
-            "readiness_tier":   _readiness_tier(latest, sc),
-            "zero_offer_risk":  _zero_offer_risk(latest, sc, slope),
+            "readiness_tier":   (r.get("cached_tier") or _readiness_tier(latest if r.get("readiness_eligible", True) else None, sc)),
+            "zero_offer_risk":  _zero_offer_risk(latest if r.get("readiness_eligible", True) else None, sc, slope),
             "is_stuck":         _is_stuck(sc, slope),
             "cohort_percentile":_compute_percentile(float(avg), all_cohort_avgs) if avg is not None else None,
-            "time_to_threshold":_time_to_threshold(latest, slope),
+            "time_to_threshold":_time_to_threshold(latest, slope) if r.get("readiness_eligible", False) else None,
+            **{key: r.get(key) for key in SUMMARY_KEYS},
             "category_scores":  {cat: _safe_round(r[f"avg_{cat}"]) for cat in _RUBRIC_CATEGORIES},
             "avg_filler_ratio": _safe_round(r["avg_filler_ratio"], 3),
             "star_usage_count": int(r["star_usage_count"] or 0),
@@ -1339,13 +1353,13 @@ async def export_student_reports(
 @router.post("/reports/schedule", status_code=201)
 async def schedule_student_report(
     body: ScheduleReportRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
-    """Create or refresh a recurring CSV delivery for an active org admin."""
-    if admin.admin_role not in {"org_admin", "placement_officer"}:
+    """Create or replay a recurring CSV delivery for an active org admin."""
+    if admin.admin_role != "org_admin":
         raise HTTPException(
             status_code=403,
-            detail="Only organization admins and placement officers can schedule reports.",
+            detail="Only organization admins can schedule reports.",
         )
     if not get_settings().RESEND_API_KEY:
         raise HTTPException(
@@ -1384,6 +1398,7 @@ async def schedule_student_report(
                        WHERE organization_id = $1
                          AND LOWER(email) = $2
                          AND status = 'active'
+                         AND role IN ('org_admin', 'placement_officer', 'viewer')
                    )""",
                 org_id,
                 recipient_email,
@@ -1432,18 +1447,9 @@ async def schedule_student_report(
             )
             if existing_id:
                 schedule = await conn.fetchrow(
-                    """UPDATE org_report_schedules
-                       SET created_by_user_id = $2,
-                           next_run_at = $3,
-                           last_status = 'scheduled',
-                           last_error = NULL,
-                           lease_until = NULL,
-                           updated_at = NOW()
-                       WHERE id = $1
-                       RETURNING id, frequency, recipient_email, next_run_at, active""",
-                    existing_id,
-                    admin.user_id,
-                    next_run_at,
+                    """SELECT id, frequency, recipient_email, next_run_at, active
+                       FROM org_report_schedules WHERE id = $1 AND organization_id = $2""",
+                    existing_id, org_id,
                 )
             else:
                 schedule = await conn.fetchrow(
@@ -1474,6 +1480,32 @@ async def schedule_student_report(
     }
 
 
+@router.get("/reports/schedules")
+async def list_report_schedules(admin: OrgAdminProfile = Depends(require_org_admin())):
+    async with DatabaseConnection() as conn:
+        rows = await conn.fetch(
+            """SELECT id, frequency, recipient_email, department_id, year_id, batch_id,
+                      active, next_run_at, last_run_at, last_status
+               FROM org_report_schedules WHERE organization_id = $1 ORDER BY created_at DESC""",
+            admin.organization_id,
+        )
+    return {"schedules": [dict(row) for row in rows]}
+
+
+@router.delete("/reports/schedules/{schedule_id}")
+async def disable_report_schedule(schedule_id: str, admin: OrgAdminProfile = Depends(require_org_admin(write=True))):
+    _validate_uuid(schedule_id, "schedule ID")
+    async with DatabaseConnection() as conn:
+        row = await conn.fetchval(
+            """UPDATE org_report_schedules SET active = FALSE, updated_at = NOW()
+               WHERE id = $1 AND organization_id = $2 RETURNING id""",
+            schedule_id, admin.organization_id,
+        )
+    if not row:
+        raise HTTPException(404, "Report schedule not found.")
+    return {"status": "disabled"}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # REPORTS / COHORT-EXPORT  (new dedicated endpoint — Q2, Q6)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1483,7 +1515,7 @@ async def export_cohort_report(
     department_id: str | None = None,
     year_id:       str | None = None,
     batch_id:      str | None = None,
-    export_format: str = "json",
+    export_format: Literal["json", "csv"] = "json",
     admin: OrgAdminProfile = Depends(require_org_admin()),
 ):
     """Dedicated cohort-level aggregate report for NAAC/NIRF/management submissions.
@@ -1623,9 +1655,9 @@ def _cc_percentile_histories(by_user: dict[str, list]) -> dict[str, list[int]]:
     for ordinal in range(max_sessions):
         ordinal_pools.append(
             sorted(
-                float(rows[ordinal]["final_score"] or 0)
+                float(rows[ordinal]["final_score"])
                 for rows in by_user.values()
-                if len(rows) > ordinal
+                if len(rows) > ordinal and rows[ordinal]["final_score"] is not None
             )
         )
 
@@ -1633,7 +1665,10 @@ def _cc_percentile_histories(by_user: dict[str, list]) -> dict[str, list[int]]:
     for user_id, rows in by_user.items():
         values: list[int] = []
         for ordinal, row in enumerate(rows):
-            score = float(row["final_score"] or 0)
+            if row["final_score"] is None:
+                values.append(None)
+                continue
+            score = float(row["final_score"])
             pool = ordinal_pools[ordinal]
             if len(pool) <= 1:
                 values.append(50)
@@ -1648,18 +1683,21 @@ def _cc_percentile_histories(by_user: dict[str, list]) -> dict[str, list[int]]:
 
 def _cc_tier_for_sessions(sess: list) -> tuple[str, bool]:
     """Apply the shared college-analytics readiness and intervention rules."""
-    if not sess:
-        return "At Risk", True
-    latest_score = float(sess[-1]["final_score"] or 0)
-    slope = _compute_slope([float(row["final_score"]) for row in sess]) or 0.0
-    key = _readiness_tier(latest_score, len(sess))
+    if not sess or sess[-1]["final_score"] is None:
+        return "Not measured", False
+    if not sess[-1].get("readiness_eligible", True):
+        return "Partially measured", False
+    latest_score = float(sess[-1]["final_score"])
+    slope = _compute_slope([float(row["final_score"]) for row in sess if row["final_score"] is not None]) or 0.0
+    measured_count = sum(row["final_score"] is not None and row.get("readiness_eligible", True) for row in sess)
+    key = _readiness_tier(latest_score, measured_count)
     tier = {
         _TIER_READY: "Ready",
         _TIER_ALMOST_READY: "Almost",
         _TIER_DEVELOPING: "Developing",
         _TIER_AT_RISK: "At Risk",
     }[key]
-    return tier, _zero_offer_risk(latest_score, len(sess), slope)
+    return tier, _zero_offer_risk(latest_score, measured_count, slope)
 
 
 def _cc_cohort_history(roster: list, by_user: dict[str, list], now: datetime) -> dict:
@@ -1692,7 +1730,8 @@ def _cc_cohort_history(roster: list, by_user: dict[str, list], now: datetime) ->
                 if row["created_at"] and start <= row["created_at"] < end
             )
             if sessions:
-                snapshot_scores.append(float(sessions[-1]["final_score"] or 0))
+                if sessions[-1]["final_score"] is not None:
+                    snapshot_scores.append(float(sessions[-1]["final_score"]))
             _, is_at_risk = _cc_tier_for_sessions(sessions)
             if is_at_risk:
                 snapshot_risk += 1
@@ -1722,7 +1761,7 @@ def _cc_session_forensics(
     scored = [s for s in sess if evals_by_session.get(str(s["id"]))]
 
     # hist: final score of every finished session, chronological, clamped to chart range
-    hist = [max(0, min(100, round(float(s["final_score"] or 0)))) for s in sess] or [0]
+    hist = [max(0, min(100, round(float(s["final_score"])))) if s["final_score"] is not None else None for s in sess]
 
     if not scored:
         return {
@@ -1880,9 +1919,9 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
                       cy.year_name, cb.batch_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
-               LEFT JOIN college_departments cd ON cd.id = os.department_id
-               LEFT JOIN college_years cy ON cy.id = os.year_id
-               LEFT JOIN college_batches cb ON cb.id = os.batch_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+               LEFT JOIN college_years cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
+               LEFT JOIN college_batches cb ON cb.id = os.batch_id AND cb.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                ORDER BY p.full_name NULLS LAST""",
             org_id,
@@ -1892,12 +1931,11 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
         eval_rows = []
         if user_ids:
             session_rows = await conn.fetch(
-                """SELECT id, user_id, final_score, rubric_scores, created_at, target_role
+                """SELECT id, user_id, plan, final_score, rubric_scores, runtime_state, total_turns, created_at, target_role
                    FROM interview_sessions
                    WHERE user_id = ANY($1::uuid[])
                      AND organization_id = $2
                      AND state = 'FINISHED'
-                     AND final_score IS NOT NULL
                    ORDER BY user_id, created_at ASC""",
                 user_ids,
                 org_id,
@@ -1911,20 +1949,20 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
                               raw_answer, normalized_answer, repaired_answer, ideal_answer,
                               what_worked, what_was_missing, classification,
                               answer_status, score, relevance_score, clarity_score,
-                              specificity_score, structure_score, answer_duration_seconds
+                              specificity_score, structure_score, communication_score, answer_duration_seconds
                        FROM question_evaluations
                        WHERE session_id = ANY($1::uuid[])
                        ORDER BY session_id, turn_number ASC""",
                     session_ids,
                 )
 
-    by_user: dict[str, list] = {}
-    for s in session_rows:
-        by_user.setdefault(str(s["user_id"]), []).append(s)
-
     evals_by_session: dict[str, list] = {}
     for e in eval_rows:
         evals_by_session.setdefault(str(e["session_id"]), []).append(e)
+
+    by_user: dict[str, list] = {}
+    for s in session_rows:
+        by_user.setdefault(str(s["user_id"]), []).append(project_session(s, evals_by_session.get(str(s["id"]), [])))
 
     now = datetime.now(timezone.utc)
     percentile_histories = _cc_percentile_histories(by_user)
@@ -1946,14 +1984,14 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
 
         if started:
             first, last = sess[0], sess[-1]
-            f_final = float(first["final_score"] or 0)
-            l_final = float(last["final_score"] or 0)
+            f_final = first["final_score"]
+            l_final = last["final_score"]
             skills_first, skills_now = _cc_skill_snapshots(sess)
-            first_score = round(f_final)
-            latest_score = round(l_final)
+            first_score = round(f_final) if f_final is not None else None
+            latest_score = round(l_final) if l_final is not None else None
             n_sess = len(sess)
             slope = _compute_slope(
-                [float(session["final_score"]) for session in sess]
+                [float(session["final_score"]) for session in sess if session["final_score"] is not None]
             ) or 0.0
             stuck = _is_stuck(n_sess, slope)
             tier, at_risk = _cc_tier_for_sessions(sess)
@@ -1962,19 +2000,19 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             target_score = float(r["target_score"] or _READINESS_TARGET)
             stt = (
                 math.ceil((target_score - latest_score) / slope)
-                if (slope > 0.2 and latest_score < target_score)
+                if (latest_score is not None and slope > 0.2 and latest_score < target_score)
                 else None
             )
             target_role = (last["target_role"] or "").strip() or None
         else:
             skills_first = {sk: None for sk in _CC_SKILLS}
             skills_now = dict(skills_first)
-            first_score = latest_score = 0
+            first_score = latest_score = None
             n_sess = 0
             slope = 0
             stuck = False
-            tier = "At Risk"
-            at_risk = True
+            tier = "Not measured"
+            at_risk = False
             enrolled_at = r["enrolled_at"]
             last_active = max(0, (now - enrolled_at).days) if enrolled_at else 0
             stt = None
@@ -2000,6 +2038,7 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             "skillsNow": skills_now,
             "firstScore": first_score,
             "latestScore": latest_score,
+            **{key: last.get(key) if started else None for key in SUMMARY_KEYS},
             "slope": slope,
             "stuck": stuck,
             "tier": tier,
@@ -2010,13 +2049,14 @@ async def command_centre(admin: OrgAdminProfile = Depends(require_org_admin())):
             "targetRole": target_role,
             "pctHistory": percentile_history,
             "scoreHistory": [
-                {"at": session["created_at"], "score": round(float(session["final_score"] or 0), 1)}
+                {"at": session["created_at"], "score": session["final_score"], "readiness_eligible": session.get("readiness_eligible", False)}
                 for session in sess
             ],
         }
-        if started:
+        scored_sessions = [value for value in sess if value["final_score"] is not None]
+        if scored_sessions:
             det, ses = _cc_session_forensics(
-                sess, evals_by_session, percentile_history
+                scored_sessions, evals_by_session, percentile_history
             )
             student["det"] = det
             student["sessionLengths"] = [
@@ -2079,8 +2119,8 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
                       cy.year_name
                FROM organization_students os
                JOIN profiles p ON p.id = os.user_id
-               LEFT JOIN college_departments cd ON cd.id = os.department_id
-               LEFT JOIN college_years cy ON cy.id = os.year_id
+               LEFT JOIN college_departments cd ON cd.id = os.department_id AND cd.organization_id = os.organization_id
+               LEFT JOIN college_years cy ON cy.id = os.year_id AND cy.organization_id = os.organization_id
                WHERE os.organization_id = $1 AND os.status = 'active'
                ORDER BY p.full_name NULLS LAST""",
             org_id,
@@ -2089,20 +2129,21 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
         session_rows = []
         if user_ids:
             session_rows = await conn.fetch(
-                """SELECT user_id, final_score, created_at, target_role
+                """SELECT id, user_id, plan, final_score, rubric_scores, runtime_state, total_turns, created_at, target_role
                    FROM interview_sessions
                    WHERE user_id = ANY($1::uuid[])
                      AND organization_id = $2
                      AND state = 'FINISHED'
-                     AND final_score IS NOT NULL
                    ORDER BY user_id, created_at ASC""",
                 user_ids,
                 org_id,
             )
 
+        session_rows = await project_sessions(conn, session_rows)
+
     by_user: dict[str, list] = {}
     for s in session_rows:
-        by_user.setdefault(str(s["user_id"]), []).append(s)
+        by_user.setdefault(str(s["user_id"]), []).append(project_session(s))
 
     students: list[dict] = []
     depts_seen: dict[str, bool] = {}
@@ -2121,11 +2162,11 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
 
         if started:
             last = sess[-1]
-            latest_value = float(last["final_score"] or 0)
-            latest_score = round(latest_value)
+            latest_value = last["final_score"]
+            latest_score = round(latest_value) if latest_value is not None else None
             n_sess = len(sess)
             slope = _compute_slope(
-                [float(session["final_score"]) for session in sess]
+                [float(session["final_score"]) for session in sess if session["final_score"] is not None]
             ) or 0.0
             tier, _ = _cc_tier_for_sessions(sess)
             score: int | None = latest_score
@@ -2133,7 +2174,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
         else:
             n_sess = 0
             slope = 0
-            tier = "Not started"
+            tier = "Not measured"
             score = None
             target_role = None
 
@@ -2145,6 +2186,7 @@ async def leaderboard(admin: OrgAdminProfile = Depends(require_org_admin())):
             "sessions": n_sess,
             "started": started,
             "score": score,
+            **{key: last.get(key) if started else None for key in SUMMARY_KEYS},
             "slope": slope,
             "tier": tier,
             "targetRole": target_role,

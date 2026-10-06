@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, field_validator
 from app.routers.interviews_helpers import _normalize_proctoring_mode, _clip_text, _MAX_VIOLATION_TYPE_LEN, _MAX_VIOLATION_DETAIL_LEN, _MAX_REASON_LEN
-from typing import Any
+from typing import Any, Literal
+from uuid import UUID
 from app.routers.interviews_helpers import _MIN_ACCESS_TOKEN_LEN, _CLIENT_REQ_ID_RE, _VIOLATION_TYPE_RE
 
 class AnswerRequest(BaseModel):
@@ -16,6 +17,11 @@ class AnswerRequest(BaseModel):
     duration_actual: int | None = None
     answer_duration_seconds: int | None = None
     client_request_id: str | None = None
+    expected_turn: int | None = None
+    question_instance_id: UUID | None = None
+    terminal_outcome: Literal["NO_ANSWER", "TRANSCRIPTION_FAILED", "UNINTELLIGIBLE", "SKIPPED", "ABORTED"] | None = None
+    capture_evidence: dict[str, bool | int | str] | None = None
+    end_after_answer: bool = False
 
     @field_validator("user_text", "access_token", "client_request_id", mode="before")
     @classmethod
@@ -77,6 +83,9 @@ class FinishRequest(BaseModel):
 class TerminateRequest(BaseModel):
     access_token: str
     reason: str = ""
+    user_text: str = ""
+    question_instance_id: UUID | None = None
+    capture_evidence: dict[str, bool | int | str] | None = None
     duration_actual: int | None = None
 
     @field_validator("access_token", "reason", mode="before")

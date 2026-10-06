@@ -81,6 +81,26 @@ async def _validate_batch_year(conn, organization_id: str, year_id: str | None) 
     if not belongs_to_org:
         raise HTTPException(422, "Year does not belong to your organization.")
 
+async def _replay_segment(conn, entity: str, org_id: str, body):
+    """Serialize natural-key creates and replay only the identical configuration."""
+    await conn.fetchval("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", org_id)
+    table, name_column, code_column = _SEGMENT_COLUMNS[entity]
+    existing = await conn.fetchrow(
+        f"SELECT * FROM {table} WHERE organization_id = $1 AND LOWER({name_column}) = LOWER($2)",
+        org_id, body.name,
+    )
+    if existing:
+        same = existing["notes"] == body.notes
+        if code_column:
+            same = same and existing[code_column] == body.code
+        if entity == "batch":
+            same = same and str(existing["year_id"]) == str(body.year_id)
+        if not same:
+            raise HTTPException(409, "Configuration already exists with different settings")
+        return {"status": "already_exists", entity: dict(existing)}
+    return None
+
+
 @router.get("/departments")
 async def list_departments(admin: OrgAdminProfile = Depends(require_org_admin())):
     async with DatabaseConnection() as conn:
@@ -94,11 +114,14 @@ async def list_departments(admin: OrgAdminProfile = Depends(require_org_admin())
 @router.post("/departments")
 async def create_department(
     body: SegmentRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         async with conn.transaction():
+            replay = await _replay_segment(conn, "department", org_id, body)
+            if replay:
+                return replay
             await _ensure_segment_unique(conn, "department", org_id, body.name, body.code)
             row = await conn.fetchrow(
                 """INSERT INTO college_departments (organization_id, department_name, department_code, notes)
@@ -116,7 +139,7 @@ async def create_department(
 async def update_department(
     dept_id: str,
     body: SegmentRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     _validate_uuid(dept_id, "department ID")
     org_id = admin.organization_id
@@ -145,7 +168,7 @@ async def update_department(
 @router.delete("/departments/{dept_id}")
 async def delete_department(
     dept_id: str,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     _validate_uuid(dept_id, "department ID")
     org_id = admin.organization_id
@@ -196,11 +219,14 @@ async def list_years(admin: OrgAdminProfile = Depends(require_org_admin())):
 @router.post("/years")
 async def create_year(
     body: SegmentRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         async with conn.transaction():
+            replay = await _replay_segment(conn, "year", org_id, body)
+            if replay:
+                return replay
             await _ensure_segment_unique(conn, "year", org_id, body.name)
             row = await conn.fetchrow(
                 "INSERT INTO college_years (organization_id, year_name, notes) VALUES ($1,$2,$3) RETURNING *",
@@ -217,7 +243,7 @@ async def create_year(
 async def update_year(
     year_id: str,
     body: SegmentRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     _validate_uuid(year_id, "year ID")
     org_id = admin.organization_id
@@ -243,7 +269,7 @@ async def update_year(
 @router.delete("/years/{year_id}")
 async def delete_year(
     year_id: str,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     _validate_uuid(year_id, "year ID")
     org_id = admin.organization_id
@@ -288,7 +314,7 @@ async def delete_year(
 @router.post("/years/reorder")
 async def reorder_years(
     year_ids: list[str],
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     org_id = admin.organization_id
     if not year_ids:
@@ -325,7 +351,7 @@ async def list_batches(admin: OrgAdminProfile = Depends(require_org_admin())):
     async with DatabaseConnection() as conn:
         rows = await conn.fetch(
             """SELECT cb.*, cy.year_name FROM college_batches cb
-               LEFT JOIN college_years cy ON cy.id = cb.year_id
+               LEFT JOIN college_years cy ON cy.id = cb.year_id AND cy.organization_id = cb.organization_id
                WHERE cb.organization_id = $1 ORDER BY cb.batch_name""",
             admin.organization_id,
         )
@@ -335,11 +361,14 @@ async def list_batches(admin: OrgAdminProfile = Depends(require_org_admin())):
 @router.post("/batches")
 async def create_batch(
     body: BatchRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     org_id = admin.organization_id
     async with DatabaseConnection() as conn:
         async with conn.transaction():
+            replay = await _replay_segment(conn, "batch", org_id, body)
+            if replay:
+                return replay
             await _validate_batch_year(conn, org_id, body.year_id)
             await _ensure_segment_unique(conn, "batch", org_id, body.name, body.code)
             row = await conn.fetchrow(
@@ -358,7 +387,7 @@ async def create_batch(
 async def update_batch(
     batch_id: str,
     body: BatchRequest,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     _validate_uuid(batch_id, "batch ID")
     org_id = admin.organization_id
@@ -387,7 +416,7 @@ async def update_batch(
 @router.delete("/batches/{batch_id}")
 async def delete_batch(
     batch_id: str,
-    admin: OrgAdminProfile = Depends(require_org_admin()),
+    admin: OrgAdminProfile = Depends(require_org_admin(write=True)),
 ):
     _validate_uuid(batch_id, "batch ID")
     org_id = admin.organization_id
