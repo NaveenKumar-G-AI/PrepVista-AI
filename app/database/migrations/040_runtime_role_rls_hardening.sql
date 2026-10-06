@@ -44,7 +44,7 @@ DECLARE
     t text;
 BEGIN
     FOREACH t IN ARRAY app_tables LOOP
-        EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO prepvista_runtime;', t);
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t) THEN EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO prepvista_runtime;', t); END IF;
     END LOOP;
 END $$;
 
@@ -64,7 +64,7 @@ DECLARE
     s text;
 BEGIN
     FOREACH s IN ARRAY app_seqs LOOP
-        EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %I TO prepvista_runtime;', s);
+        IF EXISTS (SELECT 1 FROM information_schema.sequences WHERE sequence_schema = 'public' AND sequence_name = s) THEN EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %I TO prepvista_runtime;', s); END IF;
     END LOOP;
 END $$;
 
@@ -81,7 +81,7 @@ DECLARE
     t text;
 BEGIN
     FOREACH t IN ARRAY rls_tables LOOP
-        EXECUTE format('CREATE POLICY prepvista_runtime_service_all ON %I FOR ALL TO prepvista_runtime USING (true) WITH CHECK (true);', t);
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t) THEN EXECUTE format('CREATE POLICY prepvista_runtime_service_all ON %I FOR ALL TO prepvista_runtime USING (true) WITH CHECK (true);', t); END IF;
     END LOOP;
 END $$;
 

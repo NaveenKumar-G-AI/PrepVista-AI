@@ -39,19 +39,17 @@ REVOKE EXECUTE ON FUNCTION cron_create_activity_partition() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION cron_create_activity_partition() TO prepvista_worker;
 
 -- 2. Grant necessary privileges to prepvista_worker
-GRANT USAGE ON SCHEMA public TO prepvista_worker;
-GRANT SELECT ON user_activity_events TO prepvista_worker;
-GRANT SELECT ON user_activity_settings TO prepvista_worker;
-GRANT SELECT, UPDATE ON user_activity_stats TO prepvista_worker;
-GRANT SELECT, UPDATE ON user_plan_entitlements TO prepvista_worker;
-GRANT SELECT, UPDATE, DELETE ON old_user TO prepvista_worker;
-GRANT SELECT ON profiles TO prepvista_worker;
-GRANT SELECT ON user_plan_interviews TO prepvista_worker;
-GRANT SELECT ON organizations TO prepvista_worker;
-GRANT INSERT ON public_growth_metrics TO prepvista_worker;
-GRANT DELETE ON usage_events TO prepvista_worker;
-GRANT DELETE ON billing_events TO prepvista_worker;
-
+DO $$
+DECLARE
+    t text;
+BEGIN
+    GRANT USAGE ON SCHEMA public TO prepvista_worker;
+    FOREACH t IN ARRAY ARRAY['user_activity_events', 'user_activity_settings', 'user_activity_stats', 'user_plan_entitlements', 'old_user', 'profiles', 'user_plan_interviews', 'organizations', 'public_growth_metrics', 'usage_events', 'billing_events'] LOOP
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t) THEN
+            EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO prepvista_worker;', t);
+        END IF;
+    END LOOP;
+END $$;
 -- Explicit Backend RLS Service Policies for worker on RLS-enabled tables
 DO $$
 DECLARE
@@ -59,7 +57,7 @@ DECLARE
     t text;
 BEGIN
     FOREACH t IN ARRAY rls_tables LOOP
-        EXECUTE format('CREATE POLICY prepvista_worker_service_all ON %I FOR ALL TO prepvista_worker USING (true) WITH CHECK (true);', t);
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t) THEN EXECUTE format('CREATE POLICY prepvista_worker_service_all ON %I FOR ALL TO prepvista_worker USING (true) WITH CHECK (true);', t); END IF;
     END LOOP;
 END $$;
 

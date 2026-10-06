@@ -3,6 +3,10 @@
 
 -- 1. Unify old_user identity contract.
 -- We adopt user_id as the canonical identifier because it matches audit logs.
+ALTER TABLE old_user ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY;
+ALTER TABLE old_user ADD COLUMN IF NOT EXISTS original_user_id UUID;
+ALTER TABLE old_user ADD COLUMN IF NOT EXISTS user_id UUID;
+ALTER TABLE old_user ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ DEFAULT NOW();
 UPDATE old_user SET user_id = original_user_id WHERE user_id IS NULL AND original_user_id IS NOT NULL;
 UPDATE old_user SET original_user_id = user_id WHERE original_user_id IS NULL AND user_id IS NOT NULL;
 
