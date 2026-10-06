@@ -760,20 +760,13 @@ async def _run_migrations(conn: asyncpg.Connection):
                 # not idempotent, so re-running could fail or duplicate state.
 
                 logger.error(
-                    "MIGRATION_LEDGER_INCOMPATIBLE",
+                    "migration_ledger_mismatch",
                     version=version,
+                    filename=migration_file.name,
+                    stored_checksum=stored_checksum,
+                    expected_checksum=current_checksum,
                 )
                 raise Exception("MIGRATION_LEDGER_INCOMPATIBLE")
-                logger.warning(
-                    "migration_content_changed_since_apply",
-                    version=version,
-                    detail=(
-                        "This migration's file content has changed since it "
-                        "was applied. The database schema reflects the OLD "
-                        "content. Create a new incremental migration file to "
-                        "apply the changes — do not rename or re-run this file."
-                    ),
-                )
             # else: checksum matches — no drift, nothing to log.
 
             continue

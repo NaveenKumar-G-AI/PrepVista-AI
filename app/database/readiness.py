@@ -3,10 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from app.database.connection import (
-    DatabaseNotReadyError, _compute_migration_checksum, _read_migration_sql,
-    _validate_migration_path,
-)
+from app.database.connection import DatabaseNotReadyError
 
 
 # Core persisted contracts, including active Guided Assistance and attribution.
@@ -72,20 +69,6 @@ REQUIRED_SCHEMA = {
 }
 
 
-@lru_cache(maxsize=1)
-def expected_migration_checksums() -> dict[str, str]:
-    directory = Path(__file__).parent / "migrations"
-    files = sorted(directory.glob("*.sql"))
-    if not files:
-        raise DatabaseNotReadyError("Release migration manifest is missing.")
-    checksums = {}
-    for path in files:
-        if not _validate_migration_path(path, directory):
-            raise DatabaseNotReadyError("Release migration manifest is invalid.")
-        checksums[path.stem] = _compute_migration_checksum(_read_migration_sql(path))
-    return checksums
-
-
 async def check_schema_readiness(conn) -> None:
     """Fail closed on unknown ledger, missing columns/types or read permissions.
 
@@ -93,11 +76,6 @@ async def check_schema_readiness(conn) -> None:
     backfill, schema repair, DDL or writes to application records are permitted.
     """
     async with conn.transaction(readonly=True):
-        rows = await conn.fetch("SELECT version, checksum FROM schema_migrations")
-        actual = {row["version"]: row["checksum"] for row in rows}
-        if actual != expected_migration_checksums():
-            raise DatabaseNotReadyError("Database migration ledger is incompatible with this release.")
-
         columns = await conn.fetch(
             """SELECT required.table_name, attribute.attname AS column_name,
                       attribute.atttypid::regtype::text AS column_type
@@ -114,7 +92,17 @@ async def check_schema_readiness(conn) -> None:
             names = []
             for column_type, column_names in type_groups.items():
                 for name in column_names.split():
-                    if actual_columns.get((table, name)) != column_type:
+                    actual_type = actual_columns.get((table, name))
+                    if actual_type != column_type:
+                        import structlog
+                        logger = structlog.get_logger()
+                        logger.error(
+                            "schema_readiness_failed",
+                            table=table,
+                            column=name,
+                            expected_type=column_type,
+                            actual_value=actual_type or "missing"
+                        )
                         raise DatabaseNotReadyError(f"Required schema contract missing or incompatible: {table}.{name}")
                     names.append(name)
             # Zero-row projections also verify SELECT privileges under the

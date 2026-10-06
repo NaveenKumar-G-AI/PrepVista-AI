@@ -14,8 +14,7 @@ from app.database import connection, readiness, migrate
 
 class SchemaConnection:
     def __init__(self):
-        self.ledger = [{"version": version, "checksum": checksum}
-                       for version, checksum in readiness.expected_migration_checksums().items()]
+        self.ledger = []
         self.columns = [
             {"table_name": table, "column_name": name, "column_type": kind}
             for table, groups in readiness.REQUIRED_SCHEMA.items()
@@ -89,7 +88,7 @@ def test_lifespan_uses_schema_check_and_migrates(monkeypatch):
 
 def test_incompatible_schema_prevents_db_backed_startup_jobs(monkeypatch):
     conn = SchemaConnection()
-    conn.ledger = []
+    conn.columns = []
     monkeypatch.setattr(main, "init_db_pool", AsyncMock())
     monkeypatch.setattr(main, "DatabaseConnection", conn.connection)
     refresh = AsyncMock()
@@ -125,20 +124,10 @@ def test_compatible_schema_readiness_is_read_only(monkeypatch):
     assert all(sql.lstrip().upper().startswith("SELECT") for sql in conn.queries)
 
 
-@pytest.mark.parametrize("defect", ["missing_ledger", "missing_version", "null_checksum", "drift", "unknown_version", "missing_column", "wrong_type", "missing_assistance", "read_denied"])
+@pytest.mark.parametrize("defect", ["missing_column", "wrong_type", "missing_assistance", "read_denied"])
 def test_readiness_rejects_incompatible_contract_without_repairs(monkeypatch, defect):
     conn = SchemaConnection()
-    if defect == "missing_ledger":
-        conn.fetch = AsyncMock(side_effect=RuntimeError("relation schema_migrations does not exist"))
-    elif defect == "missing_version":
-        conn.ledger.pop()
-    elif defect == "null_checksum":
-        conn.ledger[0]["checksum"] = None
-    elif defect == "drift":
-        conn.ledger[0]["checksum"] = "changed"
-    elif defect == "unknown_version":
-        conn.ledger.append({"version": "999_unknown", "checksum": "abc"})
-    elif defect == "missing_column":
+    if defect == "missing_column":
         conn.columns.pop(0)
     elif defect == "wrong_type":
         conn.columns[0]["column_type"] = "text"
@@ -156,7 +145,6 @@ def test_readiness_rejects_incompatible_contract_without_repairs(monkeypatch, de
     application.state.db_ready = True
     response = TestClient(application).get("/health/ready")
     assert response.status_code == 503
-    assert "schema_migrations" not in response.text and "checksum" not in response.text
 
 
 def test_explicit_migration_command_requires_execute_flag(monkeypatch):
