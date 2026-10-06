@@ -21,6 +21,7 @@ from app.middleware.error_handler import build_server_error_response, register_e
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.database.connection import DatabaseConnection, init_db_pool, close_db_pool
 from app.database.readiness import check_schema_readiness
+
 from app.routers import account, admin, admin_grants, auth, interviews, reports, dashboard, billing, referrals, feedback, support, admin_support, events, org_admin, org_college, outcomes, stt_ws
 from app.routers.recruiter_companies import router as recruiter_companies_router, followup_router as recruiter_followups_router
 from app.routers.placement_drives import router as placement_drives_router

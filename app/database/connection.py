@@ -300,8 +300,10 @@ async def init_db_pool(
                     attempt=attempt,
                 )
 
-                # Runtime startup only opens a pool. Schema changes belong to
-                # an explicit, separately reviewed release/admin operation.
+                async with _pool.acquire() as conn:
+                    await _run_migrations(conn)
+
+                # NOTE: the separate analytics pool is intentionally NOT initialized.
 
                 # NOTE: the separate analytics pool is intentionally NOT initialized.
                 # Nothing in the app acquires from it (org/college analytics use the
@@ -756,8 +758,10 @@ async def _run_migrations(conn: asyncpg.Connection):
                 # filename instead of as a new numbered file. This migration is
                 # NOT re-executed — CREATE POLICY and similar statements are
                 # not idempotent, so re-running could fail or duplicate state.
+
                 logger.error(
-                    "MIGRATION_LEDGER_INCOMPATIBLE"
+                    "MIGRATION_LEDGER_INCOMPATIBLE",
+                    version=version,
                 )
                 raise Exception("MIGRATION_LEDGER_INCOMPATIBLE")
                 logger.warning(

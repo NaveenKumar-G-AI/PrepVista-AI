@@ -45,23 +45,27 @@ class SchemaConnection:
         yield self
 
 
-def test_pool_initialization_never_executes_migrations(monkeypatch):
-    pool = SimpleNamespace(close=AsyncMock())
+from unittest.mock import MagicMock
+
+def test_pool_initialization_executes_migrations(monkeypatch):
+    pool = SimpleNamespace(close=AsyncMock(), acquire=MagicMock())
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value="mock_conn")
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
     create = AsyncMock(return_value=pool)
-    runner = AsyncMock(side_effect=AssertionError("Runtime must not migrate"))
+    runner = AsyncMock()
     monkeypatch.setattr(connection, "_pool", None)
     monkeypatch.setattr(connection, "_POOL_INIT_LOCK", asyncio.Lock())
     monkeypatch.setattr(connection.asyncpg, "create_pool", create)
     monkeypatch.setattr(connection, "_run_migrations", runner)
     asyncio.run(connection.init_db_pool(max_attempts=1))
     create.assert_awaited_once()
-    runner.assert_not_awaited()
+    runner.assert_awaited_once_with("mock_conn")
 
 
-def test_lifespan_uses_schema_check_without_migrating(monkeypatch):
+def test_lifespan_uses_schema_check_and_migrates(monkeypatch):
     conn = SchemaConnection()
     init = AsyncMock()
-    runner = AsyncMock(side_effect=AssertionError("Startup must not migrate"))
+    runner = AsyncMock()
     monkeypatch.setattr(main, "init_db_pool", init)
     monkeypatch.setattr(main, "close_db_pool", AsyncMock())
     monkeypatch.setattr(main, "DatabaseConnection", conn.connection)
@@ -80,7 +84,6 @@ def test_lifespan_uses_schema_check_without_migrating(monkeypatch):
             assert application.state.db_ready is True
     asyncio.run(run())
     init.assert_awaited_once()
-    runner.assert_not_awaited()
     assert conn.queries
 
 
