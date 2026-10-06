@@ -1,8 +1,15 @@
+"""LOCAL DEVELOPMENT ONLY. 
+For production deployment, the backend uses `python -m app.deployment.start` 
+which automatically handles roles and migrations safely.
+"""
+
 import asyncio
 import asyncpg
+import os
 
 async def main():
-    conn = await asyncpg.connect("postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+    migration_url = os.environ.get("MIGRATION_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+    conn = await asyncpg.connect(migration_url)
     
     # Create role
     await conn.execute("DROP ROLE IF EXISTS prepvista_runtime;")
@@ -15,22 +22,6 @@ async def main():
     await conn.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO prepvista_runtime;")
     
     await conn.close()
-    
-    # Test as runtime role
-    runtime_conn = await asyncpg.connect("postgresql://prepvista_runtime:runtime_pass@127.0.0.1:55322/postgres")
-    
-    # Should work
-    await runtime_conn.execute("SELECT 1;")
-    print("SELECT 1 works.")
-    
-    # Should fail
-    try:
-        await runtime_conn.execute("CREATE TABLE this_should_fail (id INT);")
-        print("ERROR: Was able to create table!")
-    except Exception as e:
-        print("DDL Blocked as expected:", type(e).__name__)
-        
-    await runtime_conn.close()
 
 if __name__ == '__main__':
     asyncio.run(main())

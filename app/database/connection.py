@@ -756,6 +756,10 @@ async def _run_migrations(conn: asyncpg.Connection):
                 # filename instead of as a new numbered file. This migration is
                 # NOT re-executed — CREATE POLICY and similar statements are
                 # not idempotent, so re-running could fail or duplicate state.
+                logger.error(
+                    "MIGRATION_LEDGER_INCOMPATIBLE"
+                )
+                raise Exception("MIGRATION_LEDGER_INCOMPATIBLE")
                 logger.warning(
                     "migration_content_changed_since_apply",
                     version=version,
