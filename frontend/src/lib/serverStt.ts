@@ -67,7 +67,9 @@ export class ServerSttSession {
   }
   private openSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${this.opts.backendUrl.replace(/^http/, 'ws').replace(/\/$/, '')}/ws/stt/${encodeURIComponent(this.opts.sessionId)}?token=${encodeURIComponent(this.opts.token)}`);
+      const baseUrl = this.opts.backendUrl.replace(/\/api\/?$/, '');
+        const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/ws/stt/${encodeURIComponent(this.opts.sessionId)}?token=${encodeURIComponent(this.opts.token)}`;
+        const ws = new WebSocket(wsUrl);
       this.ws = ws;
       ws.onopen = () => resolve();
       ws.onerror = () => { this.pending?.resolve(null); reject(new Error('Transcription connection unavailable')); };
@@ -108,7 +110,12 @@ export class ServerSttSession {
         if (this.active && !this.sealed) this.recordWindow();
       };
       recorder.start();
-      this.timer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, this.opts.windowMs || 3000);
+      this.timer = setTimeout(() => { 
+        if (recorder.state !== 'inactive') {
+          try { recorder.requestData(); } catch { /* ignore */ }
+          recorder.stop();
+        } 
+      }, this.opts.windowMs || 3000);
     } catch { this.evidence.failed = true; complete(); }
   }
   private async settleWindow(id: string, blob: Blob) {

@@ -731,24 +731,30 @@ class ApiClient {
   async getPublicGrowth<T = ApiPublicGrowth>() { return this.cachedRequest<T>('/dashboard/public-growth', 120_000, { retries: 0 }); }
   async getAdminOverview<T = ApiAdminOverview>() { return this.cachedRequest<T>('/admin/overview', 120_000, { retries: 0 }); }
   async approveLaunchOffer<T = { status: string; grant_id: number; user_id: string; email: string; plan: string; slot_number: number; approved_at: string | null; expires_at: string | null }>(grantId: number) {
-    return this.request<T>(`/admin/launch-offers/${grantId}/approve`, {
+    const res = await this.request<T>(`/admin/launch-offers/${grantId}/approve`, {
       method: 'POST',
       retries: 0,
     });
+    this.invalidateCache('/admin');
+    return res;
   }
   async rejectLaunchOffer<T = { status: string; grant_id: number; user_id: string; email: string; reviewed_at: string | null }>(grantId: number) {
-    return this.request<T>(`/admin/launch-offers/${grantId}/reject`, {
+    const res = await this.request<T>(`/admin/launch-offers/${grantId}/reject`, {
       method: 'POST',
       retries: 0,
     });
+    this.invalidateCache('/admin');
+    return res;
   }
   async grantAdminAccess<T = { status: string; message: string }>(userId: string, model: string, value: string, action: string) {
-    return this.request<T>(`/admin/grants`, {
+    const res = await this.request<T>(`/admin/grants`, {
       method: 'POST',
       body: { user_id: userId, model, value, action },
       retries: 0,
       timeoutMs: 15000,
     });
+    this.invalidateCache('/admin');
+    return res;
   }
   // ── Support ─────────────────────────────────
   async getMySupportThread<T = unknown>(limit = 50, offset = 0) {
@@ -808,17 +814,21 @@ class ApiClient {
     return this.request<T>(`/dashboard/sessions?limit=${limit}&offset=${offset}`);
   }
   async deleteSessionHistory<T = { status: string; session_id: string }>(sessionId: string) {
-    return this.request<T>(`/dashboard/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await this.request<T>(`/dashboard/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'DELETE',
       retries: 0,
     });
+    this.invalidateCache('/dashboard');
+    return res;
   }
   async bulkDeleteSessionHistory<T = { status: string; deleted_count: number; session_ids: string[] }>(sessionIds: string[]) {
-    return this.request<T>('/dashboard/sessions/bulk-delete', {
+    const res = await this.request<T>('/dashboard/sessions/bulk-delete', {
       method: 'POST',
       body: { session_ids: sessionIds },
       retries: 0,
     });
+    this.invalidateCache('/dashboard');
+    return res;
   }
   async getSkills<T = unknown>() { return this.cachedRequest<T>('/dashboard/skills', 120_000); }
   async deleteAccount<T = { status: string; message: string }>() {
@@ -1046,19 +1056,25 @@ class ApiClient {
     });
   }
   async verifyPayment<T = unknown>(orderId: string, paymentId: string, signature: string) {
-    return this.request<T>('/billing/verify-payment', {
+    const res = await this.request<T>('/billing/verify-payment', {
       method: 'POST',
       body: { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature },
     });
+    this.invalidateCache('/auth/me');
+    this.invalidateCache('/dashboard');
+    return res;
   }
   async getBillingStatus<T = unknown>() {
     return this.request<T>('/billing/status');
   }
   async switchPlan<T = unknown>(plan: string) {
-    return this.request<T>('/billing/switch-plan', {
+    const res = await this.request<T>('/billing/switch-plan', {
       method: 'POST',
       body: { plan },
     });
+    this.invalidateCache('/auth/me');
+    this.invalidateCache('/dashboard');
+    return res;
   }
 
   // ── Report Sharing ────────────────────────

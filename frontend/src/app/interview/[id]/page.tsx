@@ -1574,6 +1574,7 @@ export default function LiveInterviewPage() {
     setEndInterviewOpen(false);
     stopAllMedia();
     clearStoredInterviewSession();
+    api.invalidateCache('/dashboard');
     
     if (data && data.report_url) {
       router.push(typeof data.report_url === 'string' && data.report_url.startsWith(SAFE_REPORT_URL_PREFIX) ? data.report_url : `/report/${sessionId}`);
@@ -1637,10 +1638,14 @@ export default function LiveInterviewPage() {
     try {
       transitionTo('TRANSCRIBING');
       setStatusText('Completing transcription...');
+      const speechDetected = captureSpeechRef.current || lastAudioActivityAtRef.current > 0;
       if (STT_SERVER_ENABLED) {
         const result = await stopServerStt();
-        if (result) return { transcript: normalizeLiveTranscript(result.transcript), evidence: result.evidence };
-        return { transcript: currentTranscriptRef.current, evidence: { audio_bytes: 0, speech_detected: captureSpeechRef.current,
+        if (result) {
+          result.evidence.speech_detected = result.evidence.speech_detected || speechDetected;
+          return { transcript: normalizeLiveTranscript(result.transcript), evidence: result.evidence };
+        }
+        return { transcript: currentTranscriptRef.current, evidence: { audio_bytes: 0, speech_detected: speechDetected,
           failed: true, unintelligible: false, flush_status: 'timeout' } };
       }
       const recognition = recognitionRef.current;
@@ -1656,7 +1661,7 @@ export default function LiveInterviewPage() {
       }
       // Browser final results are authoritative; interim text remains UI text.
       return { transcript: normalizeLiveTranscript(accumulatedTranscriptRef.current), evidence: {
-        audio_bytes: 0, speech_detected: captureSpeechRef.current, failed: captureFailedRef.current,
+        audio_bytes: 0, speech_detected: speechDetected, failed: captureFailedRef.current,
         unintelligible: false, flush_status: captureFailedRef.current ? 'timeout' : 'ok' } };
     } finally { captureSettlingRef.current = false; clearWaveformMonitor(); setHardwareActive(false); }
   }
