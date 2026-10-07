@@ -1,0 +1,100 @@
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.buttonRow}>
+                <button
+                  type="button"
+                  className={styles.micButton}
+                  disabled
+                >
+                  {uiState === 'USER_LISTENING'
+                    ? 'Listening...'
+                    : uiState === 'SUBMITTING'
+                      ? 'Analyzing...'
+                      : uiState === 'AI_SPEAKING'
+                        ? 'Recruiter Speaking...'
+                        : 'Awaiting Logic...'}
+                </button>
+                {uiState === 'USER_LISTENING' ? (
+                  <>
+                    <button type="button" className={styles.forceButton} disabled={finalizing || !!pendingRetryRef.current} onClick={handleManualSubmit}>{pendingAnswerRef.current ? 'Retry saved answer' : 'Submit Answer'}</button>
+                    <button type="button" className={styles.forceButton} disabled={finalizing || !!pendingRetryRef.current || uiState !== 'USER_LISTENING'} onClick={() => void submitToBackend('', createSubmissionKey(), 0, false, 'SKIPPED')}>Skip question</button>
+                    <button type="button" className={styles.forceButton} disabled={finalizing || assistanceLoading || !!pendingAnswerRef.current} onClick={() => void handleAskMeAgain()}>{pendingRetryRef.current ? 'Retry Ask Me Again' : 'Ask Me Again'}</button>
+                    {assistanceEnabled ? (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.endButton}
+                          style={{ opacity: assistanceLoading ? 0.6 : 1 }}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || hintLevel >= 2}
+                          onClick={requestHint}
+                          aria-label="Show contextual hint for current interview question"
+                        >
+                          {assistanceLoading && !guidanceContent ? 'Preparing...' : hintLevel >= 2 ? 'Hints used' : '💡 Hint'}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.endButton}
+                          style={{ opacity: assistanceLoading ? 0.6 : 1 }}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || !!guidanceContent}
+                          onClick={requestAnswerGuidance}
+                          aria-label="Show professional answer guidance for current interview question"
+                        >
+                          {assistanceLoading && !hintContent ? 'Preparing...' : guidanceContent ? 'Guidance shown' : '📝 Show Answer'}
+                        </button>
+                      </>
+                    ) : null}
+                    <button type="button" className={styles.endButton} disabled={finalizing || !!pendingRetryRef.current} onClick={handleEndInterview}>End Interview</button>
+                  </>
+                ) : null}
+              </div>
+
+              {/* ── Guided Assistance Panel ──────────────────────────────── */}
+              {assistanceEnabled && assistancePanelOpen && uiState === 'USER_LISTENING' ? (
+                <div
+                  style={{
+                    margin: '12px 0',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(59,130,246,0.25)',
+                    backgroundColor: 'rgba(59,130,246,0.05)',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Assistance status label */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(59,130,246,0.8)' }}>
+                      PrepVista Guidance
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'rgba(100,116,139,0.8)' }}>
+                      {provenanceLabel(assistanceStatus)}
+                    </span>
+                  </div>
+
+                  {assistanceLoading ? (
+                    <div style={{ textAlign: 'center', padding: '12px', color: 'rgba(100,116,139,0.8)' }}>
+                      Preparing guidance...
+                    </div>
+                  ) : null}
+
+                  {assistanceError ? <div role="alert">{assistanceError}{displayedAssistance ? <button type="button" onClick={() => void acknowledgeDisplayedAssistance(displayedAssistance)}>Retry view acknowledgement</button> : null}</div> : null}
+                  {/* Hint content */}
+                  {hintContent && !assistanceLoading ? (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: '4px', fontSize: '13px' }}>
+                        {hintLevel === 1 ? 'What the interviewer wants:' : 'How to structure your answer:'}
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{hintContent}</div>
+                      {hintLevel < 2 && !guidanceContent ? (
+                        <button
+                          type="button"
+                          onClick={requestHint}
+                          disabled={assistanceLoading}
+                          style={{ marginTop: '8px', fontSize: '12px', color: 'rgb(59,130,246)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                          Need another hint?
+                        </button>

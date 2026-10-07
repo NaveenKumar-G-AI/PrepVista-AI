@@ -858,6 +858,9 @@ class ApiClient {
   async setupInterview<T = unknown>(formData: FormData) {
     return this.request<T>('/interviews/setup', { method: 'POST', body: formData, isFormData: true, timeoutMs: 60000 });
   }
+  async getInterviewSession<T = unknown>(sessionId: string) {
+    return this.request<T>(`/interviews/${sessionId}`, { method: 'GET', timeoutMs: 15000 });
+  }
   async submitAnswer<T = unknown>(
     sessionId: string,
     userText: string,

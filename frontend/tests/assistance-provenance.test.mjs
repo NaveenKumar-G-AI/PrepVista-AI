@@ -37,7 +37,7 @@ function harness(server=true) {
   window.WebSocket=Socket;
   const react={useState:initial=>{const i=hookIndex++;if(!(i in hooks))hooks[i]=initial;return[hooks[i],v=>{hooks[i]=typeof v==='function'?v(hooks[i]):v;}];},
     useRef:initial=>{const i=hookIndex++;return hooks[i]??(hooks[i]={current:initial});},useEffect(fn,deps){const i=hookIndex++;const old=effectDeps.get(i);
-      if(!old || deps?.some((value,j)=>value!==old[j])){effectDeps.set(i,deps);if(/setHintContent\(null\)|acknowledgeDisplayedAssistance|uiStateRef.current =|sessionDataRef.current =/.test(fn.toString()))effects.push(fn);}},useMemo:fn=>fn()};
+      if(!old || deps?.some((value,j)=>value!==old[j])){effectDeps.set(i,deps);if(/setActiveAssistance\(null\)|acknowledgeDisplayedAssistance|uiStateRef.current =|sessionDataRef.current =/.test(fn.toString()))effects.push(fn);}},useMemo:fn=>fn()};
   const context=vm.createContext({console,process:{env:{NEXT_PUBLIC_STT_SERVER_ENABLED:String(server),NEXT_PUBLIC_API_URL:'http://test'}},
     window,localStorage,sessionStorage,Event,EventTarget,Error,TypeError,DOMException,Response,AbortController,Blob,FormData,URL,
     navigator:{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[{stop:()=>stops.push('track')}]})}},MediaRecorder:Recorder,WebSocket:Socket,
@@ -93,7 +93,7 @@ for(const kind of ['hint','answer_guidance'])test(`actual page default OFF block
 });
 for(const kind of ['hint','answer_guidance'])test(`actual ${kind} duplicate click generates once, view only after render`,async()=>{
   const h=pageHarness();const wait=deferred();let generated=0,viewed=0,key;
-  h.fetch(async(url,options)=>{if(url.endsWith('/viewed')){viewed++;return response(200,{status:'ok'});}generated++;key=JSON.parse(options.body).client_request_id;await wait.promise;return response(200,{content:'Valid provider content',event_id:'event',level:1,why_it_works:['Reason']});});
+  h.fetch(async(url,options)=>{if(url.endsWith('/viewed')){viewed++;return response(200,{status:'ok'});}generated++; key=JSON.parse(options.body).client_request_id;await wait.promise;return response(200,{content:'Valid provider content',event_id:'event',level:1,why_it_works:['Reason']});});
   const operation=kind==='hint'?h.a.requestHint():h.a.requestAnswerGuidance();await drain();
   await (kind==='hint'?h.a.requestHint():h.a.requestAnswerGuidance());assert.equal(generated,1);assert.equal(viewed,0);
   wait.resolve();await operation;assert.equal(viewed,0);assert.match(key,/instance-1/);

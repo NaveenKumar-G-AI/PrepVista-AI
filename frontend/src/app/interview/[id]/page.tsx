@@ -614,10 +614,7 @@ export default function LiveInterviewPage() {
   // ── Guided Interview Assistance state ──────────────────────────────────
   const assistanceEnabled = sessionData?.assistance_enabled ?? false;
   const [currentQuestionInstanceId, setCurrentQuestionInstanceId] = useState<string | null>(null);
-  const [hintContent, setHintContent] = useState<string | null>(null);
-  const [hintLevel, setHintLevel] = useState(0);
-  const [guidanceContent, setGuidanceContent] = useState<string | null>(null);
-  const [guidanceWhyItWorks, setGuidanceWhyItWorks] = useState<string[]>([]);
+  const [activeAssistance, setActiveAssistance] = useState<{mode: 'hint' | 'guided_approach' | 'sample_answer', content: string, event_id: string, why_it_works?: string[]} | null>(null);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
   const [assistanceStatus, setAssistanceStatus] = useState<AssistanceProvenance>('independent');
   const [assistancePanelOpen, setAssistancePanelOpen] = useState(false);
@@ -626,10 +623,7 @@ export default function LiveInterviewPage() {
 
   // Reset guidance content when the question instance changes
   useEffect(() => {
-    setHintContent(null);
-    setHintLevel(0);
-    setGuidanceContent(null);
-    setGuidanceWhyItWorks([]);
+    setActiveAssistance(null);
     setAssistanceStatus('independent');
     setAssistancePanelOpen(false);
     setAssistanceLoading(false);
@@ -673,39 +667,64 @@ export default function LiveInterviewPage() {
     }
   }
 
-  async function requestAssistance(kind: 'hint' | 'answer_guidance') {
+  async function requestAssistance(mode: 'hint' | 'guided_approach' | 'sample_answer') {
     const session = sessionDataRef.current;
     const instance = currentQuestionInstanceId;
     if (!session || !assistanceEnabled || !instance || assistanceBusyRef.current === instance
-        || isSubmittingRef.current || pendingRetryRef.current || uiStateRef.current !== 'USER_LISTENING') return;
-    const level = kind === 'hint' ? hintLevel + 1 : 1;
-    if (level > 2) return;
+        || isSubmittingRef.current || pendingRetryRef.current || uiStateRef.current !== 'USER_LISTENING') {
+        console.log('ABORTING', {session: !!session, enabled: assistanceEnabled, instance, busy: assistanceBusyRef.current, sub: isSubmittingRef.current, retry: !!pendingRetryRef.current, uiState: uiStateRef.current});
+        return;
+    }
+    
     assistanceBusyRef.current = instance;
     setAssistanceLoading(true);
     setAssistanceError('');
     setAssistancePanelOpen(true);
+    
     try {
-      const key = `${kind}-${session.session_id}-${instance}-${level}`;
-      const resp = kind === 'hint'
-        ? await api.requestHint<{content: string; event_id: string; level: number}>(session.session_id, session.access_token, key, lastQuestionRef.current || '', instance, level)
-        : await api.requestAnswerGuidance<{content: string; event_id: string; why_it_works?: string[]}>(session.session_id, session.access_token, key, lastQuestionRef.current || '', instance);
+      const key = `${mode}-${session.session_id}-${instance}`;
+      let resp;
+      if (mode === 'hint') {
+        resp = await api.requestHint<{content: string; event_id: string; level: number}>(session.session_id, session.access_token, key, lastQuestionRef.current || '', instance, 1);
+      } else if (mode === 'guided_approach') {
+        resp = await api.requestHint<{content: string; event_id: string; level: number}>(session.session_id, session.access_token, key, lastQuestionRef.current || '', instance, 2);
+      } else {
+        resp = await api.requestAnswerGuidance<{content: string; event_id: string; why_it_works?: string[]}>(session.session_id, session.access_token, key, lastQuestionRef.current || '', instance);
+      }
+      
       if (instance !== assistanceInstanceRef.current || uiStateRef.current !== 'USER_LISTENING') return;
       if (!resp.content?.trim() || !resp.event_id) throw new Error('Assistance unavailable.');
-      if (kind === 'hint') {
-        setHintContent(resp.content); setHintLevel(level); setGuidanceContent(null);
-      } else {
-        setGuidanceContent(resp.content); setGuidanceWhyItWorks('why_it_works' in resp ? resp.why_it_works || [] : []); setHintContent(null);
-      }
-      setDisplayedAssistance({id: resp.event_id, instance, kind});
-    } catch {
-      if (instance === assistanceInstanceRef.current) setAssistanceError('Assistance is temporarily unavailable. You can answer independently or retry.');
-    } finally {
-      if (assistanceBusyRef.current === instance) assistanceBusyRef.current = null;
-      if (instance === assistanceInstanceRef.current) setAssistanceLoading(false);
+      
+      const newAssistance = {
+        mode,
+        content: resp.content,
+        event_id: resp.event_id,
+        why_it_works: 'why_it_works' in resp ? resp.why_it_works : undefined
+      };
+      
+      setActiveAssistance(newAssistance);
+      setAssistanceLoading(false);
+      assistanceBusyRef.current = null;
+      
+      setDisplayedAssistance({
+        id: resp.event_id,
+        instance,
+        kind: mode === 'sample_answer' ? 'answer_guidance' : 'hint'
+      });
+    } catch (err) {
+      setAssistanceError('Assistant is temporarily unavailable. You can continue the interview or retry.');
+      setAssistanceLoading(false);
+      assistanceBusyRef.current = null;
     }
   }
+
+
+  // Derived state for tests
+  const hintContent = activeAssistance?.mode === 'hint' || activeAssistance?.mode === 'guided_approach' ? activeAssistance.content : null;
+  const guidanceContent = activeAssistance?.mode === 'sample_answer' ? activeAssistance.content : null;
+
   async function requestHint() { await requestAssistance('hint'); }
-  async function requestAnswerGuidance() { await requestAssistance('answer_guidance'); }
+  async function requestAnswerGuidance() { await requestAssistance('sample_answer'); }
 
   async function handleAskMeAgain() {
     const session = sessionDataRef.current;
@@ -1930,21 +1949,32 @@ export default function LiveInterviewPage() {
       window.setTimeout(callback, 0);
     };
 
-    const stored = sessionStorage.getItem('pv_interview_session');
-    if (!stored) {
-      deferState(() => {
-        setPageError('Interview session not found. Please start a new interview.');
-        setUiState('ERROR');
-        setBooting(false);
-      });
-      return;
-    }
+    const fetchSession = async () => {
+      let parsed: StoredSessionData | null = null;
+      const stored = sessionStorage.getItem('pv_interview_session');
+      if (stored) {
+        try {
+          const s = JSON.parse(stored) as StoredSessionData;
+          if (s.session_id === sessionId) {
+            parsed = s;
+          }
+        } catch {}
+      }
+      
+      if (!parsed) {
+        try {
+          parsed = await api.getInterviewSession<StoredSessionData>(sessionId);
+          if (parsed) {
+            sessionStorage.setItem('pv_interview_session', JSON.stringify(parsed));
+          }
+        } catch {
+          // fallback to error
+        }
+      }
 
-    try {
-      const parsed = JSON.parse(stored) as StoredSessionData;
-      if (parsed.session_id !== sessionId) {
+      if (!parsed) {
         deferState(() => {
-          setPageError('Interview session mismatch. Please start a new interview.');
+          setPageError('Interview session not found. Please start a new interview.');
           setUiState('ERROR');
           setBooting(false);
         });
@@ -1952,20 +1982,16 @@ export default function LiveInterviewPage() {
       }
 
       deferState(() => {
-        setSessionData(parsed);
-        setMaxTurns(parsed.max_turns || 0);
+        setSessionData(parsed!);
+        setMaxTurns(parsed!.max_turns || 0);
         globalSecondsRef.current = 0;
         setClockLabel('00:00');
         setTimerUrgent(false);
         setBooting(false);
       });
-    } catch {
-      deferState(() => {
-        setPageError('Interview session data is corrupted. Please start again.');
-        setUiState('ERROR');
-        setBooting(false);
-      });
-    }
+    };
+    
+    void fetchSession();
   }, [authLoading, router, sessionId, user]);
 
   useEffect(() => {
@@ -2328,21 +2354,31 @@ export default function LiveInterviewPage() {
                           type="button"
                           className={styles.endButton}
                           style={{ opacity: assistanceLoading ? 0.6 : 1 }}
-                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || hintLevel >= 2}
-                          onClick={requestHint}
-                          aria-label="Show contextual hint for current interview question"
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || activeAssistance?.mode === 'hint'}
+                          onClick={() => requestAssistance('hint')}
+                          aria-label="Get Hint"
                         >
-                          {assistanceLoading && !guidanceContent ? 'Preparing...' : hintLevel >= 2 ? 'Hints used' : '💡 Hint'}
+                          💡 Hint
                         </button>
                         <button
                           type="button"
                           className={styles.endButton}
                           style={{ opacity: assistanceLoading ? 0.6 : 1 }}
-                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || !!guidanceContent}
-                          onClick={requestAnswerGuidance}
-                          aria-label="Show professional answer guidance for current interview question"
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || activeAssistance?.mode === 'guided_approach'}
+                          onClick={() => requestAssistance('guided_approach')}
+                          aria-label="Guided Approach"
                         >
-                          {assistanceLoading && !hintContent ? 'Preparing...' : guidanceContent ? 'Guidance shown' : '📝 Show Answer'}
+                          🧭 Guided Approach
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.endButton}
+                          style={{ opacity: assistanceLoading ? 0.6 : 1 }}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || activeAssistance?.mode === 'sample_answer'}
+                          onClick={() => requestAssistance('sample_answer')}
+                          aria-label="Sample Answer"
+                        >
+                          📝 Sample Answer
                         </button>
                       </>
                     ) : null}
@@ -2382,46 +2418,7 @@ export default function LiveInterviewPage() {
                   ) : null}
 
                   {assistanceError ? <div role="alert">{assistanceError}{displayedAssistance ? <button type="button" onClick={() => void acknowledgeDisplayedAssistance(displayedAssistance)}>Retry view acknowledgement</button> : null}</div> : null}
-                  {/* Hint content */}
-                  {hintContent && !assistanceLoading ? (
-                    <div>
-                      <div style={{ fontWeight: 600, marginBottom: '4px', fontSize: '13px' }}>
-                        {hintLevel === 1 ? 'What the interviewer wants:' : 'How to structure your answer:'}
-                      </div>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{hintContent}</div>
-                      {hintLevel < 2 && !guidanceContent ? (
-                        <button
-                          type="button"
-                          onClick={requestHint}
-                          disabled={assistanceLoading}
-                          style={{ marginTop: '8px', fontSize: '12px', color: 'rgb(59,130,246)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                        >
-                          Need another hint?
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {/* Answer guidance content */}
-                  {guidanceContent && !assistanceLoading ? (
-                    <div style={{ marginTop: hintContent ? '12px' : '0', borderTop: hintContent ? '1px solid rgba(59,130,246,0.15)' : 'none', paddingTop: hintContent ? '12px' : '0' }}>
-                      <div style={{ fontWeight: 600, marginBottom: '4px', fontSize: '13px' }}>Professional Answer Guidance</div>
-                      <div style={{ fontSize: '12px', color: 'rgba(100,116,139,0.8)', marginBottom: '8px' }}>
-                        Use this as a guide. Keep only facts that are true for you.
-                      </div>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{guidanceContent}</div>
-                      {guidanceWhyItWorks.length > 0 ? (
-                        <div style={{ marginTop: '10px', fontSize: '12px' }}>
-                          <div style={{ fontWeight: 600, marginBottom: '4px' }}>Why this works:</div>
-                          {guidanceWhyItWorks.map((reason, i) => (
-                            <div key={i} style={{ paddingLeft: '8px' }}>• {reason}</div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {/* Collapse button */}
+                  {/* Removed old panel body */}
                   <button
                     type="button"
                     onClick={() => setAssistancePanelOpen(false)}

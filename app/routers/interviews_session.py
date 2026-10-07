@@ -597,3 +597,28 @@ async def retry_question(session_id: str, req: RetryQuestionRequest,
                 last_answer_status = NULL WHERE id = $1""", session_id, turn, json.dumps(runtime),
                 _question_signature(original["question_text"]))
             return payload
+
+
+@router.get("/{session_id}")
+async def get_session(
+    session_id: str,
+    user: UserProfile = Depends(get_current_user),
+):
+    _validate_session_id(session_id)
+    async with DatabaseConnection() as conn:
+        session = await conn.fetchrow(
+            """SELECT id as session_id, access_token, plan, difficulty_mode, 
+                      total_turns as max_turns, duration_seconds, proctoring_mode, candidate_name,
+                      state
+               FROM interview_sessions WHERE id = $1 AND user_id = $2""",
+            session_id, user.id
+        )
+        if not session:
+            raise HTTPException(404, "Session not found")
+            
+        policy = await conn.fetchrow("SELECT enabled FROM interview_assistance_policy WHERE session_id = $1", session_id)
+        
+        return {
+            **dict(session),
+            "assistance_enabled": policy["enabled"] if policy else False
+        }
