@@ -180,9 +180,9 @@ async def setup_interview(
     try:
         async with connection_scope(DatabaseConnection) as conn:
             await track_funnel_event(
-                conn, "setup_started",
+                conn, "cta clicked",
                 user_id=user.id,
-                metadata={"plan": normalized_plan, "resume_fingerprint": resume_fingerprint},
+                metadata={"action": "setup_started", "plan": normalized_plan, "resume_fingerprint": resume_fingerprint},
             )
     except Exception as exc:
         logger.warning("funnel_tracking_setup_started_failed", user_id=user.id, error=str(exc))
@@ -351,6 +351,9 @@ async def terminate_interview(session_id: str, req: TerminateRequest, user: User
                 if state.get("terminal_contract_version") != 1:
                     from app.services.interviewer_session import adopt_active_terminal_contract
                     state = await adopt_active_terminal_contract(conn, session_id, state)
+                from app.services.answer_acceptance import settle_accepted_evidence
+                settle_accepted_evidence(state)
+                await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, _safe_json_dumps(state))
                 current = state.get("active_question_id")
                 if req.question_instance_id and str(req.question_instance_id) != str(current):
                     raise HTTPException(409, "The answer belongs to a different question.")
@@ -565,6 +568,24 @@ async def retry_question(session_id: str, req: RetryQuestionRequest,
                     or int(row["total_turns"] or 0) != req.expected_turn
                     or str(runtime.get("active_question_id")) != req.active_question_instance_id):
                 raise HTTPException(409, "Refresh the interview before asking again.")
+            from app.services.answer_acceptance import evidence_ack, pending_accepted_answers, settle_accepted_evidence
+            pending = pending_accepted_answers(runtime)
+            if pending:
+                accepted = [runtime["accepted_attempts"][item["evidence_ack"]["client_request_id"]]
+                            for item in pending]
+                if any(item["outcome"] != "ABORTED"
+                       or item["question_instance_id"] != req.active_question_instance_id
+                       for item in accepted):
+                    raise HTTPException(409, "Finish processing the accepted answer before asking again.")
+                # Ask Again explicitly abandons this attempt. Its accepted
+                # original remains authoritative even if a later request sends
+                # different capture text or metadata.
+                settle_accepted_evidence(runtime)
+                for item in accepted:
+                    runtime.setdefault("answer_responses", {})[item["client_request_id"]] = {
+                        "action": "accepted", "processing_state": "COMPLETE",
+                        "evidence_ack": evidence_ack(item),
+                    }
             records = runtime.get("question_records", {})
             original = records.get(req.question_instance_id)
             current = records.get(req.active_question_instance_id)
@@ -608,7 +629,7 @@ async def get_session(
     async with DatabaseConnection() as conn:
         session = await conn.fetchrow(
             """SELECT id as session_id, access_token, plan, difficulty_mode, 
-                      total_turns as max_turns, duration_seconds, proctoring_mode, candidate_name,
+                      total_turns as turn, runtime_state, duration_planned_seconds as duration_seconds, proctoring_mode, resume_summary,
                       state
                FROM interview_sessions WHERE id = $1 AND user_id = $2""",
             session_id, user.id
@@ -618,7 +639,27 @@ async def get_session(
             
         policy = await conn.fetchrow("SELECT enabled FROM interview_assistance_policy WHERE session_id = $1", session_id)
         
-        return {
-            **dict(session),
-            "assistance_enabled": policy["enabled"] if policy else False
-        }
+        from app.config import PLAN_CONFIG
+        result = dict(session)
+        summary = _safe_json_loads(result.pop("resume_summary", None), {})
+        result["candidate_name"] = _normalize_candidate_name(summary.get("candidate_name", "Candidate"))
+        runtime = coerce_runtime_state(result.pop("runtime_state", {}))
+        instance = runtime.get("active_question_id")
+        record = runtime.get("question_records", {}).get(str(instance), {})
+        question = record.get("question_text")
+        if not question and result["turn"]:
+            question = await conn.fetchval("SELECT content FROM conversation_messages WHERE session_id = $1 AND role = 'assistant' AND turn_number = $2 ORDER BY id DESC LIMIT 1", session_id, result["turn"])
+        from app.services.assistance_evidence import resolve_provenance
+        provenance = record.get("assistance_provenance")
+        if provenance is None and instance:
+            now = await conn.fetchval("SELECT clock_timestamp() AS answered_at")
+            provenance = await resolve_provenance(conn, session_id, instance, user.id, now,
+                                                  result["turn"], mark_used=False)
+        from app.services.answer_acceptance import pending_accepted_answers
+        result["pending_accepted_answers"] = pending_accepted_answers(runtime)
+        result.update(current_assistance_provenance=provenance or "unknown",
+                      max_turns=PLAN_CONFIG[_normalize_plan(result["plan"])]["max_turns"],
+                      question_instance_id=instance, current_question_text=question,
+                      terminal_outcome=record.get("outcome"), finish_response=runtime.get("finish_response"),
+                      assistance_enabled=policy["enabled"] if policy else False)
+        return result

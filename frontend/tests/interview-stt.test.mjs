@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { createPendingEvidenceMock, evidenceAck, withEvidenceAck } from './pending-evidence-mock.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const drain = async () => { for (let i=0;i<25;i++) await Promise.resolve(); };
 const deferred = () => { let resolve; const promise=new Promise(r=>{resolve=r;}); return {promise,resolve}; };
@@ -41,9 +42,11 @@ function harness(server=true) {
     window,localStorage,sessionStorage,Event,EventTarget,Error,TypeError,DOMException,Response,AbortController,Blob,FormData,URL,
     navigator:{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[{stop:()=>stops.push('track')}]})}},MediaRecorder:Recorder,WebSocket:Socket,
     crypto:{randomUUID:()=>`request-${++uuid}`},setTimeout:setTimer,clearTimeout:clearTimer,
-    SpeechSynthesisUtterance:class {constructor(text){this.text=text;}},requestAnimationFrame:()=>0,cancelAnimationFrame(){},fetch:(...args)=>fetchImpl(...args)});
+    SpeechSynthesisUtterance:class {constructor(text){this.text=text;}},requestAnimationFrame:()=>0,cancelAnimationFrame(){},fetch:async(...args)=>withEvidenceAck(await fetchImpl(...args),...args)});
   const modules=new Map();
+  const evidenceStore = createPendingEvidenceMock();
   const mocks={react,'react/jsx-runtime':{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},
+    '@/lib/pending-interview-evidence':evidenceStore,'./pending-interview-evidence':evidenceStore,
     'next/link':()=>null,'next/navigation':{useParams:()=>({id:'00000000-0000-4000-8000-000000000001'}),useRouter:()=>({push:p=>routes.push(p)})},
     '@/lib/auth-context':{useAuth:()=>({user:{id:'user',full_name:'Student'},loading:false})}};
   function load(relative){
@@ -54,7 +57,7 @@ function harness(server=true) {
     let source=fs.readFileSync(filename,'utf8');
     if(relative.includes('app/interview/'))source=source.replace('  const showLoading =',`  globalThis.__actions = { submitToBackend, handleConfirmEndInterview, handleManualSubmit, settleCapture, ensureRecognition,
       setCurrentTurn, setCurrentQuestionInstanceId, setBooting, transitionTo, sessionDataRef, serverSttRef, recognitionRef,
-      currentTranscriptRef, accumulatedTranscriptRef, captureSpeechRef, captureFailedRef, pendingAnswerRef, uiStateRef, hardTerminate, startServerStt };
+      currentTranscriptRef, accumulatedTranscriptRef, captureSpeechRef, captureFailedRef, pendingAnswerRef, uiStateRef, hardTerminate, startServerStt, startListeningLoop, currentTurnRef, assistanceInstanceRef };
       const showLoading =`);
     const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;
     const mod={exports:{}};modules.set(filename,mod);
@@ -63,9 +66,10 @@ function harness(server=true) {
     return mod.exports;
   }
   const api=load('src/lib/api.ts').api;
+  api.acceptAnswer=async(sessionId,body)=>({action:'accepted',processing_state:'PENDING',evidence_ack:evidenceAck(sessionId,body)});
   api.setTokens('aaa.bbb.ccc','refresh');sessionStorage.setItem('draft','unsaved');localStorage.setItem('workspace','keep');
   let authEvents=0;window.addEventListener('prepvista:auth-required',()=>authEvents++);
-  return {load,api,recorders,sockets,routes,timers,stops,window,context,sessionStorage,localStorage,
+  return {load,api,recorders,sockets,routes,timers,stops,window,context,sessionStorage,localStorage,evidenceStore,
     connectFailure:()=>{connect=false;},fetch:fn=>{fetchImpl=fn;},fire:async ms=>{for(const[id,timer]of [...timers])if(timer.ms===ms){timers.delete(id);timer.fn();}await drain();},
     render:component=>{hookIndex=0;return component();},actions:()=>context.__actions,
     preserved:()=>{assert.ok(api.getToken());assert.equal(sessionStorage.getItem('draft'),'unsaved');assert.equal(localStorage.getItem('workspace'),'keep');assert.equal(authEvents,0);}};
@@ -144,7 +148,8 @@ test('double stop shares the same promise and closes each microphone once',async
 function pageHarness(server=true){
   const h=harness(server),Page=h.load('src/app/interview/[id]/page.tsx').default;
   h.render(Page);let a=h.actions();a.setBooting(false);a.setCurrentTurn(1);a.setCurrentQuestionInstanceId('00000000-0000-4000-8000-000000000002');h.render(Page);a=h.actions();
-  a.sessionDataRef.current={session_id:'session',access_token:'interview-secret'};a.transitionTo('USER_LISTENING');
+  a.currentTurnRef.current=1;a.assistanceInstanceRef.current='00000000-0000-4000-8000-000000000002';
+  a.sessionDataRef.current={session_id:'00000000-0000-4000-8000-000000000001',access_token:'interview-secret'};a.transitionTo('USER_LISTENING');
   return {...h,Page,a};
 }
 const evidence={audio_bytes:20,speech_detected:true,failed:false,unintelligible:false,flush_status:'ok'};
@@ -168,6 +173,46 @@ test('actual browser stop waits for onend and uses final results instead of inte
   const result=h.a.settleCapture().then(value=>{settled=true;return value;});await drain();assert.equal(settled,false);
   h.a.accumulatedTranscriptRef.current='final browser words';recognition.onend();assert.equal((await result).transcript,'final browser words');
 });
+test('actual browser recognition journals final segments before submit and drains the last segment on stop',async()=>{
+  const h=pageHarness(false);
+  h.window.SpeechRecognition=class {
+    start(){this.onstart?.();}
+    stop(){}
+  };
+  await h.a.startListeningLoop();
+  const recognition=h.a.recognitionRef.current;
+  const segment=(text,isFinal)=>Object.assign([{transcript:text}],{isFinal});
+  recognition.onresult({resultIndex:0,results:[segment('interim words',false)]});
+  await drain();
+  const record=[...h.evidenceStore.records.values()][0];
+  assert.equal(record.transcriptSegments.length,0);
+  assert.equal(record.scope.questionInstanceId,'00000000-0000-4000-8000-000000000002');
+  recognition.onresult({resultIndex:0,results:[segment('Original first words',true)]});
+  recognition.onresult({resultIndex:0,results:[segment('Original first words',true)]});
+  await drain();
+  assert.deepEqual(record.transcriptSegments.map(value=>value.text),['Original first words']);
+  assert.equal(record.answer,null);
+  const stopped=h.a.settleCapture();
+  recognition.onresult({resultIndex:1,results:[segment('Original first words',true),segment('and final words',true)]});
+  recognition.onend();
+  const result=await stopped;
+  assert.equal(result.transcript,'Original first words and final words');
+  assert.deepEqual(record.transcriptSegments.map(value=>value.text),['Original first words','and final words']);
+  assert.equal(new Set(record.transcriptSegments.map(value=>value.id)).size,2);
+  assert.equal(record.answer,null);
+});
+test('actual recovery-storage denial blocks recording and remains unmeasured when settled',async()=>{
+  const h=pageHarness(false);
+  let recognitionCalls=0;
+  h.window.SpeechRecognition=class { constructor(){recognitionCalls++;} };
+  h.evidenceStore.ensurePendingAttempt=async()=>{throw new DOMException('Storage denied','SecurityError');};
+  await h.a.startListeningLoop();
+  assert.equal(recognitionCalls,0);
+  assert.equal(h.a.captureFailedRef.current,true);
+  const result=await h.a.settleCapture();
+  assert.equal(h.load('src/lib/interview-capture.ts').outcomeForCapture(result),'TRANSCRIPTION_FAILED');
+  assert.equal(result.transcript,'');
+});
 test('actual UI hides input/finish actions while transcribing and shows finalizing',async()=>{
   const h=pageHarness(),flush=deferred();h.a.serverSttRef.current={stop:()=>flush.promise};const request=deferred();h.fetch(()=>request.promise);
   const operation=h.a.handleConfirmEndInterview();await drain();
@@ -188,8 +233,10 @@ test('actual temporary end API failure retains captured answer, request ID, sess
 test('actual page starts STT with authenticated JWT, not interview secret, and ends through real media settlement',async()=>{
   const h=pageHarness();let payload;h.fetch(async(_,options)=>{payload=JSON.parse(options.body);return response(200,completed);});
   h.a.startServerStt();await drain();assert.equal(new URL(h.sockets[0].url).searchParams.get('token'),'aaa.bbb.ccc');
-  const ending=h.a.handleConfirmEndInterview();await drain();assert.equal(payload,undefined);h.recorders[0].finish('final audio');await drain();h.sockets[0].reply('actual final spoken words');await ending;
+  const ending=h.a.handleConfirmEndInterview();await drain();assert.equal(payload,undefined);h.recorders[0].finish('final audio');await drain();h.sockets[0].reply('actual final spoken words',{raw_transcript:'  actual  original words\n'});await ending;
   assert.equal(payload.user_text,'actual final spoken words');assert.equal(payload.capture_evidence.failed,false);
+  assert.equal(payload.capture_evidence.audio_windows[0].transcript,'actual final spoken words');
+  assert.equal(payload.capture_evidence.audio_windows[0].raw_transcript,'  actual  original words\n');
 });
 test('actual normal submit freezes capture before posting and preserves final question identity',async()=>{
   const h=pageHarness(),flush=deferred();let payload;h.a.serverSttRef.current={stop:()=>flush.promise};h.fetch(async(_,options)=>{payload=JSON.parse(options.body);return response(200,completed);});
@@ -212,9 +259,70 @@ test('actual abort outage preserves the session and exposes retry instead of cla
   h.fetch(async()=>response(503,{}));await h.a.hardTerminate('explicit abort');assert.equal(h.a.uiStateRef.current,'FINALIZING');
   assert.ok(JSON.stringify(h.render(h.Page)).includes('Retry session closure'));assert.equal(h.routes.length,0);h.preserved();
 });
+test('session closure retry reuses accepted original evidence after the first termination request fails',async()=>{
+  const h=pageHarness(),accepted=[],closures=[];
+  h.a.serverSttRef.current={stop:async()=>({transcript:'Original words before closure',flush_status:'ok',evidence})};
+  h.api.acceptAnswer=async(sessionId,body)=>{accepted.push(body);return {action:'accepted',processing_state:'PENDING',evidence_ack:evidenceAck(sessionId,body)};};
+  h.fetch(async(_,options)=>{closures.push(JSON.parse(options.body));return response(closures.length===1?503:200,{...completed,action:'terminated'});});
+  await h.a.hardTerminate('explicit abort');
+  assert.equal(accepted.length,1);assert.equal(closures.length,1);
+  const find=node=>{
+    if(Array.isArray(node))return node.map(find).find(Boolean);
+    if(!node || typeof node!=='object')return null;
+    if(node.type==='button' && node.props.children==='Retry session closure')return node;
+    return find(node.props?.children);
+  };
+  const button=find(h.render(h.Page));assert.ok(button);button.props.onClick();
+  for(let i=0;i<5;i++)await drain();
+  assert.equal(accepted.length,1);assert.equal(closures.length,2);
+  assert.equal(closures[1].user_text,'Original words before closure');
+  assert.deepEqual(closures[1].capture_evidence,closures[0].capture_evidence);
+  assert.equal(closures[1].question_instance_id,closures[0].question_instance_id);
+  assert.equal(h.routes.length,1);h.preserved();
+});
+for (const boundary of ['acceptance', 'termination']) test(`scheduled answer retry cannot race session ${boundary}`,async()=>{
+  const h=pageHarness(),accept=deferred(),terminate=deferred(),answers=[],closures=[];
+  h.a.serverSttRef.current={stop:async()=>({transcript:'Original answer before closure',flush_status:'ok',evidence})};
+  h.fetch(async(url,options)=>{
+    const body=JSON.parse(options.body);
+    if(url.endsWith('/answer')){answers.push(body);return response(503,{});}
+    assert.ok(url.endsWith('/terminate'));closures.push(body);return terminate.promise;
+  });
+  await h.a.submitToBackend('Original answer before closure');
+  assert.equal(answers.length,1);
+  const retry=[...h.timers].find(([,timer])=>timer.ms>=500 && timer.ms<800);
+  assert.ok(retry,'the failed answer schedules an actual retry callback');
+  h.api.acceptAnswer=async(sessionId,body)=>{
+    await accept.promise;
+    return {action:'accepted',processing_state:'PENDING',evidence_ack:evidenceAck(sessionId,body)};
+  };
+  const closing=h.a.hardTerminate('explicit abort');await drain();
+  if(boundary==='termination'){accept.resolve();await drain();assert.equal(closures.length,1);}
+  else assert.equal(closures.length,0);
+  h.timers.delete(retry[0]);retry[1].fn();await drain();
+  assert.equal(answers.length,1,'queued answer retry must not submit during session closure');
+  if(boundary==='acceptance'){accept.resolve();await drain();}
+  assert.equal(closures.length,1);
+  assert.equal(closures[0].user_text,answers[0].user_text);
+  terminate.resolve(response(200,{...completed,action:'terminated'}));await closing;
+  assert.equal(h.routes.length,1);h.preserved();
+});
 test('actual saved final-answer retry reuses the same request ID, transcript and expected turn',async()=>{
   const h=pageHarness();h.a.serverSttRef.current={stop:async()=>({transcript:'saved words',flush_status:'ok',evidence})};const payloads=[];
   h.fetch(async(_,options)=>{payloads.push(JSON.parse(options.body));return response(payloads.length===1?503:200,payloads.length===1?{}:completed);});
   await h.a.handleConfirmEndInterview();const retry=[...h.timers].find(([,t])=>t.ms>=500 && t.ms<800);assert.ok(retry);h.timers.delete(retry[0]);retry[1].fn();await drain();
   assert.equal(payloads.length,2);assert.deepEqual(payloads[0],payloads[1]);assert.equal(h.a.pendingAnswerRef.current,null);h.preserved();
+});
+for(const ackFailure of ['missing','wrong-question','wrong-request'])test(`actual answer 2xx with ${ackFailure} durable ACK retains original evidence`,async()=>{
+  const h=pageHarness();h.a.serverSttRef.current={stop:async()=>({transcript:'Original candidate words',flush_status:'ok',evidence})};
+  h.fetch(async(url,options)=>{
+    const request=JSON.parse(options.body);
+    const ack=evidenceAck('00000000-0000-4000-8000-000000000001',request);
+    if(ackFailure==='wrong-question')ack.question_instance_id='another-question';
+    if(ackFailure==='wrong-request')ack.client_request_id='another-request';
+    return response(200,{...completed,evidence_ack:ackFailure==='missing'?null:ack});
+  });
+  await h.a.handleConfirmEndInterview();
+  assert.equal(h.a.pendingAnswerRef.current.text,'Original candidate words');
+  assert.equal(h.evidenceStore.records.size,1);assert.equal(h.routes.length,0);h.preserved();
 });

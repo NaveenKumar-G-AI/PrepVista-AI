@@ -47,11 +47,22 @@ _DEEPGRAM_TIMEOUT = 25.0
 _groq_async = None
 
 
+def audio_format(audio_bytes: bytes) -> tuple[str, str]:
+    """Recognize browser containers without mislabeling Safari MP4 as WebM."""
+    if audio_bytes[4:8] == b"ftyp":
+        return "m4a", "audio/mp4"
+    if audio_bytes.startswith(b"OggS"):
+        return "ogg", "audio/ogg"
+    if audio_bytes.startswith(b"RIFF") and audio_bytes[8:12] == b"WAVE":
+        return "wav", "audio/wav"
+    return "webm", "audio/webm"
+
+
 def _get_groq():
     global _groq_async
     if _groq_async is None:
         from groq import AsyncGroq
-        _groq_async = AsyncGroq(api_key=get_settings().GROQ_API_KEY)
+        _groq_async = AsyncGroq(api_key=get_settings().GROQ_API_KEY, max_retries=0)
     return _groq_async
 
 
@@ -72,7 +83,7 @@ async def _transcribe_groq(audio_bytes: bytes, language: str) -> tuple[str, floa
         buf = io.BytesIO(audio_bytes)
         # The SDK accepts a (filename, fileobj) tuple; the extension hints format.
         resp = await asyncio.wait_for(client.audio.transcriptions.create(
-            file=("chunk.webm", buf),
+            file=(f"chunk.{audio_format(audio_bytes)[0]}", buf),
             model=settings.GROQ_WHISPER_MODEL,
             language=language,
             response_format="verbose_json",
@@ -124,7 +135,7 @@ async def _transcribe_deepgram(audio_bytes: bytes, language: str) -> tuple[str, 
                 content=audio_bytes,
                 headers={
                     "Authorization": f"Token {settings.DEEPGRAM_API_KEY}",
-                    "Content-Type": "audio/webm",
+                    "Content-Type": audio_format(audio_bytes)[1],
                 },
             )
         resp.raise_for_status()

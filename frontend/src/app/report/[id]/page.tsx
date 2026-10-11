@@ -212,6 +212,7 @@ export default function ReportPage() {
   };
 
   useEffect(() => {
+    let active = true;
     if (authLoading) return;
     if (!user) {
       router.push('/login');
@@ -219,9 +220,10 @@ export default function ReportPage() {
     }
 
     api.getReport<ReportData>(sessionId)
-      .then(report => setData(report))
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load report.'))
-      .finally(() => setLoading(false));
+      .then(report => { if (active) { setData(report); setError(''); } })
+      .catch(err => { if (active) setError(err instanceof Error ? err.message : 'Failed to load report.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [authLoading, router, sessionId, user]);
 
   if (loading || authLoading) {
@@ -325,6 +327,9 @@ export default function ReportPage() {
             </div>
             <div className="p-5 bg-surface-primary">
               <p className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">Response</p>
+              {record.raw_answer?.trim() ? (
+                <p className="mb-3 text-sm md:text-base text-primary break-words whitespace-pre-wrap">{record.raw_answer}</p>
+              ) : null}
               <p className="text-sm md:text-base text-secondary italic">
                 {record.evaluation_state === 'PENDING' ? 'Evaluation pending. This answer has not been scored.'
                 : record.evaluation_state === 'UNAVAILABLE' ? 'Evaluation unavailable. This answer has not been scored.'

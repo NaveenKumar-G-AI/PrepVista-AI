@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
+from app.model_config import GROQ_FAST_MODEL, GROQ_QUALITY_MODEL, canonical_groq_model
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.services.technical_taxonomy import (
@@ -95,6 +96,10 @@ class Settings(BaseSettings):
     # new instance). If you move to the TRANSACTION-mode pooler (port 6543,
     # statement_cache_size=0) or raise the Supabase Pool Size, this can grow —
     # override via env var per environment.
+    MIGRATION_LOCK_TIMEOUT_SECONDS: float = Field(
+        default=120.0, gt=0, le=600, allow_inf_nan=False,
+        description="Maximum advisory migration lock wait during startup, seconds",
+    )
     DB_POOL_MIN_SIZE: int = Field(default=2, description="asyncpg pool minimum connections")
     DB_POOL_MAX_SIZE: int = Field(default=12, description="asyncpg pool maximum connections")
     # ⚠️ INERT: the separate analytics pool is no longer initialized (see
@@ -107,8 +112,11 @@ class Settings(BaseSettings):
     # LLM Providers
     GROQ_API_KEY: str = Field(default="", description="Groq API key")
     GROQ_API_KEY_LIVE: str = Field(default="", description="Secondary Groq API key for live interview assistance (to isolate rate limits)")
-    GROQ_MODEL: str = "llama-3.1-8b-instant"
-    GROQ_EVAL_MODEL: str = "llama3-70b-8192"
+    GROQ_MODEL: str = GROQ_FAST_MODEL
+    GROQ_EVAL_MODEL: str = GROQ_QUALITY_MODEL
+    GROQ_FALLBACK_MODEL: str = GROQ_FAST_MODEL
+    GROQ_PLAN_MODEL: str = GROQ_FAST_MODEL
+    GROQ_DEFAULT_MODEL: str = GROQ_QUALITY_MODEL
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API key (fallback)")
     OPENAI_MODEL: str = "gpt-4o-mini"
 
@@ -228,17 +236,30 @@ class Settings(BaseSettings):
             return value.strip()
         return value
 
-    @field_validator("GROQ_MODEL", "GROQ_EVAL_MODEL", mode="after")
+    @field_validator("GROQ_MODEL", "GROQ_EVAL_MODEL", "GROQ_FALLBACK_MODEL", "GROQ_PLAN_MODEL", "GROQ_DEFAULT_MODEL", mode="after")
     @classmethod
     def _rewrite_dead_models(cls, value: str) -> str:
-        if value == "llama-3.3-70b-versatile":
-            return "llama3-70b-8192"
-        return value
+        return canonical_groq_model(value)
 
     @field_validator("FRONTEND_URL", "BACKEND_URL", "SUPABASE_URL")
     @classmethod
     def _normalize_urls(cls, value: str) -> str:
         return value.rstrip("/") if value else value
+
+    @field_validator("UPSTASH_REDIS_URL")
+    @classmethod
+    def _normalize_redis_url(cls, value: str) -> str:
+        value = value.strip().rstrip("/") if value else value
+        if not value:
+            return value
+        if "://" not in value:
+            value = "https://" + value
+        parsed = urlparse(value)
+        if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+                or parsed.username or parsed.password or parsed.path
+                or parsed.query or parsed.fragment):
+            raise ValueError("UPSTASH_REDIS_URL must be an HTTP(S) REST endpoint, not a Redis TCP URL")
+        return value
 
     @field_validator("INTERVIEW_AUDIO_BUCKET", "OFFER_DOCUMENT_BUCKET")
     @classmethod

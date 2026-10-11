@@ -66,6 +66,15 @@ REQUIRED_SCHEMA = {
         "uuid": "session_id", "integer": "turn_number",
         "text": "audio_object_path stt_provider",
     },
+    "account_deletion_requests": {
+        "integer": "id retry_count",
+        "uuid": "user_id claim_token",
+        "text": "email status last_error",
+        "text[]": "auth_user_ids",
+        "jsonb": "storage_paths",
+        "timestamp with time zone": "created_at updated_at lease_expires_at next_attempt_at",
+    },
+    "old_user": {"uuid": "user_id", "jsonb": "metadata"},
 }
 
 
@@ -108,3 +117,19 @@ async def check_schema_readiness(conn) -> None:
             # Zero-row projections also verify SELECT privileges under the
             # runtime role without fetching any historical user data.
             await conn.fetch(f"SELECT {', '.join(names)} FROM {table} WHERE FALSE")
+
+        await check_deletion_claim_constraint(conn)
+
+
+async def check_deletion_claim_constraint(conn):
+    rows = await conn.fetch("""
+        SELECT convalidated, pg_get_expr(conbin, conrelid) AS expression
+        FROM pg_catalog.pg_constraint
+        WHERE conrelid=to_regclass('account_deletion_requests')
+          AND conname='account_deletion_requests_claim_pair_check' AND contype='c'
+    """)
+    import re
+    if (len(rows) != 1 or not rows[0]["convalidated"]
+            or re.sub(r'[\s()"]', "", rows[0]["expression"]).lower()
+            != "claim_tokenisnull=lease_expires_atisnull"):
+        raise DatabaseNotReadyError("Required deletion claim-pair constraint missing or incompatible")

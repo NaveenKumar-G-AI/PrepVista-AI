@@ -23,14 +23,14 @@ export function BrandLogo({
     <div className={className}>
       <Image
         src="/prepvista.png"
-        alt="PrepVista"
+        alt="PrepVista AI"
         width={size}
         height={size}
         priority={priority}
         className={imageClassName}
       />
       <div>
-        <div className={nameClassName}>PrepVista</div>
+        <div className={nameClassName}>PrepVista AI</div>
         {subtitle ? <div className={subtitleClassName}>{subtitle}</div> : null}
       </div>
     </div>

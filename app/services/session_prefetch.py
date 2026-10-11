@@ -641,11 +641,9 @@ def _select_model_for_plan(plan: str) -> str:
     Use a faster/cheaper model for plan generation (latency matters here);
     reserve the larger model for live evaluation in process_answer().
     """
-    if plan == "free":
-        m = os.getenv("GROQ_PLAN_MODEL", "llama-3.1-8b-instant")
-    else:
-        m = os.getenv("GROQ_DEFAULT_MODEL", "llama3-70b-8192")
-    return "llama3-70b-8192" if m == "llama-3.3-70b-versatile" else m
+    from app.config import get_settings
+    settings = get_settings()
+    return settings.GROQ_PLAN_MODEL if plan == "free" else settings.GROQ_DEFAULT_MODEL
 
 
 def _temperature_from_seed(variant_seed: int) -> float:

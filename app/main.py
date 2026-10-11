@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings, get_cors_origins, get_allowed_hosts
 from app.middleware.error_handler import build_server_error_response, register_error_handlers
 from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.database.connection import DatabaseConnection, init_db_pool, close_db_pool
+from app.database.connection import DatabaseConnection, MigrationStartupError, init_db_pool, close_db_pool
 from app.database.readiness import check_schema_readiness
 
 from app.routers import account, admin, admin_grants, auth, interviews, reports, dashboard, billing, referrals, feedback, support, admin_support, events, org_admin, org_college, outcomes, stt_ws
@@ -198,6 +198,24 @@ def _health_payload(
     }
 
 
+async def _verify_runtime_identity(conn):
+    user = await conn.fetchval("SELECT current_user")
+    row = await conn.fetchrow("""
+        SELECT rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolreplication
+        FROM pg_roles WHERE rolname = $1
+    """, user)
+    if not row:
+        raise Exception(f"Runtime identity '{user}' not found in pg_roles.")
+
+    dangerous = []
+    if row["rolsuper"]: dangerous.append("SUPERUSER")
+    if row["rolcreaterole"]: dangerous.append("CREATEROLE")
+    if row["rolcreatedb"]: dangerous.append("CREATEDB")
+    if row["rolbypassrls"]: dangerous.append("BYPASSRLS")
+    if row["rolreplication"]: dangerous.append("REPLICATION")
+    if dangerous:
+        raise Exception(f"Runtime identity '{user}' has dangerous attributes: {','.join(dangerous)}")
+
 async def _bootstrap_runtime_services(app: FastAPI):
     """Bring up DB-backed services in the background so the port binds quickly."""
     retry_delay_seconds = 3
@@ -208,6 +226,7 @@ async def _bootstrap_runtime_services(app: FastAPI):
             attempt += 1
             await init_db_pool(max_attempts=1, log_failures=False)
             async with DatabaseConnection() as conn:
+                await _verify_runtime_identity(conn)
                 await check_schema_readiness(conn)
             app.state.db_ready = True
             app.state.db_init_error = None
@@ -239,6 +258,11 @@ async def _bootstrap_runtime_services(app: FastAPI):
             return
         except asyncio.CancelledError:
             raise
+        except MigrationStartupError as exc:
+            app.state.db_ready = False
+            app.state.db_init_error = str(exc)
+            logger.error("migration_startup_failed", error_type=type(exc).__name__, reason=str(exc))
+            return
         except Exception as exc:
             app.state.db_ready = False
             app.state.db_init_error = _describe_startup_error(exc)
@@ -265,39 +289,35 @@ async def lifespan(app: FastAPI):
     app.state.db_ready = False
     app.state.db_init_error = None
     app.state.activity_refresh_task = None
+    app.state.deletion_worker_task = None
     app.state.report_schedule_task = None
     app.state.runtime_bootstrap_task = asyncio.create_task(_bootstrap_runtime_services(app))
-    yield
-    runtime_bootstrap_task = getattr(app.state, "runtime_bootstrap_task", None)
-    if runtime_bootstrap_task:
-        runtime_bootstrap_task.cancel()
-        try:
-            await runtime_bootstrap_task
-        except asyncio.CancelledError:
-            pass
-    activity_refresh_task = getattr(app.state, "activity_refresh_task", None)
-    if activity_refresh_task:
-        activity_refresh_task.cancel()
-        try:
-            await activity_refresh_task
-        except asyncio.CancelledError:
-            pass
-    report_schedule_task = getattr(app.state, "report_schedule_task", None)
-    if report_schedule_task:
-        report_schedule_task.cancel()
-        try:
-            await report_schedule_task
-        except asyncio.CancelledError:
-            pass
-    await close_db_pool()
-    # Close the rate limiter's persistent httpx client so its connection pool is
-    # not leaked on every restart/redeploy.
     try:
-        from app.middleware.rate_limiter import close_redis_client
-        await close_redis_client()
-    except Exception as exc:
-        logger.warning("rate_limiter_client_close_failed", error=_describe_startup_error(exc))
-    logger.info("shutdown_complete")
+        yield
+    finally:
+        # Stop bootstrap first so it cannot add another consumer during shutdown.
+        bootstrap = getattr(app.state, "runtime_bootstrap_task", None)
+        if bootstrap:
+            bootstrap.cancel()
+            await asyncio.gather(bootstrap, return_exceptions=True)
+        names = ("activity_refresh_task", "report_schedule_task", "deletion_worker_task")
+        tasks = [(name, getattr(app.state, name, None)) for name in names]
+        tasks = [(name, task) for name, task in tasks if task is not None]
+        for _, task in tasks:
+            task.cancel()
+        results = await asyncio.gather(*(task for _, task in tasks), return_exceptions=True)
+        for (name, _), result in zip(tasks, results):
+            if isinstance(result, Exception):
+                logger.warning("background_task_stopped_with_error", task=name, error_type=type(result).__name__)
+        await close_db_pool()
+        # Close the rate limiter's persistent httpx client so its connection pool is
+        # not leaked on every restart/redeploy.
+        try:
+            from app.middleware.rate_limiter import close_redis_client
+            await close_redis_client()
+        except Exception as exc:
+            logger.warning("rate_limiter_client_close_failed", error=_describe_startup_error(exc))
+        logger.info("shutdown_complete")
 
 
 # ── App Factory ──────────────────────────────────────

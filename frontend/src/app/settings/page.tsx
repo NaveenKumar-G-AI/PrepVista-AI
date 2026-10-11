@@ -145,10 +145,10 @@ export default function SettingsPage() {
             <p className="mt-1 text-xs text-secondary">
               If you have any query, send mail to{' '}
               <a
-                href="mailto:support.prepvistaai@gmail.com"
+                href="mailto:founder@prepvistaai.com"
                 className="font-medium text-blue-600 hover:underline dark:text-blue-300"
               >
-                support.prepvistaai@gmail.com
+                founder@prepvistaai.com
               </a>
               .
             </p>

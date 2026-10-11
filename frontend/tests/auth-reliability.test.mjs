@@ -87,6 +87,51 @@ function harness() {
 
 const response = (status, data = { detail: 'test failure' }) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 const refreshed = () => response(200, { access_token: 'new.token.signature', refresh_token: 'rotated-refresh' });
+const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+
+test('mutation invalidation prevents an older GET from repopulating visible account cache', async () => {
+  const h = harness(), old = deferred(); let reads = 0;
+  h.fetch(url => {
+    if (url.endsWith('/billing/switch-plan')) return response(200, { plan: 'free' });
+    return ++reads === 1 ? old.promise : response(200, { plan: 'free' });
+  });
+  const before = h.api.getMe();
+  await h.api.switchPlan('free');
+  assert.equal((await h.api.getMe()).plan, 'free');
+  old.resolve(response(200, { plan: 'career' })); await before;
+  assert.equal((await h.api.getMe()).plan, 'free');
+});
+
+test('expired cached data returns fresh state on the current visit', async () => {
+  const h = harness(); let reads = 0;
+  h.fetch(() => response(200, { revision: ++reads }));
+  assert.equal((await h.api.cachedRequest('/dashboard', 0)).revision, 1);
+  assert.equal((await h.api.cachedRequest('/dashboard', 0)).revision, 2);
+});
+
+test('late CAREER profile response cannot overwrite an immediate FREE selection', async () => {
+  const h = harness(); const { AuthProvider } = h.load('src/lib/auth-context.tsx');
+  h.fetch(() => response(200, { id: 'student', plan: 'career', active_plan: 'career' }));
+  await h.render(AuthProvider).props.value.refreshUser();
+  const old = deferred(); h.fetch(() => old.promise);
+  const refresh = h.render(AuthProvider).props.value.refreshUser();
+  await Promise.resolve(); await Promise.resolve();
+  h.render(AuthProvider).props.value.applyOptimisticPlan('free');
+  assert.equal(h.render(AuthProvider).props.value.user.active_plan, 'free');
+  old.resolve(response(200, { id: 'student', plan: 'career', active_plan: 'career' }));
+  await refresh;
+  assert.equal(h.render(AuthProvider).props.value.user.active_plan, 'free');
+});
+
+test('late profile response cannot restore a logged-out user', async () => {
+  const h = harness(); const { AuthProvider } = h.load('src/lib/auth-context.tsx');
+  const old = deferred(); h.fetch(() => old.promise);
+  const refresh = h.render(AuthProvider).props.value.refreshUser();
+  await Promise.resolve(); await Promise.resolve();
+  h.render(AuthProvider).props.value.logout();
+  old.resolve(response(200, { id: 'student', plan: 'career' })); await refresh;
+  assert.equal(h.render(AuthProvider).props.value.user, null);
+});
 const failures = {
   500: () => response(500), 502: () => response(502), 503: () => response(503),
   network: () => { throw new TypeError('Failed to fetch'); },

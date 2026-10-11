@@ -1,129 +1,118 @@
-import pytest
+"""Provider classification and lifecycle tests; concurrency uses real PostgreSQL."""
 import asyncio
-from unittest.mock import AsyncMock, patch
-from app.services.deletion_worker import process_due_deletions, DELETION_MAX_RETRIES
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
-class MockConnection:
-    def __init__(self):
-        self.queries = []
-        self.rows = []
+import httpx
+import pytest
+from app.services import deletion_worker as worker
+from app.services import storage_cleanup as storage
+from app.routers import account
 
-    async def fetchrow(self, query, *args):
-        self.queries.append((query, args))
-        if self.rows:
-            return self.rows.pop(0)
-        return None
+pytestmark = pytest.mark.asyncio
 
-    async def execute(self, query, *args):
-        self.queries.append((query, args))
 
-    async def __aenter__(self):
-        return self
+@pytest.mark.parametrize("status,retryable", [(204,None),(404,None),(403,False),(429,True),(503,True)])
+async def test_auth_status_classification_and_absence(monkeypatch,status,retryable):
+    client = SimpleNamespace(delete=AsyncMock(return_value=httpx.Response(status,text="SENSITIVE PROVIDER BODY")))
+    monkeypatch.setattr(account,"_supabase_client",client)
+    if retryable is None:
+        await account._delete_supabase_auth_user("synthetic-id")
+    else:
+        with pytest.raises(account.AuthDeletionError) as error:
+            await account._delete_supabase_auth_user("synthetic-id")
+        assert error.value.retryable is retryable
+        assert "SENSITIVE" not in str(error.value)
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
 
-@pytest.mark.asyncio
-async def test_account_deletion_no_job_polling():
-    mock_conn = MockConnection()
-    with patch("app.services.deletion_worker.DatabaseConnection", return_value=mock_conn):
-        processed = await process_due_deletions()
-        assert processed == 0
-        assert "SELECT id, user_id" in mock_conn.queries[0][0]
+async def test_auth_internal_transient_retries_do_not_change_database(monkeypatch):
+    operation = AsyncMock(side_effect=[account.AuthDeletionError(True),account.AuthDeletionError(True),None])
+    monkeypatch.setattr(account,"_delete_supabase_auth_user",operation)
+    monkeypatch.setattr(account,"_AUTH_DELETE_RETRY_BASE_DELAY",0)
+    await account._delete_supabase_auth_user_with_retry("synthetic")
+    assert operation.await_count == 3
+    operation.reset_mock(side_effect=True)
+    operation.side_effect = account.AuthDeletionError(False)
+    with pytest.raises(account.AuthDeletionError):
+        await account._delete_supabase_auth_user_with_retry("synthetic")
+    assert operation.await_count == 1
 
-@pytest.mark.asyncio
-async def test_account_deletion_successful():
-    mock_conn = MockConnection()
-    mock_conn.rows.append({
-        "id": 1,
-        "user_id": "00000000-0000-0000-0000-000000000000",
-        "auth_user_ids": ["auth1"],
-        "storage_paths": '["path1"]',
-        "status": "DB_DELETED",
-        "retry_count": 0
-    })
 
-    with patch("app.services.deletion_worker.DatabaseConnection", return_value=mock_conn), \
-         patch("app.services.deletion_worker._safe_delete_auth_user", new_callable=AsyncMock) as mock_auth, \
-         patch("app.services.deletion_worker.parse_and_delete_storage_path", new_callable=AsyncMock) as mock_storage:
+async def test_auth_transport_failure_is_sanitized_retryable(monkeypatch):
+    client = SimpleNamespace(delete=AsyncMock(side_effect=httpx.ConnectError("sensitive endpoint")))
+    monkeypatch.setattr(account,"_supabase_client",client)
+    with pytest.raises(account.AuthDeletionError) as error:
+        await account._delete_supabase_auth_user("synthetic")
+    assert error.value.retryable and str(error.value) == "AUTH_PROVIDER_FAILURE"
 
-        mock_auth.return_value = ('auth1', None)
-        mock_storage.return_value = True
 
-        processed = await process_due_deletions()
-        assert processed == 1
+@pytest.mark.parametrize("status,success,retryable",[(200,True,False),(404,True,False),(403,False,False),(429,False,True),(500,False,True)])
+async def test_storage_absence_and_failure_classification(monkeypatch,status,success,retryable):
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self,*args): pass
+        async def request(self,*args,**kwargs): return httpx.Response(status,text="SENSITIVE PROVIDER BODY")
+    monkeypatch.setattr(storage.httpx,"AsyncClient",lambda **kwargs:Client())
+    result = await storage.delete_storage_target("synthetic","owner/file")
+    assert result.success is success and result.retryable is retryable
+    assert "SENSITIVE" not in result.code
 
-        # Check updates
-        assert any("SET status = 'AUTH_DELETED'" in q[0] for q in mock_conn.queries)
-        assert any("SET status = 'COMPLETED'" in q[0] for q in mock_conn.queries)
 
-@pytest.mark.asyncio
-async def test_account_deletion_worker_retry():
-    mock_conn = MockConnection()
-    mock_conn.rows.append({
-        "id": 1,
-        "user_id": "00000000-0000-0000-0000-000000000000",
-        "auth_user_ids": ["auth1"],
-        "storage_paths": '[]',
-        "status": "DB_DELETED",
-        "retry_count": 0
-    })
+async def test_storage_transport_failure_is_retryable(monkeypatch):
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self,*args): pass
+        async def request(self,*args,**kwargs): raise httpx.ReadTimeout("sensitive endpoint")
+    monkeypatch.setattr(storage.httpx,"AsyncClient",lambda **kwargs:Client())
+    assert await storage.delete_storage_target("b","p") == storage.StorageDeleteResult(False,True,"STORAGE_TRANSPORT_FAILURE")
 
-    with patch("app.services.deletion_worker.DatabaseConnection", return_value=mock_conn), \
-         patch("app.services.deletion_worker._safe_delete_auth_user", new_callable=AsyncMock) as mock_auth:
-        mock_auth.return_value = ("auth1", Exception("Simulated Auth Error"))
 
-        processed = await process_due_deletions()
-        assert processed == 1
+async def test_dispatcher_uses_only_shared_claim_protocol(monkeypatch):
+    process = AsyncMock(side_effect=[1,1,0])
+    monkeypatch.setattr(worker,"process_due_deletions",process)
+    await worker.dispatch_deletion(42)
+    assert process.await_count == 3
+    assert all(c.args == (42,) for c in process.await_args_list)
 
-        assert any("SET status = 'RETRY_REQUIRED'" in q[0] for q in mock_conn.queries)
-        assert any("retry_count + 1" in q[0] for q in mock_conn.queries)
 
-@pytest.mark.asyncio
-async def test_account_deletion_maximum_retry_behavior():
-    mock_conn = MockConnection()
-    # It queries with DELETION_MAX_RETRIES.
-    # If the row has reached it, the query will return nothing.
-    with patch("app.services.deletion_worker.DatabaseConnection", return_value=mock_conn):
-        processed = await process_due_deletions()
-        assert processed == 0
-        assert mock_conn.queries[0][1] == (DELETION_MAX_RETRIES,)
-
-@pytest.mark.asyncio
-async def test_account_deletion_concurrent_workers():
-    # SKIP LOCKED is used in the query. We just mock the query behavior.
-    mock_conn = MockConnection()
-    mock_conn.rows.append({
-        "id": 1,
-        "user_id": "00000000-0000-0000-0000-000000000000",
-        "auth_user_ids": [],
-        "storage_paths": '[]',
-        "status": "DB_DELETED",
-        "retry_count": 0
-    })
-
-    with patch("app.services.deletion_worker.DatabaseConnection", return_value=mock_conn):
-        res1, res2 = await asyncio.gather(
-            process_due_deletions(),
-            process_due_deletions()
-        )
-        # First call gets the row, second call gets None
-        assert res1 == 1
-        assert res2 == 0
-        assert any("SKIP LOCKED" in q[0] for q in mock_conn.queries)
-
-@pytest.mark.asyncio
-async def test_account_deletion_existing_rows_preserved():
-    # Only pending statuses are queried.
-    mock_conn = MockConnection()
-    with patch("app.services.deletion_worker.DatabaseConnection", return_value=mock_conn):
-        await process_due_deletions()
-        query = mock_conn.queries[0][0]
-        assert "WHERE status IN ('DB_DELETED', 'AUTH_PENDING', 'STORAGE_PENDING', 'RETRY_REQUIRED', 'FAILED')" in query
-
-@pytest.mark.asyncio
-async def test_account_deletion_worker_starts_during_lifespan():
-    from app.main import create_app
-    app2 = create_app()
-    from app.services.deletion_worker import run_deletion_worker_loop
-    assert run_deletion_worker_loop is not None
+@pytest.mark.parametrize("raise_inside", [False,True])
+@pytest.mark.parametrize("peer_fails", [False,True])
+async def test_shutdown_awaits_worker_before_pool_close(monkeypatch,raise_inside,peer_fails):
+    from app import main
+    from app.middleware import rate_limiter
+    app = main.create_app()
+    ready, stopped = asyncio.Event(), asyncio.Event()
+    async def poller():
+        ready.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await asyncio.sleep(0)
+            stopped.set()
+    async def bootstrap(app):
+        app.state.deletion_worker_task = asyncio.create_task(poller())
+        await asyncio.Event().wait()
+    async def close_pool():
+        assert stopped.is_set()
+        assert app.state.deletion_worker_task.done()
+    monkeypatch.setattr(main,"_bootstrap_runtime_services",bootstrap)
+    monkeypatch.setattr(main,"close_db_pool",close_pool)
+    monkeypatch.setattr(main,"_init_sentry",lambda:None)
+    monkeypatch.setattr(rate_limiter,"close_redis_client",AsyncMock())
+    async def exercise():
+        async with main.lifespan(app):
+            await asyncio.wait_for(ready.wait(),2)
+            if peer_fails:
+                async def broken_peer():
+                    raise RuntimeError("synthetic peer failure")
+                app.state.report_schedule_task = asyncio.create_task(broken_peer())
+                await asyncio.sleep(0)
+            if raise_inside:
+                raise RuntimeError("synthetic lifespan failure")
+    if raise_inside:
+        with pytest.raises(RuntimeError,match="synthetic"):
+            await exercise()
+    else:
+        await exercise()
+    assert stopped.is_set()

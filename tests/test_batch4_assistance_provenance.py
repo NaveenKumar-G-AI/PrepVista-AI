@@ -285,15 +285,18 @@ def test_retry_concurrency_and_stale_distinct_operation(assisted):
         assert exc.value.status_code==409
     asyncio.run(run())
 
-def test_view_failure_rolls_back_answer_provenance(assisted,monkeypatch):
+def test_provider_outage_preserves_viewed_provenance_and_answer(assisted,monkeypatch):
     from app.routers import interviews_answer as answers
     async def run():
         first=await assisted.start();event=await generate(assisted,first["question_instance_id"]);await view(assisted,event)
-        assisted.clock+=timedelta(seconds=1);before=assisted.snapshot()
+        assisted.clock+=timedelta(seconds=1)
         monkeypatch.setattr(answers,"evaluate_single_question",AsyncMock(side_effect=RuntimeError("evaluation unavailable")))
-        with pytest.raises(RuntimeError): await assisted.submit(ANSWER,"answer",1,first["question_instance_id"])
-        assert assisted.snapshot()==before
-        assert assisted.db.execute("SELECT used_before_answer FROM interview_assistance_event WHERE id=?",(event["event_id"],)).fetchone()[0] is None
+        result=await assisted.submit(ANSWER,"answer",1,first["question_instance_id"],end_after_answer=True)
+        assert result['final_score'] is None and result['assistance_provenance']=='hint_assisted'
+        record=assisted.runtime()['question_records'][first['question_instance_id']]
+        assert record['raw_answer']==ANSWER and record['assistance_provenance']=='hint_assisted'
+        assert record['evaluation_state']=='UNAVAILABLE'
+        assert assisted.db.execute("SELECT used_before_answer FROM interview_assistance_event WHERE id=?",(event["event_id"],)).fetchone()[0]==1
     asyncio.run(run())
 
 @pytest.mark.parametrize("provenance,label",[("independent","Independent Attempt"),("hint_assisted","Hint Assisted"),("answer_guided","Answer Guided"),("unknown","Unknown")])
@@ -400,3 +403,23 @@ def test_college_evidence_projection_never_penalizes_provenance(provenance):
     projected=assessment(base,[evaluation]);control=assessment(base,[{**evaluation,"assistance_provenance":"independent"}])
     assert projected==control and projected["final_score"]==80
     assert _cc_tier_for_sessions([{**base,**projected}])==_cc_tier_for_sessions([{**base,**control}])
+
+
+@pytest.mark.parametrize('kind,viewed,expected',[
+    ('hint',False,'independent'),('hint',True,'hint_assisted'),
+    ('answer_guidance',True,'answer_guided')])
+def test_restore_projects_current_view_evidence_without_marking_used(assisted,kind,viewed,expected):
+    async def run():
+        first=await assisted.start()
+        event=await generate(assisted,first['question_instance_id'],kind)
+        if viewed: await view(assisted,event)
+        assisted.clock+=timedelta(seconds=1)
+        restored=await routes.get_session(assisted.session,user())
+        assert restored['plan']=='free'
+        assert restored['turn']==1 and restored['question_instance_id']==first['question_instance_id']
+        assert restored['current_question_text']==first['text']
+        assert restored['current_assistance_provenance']==expected
+        assert restored['assistance_enabled'] is True or restored['assistance_enabled']==1
+        assert restored['candidate_name']=='Candidate'
+        assert assisted.db.execute('SELECT used_before_answer FROM interview_assistance_event WHERE id=?',(event['event_id'],)).fetchone()[0] is None
+    asyncio.run(run())

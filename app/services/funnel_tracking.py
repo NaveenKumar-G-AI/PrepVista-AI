@@ -12,7 +12,7 @@ from typing import Any
 import asyncpg
 
 ALLOWED_FUNNEL_EVENTS = {
-    "landing page viewed",
+        "landing page viewed",
     "cta clicked",
     "signup completed",
     "resume uploaded",

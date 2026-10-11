@@ -254,8 +254,9 @@ def test_actual_provider_path_rejects_missing_measurements_in_current_operation(
     async def run():
         marker = intent.set({"outcome":"EVALUATED"})
         try:
-            with pytest.raises(ValueError, match="measurement unavailable"):
+            with pytest.raises(RuntimeError, match="Evaluation unavailable") as rejected:
                 await evaluator_scoring._evaluate_question_core("Explain your application", "I built and tested a Python application", "I built and tested a Python application", "{}", "technical_depth", plan)
+            assert isinstance(rejected.value.__cause__,ValueError)
         finally:
             intent.reset(marker)
     asyncio.run(run())

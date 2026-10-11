@@ -23,7 +23,7 @@ export function MeasurementCoverage({ measurement, expectedQuestions }: { measur
         Measurement coverage is separate from candidate performance.
       </p>
       <p className="text-sm text-secondary">
-        This report reflects {coverage.measured} of {expectedQuestions || coverage.asked} planned questions completed.
+        Measured evidence is available for {coverage.measured} of {expectedQuestions ?? coverage.asked} planned questions.
       </p>
     </div>
   );

@@ -154,7 +154,7 @@ async def _maybe_rewrite_ideal_answer(
             timeout=3.0,
             fallback_timeout=3.6,
             retry_delay=0.12,
-            allow_provider_fallback=False,
+            allow_provider_fallback=True,
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("better_answer_rewrite_failed", error=str(exc), question=question_text[:80])
@@ -223,8 +223,6 @@ async def evaluate_single_question(
 
 def _require_provider_measurement(result, plan):
     """Current atomic answers cannot turn an incomplete provider reply into a score."""
-    if intent.get() is None:
-        return
     fields = {
         "free": ("relevance_score", "clarity_score", "specificity_score", "structure_score", "communication_score"),
         "pro": ("question_match_score", "technical_accuracy_score", "specificity_score", "structure_score", "communication_score"),
@@ -337,7 +335,7 @@ async def _evaluate_question_core(
                 timeout=2.9,
                 fallback_timeout=3.5,
                 retry_delay=0.12,
-                allow_provider_fallback=False,
+                allow_provider_fallback=True,
             )
             _require_provider_measurement(result, plan)
             return await _maybe_rewrite_ideal_answer(
@@ -356,16 +354,8 @@ async def _evaluate_question_core(
                 rubric_category=rubric_category,
             )
         except Exception as exc:
-            if intent.get() is not None:
-                raise
             logger.warning("free_question_evaluation_failed", error=str(exc), question=question_text[:100])
-            return _fallback_free_evaluation(
-                question_text=question_text,
-                raw_answer=raw_answer,
-                normalized_answer=normalized_answer,
-                resume_summary=resume_summary,
-                rubric_category=rubric_category,
-            )
+            raise RuntimeError("Evaluation unavailable") from exc
 
     if plan == "pro":
         eval_prompt = build_per_question_eval_prompt(
@@ -384,7 +374,7 @@ async def _evaluate_question_core(
                 timeout=3.2,
                 fallback_timeout=4.0,
                 retry_delay=0.12,
-                allow_provider_fallback=False,
+                allow_provider_fallback=True,
             )
             _require_provider_measurement(result, plan)
             return await _maybe_rewrite_ideal_answer(
@@ -403,16 +393,8 @@ async def _evaluate_question_core(
                 rubric_category=rubric_category,
             )
         except Exception as exc:
-            if intent.get() is not None:
-                raise
             logger.warning("pro_question_evaluation_failed", error=str(exc), question=question_text[:100])
-            return _fallback_pro_evaluation(
-                question_text=question_text,
-                raw_answer=raw_answer,
-                normalized_answer=normalized_answer,
-                resume_summary=resume_summary,
-                rubric_category=rubric_category,
-            )
+            raise RuntimeError("Evaluation unavailable") from exc
 
     if plan == "career":
         eval_prompt = build_per_question_eval_prompt(
@@ -450,16 +432,8 @@ async def _evaluate_question_core(
                 rubric_category=rubric_category,
             )
         except Exception as exc:
-            if intent.get() is not None:
-                raise
             logger.warning("career_question_evaluation_failed", error=str(exc), question=question_text[:100])
-            return _fallback_career_evaluation(
-                question_text=question_text,
-                raw_answer=raw_answer,
-                normalized_answer=normalized_answer,
-                resume_summary=resume_summary,
-                rubric_category=rubric_category,
-            )
+            raise RuntimeError("Evaluation unavailable") from exc
 
     eval_prompt = build_per_question_eval_prompt(
         question=question_text,
@@ -478,7 +452,7 @@ async def _evaluate_question_core(
             timeout=3.2,
             fallback_timeout=4.0,
             retry_delay=0.15,
-            allow_provider_fallback=False,
+            allow_provider_fallback=True,
         )
 
         _require_provider_measurement(result, plan)
@@ -511,12 +485,8 @@ async def _evaluate_question_core(
         }
 
     except Exception as exc:
-        if intent.get() is not None:
-            raise
         logger.error("question_evaluation_failed", error=str(exc), question=question_text[:100])
-        fallback = _fallback_evaluation(raw_answer, normalized_answer)
-        fallback["corrected_intent"] = ""
-        return fallback
+        raise RuntimeError("Evaluation unavailable") from exc
 
 
 def _response_time_stats(question_evaluations: list[dict]) -> dict | None:

@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState('');
   const initDone = useRef(false);
   const userRef = useRef<User | null>(null);
-  const refreshingRef = useRef(false);
+  const profileRevisionRef = useRef(0);
   const router = useRouter();
 
   // Derived auth state for pages that need granular checks
@@ -47,22 +47,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authState: AuthState = awaitingProfile ? 'loading' : user ? 'authenticated' : 'unauthenticated';
 
   const refreshUser = useCallback(async () => {
-    // Prevent duplicate concurrent refresh calls
-    if (refreshingRef.current) return;
-    refreshingRef.current = true;
+    const revision = ++profileRevisionRef.current;
     try {
       if (!await api.restoreSession()) {
+        if (revision !== profileRevisionRef.current) return;
         userRef.current = null;
         setUser(null);
         setAuthError('');
         setLoading(false);
         return;
       }
-      const data = await api.getMe<User>();
+      const data = await api.getMe<User>(true);
+      if (revision !== profileRevisionRef.current) return;
       userRef.current = data;
       setUser(data);
       setAuthError('');
     } catch (error) {
+      if (revision !== profileRevisionRef.current) return;
       if ((error as { status?: number })?.status === 401) {
         userRef.current = null;
         setUser(null);
@@ -75,23 +76,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       throw error;
     } finally {
-      setLoading(false);
-      refreshingRef.current = false;
+      if (revision === profileRevisionRef.current) setLoading(false);
     }
   }, []);
 
   const applyOptimisticPlan = useCallback((plan: string) => {
     const normalizedPlan = (plan || 'free').toLowerCase();
+    profileRevisionRef.current += 1;
     setUser(current => {
       if (!current) {
         return current;
       }
-      return {
+      const updated = {
         ...current,
         plan: normalizedPlan,
         active_plan: normalizedPlan,
         usage: deriveUsageForPlan(current.usage, normalizedPlan) || current.usage,
       };
+      userRef.current = updated;
+      return updated;
     });
   }, []);
 
@@ -120,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Silently update tokens without triggering any re-render
             api.setTokens(session.access_token, session.refresh_token || '');
           } else if (event === 'SIGNED_OUT') {
+            profileRevisionRef.current += 1;
             api.clearTokens();
             userRef.current = null;
             setAuthError('');
@@ -136,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleAuthenticationRequired = () => {
+      profileRevisionRef.current += 1;
       userRef.current = null;
       setUser(null);
       setLoading(false);
@@ -223,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    profileRevisionRef.current += 1;
     api.logout();
     try { getSupabase().auth.signOut(); } catch { /* ok */ }
     setUser(null);

@@ -10,7 +10,9 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAuth } from '@/lib/auth-context';
 import { AssistanceViews, provenanceLabel, type AssistanceProvenance, type ViewedEvent } from '@/lib/assistance-views';
 import { api } from '@/lib/api';
-import { ServerSttSession, serverSttSupported, type StopResult } from '@/lib/serverStt';
+import { ServerSttSession, serverSttSupported, retryPendingTranscription, type StopResult } from '@/lib/serverStt';
+import { ensurePendingAttempt, getPendingEvidence, listPendingEvidence, savePendingAnswer, acknowledgePendingEvidence, appendPendingTranscript, flushPendingAudio,
+  type EvidenceScope, type PendingAnswerPayload, type PendingInterviewEvidence, type DurableEvidenceAck } from '@/lib/pending-interview-evidence';
 
 import { bounded, outcomeForCapture, type CaptureResult } from '@/lib/interview-capture';
 import styles from './page.module.css';
@@ -56,6 +58,18 @@ interface StoredSessionData {
   resume_fingerprint?: string;
   // Additive: guided interview assistance policy
   assistance_enabled?: boolean;
+  turn?: number;
+  state?: string;
+  question_instance_id?: string | null;
+  current_question_text?: string | null;
+  current_assistance_provenance?: AssistanceProvenance | null;
+  terminal_outcome?: string | null;
+  pending_accepted_answers?: ServerPendingAnswer[];
+}
+
+interface ServerPendingAnswer {
+  request: { user_text: string; client_request_id: string; duration_actual?: number; answer_duration_seconds?: number } & PendingAnswerPayload['terminal'];
+  evidence_ack: DurableEvidenceAck;
 }
 
 interface ContinueResponse {
@@ -96,7 +110,12 @@ interface CompletedResponse extends ScoreMeasurement {
   termination_reason?: string;
 }
 
-type SubmitResponse = ContinueResponse | CompletedResponse;
+type SubmitResponse = (ContinueResponse | CompletedResponse | { action: 'accepted'; processing_state: 'PENDING' | 'COMPLETE' }) & { evidence_ack?: DurableEvidenceAck };
+
+function matchesEvidenceAck(scope: EvidenceScope, ack?: DurableEvidenceAck): boolean {
+  return ack?.durable === true && ack.session_id === scope.sessionId && ack.question_instance_id === scope.questionInstanceId
+    && ack.client_request_id === scope.requestId && Number.isFinite(Date.parse(ack.accepted_at));
+}
 
 // ---------------------------------------------------------------------------
 // Security constants
@@ -556,12 +575,14 @@ export default function LiveInterviewPage() {
   const [pageError, setPageError] = useState('');
   const [preStartOpen, setPreStartOpen] = useState(true);
   const [currentTurn, setCurrentTurn] = useState(0);
+  const [sessionLoadAttempt, setSessionLoadAttempt] = useState(0);
   const [maxTurns, setMaxTurns] = useState(0);
   const [resultData, setResultData] = useState<CompletedResponse | null>(null);
   const [waveformBars] = useState<number[]>(LIVE_WAVEFORM_BARS);
   const waveformTrackRef = useRef<HTMLDivElement | null>(null);
   const [endInterviewOpen, setEndInterviewOpen] = useState(false);
 
+  const currentTurnRef = useRef(0);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   // Fix 1 — active server-side STT session (only used when STT_SERVER_ENABLED).
   const serverSttRef = useRef<ServerSttSession | null>(null);
@@ -582,13 +603,19 @@ export default function LiveInterviewPage() {
   const globalSecondsRef = useRef(0);
   const isSubmittingRef = useRef(false);
   const captureSettlingRef = useRef(false);
+  const settledCaptureRef = useRef<{ question: string | null; result: CaptureResult } | null>(null);
   const captureFailedRef = useRef(false);
   const captureSpeechRef = useRef(false);
   const [finalizing, setFinalizing] = useState(false);
   const [terminationRetry, setTerminationRetry] = useState('');
-  const pendingAnswerRef = useRef<{
-    text: string; key: string; terminal: NonNullable<Parameters<typeof api.submitAnswer>[6]>;
-  } | null>(null);
+  const pendingAnswerRef = useRef<PendingAnswerPayload | null>(null);
+  const captureScopeRef = useRef<EvidenceScope | null>(null);
+  const acceptedSessionActionRef = useRef<{ scope: EvidenceScope; payload: PendingAnswerPayload; ack: DurableEvidenceAck } | null>(null);
+  const transcriptWritesRef = useRef<Promise<void>>(Promise.resolve());
+  const [recoveryRecords, setRecoveryRecords] = useState<PendingInterviewEvidence[]>([]);
+  const [serverPending, setServerPending] = useState<ServerPendingAnswer[]>([]);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
   const submitRetryCountRef = useRef(0);
   const pendingSubmitKeyRef = useRef('');
   const terminationPendingRef = useRef(false);
@@ -614,7 +641,7 @@ export default function LiveInterviewPage() {
   // ── Guided Interview Assistance state ──────────────────────────────────
   const assistanceEnabled = sessionData?.assistance_enabled ?? false;
   const [currentQuestionInstanceId, setCurrentQuestionInstanceId] = useState<string | null>(null);
-  const [activeAssistance, setActiveAssistance] = useState<{mode: 'hint' | 'guided_approach' | 'sample_answer', content: string, event_id: string, why_it_works?: string[]} | null>(null);
+  const [activeAssistance, setActiveAssistance] = useState<{mode: 'hint' | 'guided_approach' | 'sample_answer', instance: string, content: string, event_id: string, why_it_works?: string[]} | null>(null);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
   const [assistanceStatus, setAssistanceStatus] = useState<AssistanceProvenance>('independent');
   const [assistancePanelOpen, setAssistancePanelOpen] = useState(false);
@@ -624,11 +651,12 @@ export default function LiveInterviewPage() {
   // Reset guidance content when the question instance changes
   useEffect(() => {
     setActiveAssistance(null);
-    setAssistanceStatus('independent');
+    setAssistanceStatus(currentQuestionInstanceId ? assistanceViewsRef.current!.provenance(currentQuestionInstanceId) : 'independent');
     setAssistancePanelOpen(false);
     setAssistanceLoading(false);
     setAssistanceError('');
     setDisplayedAssistance(null);
+    currentTurnRef.current = currentTurn;
     assistanceTurnRef.current = currentTurn;
     assistanceInstanceRef.current = currentQuestionInstanceId;
   }, [currentQuestionInstanceId, currentTurn]);
@@ -648,9 +676,10 @@ export default function LiveInterviewPage() {
   // Only visible content acquires a view; generation alone never does.
   useEffect(() => {
     if (!assistanceEnabled || !assistancePanelOpen || assistanceLoading || uiState !== 'USER_LISTENING'
-        || !displayedAssistance || displayedAssistance.instance !== currentQuestionInstanceId) return;
+        || !displayedAssistance || displayedAssistance.instance !== currentQuestionInstanceId
+        || !activeAssistance?.content.trim() || activeAssistance.event_id !== displayedAssistance.id) return;
     void acknowledgeDisplayedAssistance(displayedAssistance);
-  }, [assistanceEnabled, assistancePanelOpen, assistanceLoading, uiState, displayedAssistance, currentQuestionInstanceId]);
+  }, [assistanceEnabled, assistancePanelOpen, assistanceLoading, uiState, displayedAssistance, currentQuestionInstanceId, activeAssistance]);
 
   async function acknowledgeDisplayedAssistance(event: ViewedEvent) {
     try {
@@ -672,10 +701,13 @@ export default function LiveInterviewPage() {
     const instance = currentQuestionInstanceId;
     if (!session || !assistanceEnabled || !instance || assistanceBusyRef.current === instance
         || isSubmittingRef.current || pendingRetryRef.current || uiStateRef.current !== 'USER_LISTENING') {
-        console.log('ABORTING', {session: !!session, enabled: assistanceEnabled, instance, busy: assistanceBusyRef.current, sub: isSubmittingRef.current, retry: !!pendingRetryRef.current, uiState: uiStateRef.current});
         return;
     }
     
+    if (activeAssistance?.instance === instance && activeAssistance.mode === mode) {
+      setAssistancePanelOpen(true);
+      return;
+    }
     assistanceBusyRef.current = instance;
     setAssistanceLoading(true);
     setAssistanceError('');
@@ -697,34 +729,31 @@ export default function LiveInterviewPage() {
       
       const newAssistance = {
         mode,
+        instance,
         content: resp.content,
         event_id: resp.event_id,
         why_it_works: 'why_it_works' in resp ? resp.why_it_works : undefined
       };
       
       setActiveAssistance(newAssistance);
-      setAssistanceLoading(false);
-      assistanceBusyRef.current = null;
-      
       setDisplayedAssistance({
         id: resp.event_id,
         instance,
         kind: mode === 'sample_answer' ? 'answer_guidance' : 'hint'
       });
-    } catch (err) {
-      setAssistanceError('Assistant is temporarily unavailable. You can continue the interview or retry.');
-      setAssistanceLoading(false);
-      assistanceBusyRef.current = null;
+    } catch {
+      if (instance === assistanceInstanceRef.current && uiStateRef.current === 'USER_LISTENING') {
+        setAssistanceError('Assistant is temporarily unavailable. You can continue the interview or retry.');
+      }
+    } finally {
+      if (assistanceBusyRef.current === instance) {
+        assistanceBusyRef.current = null;
+        if (instance === assistanceInstanceRef.current) setAssistanceLoading(false);
+      }
     }
   }
 
 
-  // Derived state for tests
-  const hintContent = activeAssistance?.mode === 'hint' || activeAssistance?.mode === 'guided_approach' ? activeAssistance.content : null;
-  const guidanceContent = activeAssistance?.mode === 'sample_answer' ? activeAssistance.content : null;
-
-  async function requestHint() { await requestAssistance('hint'); }
-  async function requestAnswerGuidance() { await requestAssistance('sample_answer'); }
 
   async function handleAskMeAgain() {
     const session = sessionDataRef.current;
@@ -734,6 +763,8 @@ export default function LiveInterviewPage() {
     try {
       if (!pendingRetryRef.current) {
         const capture = await settleCapture();
+        await assistanceViewsRef.current!.settle(currentQuestionInstanceId);
+        await preserveBeforeSessionAction(capture, 'ABORTED');
         pendingRetryRef.current = {access_token: session.access_token, client_request_id: createSubmissionKey(),
           expected_turn: currentTurn, question_instance_id: lastCompletedQuestionRef.current || currentQuestionInstanceId,
           active_question_instance_id: currentQuestionInstanceId, captured_text: capture.transcript, capture_evidence: capture.evidence};
@@ -743,6 +774,7 @@ export default function LiveInterviewPage() {
       const result = await api.retryQuestion<{question: string; turn: number; max_turns: number; question_instance_id: string}>(session.session_id, pendingRetryRef.current);
       pendingRetryRef.current = null;
       assistanceInstanceRef.current = result.question_instance_id;
+      currentTurnRef.current = result.turn;
       setCurrentQuestionInstanceId(result.question_instance_id); setCurrentTurn(result.turn); setMaxTurns(result.max_turns);
       appendTranscript('ai', result.question);
       speak(result.question);
@@ -1245,14 +1277,19 @@ export default function LiveInterviewPage() {
     // English than en-US.  Chrome's speech API handles both accents under en-IN.
     recognition.lang = 'en-IN';
     recognition.maxAlternatives = 1;
+    let recognitionEpoch = createSubmissionKey();
+    const savedFinalSegments = new Set<string>();
 
     recognition.onstart = () => {
+      if (recognitionRef.current !== recognition) return;
+      recognitionEpoch = createSubmissionKey();
       if (uiStateRef.current === 'USER_LISTENING') {
         setStatusText('Awaiting your response...');
       }
     };
 
     recognition.onspeechstart = () => {
+      if (recognitionRef.current !== recognition) return;
       captureSpeechRef.current = true;
       if (uiStateRef.current === 'USER_LISTENING') {
         noteAnswerActivity(true, 'Listening...');
@@ -1260,6 +1297,7 @@ export default function LiveInterviewPage() {
     };
 
     recognition.onspeechend = () => {
+      if (recognitionRef.current !== recognition) return;
       if (uiStateRef.current === 'USER_LISTENING') {
         setTimerMessage(
           currentTranscriptRef.current.trim()
@@ -1270,6 +1308,7 @@ export default function LiveInterviewPage() {
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      if (recognitionRef.current !== recognition) return;
       if (uiStateRef.current !== 'USER_LISTENING' && !captureSettlingRef.current) {
         return;
       }
@@ -1279,7 +1318,17 @@ export default function LiveInterviewPage() {
 
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         if (event.results[index].isFinal) {
-          finalSegment += `${event.results[index][0].transcript} `;
+          const segmentId = `${recognitionEpoch}:${index}`;
+          if (savedFinalSegments.has(segmentId)) continue;
+          savedFinalSegments.add(segmentId);
+          const words = event.results[index][0].transcript;
+          finalSegment += `${words} `;
+          const scope = captureScopeRef.current;
+          if (scope) {
+            transcriptWritesRef.current = transcriptWritesRef.current.then(() => appendPendingTranscript(scope, segmentId, words)).then(() => undefined).catch(() => {
+              setTimerMessage('Final words could not be saved to recovery storage. Keep this page open and retry submitting.');
+            });
+          }
         } else {
           interimTranscript += event.results[index][0].transcript;
         }
@@ -1310,6 +1359,7 @@ export default function LiveInterviewPage() {
     };
 
     recognition.onerror = (event: Event) => {
+      if (recognitionRef.current !== recognition) return;
       const code = (event as Event & { error?: string }).error;
       if (code !== 'no-speech' && code !== 'aborted') captureFailedRef.current = true;
       if (uiStateRef.current === 'USER_LISTENING') {
@@ -1318,6 +1368,7 @@ export default function LiveInterviewPage() {
     };
 
     recognition.onend = () => {
+      if (recognitionRef.current !== recognition) return;
       if (uiStateRef.current === 'USER_LISTENING') {
         try {
           recognition.start();
@@ -1335,6 +1386,16 @@ export default function LiveInterviewPage() {
   // Streams MediaRecorder windows to the backend WebSocket; each returned
   // transcript is appended to the SAME refs the Web Speech path uses, so the
   // synchronous "read currentTranscriptRef at submit" flow is unchanged.
+  function evidenceScope(): EvidenceScope {
+    const question = assistanceInstanceRef.current;
+    if (!user?.id || !question || currentTurnRef.current < 1) throw new Error('The saved question identity is unavailable. Reload the interview before recording.');
+    const existing = captureScopeRef.current;
+    if (existing && existing.userId === user.id && existing.sessionId === sessionId && existing.questionInstanceId === question) return existing;
+    const key = createSubmissionKey();
+    return (captureScopeRef.current = { userId: user.id, sessionId, questionInstanceId: question,
+      attemptId: key, requestId: key, turnNumber: currentTurnRef.current });
+  }
+
   function startServerStt() {
     if (serverSttRef.current) {
       // A session is already running for this turn.
@@ -1351,9 +1412,11 @@ export default function LiveInterviewPage() {
       sessionId,
       token,
       backendUrl: STT_BACKEND_URL,
-      turnNumber: currentTurn || 0,
+      turnNumber: currentTurnRef.current,
+      evidenceScope: evidenceScope(),
       language: 'en-IN',
       onTranscript: (full) => {
+        if (serverSttRef.current !== session) return;
         if (uiStateRef.current !== 'USER_LISTENING' && !captureSettlingRef.current) return;
         accumulatedTranscriptRef.current = full;
         currentTranscriptRef.current = normalizeLiveTranscript(full);
@@ -1363,12 +1426,14 @@ export default function LiveInterviewPage() {
         }
       },
       onStatus: (status) => {
+        if (serverSttRef.current !== session) return;
         if (uiStateRef.current !== 'USER_LISTENING') return;
         if (status === 'listening') {
           setStatusText('Listening...');
         }
       },
       onError: (message) => {
+        if (serverSttRef.current !== session) return;
         if (uiStateRef.current === 'USER_LISTENING') {
           setTimerMessage(message || 'Audio issue detected. Please keep speaking or press Submit Answer.');
         }
@@ -1394,7 +1459,8 @@ export default function LiveInterviewPage() {
     // window's transcript instead of discarding it.
     try {
       const result = await session.stop();
-      if (serverSttRef.current === session) serverSttRef.current = null;
+      if (serverSttRef.current !== session) return result;
+      serverSttRef.current = null;
 
       // Write the final flushed transcript into the refs so it's available
       // for submission. This is critical: without this, the last ~3s of
@@ -1415,7 +1481,17 @@ export default function LiveInterviewPage() {
     }
   }
 
-  function startListeningLoop(promptOverride = '', resetQuestionTimer = true) {
+  async function startListeningLoop(promptOverride = '', resetQuestionTimer = true) {
+    try {
+      await ensurePendingAttempt(evidenceScope());
+      if (uiStateRef.current !== 'USER_LISTENING' || pendingAnswerRef.current) return;
+      settledCaptureRef.current = null;
+    } catch (error) {
+      captureFailedRef.current = true;
+      setStatusText('Recording paused: recovery storage is unavailable.');
+      setTimerMessage(error instanceof Error ? error.message : 'Keep this page open and retry.');
+      return;
+    }
     captureFailedRef.current = false;
     captureSpeechRef.current = false;
     // The Web Speech path needs a recognition object up front; the server path
@@ -1631,6 +1707,12 @@ export default function LiveInterviewPage() {
   }
 
   async function settleCapture(): Promise<CaptureResult> {
+    const question = assistanceInstanceRef.current;
+    if (settledCaptureRef.current?.question === question) return settledCaptureRef.current.result;
+    const settled = (result: CaptureResult) => {
+      settledCaptureRef.current = { question, result };
+      return result;
+    };
     captureSettlingRef.current = true;
     transitionTo('STOPPING');
     setStatusText('Stopping recording...');
@@ -1643,10 +1725,10 @@ export default function LiveInterviewPage() {
         const result = await stopServerStt();
         if (result) {
           result.evidence.speech_detected = result.evidence.speech_detected || speechDetected;
-          return { transcript: normalizeLiveTranscript(result.transcript), evidence: result.evidence };
+          return settled({ transcript: normalizeLiveTranscript(result.transcript), evidence: result.evidence });
         }
-        return { transcript: currentTranscriptRef.current, evidence: { audio_bytes: 0, speech_detected: speechDetected,
-          failed: true, unintelligible: false, flush_status: 'timeout' } };
+        return settled({ transcript: currentTranscriptRef.current, evidence: { audio_bytes: 0, speech_detected: speechDetected,
+          failed: true, unintelligible: false, flush_status: 'timeout' } });
       }
       const recognition = recognitionRef.current;
       if (recognition) {
@@ -1660,59 +1742,61 @@ export default function LiveInterviewPage() {
         recognitionRef.current = null;
       }
       // Browser final results are authoritative; interim text remains UI text.
-      return { transcript: normalizeLiveTranscript(accumulatedTranscriptRef.current), evidence: {
+      await transcriptWritesRef.current;
+      if (captureScopeRef.current) await flushPendingAudio(captureScopeRef.current);
+      const saved = captureScopeRef.current ? await getPendingEvidence(captureScopeRef.current) : null;
+      return settled({ transcript: normalizeLiveTranscript(accumulatedTranscriptRef.current), evidence: {
         audio_bytes: 0, speech_detected: speechDetected, failed: captureFailedRef.current,
-        unintelligible: false, flush_status: captureFailedRef.current ? 'timeout' : 'ok' } };
+        unintelligible: false, flush_status: captureFailedRef.current ? 'timeout' : 'ok',
+        transcript_segments: saved?.transcriptSegments?.map(segment => ({ segment_id: segment.id, text: segment.text, captured_at: segment.capturedAt })) } });
     } finally { captureSettlingRef.current = false; clearWaveformMonitor(); setHardwareActive(false); }
   }
 
   async function submitToBackend(text: string, requestKey = createSubmissionKey(), attempt = 0, endAfter = false, action?: 'SKIPPED' | 'ABORTED') {
     const activeSession = sessionDataRef.current;
-    if (!activeSession || pendingRetryRef.current || isSubmittingRef.current || (pendingAnswerRef.current && pendingAnswerRef.current.key !== requestKey) || uiStateRef.current === 'FINISHED' || uiStateRef.current === 'TERMINATED') {
+    requestKey = pendingAnswerRef.current?.key || captureScopeRef.current?.requestId || requestKey;
+    if (!activeSession || pendingRetryRef.current || terminationPendingRef.current || isSubmittingRef.current || (pendingAnswerRef.current && pendingAnswerRef.current.key !== requestKey) || uiStateRef.current === 'FINISHED' || uiStateRef.current === 'TERMINATED') {
       return;
     }
 
     isSubmittingRef.current = true;
     let normalizedText = text.startsWith('[') ? text : normalizeLiveTranscript(text);
+    try {
     if (!pendingAnswerRef.current) {
       const capture = currentTurn > 0 ? await settleCapture() : null;
+      if (capture) {
+        const scope = evidenceScope();
+        requestKey = scope.requestId;
+        await flushPendingAudio(scope);
+        const saved = await getPendingEvidence(scope);
+        if (saved?.windows.some(window => window.transcript === null)) {
+          setRecoveryRecords([saved]);
+          setRecoveryError('Your audio is saved. Retry transcription before continuing.');
+          setPreStartOpen(true);
+          isSubmittingRef.current = false;
+          setFinalizing(false);
+          return;
+        }
+      }
       if (capture) normalizedText = capture.transcript;
       const outcome = capture ? outcomeForCapture(capture, action) : undefined;
       pendingAnswerRef.current = { key: requestKey, text: normalizedText, terminal: {
         expected_turn: currentTurn, question_instance_id: currentQuestionInstanceId,
         terminal_outcome: outcome === 'EVALUATED' ? undefined : outcome,
         capture_evidence: capture?.evidence, end_after_answer: endAfter,
-      } };
+      }, elapsedSeconds: Math.max(0, Math.floor((getTimestamp() - startTimeRef.current) / 1000)),
+        answerDurationSeconds: questionStartAtRef.current ? Math.max(0, Math.round((getTimestamp() - questionStartAtRef.current) / 1000)) : undefined };
       if (outcome === 'TRANSCRIPTION_FAILED') setTimerMessage('Transcription could not be completed. This answer will remain unmeasured.');
     }
     normalizedText = pendingAnswerRef.current.text;
     endAfter = pendingAnswerRef.current.terminal.end_after_answer || false;
-
-    // --- Repeat-request intercept (before any state mutation) ---
-    // If the student is asking to repeat or clarify the question, re-speak it
-    // without consuming a turn or hitting the backend.  The 35+ REPEAT_REQUEST_PATTERNS
-    // already detect these reliably.  Previously these were detected but silently
-    // swallowed — the backend received them as real answers.
-    if (
-      normalizedText &&
-      !normalizedText.startsWith('[') &&
-      attempt === 0 &&
-      !endAfter && !action && isRepeatRequest(normalizedText)
-    ) {
+    if (pendingAnswerRef.current.terminal.expected_turn > 0) await savePendingAnswer(evidenceScope(), pendingAnswerRef.current);
+    } catch (error) {
       isSubmittingRef.current = false;
-      pendingAnswerRef.current = null;
-      setLiveTranscript('');
-      accumulatedTranscriptRef.current = '';
-      currentTranscriptRef.current = '';
-      if (lastQuestionRef.current) {
-        const repeatMessage = `Of course. Here is the question again. ${lastQuestionRef.current}`;
-        appendTranscript('ai', lastQuestionRef.current);
-        transitionTo('AI_SPEAKING');
-        speak(repeatMessage);
-      } else {
-        transitionTo('USER_LISTENING');
-        startListeningLoop();
-      }
+      setFinalizing(false);
+      transitionTo('USER_LISTENING');
+      setStatusText('Your answer has not been sent. Keep this page open.');
+      setTimerMessage(error instanceof Error ? error.message : 'Recovery storage failed. Retry saving your answer.');
       return;
     }
 
@@ -1731,28 +1815,39 @@ export default function LiveInterviewPage() {
 
     try {
       await assistanceViewsRef.current!.settle(pendingAnswerRef.current.terminal.question_instance_id);
-      const elapsedSeconds = Math.floor((getTimestamp() - startTimeRef.current) / 1000);
-      const answerDurationSeconds = questionStartAtRef.current
-        ? Math.max(0, Math.round((getTimestamp() - questionStartAtRef.current) / 1000))
-        : undefined;
       const response = await api.submitAnswer<SubmitResponse>(
         activeSession.session_id,
         normalizedText,
         activeSession.access_token,
-        elapsedSeconds,
+        pendingAnswerRef.current.elapsedSeconds,
         requestKey,
-        answerDurationSeconds,
+        pendingAnswerRef.current.answerDurationSeconds,
         pendingAnswerRef.current.terminal,
       );
+
+      if (pendingAnswerRef.current.terminal.expected_turn > 0) {
+        const scope = evidenceScope();
+        if (!matchesEvidenceAck(scope, response.evidence_ack)) throw new Error('The server has not confirmed durable acceptance. Your saved answer will be retried.');
+        await acknowledgePendingEvidence(scope, response.evidence_ack!);
+      }
 
       isSubmittingRef.current = false;
       pendingSubmitKeyRef.current = '';
       lastCompletedQuestionRef.current = pendingAnswerRef.current.terminal.question_instance_id || null;
       pendingAnswerRef.current = null;
+      captureScopeRef.current = null;
       setFinalizing(false);
       submitRetryCountRef.current = 0;
 
+      if (response.action === 'accepted') {
+        setPreStartOpen(true);
+        setBooting(true);
+        setSessionLoadAttempt(value => value + 1);
+        return;
+      }
+
       if (response.action === 'continue') {
+        currentTurnRef.current = response.turn;
         setCurrentTurn(response.turn);
         setMaxTurns(response.max_turns);
         if (response.question_instance_id) {
@@ -1829,6 +1924,11 @@ export default function LiveInterviewPage() {
 
   async function hardTerminate(reason: string) {
     const activeSession = sessionDataRef.current;
+    if (isSubmittingRef.current) {
+      setTerminationRetry(reason);
+      setStatusText('Saving your current answer before closing the session.');
+      return;
+    }
     if (
       !activeSession ||
       terminationPendingRef.current ||
@@ -1853,13 +1953,15 @@ export default function LiveInterviewPage() {
 
     try {
       await assistanceViewsRef.current!.settle(currentQuestionInstanceId);
+      const preserved = await preserveBeforeSessionAction(capture);
       const elapsedSeconds = Math.floor((getTimestamp() - startTimeRef.current) / 1000);
       const response = await api.terminateInterview<CompletedResponse>(
         activeSession.session_id,
         activeSession.access_token,
         reason,
         elapsedSeconds,
-        { user_text: capture.transcript, question_instance_id: currentQuestionInstanceId, capture_evidence: capture.evidence },
+        { user_text: preserved?.text ?? capture.transcript, question_instance_id: preserved?.terminal.question_instance_id ?? currentQuestionInstanceId,
+          capture_evidence: preserved?.terminal.capture_evidence ?? capture.evidence },
       );
       terminateInterviewLocally(response);
     } catch {
@@ -1870,6 +1972,34 @@ export default function LiveInterviewPage() {
       setStatusText('Session closure could not be saved.');
       setTimerMessage('Retry to finish saving this session.');
     }
+  }
+  async function preserveBeforeSessionAction(capture: CaptureResult, action?: 'ABORTED') {
+    const session = sessionDataRef.current;
+    if (!session || currentTurnRef.current < 1) return;
+    const scope = evidenceScope();
+    const acceptedAction = acceptedSessionActionRef.current;
+    if (acceptedAction && acceptedAction.scope.userId === scope.userId && matchesEvidenceAck(scope, acceptedAction.ack)) return acceptedAction.payload;
+    await flushPendingAudio(scope);
+    const saved = await getPendingEvidence(scope);
+    if (saved?.windows.some(window => window.transcript === null)) {
+      setRecoveryRecords([saved]);
+      setPreStartOpen(true);
+      throw new Error('Your audio is saved. Recover its transcription before closing this question.');
+    }
+    const outcome = outcomeForCapture(capture, action);
+    const payload = pendingAnswerRef.current || { key: scope.requestId, text: capture.transcript,
+      terminal: { expected_turn: scope.turnNumber, question_instance_id: scope.questionInstanceId,
+        terminal_outcome: outcome === 'EVALUATED' ? undefined : outcome, capture_evidence: capture.evidence } };
+    pendingAnswerRef.current = payload;
+    await savePendingAnswer(scope, payload);
+    const result = await api.acceptAnswer<SubmitResponse>(sessionId, { user_text: payload.text, access_token: session.access_token,
+      client_request_id: payload.key, duration_actual: payload.elapsedSeconds, answer_duration_seconds: payload.answerDurationSeconds,
+      ...payload.terminal });
+    if (!matchesEvidenceAck(scope, result.evidence_ack)) throw new Error('Durable acceptance has not been confirmed. Your answer remains saved.');
+    acceptedSessionActionRef.current = { scope, payload, ack: result.evidence_ack! };
+    await acknowledgePendingEvidence(scope, result.evidence_ack!);
+    pendingAnswerRef.current = null;
+    return payload;
   }
   function runGlobalClock() {
     clearGlobalClock();
@@ -1912,8 +2042,57 @@ export default function LiveInterviewPage() {
     }
   }
 
+  async function recoverSavedAnswer(local?: PendingInterviewEvidence, accepted?: ServerPendingAnswer) {
+    const session = sessionDataRef.current;
+    if (!session || !user?.id || recoveryBusy) return;
+    setRecoveryBusy(true);
+    setRecoveryError('');
+    try {
+      let payload: PendingAnswerPayload;
+      let scope: EvidenceScope;
+      if (local) {
+        scope = local.scope;
+        if (scope.userId !== user.id || scope.sessionId !== sessionId) throw new Error('This saved answer belongs to another session.');
+        let record = await getPendingEvidence(scope);
+        if (!record) throw new Error('Saved answer is no longer available. Reload the session to confirm acceptance.');
+        if (!record.answer) {
+          const recovered = await retryPendingTranscription({ scope, backendUrl: STT_BACKEND_URL, token: api.getToken() || '', language: 'en-IN' });
+          record = recovered.record;
+          if (record.windows.some(window => window.transcript === null)) throw new Error('Your audio remains saved. Transcription is unavailable; retry when the connection returns.');
+          const outcome = outcomeForCapture(recovered);
+          payload = { key: scope.requestId, text: recovered.transcript, terminal: { expected_turn: scope.turnNumber,
+            question_instance_id: scope.questionInstanceId, terminal_outcome: outcome === 'EVALUATED' ? undefined : outcome,
+            capture_evidence: recovered.evidence } };
+          await savePendingAnswer(scope, payload);
+        } else payload = record.answer;
+      } else if (accepted) {
+        const request = accepted.request;
+        scope = { userId: user.id, sessionId, questionInstanceId: accepted.evidence_ack.question_instance_id,
+          attemptId: request.client_request_id, requestId: request.client_request_id, turnNumber: request.expected_turn };
+        payload = { text: request.user_text, key: request.client_request_id, elapsedSeconds: request.duration_actual,
+          answerDurationSeconds: request.answer_duration_seconds, terminal: { expected_turn: request.expected_turn,
+            question_instance_id: request.question_instance_id, terminal_outcome: request.terminal_outcome,
+            capture_evidence: request.capture_evidence, end_after_answer: request.end_after_answer } };
+      } else return;
+      const result = await api.submitAnswer<SubmitResponse>(sessionId, payload.text, session.access_token, payload.elapsedSeconds,
+        payload.key, payload.answerDurationSeconds, payload.terminal);
+      if (!matchesEvidenceAck(scope, result.evidence_ack)) throw new Error('Durable acceptance has not been confirmed. Your saved answer is retained.');
+      if (local) await acknowledgePendingEvidence(scope, result.evidence_ack!);
+      pendingAnswerRef.current = null;
+      captureScopeRef.current = null;
+      setRecoveryRecords([]);
+      setServerPending([]);
+      if (result.action === 'accepted' && result.processing_state === 'PENDING') setRecoveryError('Your answer is safely accepted. Processing is delayed; retry to continue.');
+      // A replay may refer to an earlier turn. Always fetch the authoritative current question.
+      setBooting(true);
+      setSessionLoadAttempt(value => value + 1);
+    } catch (error) {
+      setRecoveryError(error instanceof Error ? error.message : 'Recovery failed. Your saved evidence is retained.');
+    } finally { setRecoveryBusy(false); }
+  }
+
   async function handleStartInterview() {
-    if (!sessionDataRef.current || startupLoading) {
+    if (!sessionDataRef.current || startupLoading || recoveryRecords.length || serverPending.length) {
       return;
     }
 
@@ -1937,7 +2116,12 @@ export default function LiveInterviewPage() {
     runGlobalClock();
     setStartupLoading(false);
 
-    void submitToBackend('');
+    if (currentTurnRef.current > 0 && lastQuestionRef.current) {
+      // Resume the already-open question after the microphone gesture.
+      speak(lastQuestionRef.current);
+    } else {
+      void submitToBackend('');
+    }
   }
 
   useEffect(() => {
@@ -1945,59 +2129,63 @@ export default function LiveInterviewPage() {
       return;
     }
 
-    if (!user) {
+    if (!user?.id) {
       router.push('/login');
       return;
     }
 
-    const deferState = (callback: () => void) => {
-      window.setTimeout(callback, 0);
-    };
-
+    let cancelled = false;
     const fetchSession = async () => {
-      let parsed: StoredSessionData | null = null;
-      const stored = sessionStorage.getItem('pv_interview_session');
-      if (stored) {
-        try {
-          const s = JSON.parse(stored) as StoredSessionData;
-          if (s.session_id === sessionId) {
-            parsed = s;
-          }
-        } catch {}
-      }
-      
-      if (!parsed) {
-        try {
-          parsed = await api.getInterviewSession<StoredSessionData>(sessionId);
-          if (parsed) {
-            sessionStorage.setItem('pv_interview_session', JSON.stringify(parsed));
-          }
-        } catch {
-          // fallback to error
+      try {
+        // Session storage contains setup data, not the current turn.
+        const restored = await api.getInterviewSession<StoredSessionData>(sessionId);
+        if (cancelled) return;
+        if (!restored || restored.session_id !== sessionId) throw new Error('Session unavailable');
+        const pending = (await listPendingEvidence(user.id, sessionId)).filter(record => record.answer || record.windows.length || record.transcriptSegments?.length);
+        if (cancelled) return;
+        const accepted = restored.pending_accepted_answers || [];
+        setRecoveryRecords(pending);
+        setServerPending(accepted.filter(item => !pending.some(record => record.scope.requestId === item.evidence_ack.client_request_id)));
+        setPreStartOpen(true);
+        if (restored.state && restored.state !== 'ACTIVE' && !pending.length && !accepted.length) {
+          router.replace(`/report/${sessionId}`);
+          return;
         }
-      }
-
-      if (!parsed) {
-        deferState(() => {
-          setPageError('Interview session not found. Please start a new interview.');
-          setUiState('ERROR');
-          setBooting(false);
-        });
-        return;
-      }
-
-      deferState(() => {
-        setSessionData(parsed!);
-        setMaxTurns(parsed!.max_turns || 0);
+        const turn = restored.turn || 0;
+        if (restored.state === 'ACTIVE' && turn > 0 && (!restored.current_question_text || !restored.question_instance_id)) {
+          throw new Error('Current question unavailable');
+        }
+        sessionStorage.setItem('pv_interview_session', JSON.stringify(restored));
+        sessionDataRef.current = restored;
+        setSessionData(restored);
+        setMaxTurns(restored.max_turns || 0);
+        currentTurnRef.current = turn;
+        setCurrentTurn(turn);
+        if (restored.question_instance_id) {
+          assistanceViewsRef.current!.restore(restored.question_instance_id, restored.current_assistance_provenance);
+        }
+        assistanceInstanceRef.current = restored.question_instance_id || null;
+        setCurrentQuestionInstanceId(restored.question_instance_id || null);
+        lastQuestionRef.current = restored.current_question_text || '';
+        if (restored.current_question_text) {
+          setTranscriptLog([{ id: `restored-${restored.question_instance_id}`, role: 'ai', text: restored.current_question_text }]);
+        }
         globalSecondsRef.current = 0;
         setClockLabel('00:00');
         setTimerUrgent(false);
+        setUiState('INIT');
+        setPageError('');
         setBooting(false);
-      });
+      } catch {
+        if (cancelled) return;
+        setPageError('Your interview could not be restored. Retry to load the saved question.');
+        setUiState('ERROR');
+        setBooting(false);
+      }
     };
-    
     void fetchSession();
-  }, [authLoading, router, sessionId, user]);
+    return () => { cancelled = true; };
+  }, [authLoading, router, sessionId, user?.id, sessionLoadAttempt]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -2107,7 +2295,13 @@ export default function LiveInterviewPage() {
         void audioContextRef.current.close().catch(() => undefined);
       }
 
+      // Seal the active turn on unmount so late provider callbacks cannot write
+      // into a page that has navigated away, and always release its microphone.
+      const serverSession = serverSttRef.current;
+      serverSttRef.current = null;
+      if (serverSession) void serverSession.stop();
       const recognition = recognitionRef.current;
+      recognitionRef.current = null;
       if (recognition) {
         recognition.onend = null;
         try {
@@ -2187,7 +2381,8 @@ export default function LiveInterviewPage() {
         <div className={styles.bootCard}>
           <p>{pageError}</p>
           <div className={styles.actions}>
-            <Link href="/interview/setup" className={styles.actionButton}>Start New Interview</Link>
+            <button type="button" className={styles.actionButton} onClick={() => { setBooting(true); setSessionLoadAttempt(value => value + 1); }}>Retry restoring interview</button>
+            <Link href="/interview/setup" className={styles.secondaryButton}>Start New Interview</Link>
             <Link href="/dashboard" className={styles.secondaryButton}>Dashboard</Link>
           </div>
         </div>
@@ -2359,7 +2554,7 @@ export default function LiveInterviewPage() {
                           type="button"
                           className={styles.endButton}
                           style={{ opacity: assistanceLoading ? 0.6 : 1 }}
-                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || activeAssistance?.mode === 'hint'}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current}
                           onClick={() => requestAssistance('hint')}
                           aria-label="Get Hint"
                         >
@@ -2369,7 +2564,7 @@ export default function LiveInterviewPage() {
                           type="button"
                           className={styles.endButton}
                           style={{ opacity: assistanceLoading ? 0.6 : 1 }}
-                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || activeAssistance?.mode === 'guided_approach'}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current}
                           onClick={() => requestAssistance('guided_approach')}
                           aria-label="Guided Approach"
                         >
@@ -2379,7 +2574,7 @@ export default function LiveInterviewPage() {
                           type="button"
                           className={styles.endButton}
                           style={{ opacity: assistanceLoading ? 0.6 : 1 }}
-                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current || activeAssistance?.mode === 'sample_answer'}
+                          disabled={assistanceLoading || finalizing || !!pendingAnswerRef.current || !!pendingRetryRef.current}
                           onClick={() => requestAssistance('sample_answer')}
                           aria-label="Sample Answer"
                         >
@@ -2423,7 +2618,15 @@ export default function LiveInterviewPage() {
                   ) : null}
 
                   {assistanceError ? <div role="alert">{assistanceError}{displayedAssistance ? <button type="button" onClick={() => void acknowledgeDisplayedAssistance(displayedAssistance)}>Retry view acknowledgement</button> : null}</div> : null}
-                  {/* Removed old panel body */}
+                  {activeAssistance?.instance === currentQuestionInstanceId && !assistanceLoading ? (
+                    <section aria-label={activeAssistance.mode === 'hint' ? 'Hint content' : activeAssistance.mode === 'guided_approach' ? 'Guided Approach content' : 'Sample Answer content'}>
+                      <h3>{activeAssistance.mode === 'hint' ? 'Hint' : activeAssistance.mode === 'guided_approach' ? 'Guided Approach' : 'Sample Answer'}</h3>
+                      <p style={{ whiteSpace: 'pre-wrap' }}>{activeAssistance.content}</p>
+                      {activeAssistance.why_it_works?.length ? (
+                        <ul>{activeAssistance.why_it_works.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
+                      ) : null}
+                    </section>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => setAssistancePanelOpen(false)}
@@ -2459,7 +2662,14 @@ export default function LiveInterviewPage() {
         {preStartOpen && uiState !== 'FINISHED' && uiState !== 'TERMINATED' ? (
           <div className={styles.preStartModal}>
             <div className={styles.preStartCard}>
-              <h2>Security Check</h2>
+              <h2>{recoveryRecords.length || serverPending.length ? 'Recover your saved answer' : 'Security Check'}</h2>
+              {recoveryRecords.length || serverPending.length ? <div>
+                <p>Saved answers keep their original question identity. Recover them before continuing this interview.</p>
+                {recoveryRecords.map(record => <button key={record.key} type="button" className={styles.actionButton} disabled={recoveryBusy}
+                  onClick={() => void recoverSavedAnswer(record)}>Recover saved answer · Question {record.scope.turnNumber}</button>)}
+                {serverPending.map(record => <button key={record.evidence_ack.client_request_id} type="button" className={styles.actionButton} disabled={recoveryBusy}
+                  onClick={() => void recoverSavedAnswer(undefined, record)}>Continue accepted answer · Question {record.request.expected_turn}</button>)}
+              </div> : <>
               <p>
                 Microphone access is required. 
               </p>
@@ -2470,9 +2680,11 @@ export default function LiveInterviewPage() {
                   disabled={startupLoading}
                   onClick={handleStartInterview}
                 >
-                  {startupLoading ? 'Securing Session...' : 'Validate And Start Session'}
+                  {startupLoading ? 'Securing Session...' : currentTurn > 0 ? 'Resume Interview' : 'Validate And Start Session'}
                 </button>
               </div>
+              </>}
+              {recoveryError ? <div role="alert" className={styles.modalError}>{recoveryError}</div> : null}
               {startupError ? <div className={styles.modalError}>{startupError}</div> : null}
             </div>
           </div>

@@ -100,8 +100,11 @@ export function PlanSelector({
     onSelectedPlanChange?.(plan);
     try {
       const result = await api.switchPlan<{ message: string }>(plan);
-      await refreshUser();
       setMessage(result.message || `${plan.toUpperCase()} is now selected.`);
+      // A failed profile refresh must not undo a plan already saved by billing.
+      await refreshUser().catch(() => {
+        setMessage(`${plan.toUpperCase()} is selected. Account details will update when you retry.`);
+      });
     } catch (error) {
       applyOptimisticPlan(previousPlan);
       onSelectedPlanChange?.(previousPlan);

@@ -61,12 +61,16 @@ def classify(text, requested=None, evidence=None):
         return "TRANSCRIPTION_FAILED"
     if requested == "TRANSCRIPTION_FAILED":
         return requested
-    if requested == "UNINTELLIGIBLE" or evidence.get("unintelligible"):
+    if requested == "UNINTELLIGIBLE":
         return "UNINTELLIGIBLE"
     if text.strip() and text not in {"[NO_ANSWER_TIMEOUT]", "[USER_REQUESTED_END]", "[SYSTEM_TIME_UP]"}:
         return "EVALUATED"
     if text in {"[USER_REQUESTED_END]", "[SYSTEM_TIME_UP]"}:
         return "ABORTED"
+    # One empty audio window does not erase valid speech from another window.
+    # Capture/transport failure above still leaves partial text unmeasured.
+    if evidence.get("unintelligible"):
+        return "UNINTELLIGIBLE"
     if evidence.get("audio_bytes", 0) or evidence.get("speech_detected"):
         return "UNINTELLIGIBLE"
     return "NO_ANSWER"

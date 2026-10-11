@@ -35,9 +35,17 @@ class SchemaConnection:
         self.queries.append(sql)
         if "FROM schema_migrations" in sql:
             return self.ledger
+        if "pg_catalog.pg_constraint" in sql:
+            return [{"convalidated": True, "expression": "((claim_token IS NULL) = (lease_expires_at IS NULL))"}]
         if "pg_catalog.pg_attribute" in sql:
             return self.columns
         return []
+
+    async def fetchval(self, sql, *args):
+        return "prepvista_runtime"
+
+    async def fetchrow(self, sql, *args):
+        return {"rolsuper": False, "rolcreaterole": False, "rolcreatedb": False, "rolbypassrls": False, "rolreplication": False}
 
     @asynccontextmanager
     async def connection(self):
@@ -46,7 +54,7 @@ class SchemaConnection:
 
 from unittest.mock import MagicMock
 
-def test_pool_initialization_executes_migrations(monkeypatch):
+def test_pool_initialization_does_not_execute_migrations(monkeypatch):
     pool = SimpleNamespace(close=AsyncMock(), acquire=MagicMock())
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value="mock_conn")
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -55,10 +63,10 @@ def test_pool_initialization_executes_migrations(monkeypatch):
     monkeypatch.setattr(connection, "_pool", None)
     monkeypatch.setattr(connection, "_POOL_INIT_LOCK", asyncio.Lock())
     monkeypatch.setattr(connection.asyncpg, "create_pool", create)
-    monkeypatch.setattr(connection, "_run_migrations", runner)
+    monkeypatch.setattr(connection, "_run_startup_migrations", runner)
     asyncio.run(connection.init_db_pool(max_attempts=1))
     create.assert_awaited_once()
-    runner.assert_awaited_once_with("mock_conn")
+    runner.assert_not_awaited()
 
 
 def test_lifespan_uses_schema_check_and_migrates(monkeypatch):
@@ -79,7 +87,7 @@ def test_lifespan_uses_schema_check_and_migrates(monkeypatch):
 
     async def run():
         async with main.lifespan(application):
-            await application.state.runtime_bootstrap_task
+            await asyncio.wait_for(application.state.runtime_bootstrap_task, 5)
             assert application.state.db_ready is True
     asyncio.run(run())
     init.assert_awaited_once()
@@ -160,8 +168,45 @@ def test_explicit_migration_command_requires_execute_flag(monkeypatch):
 def test_explicit_admin_migration_entrypoint_is_separate_from_runtime(monkeypatch):
     conn = SimpleNamespace(close=AsyncMock())
     runner = AsyncMock()
+    monkeypatch.setenv("MIGRATION_DATABASE_URL", "dummy")
     monkeypatch.setattr(migrate.asyncpg, "connect", AsyncMock(return_value=conn))
     monkeypatch.setattr(migrate, "_run_migrations", runner)
     asyncio.run(migrate.run_release_migrations())
     runner.assert_awaited_once_with(conn)
     conn.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [
+    connection.MigrationLockTimeout("bounded migration wait expired"),
+    connection.MigrationStartupError("MIGRATION_LEDGER_INCOMPATIBLE"),
+])
+async def test_fatal_migration_startup_never_retries_or_starts_jobs(monkeypatch,error):
+    application=main.create_app()
+    init=AsyncMock(side_effect=error)
+    readiness_check=AsyncMock()
+    monkeypatch.setattr(main,"init_db_pool",init)
+    monkeypatch.setattr(main,"check_schema_readiness",readiness_check)
+    await main._bootstrap_runtime_services(application)
+    init.assert_awaited_once()
+    readiness_check.assert_not_awaited()
+    assert application.state.db_ready is False
+    assert not hasattr(application.state,"deletion_worker_task")
+    assert TestClient(application).get("/health/ready").status_code==503
+
+
+@pytest.mark.asyncio
+async def test_cancelled_startup_never_reports_ready(monkeypatch):
+    app=main.create_app()
+    app.state.db_ready=False
+    entered=asyncio.Event()
+    async def pending(**kwargs):
+        entered.set()
+        await asyncio.Event().wait()
+    monkeypatch.setattr(main,"init_db_pool",pending)
+    task=asyncio.create_task(main._bootstrap_runtime_services(app))
+    await entered.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError): await task
+    assert app.state.db_ready is False
+    assert not hasattr(app.state,"deletion_worker_task")

@@ -49,6 +49,8 @@ class StoredHistory:
                 columns.update(onboarding_completed="INTEGER", prep_goal="TEXT", updated_at="TEXT", org_student="INTEGER")
             if table == "interview_sessions":
                 columns["proctoring_mode"] = "TEXT"
+            if table == "conversation_messages":
+                columns["id"] = "INTEGER"
             if table == "user_plan_entitlements":
                 columns.update(source_order_id="TEXT", updated_at="TEXT")
             if table == "interview_assistance_event":
@@ -328,6 +330,11 @@ def test_guided_hint_guidance_retry_view_and_records_still_work(history, monkeyp
 def test_actual_answer_path_preserves_assistance_attribution(history, monkeypatch, event_types, view_offset, expected):
     active, instance = str(uuid4()), str(uuid4())
     history.add_session(active, NOW, state="ACTIVE")
+    history.db.execute("UPDATE interview_sessions SET access_token=?,total_turns=1,runtime_state=? WHERE id=?",
+                       ("a"*40, json.dumps({"terminal_contract_version": 1, "active_question_id": instance,
+                         "question_records": {instance: {"turn": 1, "question_instance_id": instance,
+                                                         "question_text": "Describe your project"}}}), active))
+    history.db.create_function("clock_timestamp", 0, lambda: NOW.isoformat())
     for kind in event_types:
         history.insert("interview_assistance_event", id=str(uuid4()), session_id=active,
             question_instance_id=instance, assistance_type=kind, assistance_level=1,
@@ -355,7 +362,8 @@ def test_actual_answer_path_preserves_assistance_attribution(history, monkeypatc
     async def run():
         await answers.submit_answer(active, answers.AnswerRequest(
             user_text="I built a Python application and measured its performance with realistic tests.",
-            access_token="a"*40, client_request_id="answer-1"), None, tasks, user())
+            access_token="a"*40, client_request_id="answer-1", expected_turn=1,
+            question_instance_id=instance), None, tasks, user())
         await tasks()
     asyncio.run(run())
     assert evaluator.await_args.kwargs["assistance_provenance"] == expected

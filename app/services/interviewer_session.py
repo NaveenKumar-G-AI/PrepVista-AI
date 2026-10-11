@@ -569,6 +569,10 @@ async def process_answer(
 
         answer_intent = intent.get()
         terminal_outcome = (answer_intent or {}).get("outcome")
+        if (answer_intent or {}).get("accepted_request_id") and terminal_outcome == "EVALUATED":
+            # Accepted candidate text is evidence, even if it contains words
+            # that resemble legacy repeat/exit control phrases.
+            is_repeat_request = is_exit_request = is_timeout = is_time_up = False
         if runtime_state.get("terminal_contract_version") == 1 and question_for_eval:
             instance = register_question(runtime_state, session_id, turn_for_eval, question_for_eval,
                                          runtime_state.get("active_question_id"))
@@ -1420,7 +1424,9 @@ async def _ensure_pending_evaluations(
     if ledger.get("terminal_contract_version") == 1:
         # New answer writes are synchronous; missing evaluated rows are a
         # persistence failure, never an invitation to score an empty answer.
-        if pending:
+        unavailable_turns = {record["turn"] for record in terminal_records(ledger)
+                             if record.get("evaluation_state") == "UNAVAILABLE"}
+        if any(turn not in unavailable_turns for turn, *_ in pending):
             raise RuntimeError("Committed answer evaluation is missing")
         return
     await asyncio.gather(
@@ -1455,6 +1461,10 @@ async def adopt_active_terminal_contract(conn, session_id: str, runtime_state: d
             runtime_state["active_question_id"] = instance
         if runtime_state["question_records"][instance].get("outcome"):
             continue
+        if any(item["question_instance_id"] == instance for item in runtime_state.get("accepted_attempts", {}).values()):
+            # The acceptance envelope is authoritative; finalization settles it
+            # after adoption rather than inventing an ABORTED legacy outcome.
+            continue
         raw = str((evaluation or {}).get("raw_answer") or (evaluation or {}).get("normalized_answer") or answers_by_turn.get(turn) or "")
         has_answer = bool(raw.strip() and not raw.startswith('['))
         if has_answer and (evaluation or ending or turn < current_turn):
@@ -1464,7 +1474,15 @@ async def adopt_active_terminal_contract(conn, session_id: str, runtime_state: d
                     await _evaluate_and_store(session_id, turn, question, raw, question_instance_id=instance, assistance_provenance="unknown")
                 finally:
                     intent.reset(marker)
-            terminalize(runtime_state, instance, "EVALUATED", raw, {"source": "stored_legacy_answer"})
+            record = terminalize(runtime_state, instance, "EVALUATED", raw, {"source": "stored_legacy_answer"})
+            if not evaluation:
+                # Adoption builds this ledger locally. The evaluator cannot mark
+                # an unavailable measurement on a record not yet persisted.
+                stored_evaluation = await conn.fetchrow(
+                    "SELECT id FROM question_evaluations WHERE session_id = $1 AND turn_number = $2",
+                    session_id, turn)
+                if not stored_evaluation:
+                    record.update(evaluation_state="UNAVAILABLE", measured=False)
         elif ending or turn < current_turn:
             # A persisted explicit timeout is verified silence. Otherwise the
             # finalization aborts an unresolved assessment, without guessing why
@@ -1522,6 +1540,8 @@ async def _finish_session(session_id: str, access_token: str, duration_actual: i
         runtime_state = coerce_runtime_state(session["runtime_state"] or {})
         reliable = runtime_state.get("terminal_contract_version") == 1
         if reliable:
+            from app.services.answer_acceptance import settle_accepted_evidence
+            settle_accepted_evidence(runtime_state)
             asked_rows = await conn.fetch("SELECT turn_number FROM conversation_messages WHERE session_id = $1 AND role = 'assistant' AND turn_number > 0", session_id)
             asked_turns = {int(row["turn_number"]) for row in asked_rows}
             ledger_turns = {record["turn"] for record in terminal_records(runtime_state)}
@@ -1696,15 +1716,8 @@ async def finish_session(session_id: str, access_token: str, duration_actual: in
     if connection.get() is not None:
         return await _finish_session(session_id, access_token, duration_actual)
     async with DatabaseConnection() as conn:
-        row = await conn.fetchrow("SELECT runtime_state, state, total_turns FROM interview_sessions WHERE id = $1 AND access_token = $2",
-                                  session_id, access_token)
-        state = coerce_runtime_state(row["runtime_state"] if row else {})
-        if state.get("terminal_contract_version") != 1 and (not row or int(row["total_turns"] or 0) == 0):
-            # Old non-transactional writes could insert a question before their
-            # turn counter was updated. Do not backfill that missing text as zero.
-            asked = await conn.fetchval("SELECT 1 FROM conversation_messages WHERE session_id = $1 AND role = 'assistant' AND turn_number > 0 LIMIT 1", session_id) if row else None
-            if not asked:
-                return await _finish_session(session_id, access_token, duration_actual)
+        # Even an apparently empty legacy session can race a newly started
+        # question. Lock before reading its mutable runtime snapshot.
         async with conn.transaction():
             row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1 AND access_token = $2 FOR UPDATE",
                                       session_id, access_token)

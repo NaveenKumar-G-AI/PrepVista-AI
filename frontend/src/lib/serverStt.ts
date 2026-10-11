@@ -2,11 +2,13 @@
  * The window promise is installed before recording starts. It covers final
  * dataavailable, onstop, transmission and transcript settlement.
  */
-import { bounded, type CaptureEvidence } from './interview-capture';
+import { bounded, type AudioWindowEvidence, type CaptureEvidence } from './interview-capture';
+import { appendPendingAudio, ensurePendingAttempt, flushPendingAudio, getPendingEvidence, savePendingWindowTranscript, type EvidenceScope, type PendingInterviewEvidence } from './pending-interview-evidence';
 export type ServerSttStatus = 'idle' | 'connecting' | 'listening' | 'processing' | 'error';
 export interface ServerSttOptions {
   sessionId: string; token: string; backendUrl: string; turnNumber: number;
   language?: string; windowMs?: number;
+  evidenceScope?: EvidenceScope;
   onTranscript: (fullTranscript: string) => void;
   onStatus?: (status: ServerSttStatus) => void;
   onError?: (message: string) => void;
@@ -16,7 +18,15 @@ export interface StopResult {
   flush_status: 'ok' | 'timeout' | 'no_inflight';
   evidence: CaptureEvidence;
 }
-interface SttResponse { final_transcript: string; transcription_status?: string }
+export interface SttResponse {
+  final_transcript: string;
+  transcription_status?: string;
+  raw_transcript?: string;
+  audio_id?: string;
+  audio_url?: string | null;
+  confidence?: number;
+  provider?: string;
+}
 export function serverSttSupported(): boolean {
   return typeof window !== 'undefined' && typeof navigator !== 'undefined'
     && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined' && 'WebSocket' in window;
@@ -43,7 +53,12 @@ export class ServerSttSession {
   private index = 0;
   private prefix = crypto.randomUUID();
   private evidence: CaptureEvidence = { audio_bytes: 0, speech_detected: false, failed: false, unintelligible: false, flush_status: 'no_inflight' };
-  constructor(options: ServerSttOptions) { this.opts = options; }
+  constructor(options: ServerSttOptions) {
+    if (options.evidenceScope && (options.evidenceScope.sessionId !== options.sessionId || options.evidenceScope.turnNumber !== options.turnNumber)) {
+      throw new Error('Audio recovery identity does not match this question.');
+    }
+    this.opts = { ...options, evidenceScope: options.evidenceScope ? { ...options.evidenceScope } : undefined };
+  }
   get transcript() { return this.rolling.trim(); }
   start(): Promise<void> {
     if (this.startDone) return this.startDone;
@@ -54,9 +69,20 @@ export class ServerSttSession {
   private async begin() {
     this.opts.onStatus?.('connecting');
     try {
+      // A failed storage-open must surface before recording promises recovery.
+      if (this.opts.evidenceScope) await ensurePendingAttempt(this.opts.evidenceScope);
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (!this.active) { this.stream.getTracks().forEach(track => track.stop()); return; }
-      try { await bounded(this.openSocket(), 5000); } catch { this.ws?.close(); this.ws = null; }
+      for (const track of this.stream.getTracks()) {
+        track.addEventListener?.('ended', () => {
+          if (!this.active || this.sealed) return;
+          this.evidence.failed = true;
+          this.opts.onError?.('Microphone disconnected. Captured audio will still be saved.');
+        });
+      }
+      // Start capture immediately; a slow or unavailable socket must not eat the
+      // opening words. Complete clips use REST until the socket is available.
+      void bounded(this.openSocket(), 5000).catch(() => { this.ws?.close(); this.ws = null; });
       if (this.active) { this.opts.onStatus?.('listening'); this.recordWindow(); }
     } catch {
       this.evidence.failed = true;
@@ -93,19 +119,32 @@ export class ServerSttSession {
     const chunks: BlobPart[] = [];
     const id = `${this.opts.turnNumber}-${this.prefix}-${this.index++}`;
     const mime = pickMimeType();
+    const capturedAt = new Date().toISOString();
     let complete!: () => void;
     this.windowDone = new Promise<void>(resolve => { complete = resolve; });
     try {
       const recorder = mime ? new MediaRecorder(this.stream, { mimeType: mime }) : new MediaRecorder(this.stream);
       this.recorder = recorder;
       recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
-      recorder.onerror = () => { this.evidence.failed = true; complete(); };
+      recorder.onerror = () => { this.evidence.failed = true; };
       recorder.onstop = () => {
         if (this.timer) clearTimeout(this.timer);
         const blob = new Blob(chunks, { type: mime || 'audio/webm' });
-        this.transmissionQueue = this.transmissionQueue.then(() => this.settleWindow(id, blob))
+        // Persist each completed clip immediately, not behind a slow STT request.
+        const saved = this.opts.evidenceScope && blob.size
+          ? appendPendingAudio(this.opts.evidenceScope, id, blob, capturedAt).catch(() => {
+              this.evidence.recovery_failed = true;
+              this.opts.onError?.('Browser recovery storage could not save audio. Keep this page open and retry.');
+            })
+          : Promise.resolve();
+        this.transmissionQueue = this.transmissionQueue.then(async () => {
+          await saved;
+          await this.settleWindow(id, blob, capturedAt);
+        })
           .catch(() => { this.evidence.failed = true; });
-        void this.transmissionQueue.finally(complete);
+        // Media completion and provider settlement have separate deadlines.
+        // A slow earlier window cannot make us discard later recorded clips.
+        void saved.finally(complete);
         // Capture the next complete clip while earlier clips are transcribed.
         if (this.active && !this.sealed) this.recordWindow();
       };
@@ -118,20 +157,32 @@ export class ServerSttSession {
       }, this.opts.windowMs || 3000);
     } catch { this.evidence.failed = true; complete(); }
   }
-  private async settleWindow(id: string, blob: Blob) {
+  private async settleWindow(id: string, blob: Blob, capturedAt: string) {
     if (this.sealed || !blob.size) return;
     this.evidence.audio_bytes += blob.size;
     this.evidence.flush_status = 'ok';
     this.opts.onStatus?.('processing');
     let result: SttResponse | null = null;
+    let transport: 'websocket' | 'rest' = 'websocket';
     if (this.ws?.readyState === WebSocket.OPEN) {
       try { result = await bounded(this.sendWindow(id, blob), 55000); } catch { /* REST once */ }
       this.pending = null;
     }
     if (!result && !this.sealed) {
+      transport = 'rest';
       result = await transcribeBlobViaRest({ ...this.opts, blob, turnId: id, signal: this.abort.signal });
     }
     if (this.sealed) return;
+    const provenance = windowProvenance(id, blob, capturedAt, result, transport);
+    (this.evidence.audio_windows ||= []).push(provenance);
+    if (result && this.opts.evidenceScope) {
+      try {
+        await savePendingWindowTranscript(this.opts.evidenceScope, id, result.final_transcript, provenance, result.raw_transcript);
+      } catch {
+        this.evidence.recovery_failed = true;
+        this.opts.onError?.('Browser recovery storage could not save the transcript. Keep this page open and retry.');
+      }
+    }
     if (!result) {
       this.evidence.failed = true;
       this.opts.onError?.('Transcription could not be completed.');
@@ -169,6 +220,7 @@ export class ServerSttSession {
       if (this.timer) clearTimeout(this.timer);
       if (this.recorder?.state !== 'inactive') this.recorder?.stop();
       if (this.windowDone) await bounded(this.windowDone, 65000);
+      await this.transmissionQueue;
     } catch {
       this.evidence.failed = true;
       this.evidence.flush_status = 'timeout';
@@ -189,7 +241,8 @@ export async function transcribeBlobViaRest(params: {
   blob: Blob; language?: string; turnId?: string; signal?: AbortSignal;
 }): Promise<SttResponse | null> {
   const form = new FormData();
-  form.append('audio', params.blob, 'answer.webm');
+  const extension = params.blob.type.includes('mp4') ? 'mp4' : params.blob.type.includes('ogg') ? 'ogg' : 'webm';
+  form.append('audio', params.blob, `answer.${extension}`);
   form.append('session_id', params.sessionId);
   form.append('turn_id', params.turnId || String(params.turnNumber));
   form.append('language_hint', params.language || 'en-IN');
@@ -199,12 +252,62 @@ export async function transcribeBlobViaRest(params: {
   if (params.signal?.aborted) abort();
   const timer = setTimeout(abort, 55000);
   try {
-    const response = await fetch(`${params.backendUrl.replace(/\/$/, '')}/api/stt/transcribe`, {
+    const response = await fetch(`${params.backendUrl.replace(/\/(?:api\/?)?$/, '')}/api/stt/transcribe`, {
       method: 'POST', headers: { Authorization: `Bearer ${params.token}` }, body: form, signal: controller.signal,
     });
     if (!response.ok) return null;
     const result = await response.json();
-    return typeof result?.final_transcript === 'string' && result.transcription_status !== 'failed' ? result : null;
+    return typeof result?.final_transcript === 'string' && result.transcription_status !== 'failed' && result.transcription_status !== 'partial_max_buffer' ? result : null;
   } catch { return null; }
   finally { clearTimeout(timer); params.signal?.removeEventListener('abort', abort); }
+}
+
+function windowProvenance(id: string, blob: Blob, capturedAt: string, result: SttResponse | null, transport: 'websocket' | 'rest'): AudioWindowEvidence {
+  return {
+    window_id: id, audio_bytes: blob.size, mime_type: blob.type, captured_at: capturedAt,
+    transcription_status: result ? 'success' : 'pending', transport,
+    ...(typeof result?.final_transcript === 'string' ? { transcript: result.final_transcript } : {}),
+    ...(typeof result?.raw_transcript === 'string' ? { raw_transcript: result.raw_transcript } : {}),
+    ...(typeof result?.audio_id === 'string' ? { audio_id: result.audio_id } : {}),
+    ...(typeof result?.audio_url === 'string' ? { audio_url: result.audio_url } : {}),
+    ...(typeof result?.confidence === 'number' && Number.isFinite(result.confidence) ? { confidence: result.confidence } : {}),
+    ...(typeof result?.provider === 'string' ? { provider: result.provider } : {}),
+  };
+}
+/** Retry only unresolved, original audio clips under their immutable turn IDs.
+ * The caller must verify authenticated ownership and session state before calling.
+ * This never rewrites a frozen answer or submits an answer to the current turn.
+ */
+export async function retryPendingTranscription(params: {
+  scope: EvidenceScope; backendUrl: string; token: string; language?: string; signal?: AbortSignal;
+}): Promise<{ record: PendingInterviewEvidence; transcript: string; evidence: CaptureEvidence }> {
+  await flushPendingAudio(params.scope);
+  let record = await getPendingEvidence(params.scope);
+  if (!record) throw new Error('Saved audio could not be found for this answer.');
+  if (record.answer) throw new Error('A submitted original answer cannot be retranscribed. Retry its saved payload.');
+  for (const audio of record.windows) {
+    if (audio.transcript !== null || params.signal?.aborted) continue;
+    const result = await transcribeBlobViaRest({ ...params, sessionId: record.scope.sessionId,
+      turnNumber: record.scope.turnNumber, blob: audio.blob, turnId: audio.id });
+    if (result) await savePendingWindowTranscript(record.scope, audio.id, result.final_transcript,
+      windowProvenance(audio.id, audio.blob, audio.capturedAt, result, 'rest'), result.raw_transcript);
+  }
+  record = (await getPendingEvidence(params.scope))!;
+  const transcript = [
+    ...record.windows.map(audio => ({ text: audio.transcript?.trim() || '', capturedAt: audio.capturedAt })),
+    ...(record.transcriptSegments || []).map(segment => ({ text: segment.text.trim(), capturedAt: segment.capturedAt })),
+  ].sort((a, b) => a.capturedAt.localeCompare(b.capturedAt)).map(segment => segment.text).filter(Boolean).join(' ');
+  return { record, transcript, evidence: {
+    audio_bytes: record.windows.reduce((total, audio) => total + audio.blob.size, 0),
+    speech_detected: Boolean(transcript), failed: record.windows.some(audio => audio.transcript === null),
+    unintelligible: record.windows.some(audio => audio.transcript === ''), flush_status: 'ok',
+    audio_windows: record.windows.map(audio => ({
+      ...(audio.provenance || windowProvenance(audio.id, audio.blob, audio.capturedAt, null, 'rest')),
+      ...(audio.transcript !== null ? { transcript: audio.transcript } : {}),
+      ...(typeof audio.rawTranscript === 'string' ? { raw_transcript: audio.rawTranscript } : {}),
+    })),
+    transcript_segments: (record.transcriptSegments || []).map(segment => ({
+      segment_id: segment.id, text: segment.text, captured_at: segment.capturedAt,
+    })),
+  } };
 }

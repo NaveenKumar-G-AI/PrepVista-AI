@@ -153,9 +153,9 @@ def _cache_key(
     session_id: object,
     turn_id: object,
 ) -> str:
-    if session_id is not None and turn_id is not None:
-        return f"sid:{session_id}:turn:{turn_id}"
     digest = hashlib.sha256(raw_transcript.encode("utf-8", "ignore")).hexdigest()[:24]
+    if session_id is not None and turn_id is not None:
+        return f"sid:{session_id}:turn:{turn_id}:hash:{digest}"
     return f"hash:{digest}"
 
 
@@ -212,7 +212,7 @@ async def repair_transcript(
         # dictionary doesn't already cover — let the existing chain handle it.
         return raw_transcript
 
-    cache_key = _cache_key(raw, session_id, turn_id)
+    cache_key = _cache_key(raw + "\0" + resume_flat, session_id, turn_id)
     cached = _REPAIR_CACHE.get(cache_key)
     if cached is not None:
         return cached

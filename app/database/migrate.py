@@ -14,9 +14,9 @@ import asyncpg
 from app.database.connection import _run_migrations
 
 async def run_release_migrations() -> None:
-    database_url = os.environ.get("MIGRATION_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    database_url = os.environ.get("MIGRATION_DATABASE_URL")
     if not database_url:
-        print("Error: MIGRATION_DATABASE_URL or DATABASE_URL must be set.")
+        print("Error: MIGRATION_DATABASE_URL must be set.")
         sys.exit(1)
 
     conn = await asyncpg.connect(database_url, timeout=10)

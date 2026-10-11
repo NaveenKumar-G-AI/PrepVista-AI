@@ -1,38 +1,11 @@
-"""
-PrepVista - Database Connection Pool
-Uses asyncpg for high-performance async PostgreSQL access.
-Pool startup never runs migrations. Migration helpers are release/admin only.
-
-Hardening applied:
-  - asyncio.Lock prevents double-init on concurrent startup (race condition)
-  - pool.acquire() always called with timeout — never hangs on pool exhaustion
-  - Jitter added to retry backoff — prevents thundering herd on multi-instance restart
-  - Every migration wrapped in a transaction — partial-apply can never corrupt schema
-  - Migration file path validated — symlink traversal outside migrations dir rejected
-  - Migration file size capped — huge file cannot exhaust server RAM
-  - Full filesystem paths never appear in logs — operational security
-  - max_inactive_connection_lifetime recycles stale connections automatically
-  - statement_cache_size set explicitly — no reliance on asyncpg version defaults
-  - _pool.close() guarded in retry loop — real error is never swallowed
-  - UnicodeDecodeError handled in migration read — bad-encoding file is skipped safely
-  - DatabaseConnection.__aexit__ logs release errors — silent failures made visible
-  - Migration SQL executes with an extended per-statement timeout
-    (MIGRATION_STATEMENT_TIMEOUT), decoupled from the request-serving pool's
-    command_timeout — a large multi-table migration can no longer be aborted
-    mid-statement by a 30s limit sized for API queries
-  - schema_migrations tracks a content checksum per applied migration — if a
-    migration file is edited in place after being applied, the admin runner logs a
-    warning instead of silently leaving the database on the old schema forever
-  - A separate analytics connection pool (init_analytics_pool / get_analytics_db
-    / AnalyticsConnection) isolates long-running cohort-aggregation queries from
-    the request-serving pool — a slow nightly snapshot job can never starve B2C
-    session traffic
-"""
+"""PostgreSQL pools and automatic, cross-process serialized startup migrations."""
 
 import asyncio
 import hashlib
 import random
 import re
+import os
+import time
 
 import asyncpg
 import structlog
@@ -126,6 +99,14 @@ MIGRATION_STATEMENT_TIMEOUT = 600.0  # seconds — ceiling for executing a singl
 
 class DatabaseNotReadyError(RuntimeError):
     """Raised when the database pool is not ready for application traffic."""
+
+
+class MigrationStartupError(DatabaseNotReadyError):
+    """Fatal migration startup failure; keep readiness false until a new startup."""
+
+
+class MigrationLockTimeout(MigrationStartupError):
+    """Another database session held the migration lock beyond the wait budget."""
 
 
 class AnalyticsDatabaseNotReadyError(DatabaseNotReadyError):
@@ -263,11 +244,8 @@ async def init_db_pool(
     Protected by _POOL_INIT_LOCK — safe to call from multiple startup hooks
     or during testing where the event loop may trigger startup twice.
 
-    On success, also bootstraps the analytics pool via init_analytics_pool().
-    That call is best-effort and never raises — analytics availability must
-    never block or fail B2C application startup. If it fails, get_analytics_db()
-    / AnalyticsConnection will raise AnalyticsDatabaseNotReadyError until a
-    later successful initialization.
+    Automatic migrations finish on their own serialized connection before the
+    application pool is created. The separate analytics pool remains dormant.
     """
     global _pool
 
@@ -284,7 +262,7 @@ async def init_db_pool(
 
         for attempt in range(1, total_attempts + 1):
             try:
-                _pool = await asyncpg.create_pool(
+                candidate_pool = asyncpg.create_pool(
                     dsn=settings.DATABASE_URL,
                     min_size=settings.DB_POOL_MIN_SIZE,
                     max_size=settings.DB_POOL_MAX_SIZE,
@@ -293,15 +271,18 @@ async def init_db_pool(
                     max_inactive_connection_lifetime=DB_POOL_MAX_INACTIVE_LIFETIME,
                     statement_cache_size=DB_POOL_STATEMENT_CACHE_SIZE,
                 )
+                try:
+                    _pool = await candidate_pool
+                except BaseException:
+                    # asyncpg may already have connected some minimum-size slots.
+                    candidate_pool.terminate()
+                    raise
                 logger.info(
                     "db_pool_initialized",
                     min_size=settings.DB_POOL_MIN_SIZE,
                     max_size=settings.DB_POOL_MAX_SIZE,
                     attempt=attempt,
                 )
-
-                async with _pool.acquire() as conn:
-                    await _run_migrations(conn)
 
                 # NOTE: the separate analytics pool is intentionally NOT initialized.
 
@@ -315,6 +296,8 @@ async def init_db_pool(
                 # case a future analytics worker genuinely needs an isolated pool.
                 return
 
+            except MigrationStartupError:
+                raise
             except Exception as exc:
                 last_error = exc
                 if log_failures:
@@ -323,7 +306,6 @@ async def init_db_pool(
                         attempt=attempt,
                         max_attempts=total_attempts,
                         error_type=type(exc).__name__,
-                        error=_describe_db_error(exc),
                     )
 
                 # Guard the close so that a secondary exception during cleanup
@@ -512,6 +494,18 @@ class DatabaseConnection:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.conn is not None and self.pool is not None:
             try:
+                # A server-terminated socket can report closed before asyncpg's
+                # transport callback releases its pool holder. pool.release()
+                # assumes that cleanup already ran for a closed connection.
+                # Public terminate() completes it without touching healthy
+                # connections, including when the request itself was cancelled.
+                try:
+                    closed = self.conn.is_closed()
+                except asyncpg.InterfaceError:
+                    # An already-detached pool proxy has already been returned.
+                    closed = False
+                if closed:
+                    self.conn.terminate()
                 await self.pool.release(self.conn)
             except Exception as release_exc:
                 # Release failures are rare but must never be silently dropped —
@@ -593,63 +587,94 @@ class AnalyticsConnection:
 # Migrations
 # ---------------------------------------------------------------------------
 
+# Stable across Python processes/releases; PostgreSQL advisory keys are database scoped.
+MIGRATION_LOCK_KEY = int.from_bytes(hashlib.sha256(b"prepvista:startup:migrations:v1").digest()[:8], "big", signed=True)
+MIGRATION_CLEANUP_TIMEOUT = 5.0
+
+
+async def _run_startup_migrations():
+    """Own one dedicated session using the existing deployment DATABASE_URL."""
+    settings = get_settings()
+    conn = await asyncpg.connect(
+        settings.DATABASE_URL, timeout=DB_POOL_CONNECT_TIMEOUT,
+        command_timeout=DB_POOL_COMMAND_TIMEOUT, statement_cache_size=0,
+        server_settings={"application_name": "prepvista-migrations"},
+    )
+    try:
+        return await _run_migrations(conn)
+    finally:
+        # No connection bearing this lock is ever returned to an application pool.
+        try:
+            await asyncio.wait_for(conn.close(timeout=MIGRATION_CLEANUP_TIMEOUT), MIGRATION_CLEANUP_TIMEOUT)
+        except BaseException:
+            conn.terminate()
+            raise
+
+
 async def _run_migrations(conn: asyncpg.Connection):
-    """Run numbered SQL migration files in order.
+    """Serialize the entire ledger/bootstrap/preflight/execution sequence.
 
-    Tracks applied versions in the schema_migrations table so each file is
-    executed exactly once.
+    Callers must own a dedicated, nontransactional session and close it afterward.
+    The legacy optional admin entry point also passes through this same lock.
+    """
+    if isinstance(conn, asyncpg.pool.PoolConnectionProxy) or conn.is_in_transaction():
+        raise MigrationStartupError("Migration runner requires a dedicated session outside a transaction")
+    acquired = False
+    started = time.monotonic()
+    wait_timeout = get_settings().MIGRATION_LOCK_TIMEOUT_SECONDS
+    fields = {"process_id": os.getpid()}
+    logger.info("migration_lock_waiting", timeout_seconds=wait_timeout, **fields)
+    try:
+        try:
+            await conn.execute("SELECT pg_advisory_lock($1::bigint)", MIGRATION_LOCK_KEY, timeout=wait_timeout)
+        except (TimeoutError, asyncpg.QueryCanceledError) as exc:
+            logger.error("migration_lock_timeout", wait_seconds=round(time.monotonic()-started, 3), **fields)
+            raise MigrationLockTimeout("Migration lock wait exceeded configured startup timeout") from exc
+        acquired = True
+        logger.info("migration_lock_acquired", wait_seconds=round(time.monotonic()-started, 3), **fields)
+        logger.info("migration_runner_started", **fields)
+        count = await _run_migrations_locked(conn)
+        logger.info("migration_runner_complete", newly_applied=count, **fields)
+        return count
+    except asyncio.CancelledError:
+        raise
+    except MigrationStartupError:
+        raise
+    except Exception as exc:
+        raise MigrationStartupError("Migration startup failed: " + type(exc).__name__) from exc
+    finally:
+        if acquired and not conn.is_closed():
+            try:
+                unlocked = await asyncio.wait_for(
+                    conn.fetchval("SELECT pg_advisory_unlock($1::bigint)", MIGRATION_LOCK_KEY,
+                                  timeout=MIGRATION_CLEANUP_TIMEOUT), MIGRATION_CLEANUP_TIMEOUT)
+                if not unlocked:
+                    raise MigrationStartupError("Migration lock ownership was lost")
+            except BaseException:
+                conn.terminate()
+                logger.info("migration_lock_released", release_method="session_terminated", **fields)
+                raise
+            logger.info("migration_lock_released", release_method="explicit_unlock", **fields)
+        else:
+            # A timeout/cancellation might race the lock-acquisition response.
+            # Ending the session also covers an acquired but unacknowledged lock.
+            try:
+                # Allow asyncpg to deliver/drain its query-cancellation request.
+                # Immediate terminate() would discard that task while PG still waits.
+                await asyncio.wait_for(conn.close(timeout=MIGRATION_CLEANUP_TIMEOUT), MIGRATION_CLEANUP_TIMEOUT)
+            except BaseException:
+                conn.terminate()
+                raise
+            logger.info("migration_lock_released", release_method="session_closed", **fields)
 
-    Transaction strategy
-    ─────────────────────
-    Each migration is wrapped in a transaction so that:
-      - A mid-migration failure rolls back all changes from that file.
-      - The version record is inserted in the same transaction — if SQL
-        succeeds but the version INSERT fails, the migration is retried next
-        startup from a clean state.
-      - A migration that contains CONCURRENTLY (e.g. CREATE INDEX
-        CONCURRENTLY) cannot run inside a transaction block; those files are
-        executed outside a transaction automatically.
-      - The migration SQL itself executes with timeout=MIGRATION_STATEMENT_TIMEOUT
-        (10 minutes), decoupled from the connection's pool-level
-        command_timeout (30s, sized for request-serving queries). A migration
-        with many CREATE TABLE / INDEX / FUNCTION / POLICY statements against
-        production-scale tables can legitimately take minutes; the small
-        bookkeeping queries (schema_migrations CREATE/ALTER/SELECT/INSERT)
-        keep the connection's default timeout.
 
-    Drift detection
-    ───────────────
-    schema_migrations.checksum stores a SHA-256 of each migration file's
-    content at apply time (NULL for rows written before this column existed).
-    For every migration file found — applied or not — the current file's
-    checksum is computed:
-      - Already applied, stored checksum is NULL → backfill the current
-        checksum as the baseline and log migration_baseline_recorded (info).
-        This does NOT verify the live schema matches this content — only that
-        drift from this point forward will be detected.
-      - Already applied, stored checksum differs from current → log
-        migration_content_changed_since_apply (warning), every startup. The
-        migration is NOT re-executed (CREATE POLICY and similar statements are
-        not idempotent) — this is a signal to create a new incremental
-        migration file, not to edit this one further.
-      - Not yet applied → execute normally and record (version, checksum).
+async def _run_migrations_locked(conn: asyncpg.Connection):
+    """Called only under the migration lock, preserving per-file SQL semantics.
 
-    Security
-    ─────────
-    Each migration file is:
-      - Path-validated — symlink traversal outside the migrations directory
-        is rejected before the file is opened.
-      - Size-checked — files larger than _MAX_MIGRATION_FILE_BYTES are
-        skipped with a warning rather than being read into RAM.
-      - Encoding-validated — non-UTF-8 content raises a warning and is
-        skipped rather than causing an unhandled UnicodeDecodeError.
-      - Named in logs by filename only — full filesystem paths are never
-        written to logs.
-
-    For files that are ALREADY applied, path/size/encoding problems are
-    skipped silently (no new error logs) — these checks exist to protect
-    NEW migrations from being applied incorrectly; an already-applied file
-    that has become unreadable does not need re-validating on every startup.
+    Read the ledger under serialization, verify every readable local version
+    before any migration DDL, apply full-name versions and verify the final ledger.
+    Transactional files commit their SQL and ledger entry together. The existing
+    CONCURRENTLY compatibility path remains nontransactional and must be replayable.
     """
     logger.info("running_migrations")
 
@@ -681,7 +706,7 @@ async def _run_migrations(conn: asyncpg.Connection):
             "migrations_directory_not_found",
             directory=migrations_dir.name,
         )
-        return
+        raise MigrationStartupError("Migration directory unavailable")
 
     migration_files = sorted(
         f for f in migrations_dir.iterdir()
@@ -689,6 +714,8 @@ async def _run_migrations(conn: asyncpg.Connection):
     )
 
     applied_count = 0
+    missing = []
+    expected_checksums = {}
     for migration_file in migration_files:
         version = migration_file.stem  # e.g. "001_initial_schema"
         already_applied = version in applied_checksums
@@ -701,7 +728,7 @@ async def _run_migrations(conn: asyncpg.Connection):
                     "migration_file_path_invalid",
                     file=migration_file.name,
                 )
-            continue
+            raise MigrationStartupError("Migration path invalid: " + migration_file.name)
 
         # Reject suspiciously large files before reading into memory.
         file_size = migration_file.stat().st_size
@@ -713,7 +740,7 @@ async def _run_migrations(conn: asyncpg.Connection):
                     size_bytes=file_size,
                     limit_bytes=_MAX_MIGRATION_FILE_BYTES,
                 )
-            continue
+            raise MigrationStartupError("Migration too large: " + migration_file.name)
 
         try:
             sql = _read_migration_sql(migration_file)
@@ -724,33 +751,23 @@ async def _run_migrations(conn: asyncpg.Connection):
                     file=migration_file.name,
                     detail="File is not valid UTF-8 or UTF-8 with BOM.",
                 )
-            continue
+            raise MigrationStartupError("Migration encoding invalid: " + migration_file.name)
 
         current_checksum = _compute_migration_checksum(sql)
+        expected_checksums[version] = current_checksum
 
         if already_applied:
             stored_checksum = applied_checksums[version]
 
             if stored_checksum is None:
-                # No baseline recorded — either this row predates the checksum
-                # column, or this is the first startup after deploying this
-                # feature. Record the file's CURRENT content as the baseline so
-                # future edits to this file can be detected.
-                await conn.execute(
-                    "UPDATE schema_migrations SET checksum = $1 WHERE version = $2",
-                    current_checksum,
-                    version,
-                )
-                logger.info(
-                    "migration_baseline_recorded",
+                # Current files cannot prove which SQL was historically applied.
+                # Preserve the ledger and fail readiness for explicit review.
+                logger.error(
+                    "migration_checksum_missing",
                     version=version,
-                    detail=(
-                        "No prior checksum existed for this already-applied "
-                        "migration. If this file was edited after being "
-                        "applied, the database schema may not reflect its "
-                        "current content — verify and create an incremental "
-                        "migration if needed."
-                    ),
+                )
+                raise MigrationStartupError(
+                    f"Applied migration checksum is missing: {version}"
                 )
             elif stored_checksum != current_checksum:
                 # The file on disk no longer matches what was applied. Common
@@ -763,14 +780,18 @@ async def _run_migrations(conn: asyncpg.Connection):
                     "migration_ledger_mismatch",
                     version=version,
                     filename=migration_file.name,
-                    stored_checksum=stored_checksum,
                     expected_checksum=current_checksum,
                 )
-                raise Exception("MIGRATION_LEDGER_INCOMPATIBLE")
+                raise MigrationStartupError("MIGRATION_LEDGER_INCOMPATIBLE")
             # else: checksum matches — no drift, nothing to log.
 
             continue
 
+        missing.append((migration_file, sql, current_checksum))
+
+    # All known checksums have passed before determining/executing the final list.
+    for migration_file, sql, current_checksum in missing:
+        version = migration_file.stem
         # Detect whether this migration can safely run inside a transaction.
         # PostgreSQL raises an error if CONCURRENTLY operations appear inside
         # a transaction block — those migrations run outside one.
@@ -796,6 +817,9 @@ async def _run_migrations(conn: asyncpg.Connection):
                 "END $$;\n        $job$",
                 "END $partition_body$;\n        $job$"
             )
+        if os.environ.get("PREPVISTA_IGNORE_MISSING_CRON") == "1":
+            execution_sql = execution_sql.replace("CREATE EXTENSION IF NOT EXISTS pg_cron;", "-- skipped pg_cron")
+            execution_sql = execution_sql.replace("IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN", "IF FALSE THEN")
 
         # OLD-PUSH MIGRATION COMPATIBILITY BOOTSTRAP
         # 008_public_growth.sql has the exact same nested dollar-quote pg_cron collision as 005.
@@ -851,12 +875,17 @@ async def _run_migrations(conn: asyncpg.Connection):
             logger.error(
                 "migration_failed",
                 version=version,
-                error=_describe_db_error(exc),
+                error_type=type(exc).__name__,
             )
-            raise
+            raise MigrationStartupError(f"Migration failed: {version} ({type(exc).__name__})") from exc
 
+    final_checksums = {row["version"]: row["checksum"]
+                       for row in await conn.fetch("SELECT version, checksum FROM schema_migrations")}
+    if any(final_checksums.get(version) != checksum for version, checksum in expected_checksums.items()):
+        raise MigrationStartupError("Migration ledger verification failed after execution")
     logger.info(
         "migrations_complete",
         newly_applied=applied_count,
         total_tracked=len(applied_checksums) + applied_count,
     )
+    return applied_count

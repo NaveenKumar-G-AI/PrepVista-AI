@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import json
 import re
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -24,6 +25,7 @@ from app.config import (
 )
 from app.database.connection import DatabaseConnection
 from app.services.interview_terminal import connection_scope, connection, intent, classify, terminal_records
+from app.services.answer_acceptance import evidence_ack
 from app.services.interview_summary import coerce_runtime_state
 from app.services.assistance_evidence import resolve_provenance
 from app.dependencies import UserProfile, get_current_user
@@ -44,8 +46,135 @@ router = APIRouter()
 logger = structlog.get_logger("prepvista.interviews")
 
 
+@router.post("/{session_id}/answer/accept")
+async def accept_answer(session_id: str, req: AnswerRequest,
+                        user: UserProfile = Depends(get_current_user)):
+    """Commit capture before an explicit retry/termination command does work.
+
+    This uses the same immutable identity as /answer. If the following command
+    is interrupted, restoration can still discover and settle the envelope.
+    """
+    _validate_session_id(session_id)
+    if req.expected_turn is None or req.expected_turn < 1 or not req.client_request_id:
+        raise HTTPException(422, "An answer request ID and question identity are required.")
+    accepted = await _accept_candidate_evidence(session_id, req, user)
+    return {"action": "accepted", "processing_state": "PENDING",
+            "evidence_ack": evidence_ack(accepted)}
+
+
 @router.post("/{session_id}/answer")
 async def submit_answer(session_id: str, req: AnswerRequest, request: Request,
+                        background_tasks: BackgroundTasks, user: UserProfile = Depends(get_current_user)):
+    _validate_session_id(session_id)
+    # Turn zero is the greeting, not candidate evidence. Older clients must
+    # acquire immutable turn/instance identity before submitting a real answer.
+    if req.expected_turn is None or req.expected_turn == 0:
+        return await _submit_start_or_legacy(session_id, req, request, background_tasks, user)
+    if req.expected_turn < 0 or not req.client_request_id:
+        raise HTTPException(422, "An answer request ID and question identity are required.")
+    accepted = await _accept_candidate_evidence(session_id, req, user)
+    # This line is reached only after the independent acceptance COMMIT. The
+    # processing transaction can roll back (including cancellation) without
+    # removing the immutable original envelope.
+    try:
+        return await _process_accepted_answer(session_id, req, request, background_tasks, user, accepted)
+    except Exception as exc:
+        logger.warning("accepted_answer_processing_pending", session_id=session_id,
+                       client_request_id=req.client_request_id, error_type=type(exc).__name__)
+        return {"action": "accepted", "processing_state": "PENDING",
+                "evidence_ack": evidence_ack(accepted)}
+
+
+async def _accept_candidate_evidence(session_id: str, req: AnswerRequest, user: UserProfile) -> dict:
+    original_request = req.model_dump(mode="json", exclude={"access_token"})
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT user_id, state, total_turns, runtime_state FROM interview_sessions WHERE id = $1 AND access_token = $2 FOR UPDATE",
+                session_id, req.access_token)
+            if not row or str(row["user_id"]) != str(user.id):
+                raise HTTPException(404, "Interview not found.")
+            if not req.question_instance_id:
+                raise HTTPException(422, "A question identity is required.")
+            runtime = coerce_runtime_state(row["runtime_state"])
+            attempts = runtime.setdefault("accepted_attempts", {})
+            prior = attempts.get(req.client_request_id)
+            if prior:
+                if prior["request"] != original_request:
+                    raise HTTPException(409, "This answer request ID already belongs to different evidence.")
+                return prior
+            if row["state"] != "ACTIVE" or int(row["total_turns"] or 0) != req.expected_turn:
+                raise HTTPException(409, "This question has already advanced.")
+            instance = str(req.question_instance_id)
+            if instance != str(runtime.get("active_question_id", "")):
+                raise HTTPException(409, "The answer belongs to a different question.")
+            if runtime.get("question_records", {}).get(instance, {}).get("outcome"):
+                raise HTTPException(409, "This question already has a terminal answer.")
+            if any(item["question_instance_id"] == instance for item in attempts.values()):
+                raise HTTPException(409, "This question already has an accepted answer. Retry its original request.")
+            accepted_at = await conn.fetchval("SELECT clock_timestamp() AS answered_at")
+            provenance = await resolve_provenance(conn, session_id, instance, user.id, accepted_at, req.expected_turn)
+            accepted = {"session_id": session_id, "question_instance_id": instance,
+                        "client_request_id": req.client_request_id, "accepted_at": accepted_at.isoformat(),
+                        "request": original_request, "assistance_provenance": provenance,
+                        "outcome": classify(req.user_text, req.terminal_outcome, req.capture_evidence)}
+            attempts[req.client_request_id] = accepted
+            await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1",
+                               session_id, json.dumps(runtime))
+        return accepted
+
+
+async def _process_accepted_answer(session_id, req, request, background_tasks, user, accepted):
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT user_id, state, total_turns, runtime_state FROM interview_sessions WHERE id = $1 AND access_token = $2 FOR UPDATE",
+                session_id, req.access_token)
+            if not row or str(row["user_id"]) != str(user.id):
+                raise RuntimeError("Accepted interview is unavailable")
+            runtime = coerce_runtime_state(row["runtime_state"])
+            prior = runtime.get("answer_responses", {}).get(req.client_request_id)
+            ack = evidence_ack(accepted)
+            if prior:
+                # A historical ACK is valid, but an old next-question response
+                # cannot rewind a client that has since advanced further.
+                if prior.get("action") == "continue" and int(prior.get("turn", 0)) != int(row["total_turns"] or 0):
+                    return {"action": "accepted", "processing_state": "COMPLETE", "evidence_ack": ack}
+                return {**prior, "evidence_ack": ack}
+            if runtime.get("finish_response"):
+                return {"action": "finish", **runtime["finish_response"], "evidence_ack": ack,
+                        "processing_state": "COMPLETE"}
+            if (row["state"] != "ACTIVE" or int(row["total_turns"] or 0) != req.expected_turn
+                    or str(runtime.get("active_question_id")) != str(req.question_instance_id)):
+                raise RuntimeError("Accepted answer requires session recovery")
+            marker = connection.set(conn)
+            answer_marker = intent.set(dict(outcome=accepted["outcome"], text=accepted["request"]["user_text"],
+                evidence=accepted["request"].get("capture_evidence"), end_after_answer=req.end_after_answer,
+                answered_at=datetime.fromisoformat(accepted["accepted_at"]),
+                assistance_provenance=accepted["assistance_provenance"], accepted_request_id=req.client_request_id))
+            try:
+                if runtime.get("terminal_contract_version") != 1:
+                    from app.services.interviewer_session import adopt_active_terminal_contract
+                    runtime = await adopt_active_terminal_contract(conn, session_id, runtime)
+                payload = await _submit_answer_impl(session_id, req, request, background_tasks, user)
+                row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+                runtime = coerce_runtime_state(row["runtime_state"])
+                record = runtime.get("question_records", {}).get(str(req.question_instance_id), {})
+                processing_state = record.get("evaluation_state") or ("EVALUATED" if record.get("outcome") == "EVALUATED" else record.get("outcome", "COMPLETE"))
+                payload = {**payload, "evidence_ack": ack, "processing_state": processing_state}
+                runtime.setdefault("answer_responses", {})[req.client_request_id] = payload
+                if payload.get("action") == "finish":
+                    runtime["finish_response"] = {key: value for key, value in payload.items()
+                                                  if key not in {"action", "evidence_ack", "processing_state"}}
+                await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1",
+                                   session_id, json.dumps(runtime))
+                return payload
+            finally:
+                intent.reset(answer_marker)
+                connection.reset(marker)
+
+
+async def _submit_start_or_legacy(session_id: str, req: AnswerRequest, request: Request,
                         background_tasks: BackgroundTasks, user: UserProfile = Depends(get_current_user)):
     _validate_session_id(session_id)
     if req.expected_turn is None:
@@ -58,7 +187,10 @@ async def submit_answer(session_id: str, req: AnswerRequest, request: Request,
         state = coerce_runtime_state(row["runtime_state"] if row else {})
         if state.get("terminal_contract_version") == 1 or (row and int(row["total_turns"] or 0) > 0):
             raise HTTPException(409, "Refresh the interview before submitting this answer.")
-        return await _submit_answer_impl(session_id, req, request, background_tasks, user)
+        # A slow legacy greeting must not overwrite a concurrently accepted
+        # modern turn with a stale runtime snapshot. It shares the start lock.
+        req = req.model_copy(update={"expected_turn": 0,
+                                     "client_request_id": req.client_request_id or f"legacy-start-{session_id}"})
     if not req.client_request_id:
         raise HTTPException(422, "An answer request ID is required.")
     # Row lock works across processes. One transaction contains transcript,
@@ -209,8 +341,10 @@ async def _submit_answer_impl(
     if should_evaluate:
         try:
             async with connection_scope(DatabaseConnection) as conn:
-                assistance_provenance = await resolve_provenance(
-                    conn, session_id, question_instance_id_for_eval, user.id, answer_submitted_at, turn_for_eval)
+                assistance_provenance = (intent.get() or {}).get("assistance_provenance")
+                if assistance_provenance is None:
+                    assistance_provenance = await resolve_provenance(
+                        conn, session_id, question_instance_id_for_eval, user.id, answer_submitted_at, turn_for_eval)
                 if intent.get() is not None:
                     row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
                     runtime = coerce_runtime_state(row["runtime_state"])
@@ -233,7 +367,7 @@ async def _submit_answer_impl(
                     session_id=session_id,
                     turn_number=int(turn_for_eval),
                     question_text=str(question_for_eval),
-                    raw_answer=normalized_text,
+                    raw_answer=(intent.get() or {}).get("text", normalized_text),
                     answer_duration_seconds=req.answer_duration_seconds,
                     answer_word_count=answer_word_count,
                     assistance_provenance=assistance_provenance,
@@ -256,7 +390,7 @@ async def _submit_answer_impl(
                         session_id=session_id,
                         turn_number=int(turn_for_eval),
                         question_text=str(question_for_eval),
-                        raw_answer=normalized_text,
+                        raw_answer=(intent.get() or {}).get("text", normalized_text),
                         answer_status=answer_status,
                         answer_duration_seconds=req.answer_duration_seconds,
                         question_instance_id=question_instance_id_for_eval,
@@ -303,7 +437,7 @@ async def _submit_answer_impl(
         if intent.get() is not None:
             await _evaluate_and_store(
                 session_id=session_id, turn_number=int(turn_for_eval),
-                question_text=str(question_for_eval), raw_answer=normalized_text,
+                question_text=str(question_for_eval), raw_answer=(intent.get() or {}).get("text", normalized_text),
                 answer_duration_seconds=req.answer_duration_seconds, answer_word_count=answer_word_count,
                 assistance_provenance=assistance_provenance, question_instance_id=question_instance_id_for_eval)
         else:
@@ -312,7 +446,7 @@ async def _submit_answer_impl(
                 session_id=session_id,
                 turn_number=int(turn_for_eval),
                 question_text=str(question_for_eval),
-                raw_answer=normalized_text,
+                raw_answer=(intent.get() or {}).get("text", normalized_text),
                 answer_duration_seconds=req.answer_duration_seconds,
                 answer_word_count=answer_word_count,
                 assistance_provenance=assistance_provenance,
@@ -326,7 +460,7 @@ async def _submit_answer_impl(
                 session_id=session_id,
                 turn_number=int(turn_for_eval),
                 question_text=str(question_for_eval),
-                raw_answer=normalized_text,
+                raw_answer=(intent.get() or {}).get("text", normalized_text),
                 answer_status=answer_status,
                 answer_duration_seconds=req.answer_duration_seconds,
                 question_instance_id=question_instance_id_for_eval,
@@ -343,6 +477,20 @@ async def _submit_answer_impl(
     await _cache_client_response(session_id, req.client_request_id, result)
     return result
 
+
+@asynccontextmanager
+async def _locked_runtime_write(session_id: str):
+    """Legacy background updates must not overwrite committed acceptance."""
+    current = connection.get()
+    if current is not None:
+        yield current  # The current answer/finalization already owns the row lock.
+        return
+    async with DatabaseConnection() as conn:
+        async with conn.transaction():
+            await conn.fetchrow("SELECT id FROM interview_sessions WHERE id = $1 FOR UPDATE", session_id)
+            yield conn
+
+
 async def _record_unevaluated_turn(
     session_id: str,
     turn_number: int,
@@ -353,9 +501,13 @@ async def _record_unevaluated_turn(
     question_instance_id: str | None = None,
 ) -> None:
     from app.services.interview_terminal import register_question, terminalize
-    async with connection_scope(DatabaseConnection) as conn:
+    legacy_background = connection.get() is None
+    async with _locked_runtime_write(session_id) as conn:
         row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
         runtime = coerce_runtime_state(row["runtime_state"] if row else {})
+        if legacy_background and any(item["request"]["expected_turn"] == turn_number
+                                     for item in runtime.get("accepted_attempts", {}).values()):
+            return  # The durable original wins over an old timeout task.
         instance = register_question(runtime, session_id, turn_number, question_text, question_instance_id)
         terminalize(runtime, instance, answer_status.upper(), raw_answer)
         await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, json.dumps(runtime))
@@ -374,8 +526,8 @@ async def _evaluate_and_store(
     """Persist a measured answer, preserving assistance and instance attribution.
 
     Current-contract requests borrow the enclosing session transaction and run
-    synchronously before advance becomes visible. An evaluator/write failure
-    rolls back the answer and advance for a safe retry. Legacy background calls
+    synchronously before advance becomes visible. Provider failure records an
+    unavailable measurement while retaining the answer; database writes remain atomic. Legacy background calls
     retain separate connections and the existing unique turn guard.
     """
     try:
@@ -426,25 +578,29 @@ async def _evaluate_and_store(
         # semaphore, a burst of 100+ simultaneous LLM calls hits API rate limits,
         # returns 429s, and the background tasks all fail silently.  The semaphore
         # queues excess tasks — they still run, just not all at once.
-        async with _EVAL_SEMAPHORE:
-            eval_result = await evaluate_single_question(
-                question_text=question_text,
-                raw_answer=raw_answer,
-                resume_summary=str(resume_summary),
-                rubric_category=rubric_category,
-                plan=plan,
-                session_id=session_id,
-                turn_id=turn_number,
-            )
-        if not isinstance(eval_result, dict):
-            if intent.get() is not None:
-                raise RuntimeError("Evaluation unavailable")
+        try:
+            async with _EVAL_SEMAPHORE:
+                eval_result = await evaluate_single_question(
+                    question_text=question_text,
+                    raw_answer=raw_answer,
+                    resume_summary=str(resume_summary),
+                    rubric_category=rubric_category,
+                    plan=plan,
+                    session_id=session_id,
+                    turn_id=turn_number,
+                )
+        except Exception as exc:
+            logger.warning("answer_evaluation_unavailable", session_id=session_id, turn=turn_number, error_type=type(exc).__name__)
+            await _mark_evaluation_unavailable(session_id, question_instance_id)
+            return
+        if not isinstance(eval_result, dict) or eval_result.get("score") is None:
             logger.warning(
                 "invalid_eval_result_type",
                 session_id=session_id,
                 turn=turn_number,
                 category=rubric_category,
             )
+            await _mark_evaluation_unavailable(session_id, question_instance_id)
             return
 
         # ---- Phase 3: write (new connection, double-insert guard) ---------
@@ -477,7 +633,7 @@ async def _evaluate_and_store(
                 turn_number,
                 rubric_category,
                 question_text,
-                eval_result.get("raw_answer", raw_answer),
+                raw_answer,
                 eval_result.get("normalized_answer", raw_answer),
                 eval_result.get("classification", ""),
                 eval_result.get("score", 0),
@@ -526,3 +682,19 @@ async def _evaluate_and_store(
             turn=turn_number,
             error=str(exc),
         )
+
+async def _mark_evaluation_unavailable(session_id: str, question_instance_id: str | None) -> None:
+    """Keep accepted evidence terminal without inventing a candidate score."""
+    if not question_instance_id:
+        return
+    legacy_background = connection.get() is None
+    async with _locked_runtime_write(session_id) as conn:
+        row = await conn.fetchrow("SELECT runtime_state FROM interview_sessions WHERE id = $1", session_id)
+        runtime = coerce_runtime_state(row["runtime_state"] if row else {})
+        if legacy_background and any(item["question_instance_id"] == str(question_instance_id)
+                                     for item in runtime.get("accepted_attempts", {}).values()):
+            return  # A stale provider task cannot downgrade a modern attempt.
+        record = runtime.get("question_records", {}).get(str(question_instance_id))
+        if record is not None:
+            record.update(evaluation_state="UNAVAILABLE", measured=False)
+            await conn.execute("UPDATE interview_sessions SET runtime_state = $2 WHERE id = $1", session_id, json.dumps(runtime))

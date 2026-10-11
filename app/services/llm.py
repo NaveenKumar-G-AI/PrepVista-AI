@@ -9,6 +9,7 @@ import structlog
 from groq import AsyncGroq
 from openai import AsyncOpenAI
 from app.config import get_settings
+from app.model_config import canonical_groq_model
 
 logger = structlog.get_logger("prepvista.llm")
 
@@ -25,18 +26,18 @@ def _get_groq(use_live_key: bool = False) -> AsyncGroq:
     
     if use_live_key and settings.GROQ_API_KEY_LIVE:
         if not _groq_client_live:
-            _groq_client_live = AsyncGroq(api_key=settings.GROQ_API_KEY_LIVE)
+            _groq_client_live = AsyncGroq(api_key=settings.GROQ_API_KEY_LIVE, max_retries=0)
         return _groq_client_live
 
     if not _groq_client:
-        _groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
+        _groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY, max_retries=0)
     return _groq_client
 
 
 def _get_openai() -> AsyncOpenAI:
     global _openai_client
     if not _openai_client:
-        _openai_client = AsyncOpenAI(api_key=get_settings().OPENAI_API_KEY)
+        _openai_client = AsyncOpenAI(api_key=get_settings().OPENAI_API_KEY, max_retries=0)
     return _openai_client
 
 
@@ -52,7 +53,7 @@ async def call_groq(
     """Call Groq API (primary provider)."""
     settings = get_settings()
     kwargs = {
-        "model": model or settings.GROQ_MODEL,
+        "model": canonical_groq_model(model or settings.GROQ_MODEL),
         "messages": messages,
         "temperature": temperature,
     }
@@ -129,10 +130,31 @@ async def call_llm(
             return result
         except Exception as e:
             logger.warning("groq_call_failed", attempt=attempt + 1, error=str(e))
+
+            # Non-retryable errors
+            err_str = str(e).lower()
+            if "model_decommissioned" in err_str or "model_not_found" in err_str or "invalid_request_error" in err_str:
+                logger.error("groq_non_retryable_error", error=err_str)
+                break
+            if hasattr(e, "status_code") and getattr(e, "status_code") in (400, 401, 403, 404):
+                logger.error("groq_non_retryable_status", status=getattr(e, "status_code"))
+                break
+
             if attempt < retries - 1:
                 import random
                 jittered_delay = retry_delay * (2 ** attempt) + random.uniform(0, 0.3)
                 await asyncio.sleep(jittered_delay)
+
+    # Fallback to alternative Groq model
+    target_model = canonical_groq_model(model or settings.GROQ_MODEL)
+    fallback_model = settings.GROQ_FALLBACK_MODEL
+    if allow_provider_fallback and target_model != fallback_model:
+        try:
+            logger.info("falling_back_to_groq_alternative", fallback_model=fallback_model)
+            result = await call_groq(messages, temperature, json_mode, fallback_model, max_tokens, backup_timeout, use_live_key=use_live_key)
+            return result
+        except Exception as e:
+            logger.error("groq_alternative_fallback_failed", error=str(e))
 
     # Fallback to OpenAI
     if allow_provider_fallback and settings.OPENAI_API_KEY:
@@ -142,7 +164,7 @@ async def call_llm(
                 messages,
                 temperature,
                 json_mode,
-                model,
+                None,  # Groq IDs are never valid OpenAI provider model IDs.
                 max_tokens,
                 backup_timeout,
             )

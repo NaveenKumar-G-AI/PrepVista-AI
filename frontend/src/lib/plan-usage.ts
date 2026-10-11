@@ -17,7 +17,7 @@ const PLAN_LIMITS: Record<string, number | null> = {
 
 export function getPlanInterviewLimit(plan: string, referralBonusInterviews = 0) {
   const normalized = (plan || 'free').toLowerCase();
-  const baseLimit = PLAN_LIMITS[normalized] ?? PLAN_LIMITS.free;
+  const baseLimit = Object.hasOwn(PLAN_LIMITS, normalized) ? PLAN_LIMITS[normalized] : PLAN_LIMITS.free;
   if (baseLimit === null) {
     return null;
   }

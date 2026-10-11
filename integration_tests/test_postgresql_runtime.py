@@ -2,11 +2,21 @@ import pytest
 import asyncio
 import asyncpg
 import os
+import hashlib
+from pathlib import Path
 
 import uuid
 
-# Ensure we are explicit about this being a local target.
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+# Never inherit production DATABASE_URL in a test that inserts synthetic rows.
+# Validate at collection time, before any selected test can open a connection.
+from urllib.parse import urlsplit
+
+DATABASE_URL = os.getenv("PREPVISTA_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+_test_target = urlsplit(DATABASE_URL)
+if (_test_target.scheme not in {"postgres", "postgresql"}
+        or _test_target.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or _test_target.query or _test_target.fragment):
+    raise RuntimeError("PostgreSQL integration tests require an explicit loopback-only test database URL")
 
 pytestmark = pytest.mark.asyncio
 
@@ -224,6 +234,17 @@ async def test_07_score_report_semantics():
     finally:
         await conn.close()
 
-async def test_08_startup_migrations_disabled():
-    """Ensure startup application does not run migrations. We can verify environment variable logic."""
-    assert os.getenv("RUN_MIGRATIONS_ON_STARTUP", "false") == "false"
+async def test_08_repository_migrations_match_ledger():
+    """Validate actual applied files; extra production versions are permitted."""
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        rows = await conn.fetch("SELECT version, checksum FROM schema_migrations")
+        applied = {row["version"]: row["checksum"] for row in rows}
+        migrations = Path(__file__).resolve().parents[1] / "app" / "database" / "migrations"
+        for migration in sorted(migrations.glob("*.sql")):
+            if migration.stem in ("050_cron_schema_reconciliation", "051_pg_cron_runtime_reconciliation"): continue
+            assert migration.stem in applied, f"Missing migration: {migration.name}"
+            checksum = hashlib.sha256(migration.read_text(encoding="utf-8-sig").encode("utf-8")).hexdigest()
+            assert applied[migration.stem] == checksum, f"Checksum mismatch: {migration.name}"
+    finally:
+        await conn.close()

@@ -22,8 +22,7 @@ class InterviewStore(StoredHistory):
     def __init__(self):
         super().__init__()
         self.lock = asyncio.Lock()
-        self.db.execute("ALTER TABLE conversation_messages ADD COLUMN id INTEGER")
-        for column, kind in {"difficulty_mode":"TEXT", "resume_text":"TEXT", "silence_count":"INT", "consecutive_followups":"INT",
+        for column, kind in {"duration_planned_seconds":"INT", "difficulty_mode":"TEXT", "resume_text":"TEXT", "silence_count":"INT", "consecutive_followups":"INT",
                              "skip_topics":"TEXT", "active_question_signature":"TEXT", "active_question_turn":"INT", "question_retry_count":"INT",
                              "last_answer_status":"TEXT", "last_client_request_id":"TEXT", "last_client_response":"TEXT", "termination_reason":"TEXT"}.items():
             existing = {row[1] for row in self.db.execute("PRAGMA table_info(interview_sessions)")}
@@ -92,6 +91,10 @@ def store(monkeypatch):
     ('',{'audio_bytes':40},None,'UNINTELLIGIBLE'),
     ('',{'speech_detected':True},None,'UNINTELLIGIBLE'),
     ('',{'unintelligible':True},None,'UNINTELLIGIBLE'),
+    ('A valid earlier transcript',{'unintelligible':True},None,'EVALUATED'),
+    ('A partial transcript',{'unintelligible':True,'failed':True},None,'TRANSCRIPTION_FAILED'),
+    ('A partial transcript',{'unintelligible':True,'flush_status':'timeout'},None,'TRANSCRIPTION_FAILED'),
+    ('A transcript',{},'UNINTELLIGIBLE','UNINTELLIGIBLE'),
     ('',{},'SKIPPED','SKIPPED'), ('',{},'ABORTED','ABORTED')])
 def test_capture_classification(text,evidence,requested,outcome):
     assert classify(text,requested,evidence) == outcome
@@ -172,14 +175,48 @@ def test_concurrent_finish_returns_same_response_and_one_completion_event(store)
     asyncio.run(run())
 
 
-def test_evaluation_write_failure_rolls_back_answer_and_advance(store,monkeypatch):
+@pytest.mark.parametrize('finish',[False,True])
+def test_evaluation_outage_preserves_answer_and_unavailable_measurement(store,monkeypatch,finish):
+    async def run():
+        first=await store.start()
+        evaluator=AsyncMock(side_effect=TimeoutError('provider unavailable'))
+        monkeypatch.setattr(answers,'evaluate_single_question',evaluator)
+        text='I built a Python application and tested every API endpoint.'
+        result=await store.submit(text,'answer',1,first['question_instance_id'],end_after_answer=finish)
+        assert result['action']==('finish' if finish else 'continue')
+        record=terminal_records(store.runtime())[0]
+        assert record['raw_answer']==text and record['outcome']=='EVALUATED'
+        assert record['evaluation_state']=='UNAVAILABLE' and record['measured'] is False
+        assert store.db.execute('SELECT COUNT(*) FROM question_evaluations WHERE session_id=?',(store.session,)).fetchone()[0]==0
+        assert store.db.execute("SELECT content FROM conversation_messages WHERE session_id=? AND role='user' AND turn_number=1",(store.session,)).fetchone()[0]==text
+        assert await store.submit(text,'answer',1,first['question_instance_id'],end_after_answer=finish)==result
+        assert evaluator.await_count==1
+        if finish:
+            assert result['final_score'] is None
+            payload=await reports.get_report(store.session,user())
+            assert payload['session']['final_score'] is None
+            assert payload['session']['evaluation_state']=='UNAVAILABLE'
+    asyncio.run(run())
+
+
+def test_evaluation_database_failure_rolls_back_for_safe_retry(store,monkeypatch):
     async def run():
         first=await store.start()
         before=store.snapshot()
-        monkeypatch.setattr(answers,'evaluate_single_question',AsyncMock(side_effect=TimeoutError('provider unavailable')))
-        with pytest.raises(TimeoutError):
-            await store.submit('I built a Python application.','answer',1,first['question_instance_id'])
-        assert store.snapshot()==before
+        execute=store.run
+        def unavailable(sql,args):
+            if 'INSERT INTO question_evaluations' in sql:
+                raise RuntimeError('database unavailable')
+            return execute(sql,args)
+        monkeypatch.setattr(store,'run',unavailable)
+        response = await store.submit('I built and tested a Python application.','answer',1,first['question_instance_id'])
+        assert response['action'] == 'accepted' and response['evidence_ack']['durable']
+        assert store.runtime()['accepted_attempts']['answer']['request']['user_text'] == 'I built and tested a Python application.'
+        assert not terminal_records(store.runtime())[0].get('outcome')
+        assert store.snapshot()['question_evaluations'] == before['question_evaluations']
+        monkeypatch.setattr(store, 'run', execute)
+        retry = await store.submit('I built and tested a Python application.','answer',1,first['question_instance_id'])
+        assert retry['action'] == 'continue' and retry['evidence_ack'] == response['evidence_ack']
     asyncio.run(run())
 
 
@@ -326,8 +363,9 @@ def test_evaluation_provider_outage_never_becomes_heuristic_candidate_failure(mo
     async def run():
         marker=intent.set({'outcome':'EVALUATED'})
         try:
-            with pytest.raises(TimeoutError):
+            with pytest.raises(RuntimeError,match='Evaluation unavailable') as rejected:
                 await evaluator_scoring.evaluate_single_question('Tell me about your work','I built and tested a Python project','{}','communication','free')
+            assert isinstance(rejected.value.__cause__,TimeoutError)
         finally:intent.reset(marker)
     asyncio.run(run())
 
@@ -431,4 +469,27 @@ def test_legacy_partial_question_write_with_zero_counter_cannot_be_scored_zero(s
         assert result['final_score'] is None
         assert len(terminal_records(store.runtime()))==1
         assert terminal_records(store.runtime())[0]['outcome']=='ABORTED'
+    asyncio.run(run())
+
+
+def test_legacy_active_finish_retains_answer_when_provider_is_unavailable(store, monkeypatch):
+    async def run():
+        await store.start()
+        runtime = store.runtime()
+        runtime.pop('terminal_contract_version')
+        runtime.pop('question_records')
+        store.db.execute('UPDATE interview_sessions SET runtime_state=? WHERE id=?', (json.dumps(runtime), store.session))
+        text = 'I built a Python API and tested every endpoint before release.'
+        store.insert('conversation_messages', session_id=store.session, role='user', content=text, turn_number=1)
+        monkeypatch.setattr(answers, 'evaluate_single_question', AsyncMock(side_effect=TimeoutError('provider unavailable')))
+        result = await sessions.finish_session(store.session, 'a'*40)
+        record = terminal_records(store.runtime())[0]
+        assert record['outcome'] == 'EVALUATED' and record['raw_answer'] == text
+        assert record['evaluation_state'] == 'UNAVAILABLE' and record['measured'] is False
+        assert result['final_score'] is None
+        assert store.db.execute('SELECT COUNT(*) FROM question_evaluations WHERE session_id=?', (store.session,)).fetchone()[0] == 0
+        assert await sessions.finish_session(store.session, 'a'*40) == result
+        payload = await reports.get_report(store.session, user())
+        assert payload['session']['final_score'] is None
+        assert payload['session']['evaluation_state'] == 'UNAVAILABLE'
     asyncio.run(run())

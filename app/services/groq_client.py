@@ -39,13 +39,15 @@ from enum import Enum
 from typing import Any
 
 import httpx
+from app.config import get_settings
+from app.model_config import GROQ_QUALITY_MODEL, canonical_groq_model
 
 logger = logging.getLogger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-DEFAULT_MODEL = "llama3-70b-8192"
+DEFAULT_MODEL = GROQ_QUALITY_MODEL
 
 # Groq paid-tier conservative defaults (tune via env).
 # If you have multiple API keys, set GROQ_API_KEYS as comma-separated.
@@ -367,7 +369,7 @@ class AsyncGroqClient:
         api_key: str,
     ) -> str:
         payload = {
-            "model": model,
+            "model": canonical_groq_model(model),
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,

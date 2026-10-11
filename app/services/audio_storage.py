@@ -64,6 +64,9 @@ async def store_audio_chunk(
     if not audio_bytes:
         return None
 
+    from app.services.stt_service import audio_format
+    if content_type == "audio/webm":
+        content_type = audio_format(audio_bytes)[1]
     bucket = settings.INTERVIEW_AUDIO_BUCKET
     object_path = storage_object_path(session_id, turn_id, chunk_n)
     url = f"{settings.SUPABASE_URL}/storage/v1/object/{bucket}/{object_path}"

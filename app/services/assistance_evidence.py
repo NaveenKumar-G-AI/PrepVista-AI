@@ -12,7 +12,7 @@ def content_present(value):
     return isinstance(envelope, dict) and isinstance(envelope.get("content"), str) and bool(envelope["content"].strip())
 
 
-async def resolve_provenance(conn, session_id, instance, owner, answered_at, turn=None):
+async def resolve_provenance(conn, session_id, instance, owner, answered_at, turn=None, *, mark_used=True):
     if not instance:
         return "unknown"
     events = await conn.fetch("""SELECT id, user_id, assistance_type, generated_at,
@@ -35,7 +35,7 @@ async def resolve_provenance(conn, session_id, instance, owner, answered_at, tur
             incomplete = True
             continue
         valid.append(event)
-    for event in valid:
+    for event in valid if mark_used else []:
         await conn.execute("UPDATE interview_assistance_event SET used_before_answer = TRUE WHERE id = $1", event["id"])
     kinds = {event["assistance_type"] for event in valid}
     if "answer_guidance" in kinds:

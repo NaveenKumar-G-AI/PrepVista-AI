@@ -5,7 +5,7 @@ Extracted from interviews.py.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, JsonValue, field_validator
 from app.routers.interviews_helpers import _normalize_proctoring_mode, _clip_text, _MAX_VIOLATION_TYPE_LEN, _MAX_VIOLATION_DETAIL_LEN, _MAX_REASON_LEN
 from typing import Any, Literal
 from uuid import UUID
@@ -20,10 +20,10 @@ class AnswerRequest(BaseModel):
     expected_turn: int | None = None
     question_instance_id: UUID | None = None
     terminal_outcome: Literal["NO_ANSWER", "TRANSCRIPTION_FAILED", "UNINTELLIGIBLE", "SKIPPED", "ABORTED"] | None = None
-    capture_evidence: dict[str, bool | int | str] | None = None
+    capture_evidence: dict[str, JsonValue] | None = None
     end_after_answer: bool = False
 
-    @field_validator("user_text", "access_token", "client_request_id", mode="before")
+    @field_validator("access_token", "client_request_id", mode="before")
     @classmethod
     def _strip_strings(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
@@ -85,7 +85,7 @@ class TerminateRequest(BaseModel):
     reason: str = ""
     user_text: str = ""
     question_instance_id: UUID | None = None
-    capture_evidence: dict[str, bool | int | str] | None = None
+    capture_evidence: dict[str, JsonValue] | None = None
     duration_actual: int | None = None
 
     @field_validator("access_token", "reason", mode="before")
