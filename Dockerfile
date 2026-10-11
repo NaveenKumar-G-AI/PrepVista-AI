@@ -22,6 +22,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
+COPY scripts/ scripts/
+RUN chmod +x scripts/launch.sh
 
 EXPOSE 8000
 
