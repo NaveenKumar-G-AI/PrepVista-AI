@@ -4,6 +4,10 @@ const isProduction = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_API_URL:
+      process.env.NEXT_PUBLIC_API_URL || "https://prepvistabeckend.onrender.com",
+  },
   async headers() {
     return [
       {

@@ -7,8 +7,8 @@
 // An empty or localhost NEXT_PUBLIC_API_URL in production silently routes all
 // requests — including JWT tokens and payment signatures — to the wrong host.
 // This catches misconfigured deploys before the first user login.
-const _rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 const _isProductionBuild = process.env.NODE_ENV === 'production';
+const _rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || (_isProductionBuild ? 'https://prepvistabeckend.onrender.com' : '')).trim();
 if (_isProductionBuild) {
   let validProductionUrl = false;
   try {
@@ -305,26 +305,25 @@ function adaptActivity(raw: unknown): unknown {
 
 class ApiClient {
   private static readonly MAX_CACHE_ENTRIES = 100;
-  // ✅ FIXED: MAX_INFLIGHT was declared but never enforced anywhere — was dead code.
-  // Now actively checked in cachedRequest before queuing a new background revalidation.
-  private static readonly MAX_INFLIGHT = 50;
   private token: string | null = null;
   private refreshToken: string | null = null;
   private refreshInFlight: Promise<boolean> | null = null;
   private storageListenerAttached = false;
   private cache = new Map<string, CacheEntry>();
+  private cacheRevision = 0;
   // ✅ FIXED: Promise<any> → Promise<unknown>. 'any' was leaking implicit type unsafety
   // through the entire cache and deduplication layer into every caller.
   private inFlightRequests = new Map<string, Promise<unknown>>();
 
   /**
-   * Stale-while-revalidate GET request.
-   * Returns cached data instantly if available, then revalidates in background.
+   * Return fresh cached data or await revalidation. Callers do not subscribe
+   * to this cache, so background-only updates would leave visible state stale.
    * @param path   API path
    * @param staleMs  How long before cache is considered stale (default 30s)
    * @param options  Standard request options (method is always GET)
    */
   async cachedRequest<T = unknown>(path: string, staleMs = 30_000, options: ApiOptions = {}): Promise<T> {
+    const revision = this.cacheRevision;
     const entry = this.cache.get(path) as CacheEntry<T> | undefined;
     const now = Date.now();
 
@@ -336,17 +335,6 @@ class ApiClient {
         // Fresh — return immediately, no refetch
         return entry.data;
       }
-      // Stale — return immediately but revalidate in background
-      // ✅ FIXED: MAX_INFLIGHT now enforced — previously the constant existed but was
-      // never checked, so background revalidations could accumulate without bound.
-      if (!this.inFlightRequests.has(path) && this.inFlightRequests.size < ApiClient.MAX_INFLIGHT) {
-        const promise = this.request<T>(path, options)
-          .then(fresh => { this.cache.set(path, { data: fresh, timestamp: Date.now(), lastAccessed: Date.now() }); })
-          .catch(() => { /* background revalidation failed, keep stale */ })
-          .finally(() => { this.inFlightRequests.delete(path); });
-        this.inFlightRequests.set(path, promise);
-      }
-      return entry.data;
     }
 
     // No cache — fetch fresh but deduplicate
@@ -356,6 +344,7 @@ class ApiClient {
 
     const promise = this.request<T>(path, options)
       .then(data => {
+        if (revision !== this.cacheRevision) return data;
         this.cache.set(path, { data, timestamp: Date.now(), lastAccessed: Date.now() });
         if (this.cache.size > ApiClient.MAX_CACHE_ENTRIES) {
           // ✅ PERF: LRU eviction — find and remove the least-recently-accessed entry.
@@ -375,23 +364,28 @@ class ApiClient {
         return data;
       })
       .finally(() => {
-        this.inFlightRequests.delete(path);
+        if (this.inFlightRequests.get(path) === promise) this.inFlightRequests.delete(path);
       });
-    
+
     this.inFlightRequests.set(path, promise);
     return promise;
   }
 
   /** Invalidate cache entries matching a prefix (e.g., '/dashboard') */
   invalidateCache(pathPrefix?: string) {
+    this.cacheRevision += 1;
     if (!pathPrefix) {
       this.cache.clear();
+      this.inFlightRequests.clear();
       return;
     }
     for (const key of this.cache.keys()) {
       if (key.startsWith(pathPrefix)) {
         this.cache.delete(key);
       }
+    }
+    for (const key of this.inFlightRequests.keys()) {
+      if (key.startsWith(pathPrefix)) this.inFlightRequests.delete(key);
     }
   }
 
@@ -508,6 +502,7 @@ class ApiClient {
           notifyAuthenticationRequired();
         }
         if (!response.ok) throw await this.parseError(response);
+        if (method !== 'GET') this.invalidateCache();
         return await response.json() as T;
       } catch (err) {
         let error = err instanceof Error ? err : new Error('Request failed.');
@@ -671,7 +666,16 @@ class ApiClient {
 
   // ✅ PERF: TTL raised 20s→90s. /auth/me doesn't change mid-session.
   // At 500 users with 20s TTL = 25 identical refetches/sec. At 90s = ~5.5/sec.
-  async getMe<T = ApiUser>() { return this.cachedRequest<T>('/auth/me', 90_000); }
+  async getMe<T = ApiUser>(force = false) {
+    if (force) {
+      this.invalidateCache('/auth/me');
+      const revision = this.cacheRevision;
+      const data = await this.request<T>('/auth/me');
+      if (revision === this.cacheRevision) this.cache.set('/auth/me', { data, timestamp: Date.now(), lastAccessed: Date.now() });
+      return data;
+    }
+    return this.cachedRequest<T>('/auth/me', 90_000);
+  }
 
   async trackEvent(eventName: string, metadata: Record<string, unknown> = {}) {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -900,6 +904,13 @@ class ApiClient {
       retries: 1,
       timeoutMs: 45000,
     });
+  }
+  async acceptAnswer<T = unknown>(sessionId: string, body: {
+    user_text: string; access_token: string; client_request_id: string;
+    expected_turn: number; question_instance_id?: string | null; terminal_outcome?: string;
+    capture_evidence?: object; end_after_answer?: boolean; duration_actual?: number; answer_duration_seconds?: number;
+  }) {
+    return this.request<T>(`/interviews/${sessionId}/answer/accept`, { method: 'POST', body, retries: 1, timeoutMs: 15000 });
   }
   async finishInterview<T = unknown>(sessionId: string, accessToken: string, durationActual?: number) {
     return this.request<T>(`/interviews/${sessionId}/finish`, {
@@ -1299,7 +1310,7 @@ class ApiClient {
   }
 
   // ── Cohort Analytics ───────────────────────
-  
+
   private buildCohortQuery(params?: { department?: string; year?: string; days?: number }): string {
     const search = new URLSearchParams();
     if (params?.department) search.append('department_id', params.department);
