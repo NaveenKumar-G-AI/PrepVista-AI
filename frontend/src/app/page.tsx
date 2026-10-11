@@ -472,7 +472,7 @@ function Logo({ inverse = false }: { inverse?: boolean }) {
   return (
     <span className={`brand ${inverse ? "brand-inverse" : ""}`}>
       <span className="brand-mark" aria-hidden="true"><span /><span /><span /></span>
-      <span className="brand-word">PrepVista</span>
+      <span className="brand-word">PrepVista AI</span>
     </span>
   )
 }
@@ -1659,9 +1659,9 @@ function LandingExperience() {
           <div className="v4-footer-mid">
             <div><span>EXPLORE</span><button onClick={() => scrollToId("gauntlet")}>Live experience</button><button onClick={() => scrollToId("career-proof")}>Career proof</button><button onClick={() => scrollToId("trust")}>Prototype status</button><Link href="/pricing" onClick={() => trackCtaClick("footer", "Pricing")}>Pricing</Link></div>
             <div><span>PRINCIPLES</span><p>Evidence before confidence</p><p>One blocker before ten tasks</p><p>Re-test before claiming progress</p></div>
-            <div><span>ACCOUNT & LEGAL</span><Link href="/login" onClick={() => trackCtaClick("footer", "Sign In")}>Sign In</Link><Link href="/login?mode=signup" onClick={() => trackCtaClick("footer", "Create Account")}>Create Account</Link><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms</Link></div>
+            <div><span>ACCOUNT & LEGAL</span><Link href="/login" onClick={() => trackCtaClick("footer", "Sign In")}>Sign In</Link><Link href="/login?mode=signup" onClick={() => trackCtaClick("footer", "Create Account")}>Create Account</Link><Link href="/company">Company Information</Link><Link href="/about">About</Link><Link href="/contact">Contact</Link><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms</Link></div>
           </div>
-          <div className="v4-footer-bottom"><span>© 2026 PREPVISTA</span><span>APTITUDE × TECHNICAL × COMMUNICATION × INTERVIEW</span><span>CAREER READINESS, MADE VISIBLE</span></div>
+          <div className="v4-footer-bottom"><span>© 2026 PREPVISTA AI · Udyam-registered MSME in India</span><span>APTITUDE × TECHNICAL × COMMUNICATION × INTERVIEW</span><span>CAREER READINESS, MADE VISIBLE</span></div>
         </footer>
 
         <ChallengeDialog round={activeRound} role={role} onClose={() => setActiveRound(null)} onComplete={completeRound} />

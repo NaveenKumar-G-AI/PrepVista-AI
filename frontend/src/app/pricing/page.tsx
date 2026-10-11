@@ -129,7 +129,9 @@ export default function PricingPage() {
     applyOptimisticPlan(planId);
     try {
       await api.switchPlan(planId);
-      await refreshUser();
+      await refreshUser().catch(() => {
+        setError('Your plan was saved. Account details could not be refreshed; please retry.');
+      });
     } catch (err) {
       applyOptimisticPlan(previousPlan);
       setError(err instanceof Error ? err.message : 'Failed to switch plan.');
@@ -343,6 +345,20 @@ export default function PricingPage() {
             );
           })}
         </div>
+
+        <footer className="mt-16 border-t border-border py-8 text-center text-xs text-secondary">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-6 px-6">
+            <Link href="/" className="hover:text-primary">Home</Link>
+            <Link href="/company" className="hover:text-primary">Company Information</Link>
+            <Link href="/about" className="hover:text-primary">About</Link>
+            <Link href="/contact" className="hover:text-primary">Contact</Link>
+            <Link href="/privacy" className="hover:text-primary">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-primary">Terms</Link>
+          </div>
+          <div className="mt-4 text-tertiary">
+            © 2026 PREPVISTA AI · Udyam-registered MSME in India
+          </div>
+        </footer>
       </div>
     </div>
   );
