@@ -9,7 +9,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const drain = async () => { for (let i=0;i<25;i++) await Promise.resolve(); };
 const deferred = () => { let resolve; const promise=new Promise(r=>{resolve=r;}); return {promise,resolve}; };
 function harness(server=true) {
-  const timers=new Map(); let timerId=0,hookIndex=0,uuid=0;
+  const timers=new Map(),intervals=new Map(); let timerId=0,hookIndex=0,uuid=0,clockOffset=0;
   const hooks=[],recorders=[],sockets=[],routes=[],stops=[];
   let connect=true;
   let fetchImpl=()=>{throw new Error('Live network forbidden');};
@@ -18,7 +18,7 @@ function harness(server=true) {
   const window=new EventTarget();
   const setTimer=(fn,ms)=>{const id=++timerId;timers.set(id,{fn,ms});return id;};
   const clearTimer=id=>timers.delete(id);
-  Object.assign(window,{setTimeout:setTimer,clearTimeout:clearTimer,setInterval:()=>0,clearInterval(){},
+  Object.assign(window,{setTimeout:setTimer,clearTimeout:clearTimer,setInterval:(fn,ms)=>{const id=++timerId;intervals.set(id,{fn,ms});return id;},clearInterval:id=>intervals.delete(id),
     location:{pathname:'/interview/test',origin:'http://test'},speechSynthesis:{cancel(){},getVoices:()=>[],speak:utterance=>queueMicrotask(()=>utterance.onend?.())}});
   class Recorder {
     static isTypeSupported(){return true;}
@@ -39,10 +39,11 @@ function harness(server=true) {
   const react={useState:initial=>{const i=hookIndex++;if(!(i in hooks))hooks[i]=initial;return[hooks[i],v=>{hooks[i]=typeof v==='function'?v(hooks[i]):v;}];},
     useRef:initial=>{const i=hookIndex++;return hooks[i]??(hooks[i]={current:initial});},useEffect(){},useMemo:fn=>fn()};
   const context=vm.createContext({console,process:{env:{NEXT_PUBLIC_STT_SERVER_ENABLED:String(server),NEXT_PUBLIC_API_URL:'http://test'}},
+    Date:class extends Date {static now(){return Date.now()+clockOffset;}},
     window,localStorage,sessionStorage,Event,EventTarget,Error,TypeError,DOMException,Response,AbortController,Blob,FormData,URL,
     navigator:{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[{stop:()=>stops.push('track')}]})}},MediaRecorder:Recorder,WebSocket:Socket,
     crypto:{randomUUID:()=>`request-${++uuid}`},setTimeout:setTimer,clearTimeout:clearTimer,
-    SpeechSynthesisUtterance:class {constructor(text){this.text=text;}},requestAnimationFrame:()=>0,cancelAnimationFrame(){},fetch:async(...args)=>withEvidenceAck(await fetchImpl(...args),...args)});
+    SpeechSynthesisUtterance:class {constructor(text){this.text=text;}},requestAnimationFrame:()=>0,cancelAnimationFrame(){},fetch:async(...args)=>{const result=await fetchImpl(...args);try{return await withEvidenceAck(result,...args);}catch{return result;}}});
   const modules=new Map();
   const evidenceStore = createPendingEvidenceMock();
   const mocks={react,'react/jsx-runtime':{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},
@@ -56,8 +57,8 @@ function harness(server=true) {
     if(filename.endsWith('.css'))return {default:{}};
     let source=fs.readFileSync(filename,'utf8');
     if(relative.includes('app/interview/'))source=source.replace('  const showLoading =',`  globalThis.__actions = { submitToBackend, handleConfirmEndInterview, handleManualSubmit, settleCapture, ensureRecognition,
-      setCurrentTurn, setCurrentQuestionInstanceId, setBooting, transitionTo, sessionDataRef, serverSttRef, recognitionRef,
-      currentTranscriptRef, accumulatedTranscriptRef, captureSpeechRef, captureFailedRef, pendingAnswerRef, uiStateRef, hardTerminate, startServerStt, startListeningLoop, currentTurnRef, assistanceInstanceRef };
+      setCurrentTurn, setCurrentQuestionInstanceId, setBooting, setPreStartOpen, transitionTo, sessionDataRef, serverSttRef, recognitionRef,
+      currentTranscriptRef, accumulatedTranscriptRef, captureSpeechRef, captureFailedRef, pendingAnswerRef, uiStateRef, hardTerminate, startServerStt, startListeningLoop, currentTurnRef, assistanceInstanceRef, isSubmittingRef, answerResyncRequiredRef };
       const showLoading =`);
     const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;
     const mod={exports:{}};modules.set(filename,mod);
@@ -69,7 +70,7 @@ function harness(server=true) {
   api.acceptAnswer=async(sessionId,body)=>({action:'accepted',processing_state:'PENDING',evidence_ack:evidenceAck(sessionId,body)});
   api.setTokens('aaa.bbb.ccc','refresh');sessionStorage.setItem('draft','unsaved');localStorage.setItem('workspace','keep');
   let authEvents=0;window.addEventListener('prepvista:auth-required',()=>authEvents++);
-  return {load,api,recorders,sockets,routes,timers,stops,window,context,sessionStorage,localStorage,evidenceStore,
+  return {load,api,recorders,sockets,routes,timers,intervals,advance:ms=>{clockOffset+=ms;},stops,window,context,sessionStorage,localStorage,evidenceStore,
     connectFailure:()=>{connect=false;},fetch:fn=>{fetchImpl=fn;},fire:async ms=>{for(const[id,timer]of [...timers])if(timer.ms===ms){timers.delete(id);timer.fn();}await drain();},
     render:component=>{hookIndex=0;return component();},actions:()=>context.__actions,
     preserved:()=>{assert.ok(api.getToken());assert.equal(sessionStorage.getItem('draft'),'unsaved');assert.equal(localStorage.getItem('workspace'),'keep');assert.equal(authEvents,0);}};
@@ -314,7 +315,7 @@ test('actual saved final-answer retry reuses the same request ID, transcript and
   assert.equal(payloads.length,2);assert.deepEqual(payloads[0],payloads[1]);assert.equal(h.a.pendingAnswerRef.current,null);h.preserved();
 });
 for(const ackFailure of ['missing','wrong-question','wrong-request'])test(`actual answer 2xx with ${ackFailure} durable ACK retains original evidence`,async()=>{
-  const h=pageHarness();h.a.serverSttRef.current={stop:async()=>({transcript:'Original candidate words',flush_status:'ok',evidence})};
+  const h=pageHarness();h.api.getInterviewSession=async()=>{throw new Error('Offline during synchronization');};h.a.serverSttRef.current={stop:async()=>({transcript:'Original candidate words',flush_status:'ok',evidence})};
   h.fetch(async(url,options)=>{
     const request=JSON.parse(options.body);
     const ack=evidenceAck('00000000-0000-4000-8000-000000000001',request);
@@ -325,4 +326,136 @@ for(const ackFailure of ['missing','wrong-question','wrong-request'])test(`actua
   await h.a.handleConfirmEndInterview();
   assert.equal(h.a.pendingAnswerRef.current.text,'Original candidate words');
   assert.equal(h.evidenceStore.records.size,1);assert.equal(h.routes.length,0);h.preserved();
+});
+
+const nextQuestion = { action:'continue', text:'Explain your next project.', turn:2, max_turns:5,
+  question_instance_id:'00000000-0000-4000-8000-000000000003' };
+const currentSession = { session_id:'00000000-0000-4000-8000-000000000001',access_token:'interview-secret',
+  state:'ACTIVE',turn:2,max_turns:5,question_instance_id:nextQuestion.question_instance_id,current_question_text:nextQuestion.text };
+function answerButton(tree) {
+  if (!tree || typeof tree !== 'object') return null;
+  if (tree.type === 'button' && tree.props && ['Submit Answer','Retry saved answer','Retry synchronization'].includes(tree.props.children)) return tree;
+  for (const value of Object.values(tree)) {
+    if (Array.isArray(value)) { for (const child of value) { const found=answerButton(child);if(found)return found; } }
+    else { const found=answerButton(value);if(found)return found; }
+  }
+  return null;
+}
+function readyAnswer(h,text='First answer') {
+  h.a.serverSttRef.current={stop:async()=>({transcript:text,flush_status:'ok',evidence})};
+}
+
+for (const gesture of ['double click','Enter then click']) test(`${gesture} locks the actual submit button synchronously and sends one POST`,async()=>{
+  const h=pageHarness(),capture=deferred(),request=deferred();let posts=0;
+  h.a.serverSttRef.current={stop:()=>capture.promise};
+  h.fetch(async()=>{posts++;return request.promise;});
+  const button=answerButton(h.render(h.Page));assert.equal(button.props.disabled,false);
+  // Native button Enter activation invokes this same onClick handler.
+  button.props.onClick();button.props.onClick();
+  assert.equal(h.a.isSubmittingRef.current,true);
+  assert.equal(answerButton(h.render(h.Page)).props.disabled,true);
+  capture.resolve({transcript:'One answer',flush_status:'ok',evidence});await drain();
+  assert.equal(posts,1);assert.equal(answerButton(h.render(h.Page)).props.disabled,true);
+  request.resolve(response(200,nextQuestion));await drain();
+  assert.equal(posts,1);assert.equal(h.a.currentTurnRef.current,2);
+  assert.equal(h.a.assistanceInstanceRef.current,nextQuestion.question_instance_id);
+  assert.equal(h.a.currentTranscriptRef.current,'');assert.equal(h.a.accumulatedTranscriptRef.current,'');
+  assert.ok(JSON.stringify(h.render(h.Page)).includes(nextQuestion.text));
+  assert.equal(h.a.sessionDataRef.current.turn,2);
+  assert.equal(h.a.sessionDataRef.current.current_question_text,nextQuestion.text);
+  assert.equal(h.a.isSubmittingRef.current,false);
+  assert.equal([...h.timers.values()].filter(t=>t.ms>=500&&t.ms<800).length,0);
+});
+
+test('speech callback from an older render submits the new canonical turn and a new request ID',async()=>{
+  const h=pageHarness(),oldSubmit=h.a.submitToBackend,payloads=[];
+  h.fetch(async(_,options)=>{payloads.push(JSON.parse(options.body));return response(200,payloads.length===1?nextQuestion:completed);});
+  readyAnswer(h);await oldSubmit('First answer');await drain();h.render(h.Page);
+  readyAnswer(h,'Second answer');await oldSubmit('Second answer');
+  assert.equal(payloads.length,2);assert.equal(payloads[0].expected_turn,1);
+  assert.equal(payloads[1].expected_turn,2);assert.equal(payloads[1].question_instance_id,nextQuestion.question_instance_id);
+  assert.equal(payloads[1].user_text,'Second answer');assert.notEqual(payloads[0].client_request_id,payloads[1].client_request_id);
+});
+
+test('stale-turn 409 performs one authoritative GET then renders/submits the current question',async()=>{
+  const h=pageHarness(),requests=[];readyAnswer(h);
+  h.fetch(async(url,options)=>{requests.push({url,method:options.method,body:options.body&&JSON.parse(options.body)});
+    if(options.method==='GET')return response(200,currentSession);
+    return requests.length===1?response(409,{detail:'This question has already advanced.'}):response(200,completed);
+  });
+  await h.a.submitToBackend('First answer');await drain();
+  assert.deepEqual(requests.map(r=>r.method),['POST','GET']);
+  assert.equal(requests[1].url,'http://test/interviews/'+currentSession.session_id);
+  assert.ok(JSON.stringify(h.render(h.Page)).includes(nextQuestion.text));
+  assert.equal(h.a.pendingAnswerRef.current,null);assert.equal(h.a.answerResyncRequiredRef.current,false);
+  readyAnswer(h,'Current answer');await h.a.submitToBackend('Current answer');
+  assert.equal(requests[2].body.expected_turn,2);assert.equal(requests[2].body.question_instance_id,nextQuestion.question_instance_id);
+});
+
+for (const failure of ['missing ACK','storage cleanup','malformed JSON']) test(`200 with ${failure} synchronizes via GET without a second POST`,async()=>{
+  const h=pageHarness(),methods=[];readyAnswer(h);
+  if(failure==='storage cleanup')h.evidenceStore.acknowledgePendingEvidence=async()=>{throw new Error('Storage temporarily unavailable');};
+  h.fetch(async(_,options)=>{methods.push(options.method);
+    if(options.method==='GET')return response(200,currentSession);
+    if(failure==='malformed JSON')return new Response('{invalid',{status:200});
+    return response(200,{...nextQuestion,...(failure==='missing ACK'?{evidence_ack:null}:{})});
+  });
+  await h.a.submitToBackend('First answer');await drain();
+  assert.deepEqual(methods,['POST','GET']);assert.equal(h.a.currentTurnRef.current,2);
+  assert.ok([...h.evidenceStore.records.values()].some(record=>record.answer?.text==='First answer'));
+  assert.equal([...h.timers.values()].filter(t=>t.ms>=500&&t.ms<800).length,0);
+});
+
+test('failed stale-turn synchronization retries GET only, never the old answer',async()=>{
+  const h=pageHarness();let posts=0,gets=0;readyAnswer(h);
+  h.fetch(async()=>{posts++;return response(409,{detail:'This question has already advanced.'});});
+  h.api.getInterviewSession=async()=>{gets++;if(gets===1)throw new Error('Offline');return currentSession;};
+  await h.a.submitToBackend('First answer');
+  assert.equal(h.a.answerResyncRequiredRef.current,true);
+  const button=answerButton(h.render(h.Page));assert.equal(button.props.children,'Retry synchronization');
+  button.props.onClick();await drain();
+  assert.equal(posts,1);assert.equal(gets,2);assert.equal(h.a.currentTurnRef.current,2);
+});
+
+test('queued network retry cannot replay after a successful manual retry',async()=>{
+  const h=pageHarness();let posts=0;readyAnswer(h);
+  h.fetch(async()=>response(++posts===1?503:200,posts===1?{}:nextQuestion));
+  await h.a.submitToBackend('First answer');
+  const timer=[...h.timers.values()].find(t=>t.ms>=500&&t.ms<800);assert.ok(timer);
+  await h.a.submitToBackend('First answer');await drain();
+  timer.fn();await drain();assert.equal(posts,2);assert.equal(h.a.currentTurnRef.current,2);
+});
+
+for (const state of ['FINISHED','TERMINATED']) test(`stale answer resync respects server ${state} and cannot reopen input`,async()=>{
+  const h=pageHarness();readyAnswer(h);const methods=[];
+  h.fetch(async(_,options)=>{methods.push(options.method);return options.method==='GET'
+    ? response(200,{...currentSession,state}):response(409,{detail:'This question has already advanced.'});});
+  await h.a.submitToBackend('First answer');await h.a.submitToBackend('Duplicate answer');
+  assert.deepEqual(methods,['POST','GET']);assert.equal(h.a.uiStateRef.current,state);
+  assert.deepEqual(h.routes,['/report/'+currentSession.session_id]);
+});
+
+test('immediate submit lock lets browser recognition drain its final result exactly once',async()=>{
+  const h=pageHarness(false);let stops=0,payload;
+  const recognition={onend:null,onresult:null,stop(){stops++;}};
+  h.a.recognitionRef.current=recognition;
+  h.a.accumulatedTranscriptRef.current='Earlier words';
+  h.fetch(async(_,options)=>{payload=JSON.parse(options.body);return response(200,completed);});
+  const submitting=h.a.submitToBackend('interim');await drain();
+  assert.equal(stops,1);assert.equal(payload,undefined);
+  h.a.accumulatedTranscriptRef.current='Earlier words and final words';recognition.onend();
+  await submitting;assert.equal(payload.user_text,'Earlier words and final words');
+});
+
+test('actual next-question silence callback uses current refs despite its previous-render closure',async()=>{
+  const h=pageHarness(),payloads=[];readyAnswer(h);
+  h.fetch(async(_,options)=>{payloads.push(JSON.parse(options.body));return response(200,payloads.length===1?nextQuestion:completed);});
+  await h.a.submitToBackend('First answer');await drain();
+  const silence=[...h.intervals.values()].find(timer=>timer.ms===250);assert.ok(silence);
+  h.render(h.Page);silence.fn();await drain();assert.equal(payloads.length,1,'render and speech completion must not post again');
+  readyAnswer(h,'Next spoken answer');h.advance(21000);silence.fn();silence.fn();await drain();
+  assert.equal(payloads.length,2);assert.equal(payloads[1].expected_turn,2);
+  assert.equal(payloads[1].question_instance_id,nextQuestion.question_instance_id);
+  assert.equal(payloads[1].user_text,'Next spoken answer');
+  assert.notEqual(payloads[0].client_request_id,payloads[1].client_request_id);
 });

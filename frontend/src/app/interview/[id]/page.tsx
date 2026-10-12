@@ -602,6 +602,7 @@ export default function LiveInterviewPage() {
   const lastAudioActivityAtRef = useRef(0);
   const globalSecondsRef = useRef(0);
   const isSubmittingRef = useRef(false);
+  const answerResyncRequiredRef = useRef(false);
   const captureSettlingRef = useRef(false);
   const settledCaptureRef = useRef<{ question: string | null; result: CaptureResult } | null>(null);
   const captureFailedRef = useRef(false);
@@ -1203,7 +1204,7 @@ export default function LiveInterviewPage() {
     );
 
     silenceIntervalRef.current = window.setInterval(() => {
-      if (uiStateRef.current !== 'USER_LISTENING' || isSubmittingRef.current) {
+      if (uiStateRef.current !== 'USER_LISTENING' || isSubmittingRef.current || answerResyncRequiredRef.current) {
         return;
       }
 
@@ -1482,6 +1483,7 @@ export default function LiveInterviewPage() {
   }
 
   async function startListeningLoop(promptOverride = '', resetQuestionTimer = true) {
+    if (answerResyncRequiredRef.current) return;
     try {
       await ensurePendingAttempt(evidenceScope());
       if (uiStateRef.current !== 'USER_LISTENING' || pendingAnswerRef.current) return;
@@ -1752,6 +1754,72 @@ export default function LiveInterviewPage() {
     } finally { captureSettlingRef.current = false; clearWaveformMonitor(); setHardwareActive(false); }
   }
 
+  function applyActiveQuestion(session: StoredSessionData) {
+    if (!session.question_instance_id || !session.current_question_text || !session.turn) {
+      throw new Error('Current question unavailable. Retry synchronization.');
+    }
+    sessionDataRef.current = session;
+    setSessionData(session);
+    currentTurnRef.current = session.turn;
+    setCurrentTurn(session.turn);
+    assistanceInstanceRef.current = session.question_instance_id;
+    setCurrentQuestionInstanceId(session.question_instance_id);
+    assistanceViewsRef.current!.restore(session.question_instance_id, session.current_assistance_provenance);
+    setMaxTurns(session.max_turns || 0);
+    pendingAnswerRef.current = null;
+    captureScopeRef.current = null;
+    settledCaptureRef.current = null;
+    pendingSubmitKeyRef.current = '';
+    submitRetryCountRef.current = 0;
+    currentTranscriptRef.current = '';
+    accumulatedTranscriptRef.current = '';
+    setLiveTranscript('');
+    setFinalizing(false);
+    answerResyncRequiredRef.current = false;
+    appendTranscript('ai', session.current_question_text);
+    // Close the input before speech callbacks run or React commits the new render.
+    transitionTo('AI_SPEAKING');
+    speak(session.current_question_text);
+  }
+
+  async function resyncAnswerSession() {
+    const session = sessionDataRef.current;
+    if (!session) return;
+    answerResyncRequiredRef.current = true;
+    isSubmittingRef.current = true;
+    transitionTo('SUBMITTING');
+    setStatusText('Synchronizing your current question...');
+    try {
+      const restored = await api.getInterviewSession<StoredSessionData>(session.session_id);
+      if (restored.session_id !== session.session_id) throw new Error('Interview session mismatch.');
+      if (['FINISHED', 'TERMINATED'].includes(restored.state || '')) {
+        sessionDataRef.current = restored;
+        setSessionData(restored);
+        pendingAnswerRef.current = null;
+        captureScopeRef.current = null;
+        transitionTo(restored.state === 'FINISHED' ? 'FINISHED' : 'TERMINATED');
+        router.push(`/report/${session.session_id}`);
+      } else if (restored.pending_accepted_answers?.length) {
+        // Accepted work can still be processing. The recovery screen owns that state.
+        sessionDataRef.current = restored;
+        setSessionData(restored);
+        setServerPending(restored.pending_accepted_answers);
+        setPreStartOpen(true);
+        transitionTo('INIT');
+      } else {
+        applyActiveQuestion(restored);
+      }
+    } catch (error) {
+      // Retain local evidence, but never repost a successfully accepted/stale turn.
+      transitionTo('USER_LISTENING');
+      setStatusText('Current question could not be synchronized.');
+      setTimerMessage(error instanceof Error ? error.message : 'Retry synchronization.');
+    } finally {
+      setFinalizing(false);
+      isSubmittingRef.current = false;
+    }
+  }
+
   async function submitToBackend(text: string, requestKey = createSubmissionKey(), attempt = 0, endAfter = false, action?: 'SKIPPED' | 'ABORTED') {
     const activeSession = sessionDataRef.current;
     requestKey = pendingAnswerRef.current?.key || captureScopeRef.current?.requestId || requestKey;
@@ -1759,11 +1827,20 @@ export default function LiveInterviewPage() {
       return;
     }
 
+    if (answerResyncRequiredRef.current) {
+      await resyncAnswerSession();
+      return;
+    }
+    if (!pendingAnswerRef.current && currentTurnRef.current > 0 && uiStateRef.current !== 'USER_LISTENING') return;
     isSubmittingRef.current = true;
+    // Disable input immediately; settleCapture owns the final media flush.
+    transitionTo('STOPPING');
+    const submittedTurn = currentTurnRef.current;
+    const submittedQuestion = assistanceInstanceRef.current;
     let normalizedText = text.startsWith('[') ? text : normalizeLiveTranscript(text);
     try {
     if (!pendingAnswerRef.current) {
-      const capture = currentTurn > 0 ? await settleCapture() : null;
+      const capture = submittedTurn > 0 ? await settleCapture() : null;
       if (capture) {
         const scope = evidenceScope();
         requestKey = scope.requestId;
@@ -1781,7 +1858,7 @@ export default function LiveInterviewPage() {
       if (capture) normalizedText = capture.transcript;
       const outcome = capture ? outcomeForCapture(capture, action) : undefined;
       pendingAnswerRef.current = { key: requestKey, text: normalizedText, terminal: {
-        expected_turn: currentTurn, question_instance_id: currentQuestionInstanceId,
+        expected_turn: submittedTurn, question_instance_id: submittedQuestion,
         terminal_outcome: outcome === 'EVALUATED' ? undefined : outcome,
         capture_evidence: capture?.evidence, end_after_answer: endAfter,
       }, elapsedSeconds: Math.max(0, Math.floor((getTimestamp() - startTimeRef.current) / 1000)),
@@ -1813,6 +1890,7 @@ export default function LiveInterviewPage() {
       appendTranscript('user', normalizedText);
     }
 
+    let receivedSuccess = false;
     try {
       await assistanceViewsRef.current!.settle(pendingAnswerRef.current.terminal.question_instance_id);
       const response = await api.submitAnswer<SubmitResponse>(
@@ -1825,13 +1903,13 @@ export default function LiveInterviewPage() {
         pendingAnswerRef.current.terminal,
       );
 
+      receivedSuccess = true;
       if (pendingAnswerRef.current.terminal.expected_turn > 0) {
         const scope = evidenceScope();
-        if (!matchesEvidenceAck(scope, response.evidence_ack)) throw new Error('The server has not confirmed durable acceptance. Your saved answer will be retried.');
+        if (!matchesEvidenceAck(scope, response.evidence_ack)) throw new Error('The acceptance receipt could not be verified. Synchronizing your interview; saved evidence is retained.');
         await acknowledgePendingEvidence(scope, response.evidence_ack!);
       }
 
-      isSubmittingRef.current = false;
       pendingSubmitKeyRef.current = '';
       lastCompletedQuestionRef.current = pendingAnswerRef.current.terminal.question_instance_id || null;
       pendingAnswerRef.current = null;
@@ -1847,19 +1925,10 @@ export default function LiveInterviewPage() {
       }
 
       if (response.action === 'continue') {
-        currentTurnRef.current = response.turn;
-        setCurrentTurn(response.turn);
-        setMaxTurns(response.max_turns);
-        if (response.question_instance_id) {
-          assistanceInstanceRef.current = response.question_instance_id;
-          setCurrentQuestionInstanceId(response.question_instance_id);
-        }
-        appendTranscript('ai', response.text);
-        // Store quality hint so startListeningLoop can show it after the AI speaks
-        if (response.answer_quality_hint) {
-          pendingQualityHintRef.current = response.answer_quality_hint;
-        }
-        speak(response.text);
+        if (response.answer_quality_hint) pendingQualityHintRef.current = response.answer_quality_hint;
+        applyActiveQuestion({ ...activeSession, state: 'ACTIVE', turn: response.turn,
+          max_turns: response.max_turns, question_instance_id: response.question_instance_id,
+          current_question_text: response.text, current_assistance_provenance: null });
         return;
       }
 
@@ -1873,6 +1942,11 @@ export default function LiveInterviewPage() {
       isSubmittingRef.current = false;
 
       const status = (error as Error & { status?: number }).status;
+      if (receivedSuccess || (status !== undefined && status >= 200 && status < 300)
+          || (status === 409 && error instanceof Error && error.message === 'This question has already advanced.')) {
+        await resyncAnswerSession();
+        return;
+      }
 
       // Don't retry on client errors (4xx) — the request itself is wrong
       const isClientError = status !== undefined && status >= 400 && status < 500;
@@ -1904,7 +1978,9 @@ export default function LiveInterviewPage() {
         const delay = SUBMIT_BASE_DELAY_MS * Math.pow(2, attempt) + jitter; // 500–800, 1000–1300, 2000–2300
         setStatusText(`Network slow. Retrying your answer (${attempt + 1}/${MAX_SUBMIT_RETRIES})...`);
         setTimerMessage('Holding your answer and retrying now...');
+        const retryPayload = pendingAnswerRef.current;
         window.setTimeout(() => {
+          if (!retryPayload || pendingAnswerRef.current !== retryPayload || answerResyncRequiredRef.current) return;
           void submitToBackend(normalizedText, requestKey, attempt + 1, endAfter, action);
         }, delay);
         return;
@@ -1919,6 +1995,8 @@ export default function LiveInterviewPage() {
       currentTranscriptRef.current = normalizedText;
       accumulatedTranscriptRef.current = normalizedText;
       setLiveTranscript(normalizedText ? `"${normalizedText}"` : '');
+    } finally {
+      isSubmittingRef.current = false;
     }
   }
 
@@ -2044,8 +2122,10 @@ export default function LiveInterviewPage() {
 
   async function recoverSavedAnswer(local?: PendingInterviewEvidence, accepted?: ServerPendingAnswer) {
     const session = sessionDataRef.current;
-    if (!session || !user?.id || recoveryBusy) return;
+    if (!session || !user?.id || recoveryBusy || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setRecoveryBusy(true);
+    let receivedSuccess = false;
     setRecoveryError('');
     try {
       let payload: PendingAnswerPayload;
@@ -2076,6 +2156,7 @@ export default function LiveInterviewPage() {
       } else return;
       const result = await api.submitAnswer<SubmitResponse>(sessionId, payload.text, session.access_token, payload.elapsedSeconds,
         payload.key, payload.answerDurationSeconds, payload.terminal);
+      receivedSuccess = true;
       if (!matchesEvidenceAck(scope, result.evidence_ack)) throw new Error('Durable acceptance has not been confirmed. Your saved answer is retained.');
       if (local) await acknowledgePendingEvidence(scope, result.evidence_ack!);
       pendingAnswerRef.current = null;
@@ -2087,8 +2168,16 @@ export default function LiveInterviewPage() {
       setBooting(true);
       setSessionLoadAttempt(value => value + 1);
     } catch (error) {
-      setRecoveryError(error instanceof Error ? error.message : 'Recovery failed. Your saved evidence is retained.');
-    } finally { setRecoveryBusy(false); }
+      const status = (error as Error & { status?: number }).status;
+      if (receivedSuccess || (status !== undefined && status >= 200 && status < 300)
+          || (status === 409 && error instanceof Error && error.message === 'This question has already advanced.')) {
+        // Refresh the recovery inventory/current turn; keep unacknowledged local evidence.
+        setBooting(true);
+        setSessionLoadAttempt(value => value + 1);
+      } else {
+        setRecoveryError(error instanceof Error ? error.message : 'Recovery failed. Your saved evidence is retained.');
+      }
+    } finally { setRecoveryBusy(false); isSubmittingRef.current = false; }
   }
 
   async function handleStartInterview() {
@@ -2158,6 +2247,7 @@ export default function LiveInterviewPage() {
         sessionStorage.setItem('pv_interview_session', JSON.stringify(restored));
         sessionDataRef.current = restored;
         setSessionData(restored);
+        answerResyncRequiredRef.current = false;
         setMaxTurns(restored.max_turns || 0);
         currentTurnRef.current = turn;
         setCurrentTurn(turn);
@@ -2543,9 +2633,11 @@ export default function LiveInterviewPage() {
                         ? 'Recruiter Speaking...'
                         : 'Awaiting Logic...'}
                 </button>
+                <button type="button" className={styles.forceButton}
+                  disabled={uiState !== 'USER_LISTENING' || finalizing || !!pendingRetryRef.current}
+                  onClick={handleManualSubmit}>{answerResyncRequiredRef.current ? 'Retry synchronization' : pendingAnswerRef.current ? 'Retry saved answer' : 'Submit Answer'}</button>
                 {uiState === 'USER_LISTENING' ? (
                   <>
-                    <button type="button" className={styles.forceButton} disabled={finalizing || !!pendingRetryRef.current} onClick={handleManualSubmit}>{pendingAnswerRef.current ? 'Retry saved answer' : 'Submit Answer'}</button>
                     <button type="button" className={styles.forceButton} disabled={finalizing || !!pendingRetryRef.current || uiState !== 'USER_LISTENING'} onClick={() => void submitToBackend('', createSubmissionKey(), 0, false, 'SKIPPED')}>Skip question</button>
                     <button type="button" className={styles.forceButton} disabled={finalizing || assistanceLoading || !!pendingAnswerRef.current} onClick={() => void handleAskMeAgain()}>{pendingRetryRef.current ? 'Retry Ask Me Again' : 'Ask Me Again'}</button>
                     {assistanceEnabled ? (

@@ -503,7 +503,17 @@ class ApiClient {
         }
         if (!response.ok) throw await this.parseError(response);
         if (method !== 'GET') this.invalidateCache();
-        return await response.json() as T;
+        try {
+          return await response.json() as T;
+        } catch (cause) {
+          // A successful answer must not be repeated just because its body is unreadable.
+          if (method === 'POST' && /^\/interviews\/[^/]+\/answer$/.test(path)) {
+            const error = new Error('Server response could not be read.') as Error & { status?: number };
+            error.status = response.status;
+            throw error;
+          }
+          throw cause;
+        }
       } catch (err) {
         let error = err instanceof Error ? err : new Error('Request failed.');
         if (error.name === 'AbortError') {
@@ -901,7 +911,7 @@ class ApiClient {
       },
       // The interview page retries with this same request/turn/instance.
       // request() preserves the independent single auth-refresh opportunity.
-      retries: 1,
+      retries: 0,
       timeoutMs: 45000,
     });
   }
