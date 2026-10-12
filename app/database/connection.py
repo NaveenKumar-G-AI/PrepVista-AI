@@ -244,8 +244,8 @@ async def init_db_pool(
     Protected by _POOL_INIT_LOCK — safe to call from multiple startup hooks
     or during testing where the event loop may trigger startup twice.
 
-    Automatic migrations finish on their own serialized connection before the
-    application pool is created. The separate analytics pool remains dormant.
+    Runtime startup uses DATABASE_URL only and never runs migrations. Release
+    migrations use the separate manual entry point. The analytics pool is dormant.
     """
     global _pool
 
@@ -611,7 +611,7 @@ async def _run_startup_migrations():
             raise
 
 
-async def _run_migrations(conn: asyncpg.Connection):
+async def _run_migrations(conn: asyncpg.Connection, *, through: str | None = None):
     """Serialize the entire ledger/bootstrap/preflight/execution sequence.
 
     Callers must own a dedicated, nontransactional session and close it afterward.
@@ -633,7 +633,7 @@ async def _run_migrations(conn: asyncpg.Connection):
         acquired = True
         logger.info("migration_lock_acquired", wait_seconds=round(time.monotonic()-started, 3), **fields)
         logger.info("migration_runner_started", **fields)
-        count = await _run_migrations_locked(conn)
+        count = await _run_migrations_locked(conn, through=through) if through is not None else await _run_migrations_locked(conn)
         logger.info("migration_runner_complete", newly_applied=count, **fields)
         return count
     except asyncio.CancelledError:
@@ -668,7 +668,7 @@ async def _run_migrations(conn: asyncpg.Connection):
             logger.info("migration_lock_released", release_method="session_closed", **fields)
 
 
-async def _run_migrations_locked(conn: asyncpg.Connection):
+async def _run_migrations_locked(conn: asyncpg.Connection, *, through: str | None = None):
     """Called only under the migration lock, preserving per-file SQL semantics.
 
     Read the ledger under serialization, verify every readable local version
@@ -712,6 +712,8 @@ async def _run_migrations_locked(conn: asyncpg.Connection):
         f for f in migrations_dir.iterdir()
         if f.suffix == ".sql" and f.name[0].isdigit()
     )
+    if through is not None and through not in {f.stem for f in migration_files}:
+        raise MigrationStartupError("Unknown full migration cutoff: " + through)
 
     applied_count = 0
     missing = []
@@ -754,7 +756,8 @@ async def _run_migrations_locked(conn: asyncpg.Connection):
             raise MigrationStartupError("Migration encoding invalid: " + migration_file.name)
 
         current_checksum = _compute_migration_checksum(sql)
-        expected_checksums[version] = current_checksum
+        if through is None or version <= through:
+            expected_checksums[version] = current_checksum
 
         if already_applied:
             stored_checksum = applied_checksums[version]
@@ -787,7 +790,8 @@ async def _run_migrations_locked(conn: asyncpg.Connection):
 
             continue
 
-        missing.append((migration_file, sql, current_checksum))
+        if through is None or version <= through:
+            missing.append((migration_file, sql, current_checksum))
 
     # All known checksums have passed before determining/executing the final list.
     for migration_file, sql, current_checksum in missing:
@@ -817,10 +821,6 @@ async def _run_migrations_locked(conn: asyncpg.Connection):
                 "END $$;\n        $job$",
                 "END $partition_body$;\n        $job$"
             )
-        if os.environ.get("PREPVISTA_IGNORE_MISSING_CRON") == "1":
-            execution_sql = execution_sql.replace("CREATE EXTENSION IF NOT EXISTS pg_cron;", "-- skipped pg_cron")
-            execution_sql = execution_sql.replace("IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN", "IF FALSE THEN")
-
         # OLD-PUSH MIGRATION COMPATIBILITY BOOTSTRAP
         # 008_public_growth.sql has the exact same nested dollar-quote pg_cron collision as 005.
         if version == "008_public_growth":

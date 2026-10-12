@@ -276,6 +276,10 @@ function ApprovalsSection({
 
 /* ─────────────────── Users Section ─────────────────── */
 function GrantsSection({ data, loadOverview }: { data: ApiAdminOverview | null, loadOverview: () => Promise<void> }) {
+  // Retain the ID after an ambiguous network failure; an unchanged retry must
+  // return the committed result rather than applying another additive grant.
+  const pendingRequest = useRef<{ payload: string; id: string } | null>(null);
+  const submitting = useRef(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [model, setModel] = useState('free');
   const [value, setValue] = useState('normal');
@@ -288,20 +292,28 @@ function GrantsSection({ data, loadOverview }: { data: ApiAdminOverview | null, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     if (!selectedUserId) {
       setError('Please select a user.');
       return;
     }
+    submitting.current = true;
     setLoading(true);
     setError('');
     setSuccess('');
     try {
-      const res = await api.grantAdminAccess(selectedUserId, model, value, action);
+      const payloadKey = JSON.stringify([selectedUserId, model, value, action]);
+      if (pendingRequest.current?.payload !== payloadKey) {
+        pendingRequest.current = { payload: payloadKey, id: crypto.randomUUID() };
+      }
+      const res = await api.grantAdminAccess(selectedUserId, model, value, action, pendingRequest.current.id);
+      pendingRequest.current = null;
       setSuccess(res.message || 'Grant applied successfully.');
       await loadOverview();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to apply grant.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -383,9 +395,10 @@ function GrantsSection({ data, loadOverview }: { data: ApiAdminOverview | null, 
       <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 mt-6">
         <h3 className="text-sm font-semibold text-blue-400 mb-2">How it works:</h3>
         <ul className="list-disc leading-relaxed text-slate-400 text-xs pl-5 space-y-1">
-          <li><strong>Unlimited:</strong> Automatically overrides standard quotas to grant endless interviews dynamically tailored to the selected plan tier.</li>
-          <li><strong>Normal:</strong> Bestows exact baseline allocations (e.g. +2 Free, +15 Pro, 1mo Career) gracefully appending to existing metrics.</li>
-          <li><strong>Expiration:</strong> All bonuses natively expire aligned strictly with the user&apos;s 30-day billing rollover, ensuring mathematically stable regressions.</li>
+          <li><strong>Unlimited:</strong> Applies to the selected tier. Deactivate an existing override before granting unlimited access to another tier.</li>
+          <li><strong>Normal:</strong> Free adds 2 up to a bonus of 20, preserving larger balances. Pro unlocks 30-day access or adds 15 when access is already active. Career unlocks 30-day access. Valid access is not extended.</li>
+          <li><strong>Expiration:</strong> Bonuses expire at the end of the current 30-day usage period, which may be sooner than 30 days after this grant.</li>
+          <li><strong>Deactivation:</strong> Purchased access is preserved. Choose Unlimited to clear that tier&apos;s override. Finite bonus reversals require a separate review.</li>
         </ul>
       </div>
     </div>

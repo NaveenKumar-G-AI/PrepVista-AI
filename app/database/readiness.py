@@ -1,8 +1,8 @@
 """Read-only readiness contracts; never repair or migrate a database."""
 
-from functools import lru_cache
 from pathlib import Path
 
+from app.database import connection
 from app.database.connection import DatabaseNotReadyError
 
 
@@ -10,6 +10,17 @@ from app.database.connection import DatabaseNotReadyError
 # The migration ledger also has to match this release: historical schema drift
 # cannot be silently adopted by recording new baselines during runtime startup.
 REQUIRED_SCHEMA = {
+    "admin_grant_operations": {
+        "uuid": "request_id actor_id target_id",
+        "text": "plan grant_kind action request_fingerprint",
+        "jsonb": "before_state after_state response",
+        "timestamp with time zone": "created_at",
+    },
+    "admin_bonus_grants": {
+        "uuid": "id granted_by granted_to",
+        "integer": "amount snapshot_after", "text": "reason",
+        "timestamp with time zone": "created_at",
+    },
     "profiles": {
         "uuid": "id",
         "text": "plan email full_name subscription_status",
@@ -78,6 +89,14 @@ REQUIRED_SCHEMA = {
 }
 
 
+def expected_migration_checksums():
+    directory = Path(connection.__file__).parent / 'migrations'
+    files = sorted(p for p in directory.iterdir() if p.suffix == '.sql' and p.name[0].isdigit())
+    if not files:
+        raise DatabaseNotReadyError('Release migration manifest unavailable')
+    return {p.stem: connection._compute_migration_checksum(connection._read_migration_sql(p)) for p in files}
+
+
 async def check_schema_readiness(conn) -> None:
     """Fail closed on unknown ledger, missing columns/types or read permissions.
 
@@ -85,6 +104,9 @@ async def check_schema_readiness(conn) -> None:
     backfill, schema repair, DDL or writes to application records are permitted.
     """
     async with conn.transaction(readonly=True):
+        ledger = {r['version']: r['checksum'] for r in await conn.fetch('SELECT version, checksum FROM schema_migrations')}
+        if any(ledger.get(version) != checksum for version, checksum in expected_migration_checksums().items()):
+            raise DatabaseNotReadyError('Release migration ledger missing or incompatible')
         columns = await conn.fetch(
             """SELECT required.table_name, attribute.attname AS column_name,
                       attribute.atttypid::regtype::text AS column_type

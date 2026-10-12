@@ -14,7 +14,7 @@ from app.database import connection, readiness, migrate
 
 class SchemaConnection:
     def __init__(self):
-        self.ledger = []
+        self.ledger = [{'version': v, 'checksum': c} for v, c in readiness.expected_migration_checksums().items()]
         self.columns = [
             {"table_name": table, "column_name": name, "column_type": kind}
             for table, groups in readiness.REQUIRED_SCHEMA.items()
@@ -69,7 +69,7 @@ def test_pool_initialization_does_not_execute_migrations(monkeypatch):
     runner.assert_not_awaited()
 
 
-def test_lifespan_uses_schema_check_and_migrates(monkeypatch):
+def test_lifespan_uses_schema_check_without_migrations(monkeypatch):
     conn = SchemaConnection()
     init = AsyncMock()
     runner = AsyncMock()
@@ -91,6 +91,7 @@ def test_lifespan_uses_schema_check_and_migrates(monkeypatch):
             assert application.state.db_ready is True
     asyncio.run(run())
     init.assert_awaited_once()
+    runner.assert_not_awaited()
     assert conn.queries
 
 

@@ -1,251 +1,154 @@
+"""No ambient DB probing, scheduler activation, or production credentials."""
 import asyncio
-import os
-import pytest
-import pytest_asyncio
+
 import asyncpg
+import pytest
 
-import subprocess
+from recovery_fixture import real_cron_db,apply_sql
+from test_050_cron_schema_reconciliation import prepare
 
-def _get_candidate_dsns():
-    dsns = []
-    if os.environ.get("PG_QUAL_DSN"):
-        dsns.append(os.environ.get("PG_QUAL_DSN"))
-    if os.name == "nt":
+pytestmark=pytest.mark.asyncio
+
+
+async def test_051_empty_catalog_full_release_chain(real_cron_db):
+    c=real_cron_db
+    await prepare(c)
+    await apply_sql(c,'051_pg_cron_runtime_reconciliation')
+    await apply_sql(c,'052_admin_grant_contract')
+    assert await c.fetchval('SELECT count(*) FROM cron.job')==0
+    assert not await c.fetchval("SELECT has_table_privilege('prepvista_worker','user_activity_events','DELETE')")
+    assert not await c.fetchval("SELECT has_function_privilege('authenticated','cron_refresh_activity_stats()','EXECUTE')")
+
+
+@pytest.mark.parametrize('legacy_is_active',[False,True],ids=['is_active_absent','is_active_present'])
+async def test_runner_production_shaped_drift_cutoff_and_complete_chain(real_cron_db,legacy_is_active):
+    from app.database import connection
+    from recovery_fixture import MIGRATIONS
+    c=real_cron_db
+    column_exists_sql="""SELECT EXISTS(SELECT FROM pg_catalog.pg_attribute
+        WHERE attrelid='public.user_plan_entitlements'::regclass
+          AND attname='is_active' AND attnum>0 AND NOT attisdropped)"""
+    assert not await c.fetchval(column_exists_sql)
+    if legacy_is_active:
+        await c.execute('ALTER TABLE public.user_plan_entitlements ADD COLUMN is_active boolean')
+    baseline={p.stem:connection._compute_migration_checksum(connection._read_migration_sql(p))
+              for p in MIGRATIONS.glob('*.sql') if p.stem<='048_account_deletion_claim_leases'}
+    baseline['046_production_only']='synthetic-preserved-history'
+    await c.executemany('INSERT INTO schema_migrations(version,checksum) VALUES($1,$2)',baseline.items())
+    await c.execute('INSERT INTO profiles(admin_bonus_interviews) VALUES(9992),(9993)')
+    assert await connection._run_migrations(c,through='049_backend_schema_access_hardening')==2
+    assert await c.fetchval("SELECT to_regclass('admin_grant_operations')") is None
+    committed_before=dict(await c.fetch('SELECT version,checksum FROM schema_migrations'))
+    functions={
+        'cron_gdpr_pseudonymise_old_user':'old_user',
+        'cron_gdpr_hard_delete_old_user':'old_user',
+        'cron_refresh_public_growth_metrics':'public_growth_metrics',
+        'cron_purge_usage_events':'usage_events',
+        'cron_purge_billing_events':'billing_events',
+    }
+    for name in functions:
+        assert await c.fetchval('SELECT to_regprocedure($1)','public.'+name+'()') is None
+    assert await c.fetchval("SELECT to_regprocedure('public.fn_refresh_is_active()')") is None
+    assert not await c.fetchval("SELECT EXISTS(SELECT FROM pg_trigger WHERE tgrelid='public.user_plan_entitlements'::regclass AND tgname='trg_upe_refresh_is_active')")
+    target=await c.fetchval('SELECT id FROM profiles ORDER BY id LIMIT 1')
+    await c.execute("""INSERT INTO user_plan_entitlements(user_id,plan,status,source_order_id,activated_at,expires_at)
+        VALUES($1,'pro','active','synthetic_purchase',now()-interval '1 day',now()+interval '29 days'),
+              ($1,'career','expired','manual_grant',now()-interval '60 days',now()-interval '30 days')""",target)
+    if legacy_is_active:
+        await c.execute("UPDATE user_plan_entitlements SET is_active=(status='active')")
+        await c.execute("""CREATE FUNCTION public.fn_refresh_is_active() RETURNS trigger LANGUAGE plpgsql
+            AS $$ BEGIN NEW.is_active := (NEW.status='active'); RETURN NEW; END $$;
+            CREATE TRIGGER trg_upe_refresh_is_active BEFORE INSERT OR UPDATE ON public.user_plan_entitlements
+            FOR EACH ROW EXECUTE FUNCTION public.fn_refresh_is_active()""")
+    # These rows would change if a retention/metrics function were executed.
+    await c.execute("INSERT INTO old_user(full_name,email,archived_at) VALUES('Synthetic','synthetic@example.test',now()-interval '1200 days'),(NULL,NULL,now()-interval '1200 days')")
+    await c.execute("INSERT INTO usage_events(deleted_at) VALUES(now()-interval '800 days')")
+    await c.execute("INSERT INTO billing_events(deleted_at) VALUES(now()-interval '2600 days')")
+    await c.execute('INSERT INTO public_growth_metrics(id,total_users_count) VALUES(1,987)')
+    await c.execute('INSERT INTO user_activity_stats(id,total_users_count) VALUES(1,654)')
+    tables=('user_plan_entitlements','old_user','usage_events','billing_events','public_growth_metrics','user_activity_stats')
+    rows_before={table:await c.fetch(f'SELECT xmin::text AS row_version,* FROM public.{table} ORDER BY id') for table in tables}
+    partitions_before=await c.fetch("SELECT relid FROM pg_partition_tree('public.user_activity_events') ORDER BY relid")
+    rls_before={table:await c.fetchval('SELECT relrowsecurity FROM pg_class WHERE oid=$1::regclass','public.'+table)
+                for table in set(functions.values())|{'user_activity_events'}}
+
+    async def assert_security():
+        for name,table in {**functions,'cron_create_activity_partition':'user_activity_events'}.items():
+            signature='public.'+name+'()'
+            routine=await c.fetchrow('SELECT prosecdef,proconfig,proowner,proacl FROM pg_proc WHERE oid=$1::regprocedure',signature)
+            assert routine['prosecdef']
+            assert routine['proconfig']==['search_path=pg_catalog, public, pg_temp']
+            assert routine['proowner']==await c.fetchval('SELECT relowner FROM pg_class WHERE oid=$1::regclass','public.'+table)
+            assert not await c.fetchval("SELECT EXISTS(SELECT FROM pg_proc p,LATERAL aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a WHERE p.oid=$1::regprocedure AND a.grantee=0 AND a.privilege_type='EXECUTE')",signature)
+            for role in ('anon','authenticated','service_role','prepvista_runtime'):
+                assert not await c.fetchval("SELECT has_function_privilege($1,$2,'EXECUTE')",role,signature)
+            assert await c.fetchval("SELECT has_function_privilege('prepvista_worker',$1,'EXECUTE')",signature)
+            assert await c.fetchval('SELECT relrowsecurity FROM pg_class WHERE oid=$1::regclass','public.'+table)==rls_before[table]
+            assert not await c.fetchval("SELECT has_table_privilege('prepvista_worker',$1,'INSERT,UPDATE,DELETE')",'public.'+table)
+
+    for version in ('050_cron_schema_reconciliation','051_pg_cron_runtime_reconciliation','052_admin_grant_contract'):
+        assert await connection._run_migrations(c,through=version)==1
+        assert await c.fetchval('SELECT count(*) FROM schema_migrations WHERE version=$1',version)==1
+        assert await c.fetchval('SELECT count(*) FROM cron.job')==0
+        assert await c.fetchval('SELECT count(*) FROM cron.job WHERE active')==0
+        assert await c.fetchval(column_exists_sql)==legacy_is_active
+        for table,rows in rows_before.items():
+            assert await c.fetch(f'SELECT xmin::text AS row_version,* FROM public.{table} ORDER BY id')==rows
+        assert await c.fetch("SELECT relid FROM pg_partition_tree('public.user_activity_events') ORDER BY relid")==partitions_before
+        await assert_security()
+    assert await connection._run_migrations(c)==0
+    assert await c.fetchval("SELECT to_regprocedure('public.fn_refresh_is_active()')") is None
+    assert not await c.fetchval("SELECT EXISTS(SELECT FROM pg_trigger WHERE tgrelid='public.user_plan_entitlements'::regclass AND tgname='trg_upe_refresh_is_active')")
+    if legacy_is_active:
+        assert await c.fetchval("SELECT col_description(attrelid,attnum) FROM pg_attribute WHERE attrelid='public.user_plan_entitlements'::regclass AND attname='is_active' AND NOT attisdropped")=='DEPRECATED: Unused by backend. Replaced by explicit status updates.'
+    assert await c.fetchval("SELECT to_regclass('public.admin_grant_operations')") is not None
+    assert await c.fetchval('SELECT count(*) FROM admin_grant_operations')==0
+    with pytest.raises(asyncpg.CheckViolationError):
+        await c.execute('INSERT INTO profiles(admin_bonus_interviews) VALUES(1001)')
+    ledger=dict(await c.fetch('SELECT version,checksum FROM schema_migrations'))
+    assert all(ledger[v]==checksum for v,checksum in committed_before.items())
+    assert len(ledger)==len(committed_before)+3
+    for version in ('050_cron_schema_reconciliation','051_pg_cron_runtime_reconciliation','052_admin_grant_contract'):
+        assert ledger[version]==connection._compute_migration_checksum(connection._read_migration_sql(MIGRATIONS/(version+'.sql')))
+    assert await c.fetchval('SELECT count(*) FROM cron.job')==0
+    assert [r[0] for r in await c.fetch('SELECT admin_bonus_interviews FROM profiles ORDER BY 1')]==[9992,9993]
+
+
+async def test_051_missing_stats_fails_before_retention(real_cron_db):
+    c=real_cron_db
+    await prepare(c)
+    await apply_sql(c,'051_pg_cron_runtime_reconciliation')
+    await c.execute('CREATE UNLOGGED TABLE activity_default PARTITION OF user_activity_events DEFAULT')
+    await c.execute("INSERT INTO user_activity_events(created_at) VALUES(now()-interval '2 days')")
+    with pytest.raises(asyncpg.RaiseError,match='singleton missing'):
+        await c.execute('SELECT public.cron_refresh_activity_stats()')
+    assert await c.fetchval('SELECT count(*) FROM user_activity_events')==1
+    await c.execute('INSERT INTO user_activity_stats(id,total_users_count) VALUES(1,1)')
+    await c.execute('SELECT public.cron_refresh_activity_stats()')
+    assert await c.fetchval('SELECT count(*) FROM user_activity_events')==0
+
+
+async def test_051_partition_wrong_end_fails(real_cron_db):
+    c=real_cron_db
+    await prepare(c)
+    await apply_sql(c,'051_pg_cron_runtime_reconciliation')
+    name,start,end=await c.fetchrow("SELECT 'user_activity_events_'||to_char(now()+interval '1 month','YYYY_MM'),date_trunc('month',now()+interval '1 month'),date_trunc('month',now()+interval '3 months')")
+    await c.execute(f"CREATE UNLOGGED TABLE {name} PARTITION OF user_activity_events FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')")
+    with pytest.raises(asyncpg.RaiseError,match='bound expression'):
+        await c.execute('SELECT public.cron_create_activity_partition()')
+
+
+async def test_051_concurrent_partition_creation_and_temp_shadow(real_cron_db):
+    c=real_cron_db
+    await prepare(c)
+    await apply_sql(c,'051_pg_cron_runtime_reconciliation')
+    name=await c.fetchval("SELECT 'user_activity_events_'||to_char(now()+interval '1 month','YYYY_MM')")
+    async def create():
+        worker=await asyncpg.connect('postgresql://prepvista_worker@127.0.0.1:55473/pv_recovery_cron')
         try:
-            wsl_ip = subprocess.check_output(
-                ["wsl.exe", "-d", "Ubuntu", "-u", "root", "-e", "hostname", "-I"],
-                text=True,
-                timeout=3,
-            ).split()[0]
-            dsns.append(f"postgresql://postgres:postgres@{wsl_ip}:5433/postgres")
-        except Exception:
-            pass
-    dsns.extend([
-        "postgresql://postgres:postgres@172.24.109.149:5433/postgres",
-        "postgresql://postgres:postgres@127.0.0.1:5433/postgres",
-        "postgresql://postgres:postgres@127.0.0.1:5432/postgres",
-    ])
-    return dsns
-
-async def _resolve_dsn():
-    for dsn in _get_candidate_dsns():
-        if not dsn:
-            continue
-        try:
-            conn = await asyncpg.connect(dsn, timeout=4.0)
-            await conn.close()
-            return dsn
-        except Exception:
-            continue
-    pytest.skip("No accessible PostgreSQL 17 + pg_cron qualification database found")
-
-@pytest_asyncio.fixture(scope="module")
-async def dsn():
-    return await _resolve_dsn()
-
-@pytest_asyncio.fixture
-async def admin_conn(dsn):
-    conn = await asyncpg.connect(dsn)
-    try:
-        yield conn
-    finally:
-        await conn.close()
-
-@pytest_asyncio.fixture
-async def worker_conn(dsn):
-    # Connect using prepvista_worker role
-    # Since prepvista_worker has no password in qualification or trust auth,
-    # swap username in DSN.
-    worker_dsn = dsn.replace("postgres:postgres@", "prepvista_worker:qual_worker_pass@").replace("postgres@", "prepvista_worker:qual_worker_pass@")
-    conn = await asyncpg.connect(worker_dsn)
-    try:
-        yield conn
-    finally:
-        await conn.close()
-
-# ============================================================================
-# 1. LEDGER & CHECKSUM VERIFICATION
-# ============================================================================
-
-@pytest.mark.asyncio
-async def test_051_migration_ledger_and_checksum(admin_conn):
-    """Verify migration 051 ledger entry exists, matches checksum, and 050/049 are intact."""
-    rows = await admin_conn.fetch("""
-        SELECT version, checksum
-        FROM schema_migrations
-        WHERE version IN (
-            '049_backend_schema_access_hardening',
-            '050_cron_schema_reconciliation',
-            '051_pg_cron_runtime_reconciliation'
-        )
-    """)
-    checksums = {r["version"]: r["checksum"] for r in rows}
-    
-    assert "051_pg_cron_runtime_reconciliation" in checksums, "051 migration not in ledger"
-    assert checksums["051_pg_cron_runtime_reconciliation"] == "60c0e9654c0e22759ccddcdc9e6a66bd1c1d609b833cdd5dfd8d28099764cc98"
-
-    assert "050_cron_schema_reconciliation" in checksums, "050 migration not in ledger"
-    assert checksums["050_cron_schema_reconciliation"] == "3625e313ca8c504ae7622ae574aa18375056ae36c1376249c6d4fa2d3a0a3db6"
-
-    assert "049_backend_schema_access_hardening" in checksums, "049 migration not in ledger"
-    assert checksums["049_backend_schema_access_hardening"] == "40b5d3476fdf105fd6204659a6c87f835a56304b64aed28260413eac4787cb09"
-
-# ============================================================================
-# 2. DEFECT #1: WORKER LOGIN & LEAST PRIVILEGE
-# ============================================================================
-
-@pytest.mark.asyncio
-async def test_prepvista_worker_login_and_attributes(admin_conn, worker_conn):
-    """Verify prepvista_worker has LOGIN = true and strictly non-admin attributes."""
-    role = await admin_conn.fetchrow("""
-        SELECT rolcanlogin, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls
-        FROM pg_roles
-        WHERE rolname = 'prepvista_worker'
-    """)
-    assert role is not None, "prepvista_worker role missing"
-    assert role["rolcanlogin"] is True, "prepvista_worker must have LOGIN enabled for pg_cron"
-    assert role["rolsuper"] is False, "prepvista_worker must NOT be SUPERUSER"
-    assert role["rolcreaterole"] is False, "prepvista_worker must NOT have CREATEROLE"
-    assert role["rolcreatedb"] is False, "prepvista_worker must NOT have CREATEDB"
-    assert role["rolreplication"] is False, "prepvista_worker must NOT have REPLICATION"
-    assert role["rolbypassrls"] is False, "prepvista_worker must NOT have BYPASSRLS"
-
-    # Verify actual connection session identity
-    ident = await worker_conn.fetchrow("SELECT current_user, session_user;")
-    assert ident["current_user"] == "prepvista_worker"
-    assert ident["session_user"] == "prepvista_worker"
-
-# ============================================================================
-# 3. DEFECT #2: REFRESH ACTIVITY STATS & LEAST PRIVILEGE REVOCATIONS
-# ============================================================================
-
-@pytest.mark.asyncio
-async def test_worker_direct_dml_revoked(worker_conn):
-    """Verify prepvista_worker cannot directly UPDATE user_activity_stats or DELETE user_activity_events."""
-    with pytest.raises(asyncpg.exceptions.InsufficientPrivilegeError):
-        await worker_conn.execute("UPDATE public.user_activity_stats SET active_users_count = 0 WHERE id = 1;")
-
-    with pytest.raises(asyncpg.exceptions.InsufficientPrivilegeError):
-        await worker_conn.execute("DELETE FROM public.user_activity_events WHERE created_at < NOW() - INTERVAL '24 hours';")
-
-@pytest.mark.asyncio
-async def test_cron_refresh_activity_stats_function_and_acls(admin_conn, worker_conn):
-    """Verify cron_refresh_activity_stats is SECURITY DEFINER, search_path pinned, and worker can EXECUTE."""
-    fn = await admin_conn.fetchrow("""
-        SELECT prosecdef, proconfig
-        FROM pg_proc
-        WHERE proname = 'cron_refresh_activity_stats'
-    """)
-    assert fn is not None, "cron_refresh_activity_stats function missing"
-    assert fn["prosecdef"] is True, "Must be SECURITY DEFINER"
-    assert fn["proconfig"] == ["search_path=pg_catalog, public, pg_temp"], "search_path must be pinned"
-
-    # Execution permission checks
-    assert await admin_conn.fetchval("SELECT has_function_privilege('prepvista_worker', 'cron_refresh_activity_stats()', 'execute')")
-    assert not await admin_conn.fetchval("SELECT has_function_privilege('anon', 'cron_refresh_activity_stats()', 'execute')")
-    assert not await admin_conn.fetchval("SELECT has_function_privilege('authenticated', 'cron_refresh_activity_stats()', 'execute')")
-    assert not await admin_conn.fetchval("SELECT has_function_privilege('prepvista_runtime', 'cron_refresh_activity_stats()', 'execute')")
-
-    # Worker can execute the function
-    await worker_conn.execute("SELECT public.cron_refresh_activity_stats();")
-
-@pytest.mark.asyncio
-async def test_refresh_activity_stats_cron_job_and_run_details(admin_conn):
-    """Verify refresh-activity-stats job config in cron.job and successful scheduler runs."""
-    job = await admin_conn.fetchrow("""
-        SELECT jobid, command, username, active
-        FROM cron.job
-        WHERE jobname = 'refresh-activity-stats'
-    """)
-    assert job is not None, "refresh-activity-stats cron job missing"
-    assert job["username"] == "prepvista_worker"
-    assert job["command"] == "SELECT public.cron_refresh_activity_stats();"
-    assert job["active"] is True
-
-    # Check that pg_cron scheduler has succeeded runs for this job
-    detail = await admin_conn.fetchrow("""
-        SELECT status, return_message
-        FROM cron.job_run_details
-        WHERE jobid = $1
-        ORDER BY runid DESC
-        LIMIT 1
-    """, job["jobid"])
-    assert detail is not None, "No run details recorded for refresh-activity-stats"
-    assert detail["status"] == "succeeded", f"Scheduler run failed with: {detail['return_message']}"
-    assert detail["return_message"] == "SELECT 1"
-
-# ============================================================================
-# 4. DEFECT #3: PARTITION CREATION CONCURRENCY & ADVISORY LOCK
-# ============================================================================
-
-@pytest.mark.asyncio
-async def test_cron_create_activity_partition_concurrency(dsn):
-    """Verify concurrent execution of cron_create_activity_partition at 2, 5, 10 workers."""
-    async def worker_call():
-        conn = await asyncpg.connect(dsn)
-        try:
-            await conn.execute("SELECT public.cron_create_activity_partition();")
-            return True
-        finally:
-            await conn.close()
-
-    for count in [2, 5, 10]:
-        tasks = [worker_call() for _ in range(count)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        errors = [r for r in results if isinstance(r, Exception)]
-        assert len(errors) == 0, f"Concurrency test at {count} failed with errors: {errors}"
-
-@pytest.mark.asyncio
-async def test_created_partition_integrity_and_security(admin_conn):
-    """Verify partition table inherits from user_activity_events and has RLS enabled."""
-    part = await admin_conn.fetchrow("""
-        SELECT c.relname, c.relrowsecurity
-        FROM pg_class c
-        JOIN pg_inherits i ON c.oid = i.inhrelid
-        JOIN pg_class p ON p.oid = i.inhparent
-        WHERE p.relname = 'user_activity_events'
-        ORDER BY c.relname DESC
-        LIMIT 1
-    """)
-    assert part is not None, "No partition created for user_activity_events"
-    assert part["relrowsecurity"] is True, f"RLS must be enabled on partition {part['relname']}"
-
-# ============================================================================
-# 5. ALL SCHEDULED CRON JOBS HEALTH
-# ============================================================================
-
-@pytest.mark.asyncio
-async def test_all_scheduled_cron_jobs_health(admin_conn, worker_conn):
-    """Verify all 7 production cron jobs exist under prepvista_worker and execute cleanly."""
-    expected_jobs = [
-        "refresh-activity-stats",
-        "gdpr-pseudonymise-old-user",
-        "gdpr-hard-delete-old-user",
-        "refresh-public-growth-metrics",
-        "purge-usage-events",
-        "purge-billing-events",
-        "create-activity-partition",
-    ]
-    rows = await admin_conn.fetch("""
-        SELECT jobname, username, command, active
-        FROM cron.job
-        WHERE username = 'prepvista_worker'
-    """)
-    jobs_by_name = {r["jobname"]: r for r in rows}
-
-    for name in expected_jobs:
-        assert name in jobs_by_name, f"Expected cron job '{name}' missing"
-        assert jobs_by_name[name]["active"] is True, f"Cron job '{name}' is inactive"
-
-    # Verify worker can execute each of the security definer functions directly
-    functions_to_test = [
-        "cron_refresh_activity_stats()",
-        "cron_gdpr_pseudonymise_old_user()",
-        "cron_gdpr_hard_delete_old_user()",
-        "cron_refresh_public_growth_metrics()",
-        "cron_purge_usage_events()",
-        "cron_purge_billing_events()",
-        "cron_create_activity_partition()",
-    ]
-    for fn in functions_to_test:
-        await worker_conn.execute(f"SELECT public.{fn};")
+            await worker.execute(f'CREATE TEMP TABLE {name}(id integer)')
+            await worker.execute('SELECT public.cron_create_activity_partition()')
+        finally: await worker.close()
+    await asyncio.gather(create(),create())
+    assert await c.fetchval('SELECT relrowsecurity FROM pg_class WHERE oid=$1::regclass','public.'+name)
+    assert not await c.fetchval("SELECT has_table_privilege('authenticated',$1,'SELECT,INSERT,UPDATE,DELETE')",'public.'+name)

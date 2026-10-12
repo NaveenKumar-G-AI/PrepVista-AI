@@ -112,6 +112,8 @@ class SchemaConnection:
 
     async def fetch(self, query, *args):
         assert self.readonly
+        if 'FROM schema_migrations' in query:
+            return [{'version': v, 'checksum': c} for v,c in readiness.expected_migration_checksums().items()]
         if "pg_catalog.pg_constraint" in query:
             return [{"convalidated": True, "expression": "((claim_token IS NULL) = (lease_expires_at IS NULL))"}]
         if "pg_catalog.pg_attribute" not in query:

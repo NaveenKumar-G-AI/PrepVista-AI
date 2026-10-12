@@ -41,7 +41,7 @@ BEGIN
         RAISE EXCEPTION 'Required table user_activity_events does not exist.';
     END IF;
 
-    IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-activity-stats' AND username = 'prepvista_worker') THEN
+    IF EXISTS (SELECT FROM cron.job) AND NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-activity-stats' AND username = 'prepvista_worker') THEN
         RAISE EXCEPTION 'Required cron job refresh-activity-stats under prepvista_worker does not exist.';
     END IF;
 END $$;
@@ -69,6 +69,10 @@ BEGIN
       INTO v_live_mins, v_total_users
       FROM public.user_activity_stats
      WHERE id = 1;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Activity stats singleton missing; refusing refresh and retention purge';
+    END IF;
 
     IF v_live_mins IS NULL THEN
         v_live_mins := 15; -- Fallback default if unset
@@ -160,6 +164,9 @@ BEGIN
         ) THEN
             RAISE EXCEPTION 'cron.alter_job failed to update refresh-activity-stats command';
         END IF;
+    ELSIF v_count = 0 AND NOT EXISTS (SELECT FROM cron.job) THEN
+        -- Dormant installation: do not create, schedule or activate any job.
+        NULL;
     ELSE
         RAISE EXCEPTION 'Expected exactly 1 job for refresh-activity-stats under prepvista_worker, found %', v_count;
     END IF;
@@ -193,7 +200,7 @@ SET search_path = pg_catalog, public, pg_temp
 AS $func$
 DECLARE
     -- Dedicated deterministic advisory lock key for activity partition creation.
-    -- Distinct from migration runner lock (270419985555) and bootstrap lock (20261010).
+    -- Distinct from the migration runner's hashed lock and bootstrap lock (20261010).
     c_partition_lock_key CONSTANT BIGINT := 202610110051;
     v_target_start TIMESTAMPTZ := date_trunc('month', NOW() + INTERVAL '1 month');
     v_target_end   TIMESTAMPTZ := date_trunc('month', NOW() + INTERVAL '2 months');
@@ -219,9 +226,8 @@ BEGIN
     -- Check if it actually belongs to user_activity_events
     SELECT EXISTS (
         SELECT 1 FROM pg_inherits i
-        JOIN pg_class c ON c.oid = i.inhrelid
-        JOIN pg_class p ON p.oid = i.inhparent
-        WHERE c.relname = v_part_name AND p.relname = 'user_activity_events'
+        WHERE i.inhrelid = to_regclass(format('public.%I',v_part_name))
+          AND i.inhparent = 'public.user_activity_events'::regclass
     ) INTO v_is_part;
 
     IF NOT v_is_part THEN
@@ -231,8 +237,8 @@ BEGIN
     -- Verify partition bound expression matches target month
     SELECT EXISTS (
         SELECT 1 FROM pg_class c
-        WHERE c.relname = v_part_name
-          AND pg_get_expr(c.relpartbound, c.oid) LIKE '%' || to_char(v_target_start, 'YYYY-MM-DD') || '%'
+        WHERE c.oid = to_regclass(format('public.%I',v_part_name))
+          AND pg_get_expr(c.relpartbound, c.oid) = format('FOR VALUES FROM (%L) TO (%L)',v_target_start,v_target_end)
     ) INTO v_bounds_valid;
 
     IF NOT v_bounds_valid THEN
@@ -244,7 +250,7 @@ BEGIN
 
     -- Check if RLS is enabled
     SELECT relrowsecurity INTO v_relrowsec
-    FROM pg_class WHERE relname = v_part_name;
+    FROM pg_class WHERE oid = to_regclass(format('public.%I',v_part_name));
 
     IF NOT v_relrowsec THEN
         RAISE EXCEPTION 'Failed to enable RLS on partition %.', v_part_name;

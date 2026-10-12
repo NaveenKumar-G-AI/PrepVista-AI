@@ -143,6 +143,11 @@ BEGIN
     FOREACH t IN ARRAY names LOOP
         target := to_regclass(format('public.%I',t));
         IF target IS NULL THEN
+            -- Obsolete institution-era tables may be absent. Harden them if
+            -- retained; all current reviewed tables remain mandatory.
+            IF t IN ('institutions','institution_admins','cohort_snapshots') THEN
+                CONTINUE;
+            END IF;
             RAISE EXCEPTION 'Required reviewed table missing: %',t;
         END IF;
         EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.%I FROM PUBLIC, anon, authenticated',t);
@@ -182,17 +187,28 @@ END $access$;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC, anon, authenticated;
 
 -- Preserve existing routines and owners, pin resolution to trusted schemas.
-ALTER FUNCTION public.admin_can_view_department(uuid,text) SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.get_admin_institution_id() SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.is_institution_admin(uuid) SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.get_admin_organization_id() SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.get_student_organization_id() SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.is_org_admin(uuid) SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.is_student_in_org(uuid) SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.org_admin_can_view_department(uuid,uuid) SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.is_admin_user() SET search_path=pg_catalog,public,pg_temp;
+DO $optional_helpers$
+DECLARE signature text; routine regprocedure;
+BEGIN
+    FOREACH signature IN ARRAY ARRAY[
+        'public.admin_can_view_department(uuid,text)',
+        'public.get_admin_institution_id()',
+        'public.is_institution_admin(uuid)',
+        'public.get_admin_organization_id()',
+        'public.get_student_organization_id()',
+        'public.is_org_admin(uuid)',
+        'public.is_student_in_org(uuid)',
+        'public.org_admin_can_view_department(uuid,uuid)',
+        'public.is_admin_user()',
+        'public.fn_gdpr_erase_event_records()'
+    ] LOOP
+        routine := to_regprocedure(signature);
+        IF routine IS NOT NULL THEN
+            EXECUTE format('ALTER FUNCTION %s SET search_path=pg_catalog,public,pg_temp', routine);
+        END IF;
+    END LOOP;
+END $optional_helpers$;
 ALTER FUNCTION public.fn_erasure_pseudonymise_old_user() SET search_path=pg_catalog,public,pg_temp;
-ALTER FUNCTION public.fn_gdpr_erase_event_records() SET search_path=pg_catalog,public,pg_temp;
 ALTER FUNCTION public.cron_create_activity_partition() SET search_path=pg_catalog,public,pg_temp;
 
 COMMIT;

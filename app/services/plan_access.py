@@ -279,6 +279,7 @@ async def sync_profile_plan_state(
     selected_plan: str | None = None,
     premium_override: bool = False,
     is_org_student: bool = False,
+    send_notifications: bool = True,
 ) -> dict:
     """
     Ensure profile.plan and subscription_status match current active entitlements.
@@ -345,7 +346,7 @@ async def sync_profile_plan_state(
             try:
                 user_email_row = await conn.fetchval(
                     "SELECT email FROM profiles WHERE id = $1", user_id
-                )
+                ) if send_notifications else None
                 if user_email_row:
                     from app.services.email_service import send_plan_expired_notification
                     for expired_plan in plans_to_expire:
@@ -366,7 +367,7 @@ async def sync_profile_plan_state(
             and _coerce_dt(row["expires_at"])
             and 0 < (_coerce_dt(row["expires_at"]) - now).days <= 3
         ]
-        if plans_expiring_soon:
+        if plans_expiring_soon and send_notifications:
             try:
                 user_email_row = await conn.fetchval(
                     "SELECT email FROM profiles WHERE id = $1", user_id

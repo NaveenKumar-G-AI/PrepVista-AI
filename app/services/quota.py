@@ -35,11 +35,21 @@ def _period_needs_reset(period_start) -> bool:
 
 async def _ensure_current_usage_period(conn, user_id: str):
     """Reset the rolling quota window when the current usage period has expired."""
+    async with conn.transaction():
+        return await _ensure_current_usage_period_locked(conn, user_id)
+
+
+async def _ensure_current_usage_period_locked(conn, user_id: str):
+    """All period resets serialize with grants on the same profile row.
+
+    Both finite bonuses and unlimited markers expire at the rolling 30-day
+    boundary. A grant made after the boundary belongs to the new period.
+    """
     profile = await conn.fetchrow(
         """SELECT plan, interviews_used_this_period, period_start,
                   referral_bonus_interviews, admin_bonus_interviews, org_student
            FROM profiles
-           WHERE id = $1""",
+           WHERE id = $1 FOR UPDATE""",
         user_id,
     )
     if not profile:
@@ -131,8 +141,9 @@ def _effective_limit(
     # Handle tier-isolated unlimited admin grants (enum-documented sentinel values)
     if admin_bonus_interviews in ADMIN_UNLIMITED_VALUES:
         expected_sentinel = ADMIN_UNLIMITED_BY_PLAN.get(plan)
-        if admin_bonus_interviews != expected_sentinel:
-            admin_bonus_interviews = 0
+        if admin_bonus_interviews == expected_sentinel:
+            return None
+        admin_bonus_interviews = 0
 
     return limit + max(0, referral_bonus_interviews or 0) + max(0, admin_bonus_interviews or 0)
 
@@ -144,18 +155,14 @@ async def enforce_quota(user: UserProfile):
         return
 
     selected_plan = user.plan or "free"
-    limit = _selected_plan_limit(selected_plan)
-
-    if limit is None:
-        logger.info("quota_unlimited_plan", user_id=user.id, plan=selected_plan)
-        return
-
     async with DatabaseConnection() as conn:
         _, _, used, referral_bonus_interviews, admin_bonus_interviews = (
             await _resolve_selected_plan_usage(conn, user.id, selected_plan)
         )
 
     limit = _effective_limit(selected_plan, referral_bonus_interviews, admin_bonus_interviews)
+    if limit is None:
+        return
 
     if used >= limit:
         logger.info(
@@ -297,13 +304,7 @@ async def get_usage_stats(
 
 
 async def reset_period_usage(user_id: str):
-    """Reset interview count for a new billing period."""
+    """Normalize an expired period using the same rule as reads and grants."""
     async with DatabaseConnection() as conn:
-        await conn.execute(
-            """UPDATE profiles
-               SET interviews_used_this_period = 0,
-                   period_start               = NOW()
-               WHERE id = $1""",
-            user_id,
-        )
+        await _ensure_current_usage_period(conn, user_id)
     logger.info("quota_reset", user_id=user_id)

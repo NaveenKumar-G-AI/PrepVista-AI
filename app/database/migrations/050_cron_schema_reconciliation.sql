@@ -4,12 +4,23 @@
 -- Fully enforces strict execution boundaries and least-privilege for pg_cron.
 
 DO $$
+DECLARE job_name text;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'prepvista_worker') THEN
         RAISE EXCEPTION 'prepvista_worker role does not exist.';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
         RAISE EXCEPTION 'pg_cron extension is required.';
+    END IF;
+    -- An empty catalog is a supported dormant installation. Never provision
+    -- or activate jobs here. Nonempty catalogs must retain the reviewed set.
+    IF EXISTS (SELECT FROM cron.job) THEN
+        FOREACH job_name IN ARRAY ARRAY['gdpr-pseudonymise-old-user','gdpr-hard-delete-old-user',
+            'refresh-public-growth-metrics','purge-usage-events','purge-billing-events'] LOOP
+            IF (SELECT count(*) FROM cron.job WHERE jobname=job_name AND username='prepvista_worker')<>1 THEN
+                RAISE EXCEPTION 'Incomplete cron baseline: %',job_name;
+            END IF;
+        END LOOP;
     END IF;
 END $$;
 
@@ -37,7 +48,16 @@ END $$;
 
 DROP TRIGGER IF EXISTS trg_upe_refresh_is_active ON public.user_plan_entitlements;
 DROP FUNCTION IF EXISTS public.fn_refresh_is_active();
-COMMENT ON COLUMN public.user_plan_entitlements.is_active IS 'DEPRECATED: Unused by backend. Replaced by explicit status updates.';
+DO $legacy_entitlement_comment$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_catalog.pg_attribute
+        WHERE attrelid = 'public.user_plan_entitlements'::regclass
+          AND attname = 'is_active' AND attnum > 0 AND NOT attisdropped
+    ) THEN
+        COMMENT ON COLUMN public.user_plan_entitlements.is_active IS 'DEPRECATED: Unused by backend. Replaced by explicit status updates.';
+    END IF;
+END $legacy_entitlement_comment$;
 
 
 -- ============================================================================
@@ -80,7 +100,16 @@ BEGIN
     DELETE FROM public.old_user
     WHERE archived_at < NOW() - INTERVAL '1095 days'
       AND full_name IS NULL
-      AND email IS NULL;
+      AND email IS NULL
+      -- Preserve ownership receipts while any deletion is unresolved. A
+      -- receipt with no matching completed request is also retained.
+      AND NOT EXISTS (SELECT FROM public.account_deletion_requests r
+                      WHERE r.user_id=old_user.user_id AND r.status IS DISTINCT FROM 'COMPLETED')
+      AND NOT EXISTS (
+          SELECT FROM jsonb_object_keys(COALESCE(old_user.metadata->'deletion_requests','{}'::jsonb)) receipt(id)
+          WHERE NOT EXISTS (SELECT FROM public.account_deletion_requests r
+                            WHERE r.id::text=receipt.id AND r.user_id=old_user.user_id AND r.status='COMPLETED')
+      );
 
     GET DIAGNOSTICS v_count = ROW_COUNT;
     RAISE NOTICE 'GDPR hard delete complete: % rows processed', v_count;
@@ -123,8 +152,10 @@ BEGIN
      WHERE o.category = 'college';
     
     SELECT COUNT(*) INTO v_new_users_week FROM public.profiles WHERE created_at > v_week_start;
-    SELECT COUNT(*) INTO v_week_interviews FROM public.user_activity_events WHERE event_type = 'interview_completed' AND created_at > v_week_start;
-    SELECT COUNT(*) INTO v_today_interviews FROM public.user_activity_events WHERE event_type = 'interview_completed' AND created_at > v_today_start;
+    -- Completion events are written to usage_events. The 24-hour activity
+    -- stream cannot supply a seven-day interview count.
+    SELECT COUNT(*) INTO v_week_interviews FROM public.usage_events WHERE event_type = 'interview_completed' AND created_at > v_week_start;
+    SELECT COUNT(*) INTO v_today_interviews FROM public.usage_events WHERE event_type = 'interview_completed' AND created_at > v_today_start;
 
     INSERT INTO public.public_growth_metrics (
         id, total_users_count, active_users_count, total_interviews_count,
@@ -292,6 +323,9 @@ BEGIN
             IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobid = v_jobid AND command = r.command) THEN
                 RAISE EXCEPTION 'cron.alter_job failed to update %', r.jobname;
             END IF;
+        ELSIF v_count = 0 AND NOT EXISTS (SELECT FROM cron.job) THEN
+            -- Functions only; provisioning/activation needs separate approval.
+            CONTINUE;
         ELSE
             RAISE EXCEPTION 'Expected 1 job for % under prepvista_worker, found %', r.jobname, v_count;
         END IF;

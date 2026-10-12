@@ -3,7 +3,7 @@ import os
 import sys
 import asyncpg
 import structlog
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 from app.database.connection import _run_migrations
 
 logger = structlog.get_logger("prepvista.bootstrap")
@@ -33,9 +33,16 @@ async def validate_role_attributes(conn, rolename):
         logger.error("dangerous_role_attributes", role=rolename, attributes=dangerous)
         raise RuntimeError(f"Role {rolename} has dangerous attributes: {', '.join(dangerous)}")
 
-    if rolename == "prepvista_worker" and not row["rolcanlogin"]:
-        logger.error("worker_missing_login", role=rolename)
-        raise RuntimeError(f"Role {rolename} requires LOGIN for pg_cron scheduler execution")
+    if not row["rolcanlogin"]:
+        logger.error("backend_missing_login", role=rolename)
+        raise RuntimeError(f"Role {rolename} requires LOGIN for its backend connection")
+
+    if await conn.fetchval('''SELECT EXISTS (
+        SELECT FROM pg_roles parent WHERE parent.rolname<>$1
+          AND pg_has_role($1,parent.oid,'MEMBER')
+          AND (parent.rolsuper OR parent.rolcreaterole OR parent.rolcreatedb OR parent.rolbypassrls OR parent.rolreplication)
+    )''',rolename):
+        raise RuntimeError('Unsafe inherited backend role attributes')
 
     return True
 
@@ -57,8 +64,9 @@ async def run_bootstrap():
         logger.error("identical_credentials", detail="MIGRATION_DATABASE_URL and DATABASE_URL use the same identity.")
         sys.exit(1)
 
-    runtime_user = run_parsed.username
-    runtime_password = run_parsed.password
+    runtime_user = unquote(run_parsed.username or '')
+    if runtime_user != 'prepvista_runtime':
+        raise RuntimeError('DATABASE_URL must use the reviewed prepvista_runtime identity')
 
     # Connect with migration identity
     conn = await asyncpg.connect(migration_url, timeout=10)
@@ -69,36 +77,16 @@ async def run_bootstrap():
         logger.info("acquired_bootstrap_lock")
 
         try:
-            # Create runtime role if missing
-            exists = await conn.fetchval("SELECT 1 FROM pg_roles WHERE rolname = $1", runtime_user)
-            if not exists:
-                logger.info("creating_runtime_role", role=runtime_user)
-                if runtime_password:
-                    await conn.execute(f"CREATE ROLE {runtime_user} WITH LOGIN PASSWORD '{runtime_password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;")
-                else:
-                    await conn.execute(f"CREATE ROLE {runtime_user} WITH NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;")
-            
-            await validate_role_attributes(conn, runtime_user)
-
-            # Ensure worker role exists and has LOGIN contract required by pg_cron
-            worker_row = await conn.fetchrow("SELECT rolcanlogin FROM pg_roles WHERE rolname = 'prepvista_worker'")
-            if not worker_row:
-                logger.info("creating_worker_role")
-                await conn.execute("CREATE ROLE prepvista_worker WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;")
-            elif not worker_row["rolcanlogin"]:
-                logger.info("reconciling_worker_role_login")
-                await conn.execute("ALTER ROLE prepvista_worker WITH LOGIN;")
-            
-            await validate_role_attributes(conn, "prepvista_worker")
+            # Provision roles separately. URLs are credentials, never SQL role
+            # definitions; this command neither creates nor repairs identities.
+            for role in (runtime_user, 'prepvista_worker'):
+                if not await validate_role_attributes(conn, role):
+                    raise RuntimeError('Reviewed backend role prerequisite missing')
 
             # Validate pg_cron (fail closed if absent)
             has_pg_cron = await conn.fetchval("SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'")
             if not has_pg_cron:
-                # In a real environment, this fails closed.
-                # For local testing without pg_cron, we skip to allow the rest of the tests to run if PREPVISTA_IGNORE_MISSING_CRON is set.
-                if os.environ.get("PREPVISTA_IGNORE_MISSING_CRON") != "1":
-                    logger.error("pg_cron_prerequisite_missing")
-                    raise RuntimeError("pg_cron prerequisite unavailable. It must be installed externally.")
+                raise RuntimeError("pg_cron prerequisite unavailable. It must be installed externally.")
 
         finally:
             await conn.execute("SELECT pg_advisory_unlock($1)", BOOTSTRAP_LOCK_ID)
@@ -109,7 +97,7 @@ async def run_bootstrap():
         await _run_migrations(conn)
 
     except Exception as e:
-        logger.error("bootstrap_failed", error=str(e))
+        logger.error("bootstrap_failed", error_type=type(e).__name__)
         raise
     finally:
         await conn.close()

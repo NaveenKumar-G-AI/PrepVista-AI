@@ -1,27 +1,21 @@
-"""
-PrepVista - Admin Grants
-Endpoints for manipulating fine-grained user subscription limits and tiers manually.
-"""
+"""Transactional, tier-isolated manual grants with prospective idempotency."""
+
+import hashlib
+import json
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-import structlog
 
-from app.config import AdminUnlimitedGrant, ADMIN_UNLIMITED_BY_PLAN, ADMIN_UNLIMITED_VALUES
+from app.config import ADMIN_UNLIMITED_BY_PLAN, ADMIN_UNLIMITED_VALUES
 from app.database.connection import DatabaseConnection
 from app.dependencies import UserProfile, get_current_user
-from app.services.launch_offer import expire_launch_offer_grant
-from app.services.plan_access import activate_plan_entitlement, sync_profile_plan_state
+from app.services.plan_access import sync_profile_plan_state
+from app.services.quota import _ensure_current_usage_period
 from app.routers.admin import _OVERVIEW_CACHE as _admin_overview_cache
 
 router = APIRouter()
-logger = structlog.get_logger("prepvista.admin.grants")
-
-# Maximum admin_bonus_interviews accrued via repeated "free normal" activate calls.
-# Without this cap, 50 accidental clicks grant +100 bonus interviews with no
-# audit trail and no recovery path short of a manual DB update.
-# Value chosen to allow ~10 legitimate stacking grants (2 each) before capping.
-_FREE_NORMAL_BONUS_CAP: int = 20
+_FREE_NORMAL_BONUS_CAP = 20
 
 
 def require_admin(current_user: UserProfile = Depends(get_current_user)) -> UserProfile:
@@ -31,238 +25,144 @@ def require_admin(current_user: UserProfile = Depends(get_current_user)) -> User
 
 
 class AdminGrantRequest(BaseModel):
-    user_id: str
-    model: str  # 'free', 'pro', 'career'
-    value: str  # 'normal', 'unlimited'
-    action: str # 'activate', 'deactivate'
+    request_id: UUID
+    user_id: UUID
+    model: str
+    value: str
+    action: str
+
+
+def transition_bonus(current: int, model: str, value: str, action: str, *, paid_active: bool) -> int:
+    """Finite arithmetic only; never infer the origin of a historical bonus.
+
+    Free stacking stops at 20 without reducing larger existing grants. Pro's
+    first normal grant unlocks its base allowance; subsequent grants add 15.
+    Career has no additive grant. Matching unlimited activation is a no-op.
+    """
+    if current not in ADMIN_UNLIMITED_VALUES and not 0 <= current <= 1000:
+        raise HTTPException(409, "Stored bonus is outside the supported domain.")
+    marker = ADMIN_UNLIMITED_BY_PLAN[model]
+    if action == "deactivate":
+        if value == "unlimited":
+            return 0 if current == marker else current
+        if current and current not in ADMIN_UNLIMITED_VALUES:
+            raise HTTPException(409, "Finite grant provenance is ambiguous; no bonus or access was changed.")
+        return current
+    if current in ADMIN_UNLIMITED_VALUES:
+        if current != marker:
+            raise HTTPException(409, "Another tier has an unlimited grant. Deactivate that override explicitly first.")
+        return current
+    if value == "unlimited":
+        return int(marker)
+    if model == "free":
+        return max(current, min(current + 2, _FREE_NORMAL_BONUS_CAP))
+    if model == "pro" and paid_active:
+        if current > 985:
+            raise HTTPException(409, "Grant would exceed the finite bonus limit of 1000.")
+        return current + 15
+    return current
 
 
 async def _clear_model_bonus_override(conn, target_user_id: str, model: str) -> None:
-    """Remove the stored bonus marker that belongs to the selected model."""
-    current_bonus = await conn.fetchval(
-        "SELECT admin_bonus_interviews FROM profiles WHERE id = $1",
-        target_user_id,
-    )
-    current_bonus = int(current_bonus or 0)
+    """Compatibility helper: only remove a marker attributable to this tier."""
+    current = await conn.fetchval("SELECT admin_bonus_interviews FROM profiles WHERE id = $1", target_user_id)
+    if current == ADMIN_UNLIMITED_BY_PLAN.get(model):
+        await conn.execute("UPDATE profiles SET admin_bonus_interviews = $2 WHERE id = $1", target_user_id, 0)
 
-    model_sentinel = ADMIN_UNLIMITED_BY_PLAN.get(model)
-    if current_bonus == model_sentinel:
-        updated_bonus = 0
-    elif model == "free":
-        updated_bonus = 0
-    elif model == "pro" and current_bonus >= 15 and current_bonus not in ADMIN_UNLIMITED_VALUES:
-        updated_bonus = max(0, current_bonus - 15)
-    else:
-        updated_bonus = current_bonus
 
-    if updated_bonus != current_bonus:
-        await conn.execute(
-            "UPDATE profiles SET admin_bonus_interviews = $2 WHERE id = $1",
-            target_user_id,
-            updated_bonus,
+def _json(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
+
+async def apply_admin_grant(conn, payload: AdminGrantRequest, actor_id: str):
+    model, value, action = payload.model.lower(), payload.value.lower(), payload.action.lower()
+    if model not in {"free", "pro", "career"} or value not in {"normal", "unlimited"} or action not in {"activate", "deactivate"}:
+        raise HTTPException(400, "Invalid grant model, value or action.")
+    target = str(payload.user_id)
+    fingerprint = hashlib.sha256(_json([str(actor_id), target, model, value, action]).encode()).hexdigest()
+    async with conn.transaction():
+        # Serialize reused request IDs even across different target profiles.
+        # Hash collisions merely serialize unrelated requests.
+        await conn.execute("SELECT pg_advisory_xact_lock(hashtextextended($1, 52001))", str(payload.request_id))
+        prior = await conn.fetchrow(
+            "SELECT request_fingerprint, response FROM admin_grant_operations WHERE request_id = $1", payload.request_id
         )
+        if prior:
+            if prior["request_fingerprint"] != fingerprint:
+                raise HTTPException(409, "Request ID was already used with a different payload or actor.")
+            return json.loads(prior["response"]) if isinstance(prior["response"], str) else dict(prior["response"])
+        profile = await conn.fetchrow(
+            "SELECT email, plan, admin_bonus_interviews, period_start FROM profiles WHERE id = $1 FOR UPDATE", target
+        )
+        if not profile:
+            raise HTTPException(404, "User not found.")
+        before = dict(profile)
+        normalized = await _ensure_current_usage_period(conn, target)
+        # Resolve real purchases before granting access; suppress notifications
+        # from uncommitted state. Preserve any valid selected plan.
+        await sync_profile_plan_state(conn, target, send_notifications=False)
+        entitlement = None
+        if model != "free":
+            entitlement = await conn.fetchrow(
+                """SELECT status, source_order_id, activated_at, expires_at,
+                          (status = 'active' AND expires_at > NOW()) AS valid
+                   FROM user_plan_entitlements WHERE user_id = $1 AND plan = $2 FOR UPDATE""", target, model
+            )
+        before["entitlement"] = dict(entitlement) if entitlement else None
+        if action == 'activate' and entitlement and entitlement['status'] == 'active' and entitlement['expires_at'] is None:
+            raise HTTPException(409, 'Active entitlement has no expiry; review it before changing access.')
+        current = normalized["admin_bonus_interviews"]
+        updated = transition_bonus(current, model, value, action, paid_active=bool(entitlement and entitlement["valid"]))
+        if updated != current:
+            await conn.execute("UPDATE profiles SET admin_bonus_interviews = $2, updated_at = NOW() WHERE id = $1", target, updated)
+            # Sentinel transitions and pre-grant rollover are JSON states, never
+            # numeric adjustments in the historical finite-delta audit table.
+            if current not in ADMIN_UNLIMITED_VALUES and updated not in ADMIN_UNLIMITED_VALUES:
+                await conn.execute(
+                    """INSERT INTO admin_bonus_grants(granted_by, granted_to, amount, reason, snapshot_after)
+                       VALUES ($1, $2, $3, $4, $5)""", str(actor_id), target, updated-current,
+                    "manual request " + str(payload.request_id), updated,
+                )
+        if model != "free":
+            if action == "activate" and not (entitlement and entitlement["valid"]):
+                # A concurrent purchase may insert after our read. Never replace
+                # valid access in the conflict branch or extend it on retry.
+                await conn.execute(
+                    """INSERT INTO user_plan_entitlements
+                       (user_id, plan, status, source_order_id, activated_at, expires_at, created_at, updated_at)
+                       VALUES ($1, $2, 'active', 'manual_grant', NOW(), NOW()+INTERVAL '30 days', NOW(), NOW())
+                       ON CONFLICT (user_id, plan) DO UPDATE SET status='active', source_order_id='manual_grant',
+                           activated_at=EXCLUDED.activated_at, expires_at=EXCLUDED.expires_at, updated_at=NOW()
+                       WHERE user_plan_entitlements.status <> 'active'
+                          OR user_plan_entitlements.expires_at <= NOW()""", target, model
+                )
+            elif action == "deactivate":
+                await conn.execute(
+                    """UPDATE user_plan_entitlements SET status='expired', updated_at=NOW()
+                       WHERE user_id=$1 AND plan=$2 AND status='active' AND source_order_id='manual_grant'
+                         AND NOT EXISTS (SELECT FROM payments WHERE user_id=$1 AND plan=$2
+                           AND status='verified' AND COALESCE(verified_at,created_at)+INTERVAL '30 days'>NOW())""", target, model
+                )
+        state = await sync_profile_plan_state(conn, target, send_notifications=False)
+        after_entitlement = await conn.fetchrow(
+            "SELECT status, source_order_id, activated_at, expires_at FROM user_plan_entitlements WHERE user_id=$1 AND plan=$2",
+            target, model,
+        ) if model != "free" else None
+        response = {"status": "success", "message": f"{model.title()} {value} grant {action} completed.", "request_id": str(payload.request_id)}
+        await conn.execute(
+            """INSERT INTO admin_grant_operations
+               (request_id, actor_id, target_id, plan, grant_kind, action, request_fingerprint, before_state, after_state, response)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb)""",
+            payload.request_id, str(actor_id), target, model, value, action, fingerprint, _json(before),
+            _json({"admin_bonus_interviews": updated, "period_start": normalized["period_start"],
+                   "plan": state["selected_plan"], "entitlement": dict(after_entitlement) if after_entitlement else None}), _json(response),
+        )
+    return response
 
 
 @router.post("")
-async def grant_admin_access(
-    payload: AdminGrantRequest,
-    current_user: UserProfile = Depends(require_admin),
-):
-    """Apply targeted overrides or unlocks to a user's subscription natively."""
-    target_user_id = payload.user_id
-    model = payload.model.lower()
-    value = payload.value.lower()
-    action = payload.action.lower()
-
-    if model not in {"free", "pro", "career"}:
-        raise HTTPException(status_code=400, detail="Invalid model identifier.")
-    if value not in {"normal", "unlimited"}:
-        raise HTTPException(status_code=400, detail="Invalid value tier.")
-    if action not in {"activate", "deactivate"}:
-        raise HTTPException(status_code=400, detail="Action must be activate or deactivate.")
-
-    # ── Pre-action forensic audit log ─────────────────────────────────────────
-    logger.info(
-        "admin_grant_request_received",
-        admin_email=current_user.email,
-        target_user_id=target_user_id,
-        model=model,
-        value=value,
-        action=action,
-    )
-
+async def grant_admin_access(payload: AdminGrantRequest, current_user: UserProfile = Depends(require_admin)):
     async with DatabaseConnection() as conn:
-        profile = await conn.fetchrow(
-            "SELECT email FROM profiles WHERE id = $1", target_user_id
-        )
-        if not profile:
-            raise HTTPException(status_code=404, detail="User not found.")
-
-        target_email = profile["email"]
-
-        # ── TRANSACTION: all mutations are atomic ─────────────────────────────
-        # Previously none of the multi-step mutations in either branch were
-        # wrapped in a transaction. Failure scenarios without this:
-        #
-        # DEACTIVATE crash scenario:
-        #   _clear_model_bonus_override succeeds (bonus cleared) →
-        #   expire_launch_offer_grant succeeds (offer marked expired) →
-        #   UPDATE user_plan_entitlements throws (transient deadlock)
-        #   Result: bonus cleared + offer expired, but entitlement still 'active'.
-        #   Student retains plan access. Admin sees "success" but nothing was
-        #   fully revoked. Detecting this requires reading three tables manually.
-        #
-        # ACTIVATE crash scenario:
-        #   bonus UPDATE succeeds →
-        #   activate_plan_entitlement throws
-        #   Result: bonus applied, entitlement never created. Student has bonus
-        #   interviews but cannot access the plan features gated by entitlement.
-        #
-        # asyncpg handles nested conn.transaction() calls inside service
-        # functions as SAVEPOINTs — correct nesting behavior, no conflicts.
-        async with conn.transaction():
-            if action == "deactivate":
-                await _clear_model_bonus_override(conn, target_user_id, model)
-
-                if model != "free":
-                    launch_offer_row = await expire_launch_offer_grant(
-                        conn,
-                        target_user_id,
-                        model,
-                        current_user.email,
-                    )
-                    await conn.execute(
-                        """UPDATE user_plan_entitlements
-                           SET status = 'expired'
-                           WHERE user_id = $1 AND plan = $2 AND status = 'active'""",
-                        target_user_id, model,
-                    )
-                    await sync_profile_plan_state(conn, target_user_id, "free")
-                    logger.info(
-                        "admin_entitlement_revoked",
-                        admin_email=current_user.email,
-                        target_user_id=target_user_id,
-                        target_email=target_email,
-                        model=model,
-                        launch_offer_revoked=bool(launch_offer_row),
-                    )
-                else:
-                    logger.info(
-                        "admin_grant_revoked",
-                        admin_email=current_user.email,
-                        target_user_id=target_user_id,
-                        target_email=target_email,
-                        model=model,
-                    )
-
-            else:
-                # ── Action = ACTIVATE ─────────────────────────────────────────
-
-                if model == "free":
-                    if value == "unlimited":
-                        await conn.execute(
-                            "UPDATE profiles SET admin_bonus_interviews = $2 WHERE id = $1",
-                            target_user_id, int(AdminUnlimitedGrant.FREE_UNLIMITED),
-                        )
-                    elif value == "normal":
-                        # ── Stacking cap ──────────────────────────────────────
-                        # Previously used admin_bonus_interviews + 2 with no upper
-                        # bound. 50 accidental clicks → +100 bonus interviews with
-                        # no audit trail. LEAST() enforces _FREE_NORMAL_BONUS_CAP
-                        # at the DB level — atomically, without a read-modify-write
-                        # race — while still allowing up to 10 legitimate stacking
-                        # grants before the cap is reached.
-                        await conn.execute(
-                            """UPDATE profiles
-                               SET admin_bonus_interviews = LEAST(admin_bonus_interviews + 2, $2)
-                               WHERE id = $1""",
-                            target_user_id,
-                            _FREE_NORMAL_BONUS_CAP,
-                        )
-
-                elif model == "pro":
-                    entitlement = await conn.fetchrow(
-                        """SELECT id FROM user_plan_entitlements
-                           WHERE user_id = $1 AND plan = 'pro' AND status = 'active'""",
-                        target_user_id,
-                    )
-                    if entitlement:
-                        if value == "unlimited":
-                            await conn.execute(
-                                "UPDATE profiles SET admin_bonus_interviews = $2 WHERE id = $1",
-                                target_user_id, int(AdminUnlimitedGrant.PRO_UNLIMITED),
-                            )
-                        else:
-                            await conn.execute(
-                                "UPDATE profiles SET admin_bonus_interviews = admin_bonus_interviews + 15 WHERE id = $1",
-                                target_user_id,
-                            )
-                    else:
-                        if value == "unlimited":
-                            await conn.execute(
-                                "UPDATE profiles SET admin_bonus_interviews = $2 WHERE id = $1",
-                                target_user_id, int(AdminUnlimitedGrant.PRO_UNLIMITED),
-                            )
-                        await activate_plan_entitlement(
-                            conn, target_user_id, "pro", source_order_id="manual_grant"
-                        )
-
-                elif model == "career":
-                    # ── Idempotency guard — mirrors pro branch ─────────────────
-                    # Previously career always called activate_plan_entitlement
-                    # unconditionally. A double-submit (or accidental repeat) for
-                    # a user already holding an active career plan created a second
-                    # entitlement row — potential duplicate-slot bugs downstream.
-                    # Now matches the identical guard pattern used for pro.
-                    career_entitlement = await conn.fetchrow(
-                        """SELECT id FROM user_plan_entitlements
-                           WHERE user_id = $1 AND plan = 'career' AND status = 'active'""",
-                        target_user_id,
-                    )
-                    if career_entitlement:
-                        # Plan already active — only update the bonus if requested.
-                        if value == "unlimited":
-                            await conn.execute(
-                                "UPDATE profiles SET admin_bonus_interviews = $2 WHERE id = $1",
-                                target_user_id, int(AdminUnlimitedGrant.CAREER_UNLIMITED),
-                            )
-                        # 'normal' on an already-active career plan: no-op bonus
-                        # (career has no additive stacking equivalent to pro's +15).
-                    else:
-                        if value == "unlimited":
-                            await conn.execute(
-                                "UPDATE profiles SET admin_bonus_interviews = $2 WHERE id = $1",
-                                target_user_id, int(AdminUnlimitedGrant.CAREER_UNLIMITED),
-                            )
-                        await activate_plan_entitlement(
-                            conn, target_user_id, "career", source_order_id="manual_grant"
-                        )
-
-                logger.info(
-                    "admin_grant_applied",
-                    admin_email=current_user.email,
-                    target_user_id=target_user_id,
-                    target_email=target_email,
-                    model=model,
-                    value=value,
-                )
-
-                # Resync to ensure new plans manifest immediately on the student's
-                # next request. Runs inside the transaction so the updated plan
-                # state commits atomically with all entitlement changes above.
-                await sync_profile_plan_state(conn, target_user_id, "free")
-
-    # ── Invalidate admin overview cache ───────────────────────────────────────
-    # Placed outside the DatabaseConnection context — cache invalidation cannot
-    # affect the already-committed DB state and must not block on a DB error.
+        response = await apply_admin_grant(conn, payload, str(current_user.id))
     _admin_overview_cache.clear()
-
-    if action == "deactivate":
-        return {
-            "status": "success",
-            "message": f"{model.title()} tier grants successfully deactivated for {target_email}.",
-        }
-    return {
-        "status": "success",
-        "message": f"Successfully activated {value.title()} {model.title()} tier override for {target_email}.",
-    }
+    return response

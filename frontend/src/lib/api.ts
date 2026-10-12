@@ -750,10 +750,10 @@ class ApiClient {
     this.invalidateCache('/admin');
     return res;
   }
-  async grantAdminAccess<T = { status: string; message: string }>(userId: string, model: string, value: string, action: string) {
+  async grantAdminAccess<T = { status: string; message: string }>(userId: string, model: string, value: string, action: string, requestId: string) {
     const res = await this.request<T>(`/admin/grants`, {
       method: 'POST',
-      body: { user_id: userId, model, value, action },
+      body: { user_id: userId, model, value, action, request_id: requestId },
       retries: 0,
       timeoutMs: 15000,
     });

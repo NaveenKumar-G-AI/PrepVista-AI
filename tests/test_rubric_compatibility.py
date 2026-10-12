@@ -204,7 +204,7 @@ class TestMigrationOrdering:
 
     def test_total_migration_count(self):
         files = list(MIGRATIONS_DIR.glob("*.sql"))
-        assert len(files) == 52, f"Expected 52 migration files through approved 051, found {len(files)}"
+        assert len(files) == 54, f"Expected 54 migration files through local recovery 052, found {len(files)}"
 
 
 # ════════════════════════════════════════════════════════════════════════════

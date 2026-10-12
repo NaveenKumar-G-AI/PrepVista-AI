@@ -35,6 +35,9 @@ for _key, _value in _REQUIRED_TEST_ENV.items():
     # values (Windows tooling may define DEBUG to a non-boolean like "release").
     os.environ[_key] = _value
 
+for _key in ('MIGRATION_DATABASE_URL', 'PG_QUAL_DSN', 'PREPVISTA_IGNORE_MISSING_CRON'):
+    os.environ.pop(_key, None)
+
 
 @pytest.fixture(autouse=True)
 def block_external_connections(monkeypatch):
