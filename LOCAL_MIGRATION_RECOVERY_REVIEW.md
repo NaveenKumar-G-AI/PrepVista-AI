@@ -8,7 +8,23 @@ Date: 2026-10-12. Workspace: `G:\PrepVista-Old-Push`.
 
 **NOT YET APPROVED FOR PRODUCTION** — no production connection, mutation, bootstrap, deployment, commit, push, Render change, role change, or cron scheduling/activation was performed. The forbidden `C:\PrepVista-AI` tree was not used.
 
-This statement describes this agent's local work. The user subsequently reported that production 048a and 049 were successfully applied, and that 050 failed and rolled back as detailed below. No additional production action is authorized by this report.
+This statement describes this agent's local work. The user subsequently reported successful production application of 048a through 052. The earlier 049/050 failures and corrections below are historical records. The current follow-up is the new 053 metadata contract and its narrow endpoint compatibility fix. No additional production action is authorized by this report.
+
+## 053 archive receipt forward fix
+
+The latest user-supplied production schema has exactly six `old_user` columns, in order: nullable `full_name text`, non-null `email text`, non-null `id integer` with the existing `old_user_id_seq` default, nullable `original_user_id uuid`, nullable `user_id uuid`, and nullable `archived_at timestamptz DEFAULT now()`. There is no metadata column, and deployment readiness fails on `old_user.metadata`, expected `jsonb`, actual `missing`. Production was not contacted to obtain or modify these facts during this task.
+
+`053_old_user_metadata_receipt.sql` is the only new migration. Within the runner-owned per-file transaction, with a five-second lock timeout, it fails if the table is absent, locks the table to serialize the catalog check with the addition, and inspects the exact non-dropped `metadata` attribute. If absent it adds nullable `jsonb` with no default. Existing JSONB is accepted unchanged; any other PostgreSQL type fails closed. It performs no row DML, backfill, receipt fabrication, sequence change, identity change, constraint change or cron operation. All 048a/049/050/051/052 files retain their previously reviewed checksums. Readiness and the worker are unchanged.
+
+Final runner-compatibility correction: only the outer `BEGIN;` and `COMMIT;` lines were removed from 053. Both `SET LOCAL` statements and the entire DO block are unchanged. The migration runner owns the schema-and-ledger transaction. The approved `account.py` implementation is unchanged by this correction. The file count remains 55.
+
+Application review found two endpoint assumptions requiring correction: `ON CONFLICT(email)` required a uniqueness constraint not established by this production shape, and legacy NULL metadata was promoted to an empty receipt container. The final narrow identity correction locks archive rows only with `WHERE user_id=$1 FOR UPDATE`; email never selects an archive. Multiple rows for that user or legacy NULL/missing/empty receipt containers return HTTP 409 and roll back the request/local deletion. Exactly one valid user archive receives the newly requested receipt while retaining prior receipts and other fields. With no matching user archive, a normal `INSERT ... RETURNING id` writes a fresh row with complete metadata. A shared email on a NULL-user or different-user historical archive does not block insertion or cause that archive to change. Unexpected database constraint failures propagate; there is no blanket conflict suppression. No email uniqueness constraint or fabricated legacy receipt is introduced. Migration 053 is unchanged by this identity correction.
+
+The unchanged worker's JSONB extraction returns SQL NULL for legacy NULL metadata. Without exactly one valid request-specific receipt, it raises `OWNERSHIP_UNVERIFIED` and marks the request `FAILED` for manual review before any auth/storage provider call. New receipts retain the existing request/owner/target/completion validation. The unchanged readiness contract accepts nullable JSONB and still rejects a missing or incorrectly typed column; its release ledger check now naturally includes 053.
+
+Qualification uses the exact six-column archive shape with synthetic pre-existing rows, including duplicate emails and no email uniqueness constraint. Tests verify NULL preservation, unchanged original columns/data/row versions/table storage/ACL/RLS/sequence state, no fabricated archive rows, unchanged empty cron catalog, real runtime-role readiness, existing JSONB acceptance, wrong-type and missing-table rollback without ledger insertion, new endpoint receipt creation and worker validation, and safe endpoint/worker handling of missing legacy receipts. This fixture completes other declared readiness contracts synthetically; it is not a full production schema replay.
+
+Runner compatibility is also tested through a separate real `python -m app.database.migrate --execute --through 053_old_user_metadata_receipt` process against the guarded disposable PostgreSQL database. A test-only ledger trigger confirms that the column has been added inside the transaction, then rejects the ledger insert. After failure, an independent connection sees neither the new column nor a 053 ledger row, and legacy rows are unchanged. Removing the test trigger and retrying the same CLI commits both the nullable JSONB column and exactly one matching checksum row. A further CLI retry succeeds without adding another ledger row. No application or runner implementation was changed for this qualification.
 
 ## Exact repository changes
 
@@ -23,6 +39,7 @@ Modified:
 | `app/database/migrations/050_cron_schema_reconciliation.sql` | Accept an empty cron catalog without provisioning jobs; reject incomplete nonempty baselines; protect unresolved deletion receipts; count completion events from `usage_events`; comment on the legacy entitlement `is_active` column only when it exists. |
 | `app/database/migrations/051_pg_cron_runtime_reconciliation.sql` | Accept an empty cron catalog without provisioning jobs; fail before retention if the stats singleton is missing; check partition parent by OID and both exact bounds in the public schema. |
 | `app/database/readiness.py` | Read-only release-ledger checksum validation plus required grant audit/journal column contracts. Extra production-only versions remain allowed. |
+| `app/routers/account.py` | New receipts no longer require email uniqueness; legacy NULL/missing receipt containers fail safely for review instead of being fabricated. |
 | `app/routers/admin_grants.py` | Locked grant transition, request fingerprint/idempotency, prospective journal, finite audit entries, purchase-preserving deactivation and selected-plan preservation. |
 | `app/services/plan_access.py` | Allow grant transactions to suppress notification dispatch from uncommitted state. Other callers retain existing defaults. |
 | `app/services/quota.py` | Matching sentinels return unlimited/None; enforcement handles None; all period normalization uses the profile lock and one expiration rule. |
@@ -33,7 +50,7 @@ Modified:
 | `tests/conftest.py` | Clear ambient migration/qualification credentials and the old cron-bypass flag. |
 | `tests/test_batch0_startup_safety.py` | Model a valid ledger and explicitly assert startup never calls the migration runner. |
 | `tests/test_database_audit_regressions.py` | Supply the release ledger in read-only readiness fixtures. |
-| `tests/test_rubric_compatibility.py` | Account for 54 migration files, including the two new files. |
+| `tests/test_rubric_compatibility.py` | Account for 55 migration files, including forward migration 053. |
 
 Added:
 
@@ -41,6 +58,8 @@ Added:
 | --- | --- |
 | `app/database/migrations/048a_current_schema_reconciliation.sql` | Restore/validate the three current declared tables. |
 | `app/database/migrations/052_admin_grant_contract.sql` | Supported bonus domain, bonus index, prospective request journal. |
+| `app/database/migrations/053_old_user_metadata_receipt.sql` | Add nullable JSONB receipt metadata without altering legacy archives; fail closed on missing table or wrong type. |
+| `integration_tests/test_053_old_user_metadata_receipt.py` | Production archive shape, real readiness, row/sequence preservation and endpoint/worker receipt safety. |
 | `tests/test_admin_grant_recovery.py` | Grant truth tables, boundaries, unlimited enforcement, cutoff/order/checksum/readiness/bootstrap guards. |
 | `integration_tests/recovery_fixture.py` | Explicit loopback clusters with exact data-directory verification, random disposable databases and synthetic schema/data. |
 | `integration_tests/test_recovery_schema_postgresql.py` | Real PostgreSQL reconciliation, drift, security, idempotency, concurrency, rollover and purchase-preservation tests. |
@@ -60,6 +79,7 @@ The runner sorts `Path` objects by the **complete filename**, then records the c
 050_cron_schema_reconciliation
 051_pg_cron_runtime_reconciliation
 052_admin_grant_contract
+053_old_user_metadata_receipt
 ```
 
 The compatibility suffixes and both `034` files remain intact. No `042`–`046` files were invented. Extra ledger versions are preserved. All existing migrations through 048, including 012, are unchanged.
@@ -80,8 +100,10 @@ Checksums below use the runner's UTF-8-with-optional-BOM reader, universal newli
 | 051, old | `60c0e9654c0e22759ccddcdc9e6a66bd1c1d609b833cdd5dfd8d28099764cc98` |
 | 051, new | `f7dd14f31efeba2b24aaa25d3b6e2ae79c3d8d1ff731f6328633fc8c92fd0c83` |
 | **052, new** | `0749174c12d8648a72e9da1b347828565ac3dbaceb10c336b588a9b1048b4531` |
+| 053, prior outer transaction wrapper | `d26bffd385141ed052f560d1dba75ac92d332a757ca2631bd77ec67ea062a118` |
+| **053, final runner-owned transaction** | `70ff43e4022d7d40ccaadc653a0bc53a19f1e4fb5616d2e340e9fb800287267c` |
 
-The earlier local rewrites of 049–051 were made while the user confirmed all three were unapplied. The latest user verification establishes that 048a and 049 are now applied in production: their reviewed files and checksums remain unchanged and immutable. 050 failed transactionally, and 050/051/052 remain absent from the production ledger. Only the still-unapplied 050 is corrected in this follow-up. No ledger checksum adoption/update was added; any already-applied copy elsewhere remains immutable and is a stop condition for substituting this file.
+The earlier local rewrites of 049–051 were made while the user confirmed all three were unapplied. At the previous 050 correction stage, 048a/049 were applied and 050/051/052 were absent after a transactional failure. The latest user instruction identifies all five as already applied and immutable. This follow-up changes none of those files and adds only forward migration 053. No ledger checksum adoption/update was added.
 
 ## Exact 049 correction
 
@@ -163,9 +185,11 @@ All final listed runs completed successfully. Intermediate failures identified a
 
 | Qualification | Final result |
 | --- | --- |
-| Full backend `pytest -q --disable-warnings --basetemp=.audit-runtime/final-050-column-unit-tmp` | **1,100 passed**, 73 warnings, no failures/skips. |
-| New/updated recovery and real-pg_cron integration suites | **42 passed**. |
+| Full backend `pytest -q --disable-warnings --basetemp=.audit-runtime/runner-053-unit-tmp` | **1,100 passed**, 73 warnings, no failures/skips. |
+| Existing recovery and real-pg_cron integration suites | **42 passed**. |
+| New 053 archive/receipt PostgreSQL suite, including identity and actual CLI atomicity cases | **18 passed**. |
 | Existing migration concurrency/process-failure suite | **25 passed**. |
+| Existing deletion-worker PostgreSQL suite | **39 passed** (64 combined with migration concurrency). |
 | Existing five frontend regression suites (prior helper-correction qualification) | **218 passed**; unaffected by this SQL/test/report-only correction, not rerun. |
 | New actual admin-component retry tests (prior helper-correction qualification) | **3 passed**; unaffected, not rerun. |
 | Frontend `tsc --noEmit --incremental false` (prior helper-correction qualification) | Passed; unaffected, not rerun. |
@@ -185,8 +209,8 @@ Reproduction commands for the already provisioned disposable clusters:
 
 ```powershell
 $env:PYTHONPATH='G:\PrepVista-Old-Push\.audit-runtime\python311'
-& 'C:\Python311\python.exe' -m pytest -q --disable-warnings --basetemp=.audit-runtime/final-050-column-unit-tmp
-& 'C:\Python311\python.exe' -m pytest integration_tests/test_050_cron_schema_reconciliation.py integration_tests/test_051_pg_cron_runtime_reconciliation.py integration_tests/test_recovery_schema_postgresql.py -q
+& 'C:\Python311\python.exe' -m pytest -q --disable-warnings --basetemp=.audit-runtime/runner-053-unit-tmp
+& 'C:\Python311\python.exe' -m pytest integration_tests/test_050_cron_schema_reconciliation.py integration_tests/test_051_pg_cron_runtime_reconciliation.py integration_tests/test_recovery_schema_postgresql.py integration_tests/test_053_old_user_metadata_receipt.py -q
 $env:PREPVISTA_TEST_DATABASE_URL='postgresql://postgres@127.0.0.1:55472/postgres'
 & 'C:\Python311\python.exe' -m pytest integration_tests/test_migration_concurrency_postgresql.py -q
 ```
@@ -206,33 +230,23 @@ node --test tests/auth-reliability.test.mjs tests/interview-stt.test.mjs tests/r
 4. No product/legal decision about 24-hour, 730-day, 1095-day or 2555-day retention was invented. Unlogged activity partitions retain their existing crash-loss characteristics. These remain activation-review items.
 5. Generic reversal of historical finite aggregates remains intentionally unsupported (409). A future operation-specific reversal workflow must establish provenance rather than infer a subtraction from the aggregate. Switching finite state to unlimited does not bank the former finite balance.
 6. The frontend retains an ambiguous request ID while the component remains mounted; it is not a durable browser-side queue across reloads. API callers must retain their ID when retrying. Old clients without a request ID receive validation errors and must be deployed with the backend update.
-7. New readiness requires the complete release manifest, including 052. Deploying the new application before the migrations finish will keep readiness false. Normal startup remains migration-free and requires only runtime `DATABASE_URL`.
+7. New readiness requires the complete release manifest, including 053. Deploying the new application before the migrations finish will keep readiness false. Normal startup remains migration-free and requires only runtime `DATABASE_URL`.
 8. Reconciliation deliberately rejects custom/drifted definitions, extra columns/constraints/triggers, wrong indexes or inherited access. It takes short-timeout table locks; index creation and constraint validation may scan/lock tables. The runner's per-file execution ceiling remains 600 seconds. These are not zero-downtime DDL guarantees.
 9. The restored invite/snapshot tables have no runtime access because there are no current callers. Future use must add explicitly reviewed privileges. The audit/journal's original-style actor RESTRICT and target CASCADE relationships should remain part of account-deletion review.
 10. Bootstrap now accepts the canonical `prepvista_runtime` URL username and validates existing roles; it does not provision them or interpret pooler-qualified names as SQL roles. The proposed release uses the dedicated migration command, not bootstrap.
 
-## Exact future production effects and proposed sequence — approval required
+## Exact future production effects and proposed sequence ? approval required
 
-The approved scope ends at local implementation. The following is a proposal only.
+The approved scope ends at local implementation. This proposal supersedes the earlier 050 retry sequence; the user now reports 048a through 052 as applied.
 
-1. Review this diff and these exact checksums. Take/verify a restorable pre-change database snapshot/PITR point and capture the current schema/ACL/function definitions and ledger. Read-only verify 012/048 and all known older checksums, the applied 048a/049 hashes, absence of 050/051/052, zero total and active cron jobs, the restored current tables, the ten absent helpers, the absent entitlement `is_active` column, current required objects, role safety and the bonus distribution. Stop if the confirmed baseline changed; do not edit ledger rows to make it fit.
-2. Prepare the corrected backend and frontend together. Stop/drain the old application writers for the coordinated release window before the new domain is enforced. In particular, do not leave the old sentinel-corrupting grant route serving requests. Keep normal Render startup migration-free; migration credentials belong only in a dedicated manual release session.
-3. The user has already applied 048a and 049 successfully. Preserve those exact files and ledger rows. Read-only inspect their committed hashes, restored table definitions and effective privileges; do not rewrite either applied migration. The next runner invocation must validate their checksums and skip them.
-
-4. Reconfirm cron has zero jobs and zero active jobs. With approval for the remaining reviewed changes, run:
-
-   ```text
-   python -m app.database.migrate --execute --through 052_admin_grant_contract
-   ```
-
-   This executes the final corrected 050, unchanged reviewed 051, then unchanged reviewed 052 in separate atomic file transactions. It installs/hardens cron functions, removes obsolete entitlement trigger/function if present, comments on the legacy `is_active` column only when it exists, adjusts worker privileges, validates the finite-or-sentinel domain, removes only the recognized old `<=1000` constraint if present, preserves NOT NULL, restores/validates the profile bonus index, and creates the empty prospective journal. It inserts exactly those three new migration ledger rows. It does not add an entitlement column, change entitlement rows, call retention functions, schedule jobs, activate jobs, update sentinel values, or backfill history.
-
-5. Read-only verify all five release hashes, constraint/index definitions, table/sequence ACLs and RLS, both preserved sentinel rows, absence of unexpected bonus values, and the still-empty cron catalog. Start the corrected application/frontend through the separately approved deployment process. Check runtime identity and `/health/ready`; verify representative backend-mediated pages and grant requests using an approved test account. Do not use production users for destructive qualification.
-6. Keep cron provisioning/activation outside this release. Resolve the metric/retention/authentication review items before proposing a separate explicit job schedule.
+1. Before any separately approved execution, verify a restorable snapshot/PITR point and read-only compare the complete ledger, all applied hashes (especially 048a?052), the exact archive columns/defaults/identity relationships and effective runtime privileges. Verify the zero-job cron baseline remains unchanged. Do not alter applied migration files or ledger entries.
+2. Review the 053 checksum above and the narrow account endpoint change together. With separate execution approval and a dedicated migration connection, the proposed command is `python -m app.database.migrate --execute --through 053_old_user_metadata_receipt`. The runner must validate and skip earlier applied files. 053 adds only nullable JSONB metadata when absent and records its own ledger row atomically. Wrong metadata type or missing table is a hard stop; no historical row is populated.
+3. Read-only verify the new column type/nullability/default, unchanged legacy data and sequence/identity definitions, the 053 ledger checksum, and unchanged cron catalog. Deploy the reviewed backend only through a separately approved process and confirm runtime readiness. Legacy NULL archives require review, not receipt fabrication. No new frontend change is required for 053.
+4. Cron activation remains outside this release. In particular, the reported production `email NOT NULL` remains untouched: the dormant pseudonymisation function's email-nulling behavior needs separate schema/retention review before activation. No retention function was called against the production-shaped archive fixture during migration qualification.
 
 ## Rollback and recovery proposal
 
-1. On any migration error, stop at that file. The runner rolls back that file's SQL and ledger insertion together. Previously committed files remain committed. For 048a/049/050/051/052 there is no nontransactional index path. Do not delete a ledger row or alter its checksum.
+1. On any migration error, stop at that file. The runner rolls back that file's SQL and ledger insertion together. Previously committed files remain committed. For 048a/049/050/051/052/053 there is no nontransactional index path. Do not delete a ledger row or alter its checksum.
 2. While writers remain stopped, read the ledger and catalogs to identify the last committed file. Preserve diagnostics without printing credentials. A failed lock acquisition or transient interruption can be retried using the **same files and checksums** after its cause is resolved; the runner skips already-applied matching versions.
 3. On genuine schema/ownership/checksum drift, do not weaken checks or mark a file applied. Investigate the discrepancy. Correct an unapplied file only after review, or use a new forward migration for changes to any already-applied contract.
 4. If application validation fails after the database changes, keep the grant endpoint/writers stopped. Preserve the new tables, journal, audit rows and valid sentinel values. Prefer a reviewed forward application fix using this exact migration manifest. Do not roll back to the old unsafe grant writer or restore the old `<=1000` constraint while sentinel values exist.

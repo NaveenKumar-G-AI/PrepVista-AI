@@ -132,26 +132,36 @@ async def delete_account(background_tasks: BackgroundTasks, user: UserProfile = 
             receipt = {"version": 1, "request_id": request_id, "user_id": owner,
                        "auth_user_ids": auth_ids, "storage_paths": paths,
                        "storage_bindings": bindings, "db_deleted": True}
-            await conn.execute("""
-                INSERT INTO old_user(user_id,full_name,email,metadata)
-                VALUES($1,$2,$3,'{}'::jsonb) ON CONFLICT(email) DO NOTHING
-            """, user.id, profile["full_name"], profile["email"])
-            archive = await conn.fetchrow(
-                "SELECT id,user_id,metadata FROM old_user WHERE email=$1 FOR UPDATE", profile["email"])
-            if not archive or str(archive["user_id"]) != owner:
-                raise HTTPException(status_code=409, detail="Account cleanup requires review.")
-            metadata = archive["metadata"]
-            metadata = json.loads(metadata) if isinstance(metadata, str) else metadata
-            if metadata is None:
-                metadata = {}
-            if not isinstance(metadata, dict) or not isinstance(metadata.get("deletion_requests", {}), dict):
-                raise HTTPException(status_code=409, detail="Account cleanup requires review.")
-            receipts = metadata.setdefault("deletion_requests", {})
-            if str(request_id) in receipts:
-                raise HTTPException(status_code=409, detail="Account cleanup requires review.")
-            receipts[str(request_id)] = receipt
-            await conn.execute("UPDATE old_user SET metadata=$2::jsonb WHERE id=$1",
-                               archive["id"], json.dumps(metadata))
+            archives = await conn.fetch(
+                "SELECT id,user_id,metadata FROM old_user WHERE user_id=$1 FOR UPDATE",
+                user.id)
+            if archives:
+                if len(archives) != 1 or str(archives[0]["user_id"]) != owner:
+                    raise HTTPException(status_code=409, detail="Account cleanup requires review.")
+                archive = archives[0]
+                metadata = archive["metadata"]
+                metadata = json.loads(metadata) if isinstance(metadata, str) else metadata
+                # Never turn legacy NULL/missing receipts into verified history.
+                if (not isinstance(metadata, dict)
+                        or not isinstance(metadata.get("deletion_requests"), dict)
+                        or not metadata["deletion_requests"]):
+                    raise HTTPException(status_code=409, detail="Account cleanup requires review.")
+                receipts = metadata["deletion_requests"]
+                if str(request_id) in receipts:
+                    raise HTTPException(status_code=409, detail="Account cleanup requires review.")
+                receipts[str(request_id)] = receipt
+                await conn.execute("UPDATE old_user SET metadata=$2::jsonb WHERE id=$1",
+                                   archive["id"], json.dumps(metadata))
+            else:
+                # Production need not have a unique email constraint. Insert the
+                # new request's complete receipt, never an empty legacy archive.
+                archive_id = await conn.fetchval("""
+                    INSERT INTO old_user(user_id,full_name,email,metadata)
+                    VALUES($1,$2,$3,$4::jsonb) RETURNING id
+                """, user.id, profile["full_name"], profile["email"],
+                    json.dumps({"deletion_requests": {str(request_id): receipt}}))
+                if archive_id is None:
+                    raise HTTPException(status_code=409, detail="Account cleanup requires review.")
             await conn.execute("""
                 DELETE FROM launch_offer_grants WHERE user_id=$1 AND status=ANY($2::text[])
             """, user.id, ["pending", "rejected"])

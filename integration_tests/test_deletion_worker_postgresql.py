@@ -480,14 +480,15 @@ async def test_preexisting_exhausted_row_transitions_without_provider(case,retry
     assert await counts(case) == {"auth":(0,0),"storage":(0,0)}
 
 
-async def test_endpoint_archive_conflict_rolls_back_local_delete_and_request(case):
+async def test_endpoint_unexpected_archive_constraint_rolls_back_without_suppression(case):
     owner, other = uuid4(),uuid4()
     await case.conn.execute("INSERT INTO profiles VALUES($1,'synthetic@example.invalid','Synthetic')",owner)
     await case.conn.execute("INSERT INTO old_user(user_id,email,metadata) VALUES($1,'synthetic@example.invalid','{}')",other)
     background = BackgroundTasks()
-    with pytest.raises(HTTPException) as error:
+    # This historical fixture has a unique email constraint. It is not an
+    # identity rule: unexpected database constraint failures must propagate.
+    with pytest.raises(asyncpg.UniqueViolationError):
         await account.delete_account(background,UserProfile(str(owner),"synthetic@example.invalid","free"))
-    assert error.value.status_code == 409
     assert await case.conn.fetchval("SELECT count(*) FROM profiles") == 1
     assert await case.conn.fetchval("SELECT count(*) FROM account_deletion_requests") == 0
     assert not background.tasks

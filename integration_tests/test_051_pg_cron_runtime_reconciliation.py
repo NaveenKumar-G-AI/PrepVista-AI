@@ -96,7 +96,7 @@ async def test_runner_production_shaped_drift_cutoff_and_complete_chain(real_cro
             assert await c.fetch(f'SELECT xmin::text AS row_version,* FROM public.{table} ORDER BY id')==rows
         assert await c.fetch("SELECT relid FROM pg_partition_tree('public.user_activity_events') ORDER BY relid")==partitions_before
         await assert_security()
-    assert await connection._run_migrations(c)==0
+    assert await connection._run_migrations(c,through='052_admin_grant_contract')==0
     assert await c.fetchval("SELECT to_regprocedure('public.fn_refresh_is_active()')") is None
     assert not await c.fetchval("SELECT EXISTS(SELECT FROM pg_trigger WHERE tgrelid='public.user_plan_entitlements'::regclass AND tgname='trg_upe_refresh_is_active')")
     if legacy_is_active:

@@ -79,7 +79,7 @@ def test_actual_filename_sorting_and_historical_checksums():
     stems=[f.stem for f in files]
     assert stems.index('048a_current_schema_reconciliation')==stems.index('048_account_deletion_claim_leases')+1
     assert stems.index('049_backend_schema_access_hardening')==stems.index('048a_current_schema_reconciliation')+1
-    assert stems[-1]=='052_admin_grant_contract'
+    assert stems[-1]=='053_old_user_metadata_receipt'
     assert len([s for s in stems if s.startswith('034')])==2
     ledger=release_ledger()
     assert ledger['012_admin_bonus']=='d5ad148a11952d96fad2268366ff4c65ec08bac7df04aebca52b0b423d626e10'
