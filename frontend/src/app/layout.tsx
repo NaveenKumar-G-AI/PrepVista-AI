@@ -86,8 +86,8 @@ export const metadata: Metadata = {
   },
 
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
+    icon: '/prepvista.png',
+    shortcut: '/prepvista.png',
   },
 
   category: 'Education Technology',
