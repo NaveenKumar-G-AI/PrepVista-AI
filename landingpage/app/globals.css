@@ -195,11 +195,12 @@ textarea:focus-visible {
 
 .brand-mark {
   display: inline-block;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  overflow: hidden;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
+  vertical-align: middle;
+  filter: drop-shadow(0 0 1px rgba(0,0,0,.15));
+  mix-blend-mode: screen;
 }
 
 .section-marker {
@@ -2954,7 +2955,7 @@ body::before { opacity: 0.012; }
   backdrop-filter: blur(12px) saturate(125%);
 }
 
-.brand-mark { width: 30px; height: 30px; border-radius: 9px; }
+
 .brand-word { font-size: 1.06rem; font-weight: 760; }
 .v4-nav nav { gap: 4px; }
 .v4-nav nav button { min-height: 42px; padding: 0 17px; color: #9aa6b8; font-size: 0.84rem; }
