@@ -3,16 +3,19 @@ import { BrandLogo } from '@/components/brand-logo';
 
 interface LegalDocumentPageProps {
   content: string;
+  /** Explicit page heading rendered as the semantic H1. When omitted the
+   *  component falls back to extracting a markdown `# Title` first-line. */
+  title?: string;
 }
 
-export function LegalDocumentPage({ content }: LegalDocumentPageProps) {
+export function LegalDocumentPage({ content, title }: LegalDocumentPageProps) {
   // Extract the first markdown heading (# Title) and render it as a
   // semantic <h1> so search engines (Bing, Google) can identify the page
   // heading. The remaining body stays inside the <pre> for layout parity.
   const lines = content.split('\n');
   const firstLine = lines[0] ?? '';
-  const hasMarkdownH1 = firstLine.startsWith('# ');
-  const h1Text = hasMarkdownH1 ? firstLine.slice(2).trim() : null;
+  const hasMarkdownH1 = !title && firstLine.startsWith('# ');
+  const h1Text = title ?? (hasMarkdownH1 ? firstLine.slice(2).trim() : null);
   const bodyContent = hasMarkdownH1 ? lines.slice(1).join('\n').replace(/^\n+/, '') : content;
 
   return (

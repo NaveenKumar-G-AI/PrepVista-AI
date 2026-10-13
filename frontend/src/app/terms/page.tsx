@@ -12,5 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
-  return <LegalDocumentPage content={TERMS_TEXT} />;
+  return <LegalDocumentPage title="Terms of Service" content={TERMS_TEXT} />;
 }
