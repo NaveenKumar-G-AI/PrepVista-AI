@@ -160,6 +160,8 @@ const structuredData = {
 
       jobTitle: 'Founder',
 
+      image: 'https://prepvistaai.com/naveen-kumar-g-founder-prepvista-ai.jpg',
+
       worksFor: {
         '@id': 'https://prepvistaai.com/#organization',
       },

@@ -33,21 +33,37 @@ export default function AboutPage() {
         learning and feedback.
       </p>
 
+      <section style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/naveen-kumar-g-founder-prepvista-ai.jpg"
+          alt="Naveen Kumar G, Founder of PrepVista AI"
+          width={80}
+          height={80}
+          style={{ borderRadius: '1rem', objectFit: 'cover', aspectRatio: '1 / 1' }}
+        />
+        <div>
+          <p style={{ fontWeight: 700, margin: 0 }}>Naveen Kumar G</p>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem' }}>Founder, PrepVista AI</p>
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem', lineHeight: 1.5 }}>
+            Naveen Kumar G founded PrepVista AI on March 3, 2026, with the goal
+            of building practical AI-powered tools for placement readiness,
+            interview preparation, coding, aptitude, communication, and career
+            development.
+          </p>
+          <a
+            href="https://www.linkedin.com/in/naveenkumar-ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: '0.8125rem', marginTop: '0.5rem', display: 'inline-block' }}
+          >
+            LinkedIn →
+          </a>
+        </div>
+      </section>
+
       <section>
         <dl>
-          <div>
-            <dt>Founder</dt>
-            <dd>
-              <a
-                href="https://www.linkedin.com/in/naveenkumar-ai/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Naveen Kumar G
-              </a>
-            </dd>
-          </div>
-
           <div>
             <dt>Founded</dt>
             <dd>March 3, 2026</dd>

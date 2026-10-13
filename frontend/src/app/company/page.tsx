@@ -228,7 +228,64 @@ export default function CompanyPage() {
           </div>
         </section>
 
-        {/* Section 2: Official Profiles */}
+        {/* Section 2: Founder */}
+        <section
+          aria-labelledby="founder-heading"
+          className="mb-12 rounded-2xl border border-[var(--border-color)] bg-[var(--card-bg)] p-6 shadow-sm sm:p-8"
+        >
+          <h2
+            id="founder-heading"
+            className="mb-6 text-xl font-bold tracking-tight text-[var(--text-primary)]"
+          >
+            FOUNDER
+          </h2>
+
+          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/naveen-kumar-g-founder-prepvista-ai.jpg"
+              alt="Naveen Kumar G, Founder of PrepVista AI"
+              width={160}
+              height={160}
+              className="rounded-2xl border border-[var(--border-color)] object-cover"
+              style={{ aspectRatio: '1 / 1' }}
+            />
+
+            <div className="text-center sm:text-left">
+              <h3 className="text-lg font-bold text-[var(--text-primary)]">
+                Naveen Kumar G
+              </h3>
+              <p className="mt-1 text-sm font-medium text-[var(--pv-blue)]">
+                Founder, PrepVista AI
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                Naveen Kumar G is the founder of PrepVista AI, an AI-powered
+                placement-readiness platform for college students, freshers, and
+                early-career candidates.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-3 sm:justify-start">
+                <a
+                  href="https://www.linkedin.com/in/naveenkumar-ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] px-3 py-1.5 text-xs font-medium text-[var(--pv-blue)] transition-colors hover:bg-[var(--neutral-bg)]"
+                >
+                  LinkedIn
+                </a>
+                <a
+                  href="https://github.com/Devil-nkp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] px-3 py-1.5 text-xs font-medium text-[var(--pv-blue)] transition-colors hover:bg-[var(--neutral-bg)]"
+                >
+                  GitHub
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 3: Official Profiles */}
         <section className="mb-12 rounded-2xl border border-[var(--border-color)] bg-[var(--card-bg)] p-6 shadow-sm sm:p-8">
           <h2 className="mb-6 text-xl font-bold tracking-tight text-[var(--text-primary)]">
             OFFICIAL PROFILES
