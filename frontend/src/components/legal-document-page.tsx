@@ -2,17 +2,21 @@ import Link from 'next/link';
 import { BrandLogo } from '@/components/brand-logo';
 
 interface LegalDocumentPageProps {
-  content: string;
+  content?: string;
   /** Explicit page heading rendered as the semantic H1. When omitted the
    *  component falls back to extracting a markdown `# Title` first-line. */
   title?: string;
+  /** When provided, rendered instead of the raw-text <pre>. Use this for
+   *  pages that need proper semantic HTML (links, lists, definition lists)
+   *  rather than preformatted Markdown text. */
+  children?: React.ReactNode;
 }
 
-export function LegalDocumentPage({ content, title }: LegalDocumentPageProps) {
+export function LegalDocumentPage({ content, title, children }: LegalDocumentPageProps) {
   // Extract the first markdown heading (# Title) and render it as a
   // semantic <h1> so search engines (Bing, Google) can identify the page
   // heading. The remaining body stays inside the <pre> for layout parity.
-  const lines = content.split('\n');
+  const lines = (content ?? '').split('\n');
   const firstLine = lines[0] ?? '';
   const hasMarkdownH1 = !title && firstLine.startsWith('# ');
   const h1Text = title ?? (hasMarkdownH1 ? firstLine.slice(2).trim() : null);
@@ -40,7 +44,11 @@ export function LegalDocumentPage({ content, title }: LegalDocumentPageProps) {
         <article className="mx-auto max-w-5xl px-6 py-12">
           <div className="card p-0 overflow-hidden">
             {h1Text && <h1 className="legal-pre" style={{ margin: 0 }}>{h1Text}</h1>}
-            <pre className="legal-pre" style={h1Text ? { paddingTop: 0 } : undefined}>{bodyContent}</pre>
+            {children ? (
+              <div className="legal-pre" style={h1Text ? { paddingTop: 0 } : undefined}>{children}</div>
+            ) : (
+              <pre className="legal-pre" style={h1Text ? { paddingTop: 0 } : undefined}>{bodyContent}</pre>
+            )}
           </div>
         </article>
       </div>
