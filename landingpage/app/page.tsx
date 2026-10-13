@@ -465,7 +465,8 @@ function resultClass(status: RoundResult["status"]) {
 function Logo({ inverse = false }: { inverse?: boolean }) {
   return (
     <span className={`brand ${inverse ? "brand-inverse" : ""}`}>
-      <span className="brand-mark" aria-hidden="true"><span /><span /><span /></span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/prepvista.png" alt="" aria-hidden="true" className="brand-mark" width={30} height={30} />
       <span className="brand-word">PrepVista</span>
     </span>
   )

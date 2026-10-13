@@ -6,8 +6,8 @@ export const metadata: Metadata = {
   description:
     "Choose a career direction, enter a role-specific placement route, perform live challenges and see PrepVista turn aptitude, technical, communication and interview evidence into one focused next move.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/prepvista.png",
+    shortcut: "/prepvista.png",
   },
   other: {
     "codex-preview": "development",
